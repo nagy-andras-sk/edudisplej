@@ -150,15 +150,18 @@ After=network-online.target systemd-user-sessions.service
 Wants=network-online.target
 
 [Service]
+Type=simple
 User=edudisplej
+Group=edudisplej
 Environment=HOME=/home/edudisplej
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 WorkingDirectory=/home/edudisplej
 StandardOutput=journal
 StandardError=journal
-# Switch to VT7 to satisfy console-user expectations (optional with Xwrapper=anybody)
-ExecStartPre=/usr/bin/chvt 7
-# Run xinit with our X client wrapper; pipe output to log
-ExecStart=/usr/bin/bash -lc 'echo "[INFO] xinit starting $(date)" | tee -a /var/log/kioskchrome.log; /usr/bin/xinit /home/edudisplej/init/xclient.sh -- :0 vt7 -nolisten tcp 2>&1 | tee -a /var/log/kioskchrome.log'
+PAMName=login
+TTYPath=/dev/tty7
+# Run xinit with our X client wrapper
+ExecStart=/usr/bin/xinit /home/edudisplej/init/xclient.sh -- :0 vt7 -nolisten tcp
 Restart=no
 
 [Install]
