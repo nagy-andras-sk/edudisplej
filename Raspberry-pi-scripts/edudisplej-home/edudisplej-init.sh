@@ -126,9 +126,10 @@ if grep -q "EDUDISPLEJ_SERVER" "$MODEFILE" 2>/dev/null; then
         sudo rm -f /tmp/.X0-lock /tmp/.X11-unix/X0
         rm -f /home/edudisplej/.Xauthority
 
-        echo "[INFO] switching to tty1 and starting X on vt1..." | tee -a "$LOGFILE"
-        /usr/bin/chvt 1
-        sudo -u edudisplej /usr/bin/xinit /home/edudisplej/init/xclient.sh -- /usr/lib/xorg/Xorg :0 -keeptty vt1 -nolisten tcp
+        echo "[INFO] starting X server..." | tee -a "$LOGFILE"
+        # Start X without chvt and using proper xinit without keeptty flag
+        # This allows X to allocate VT automatically and systemd-logind to track the session properly
+        sudo -u edudisplej /usr/bin/xinit /home/edudisplej/init/xclient.sh -- :0 vt7 -nolisten tcp &
 
         exit 0
 
