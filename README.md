@@ -179,6 +179,33 @@ Common causes:
 2. **Windows line endings (CRLF)** - Convert to Unix line endings (LF) using `dos2unix`
 3. **Missing init modules** - Ensure all files in `/home/edudisplej/init/` are present
 
+### $'\r': command not found errors
+
+If you see errors like `$'\r': command not found` or `syntax error near unexpected token '$'r''`, the script files have Windows-style line endings (CRLF) instead of Unix line endings (LF).
+
+**Symptoms:**
+- Multiple `$'\r': command not found` errors
+- Syntax errors on function definitions
+- Script fails to start properly
+
+**Solution:**
+```bash
+# Install dos2unix if not present
+sudo apt install dos2unix
+
+# Convert all shell scripts to Unix line endings
+dos2unix /home/edudisplej/edudisplej-init.sh
+dos2unix /home/edudisplej/init/*.sh
+
+# Verify the fix
+file /home/edudisplej/edudisplej-init.sh
+# Should show: Bourne-Again shell script, ASCII text executable
+# (NOT: ASCII text executable, with CRLF line terminators)
+```
+
+**Prevention:**
+The repository includes a `.gitattributes` file that ensures all shell scripts use Unix line endings (LF) when checked out from Git.
+
 ### Check service status
 
 ```bash
