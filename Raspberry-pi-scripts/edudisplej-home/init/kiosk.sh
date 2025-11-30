@@ -9,8 +9,17 @@ configure_xwrapper() {
 
     # Set allowed_users=anybody explicitly (no interactive dpkg)
     echo "allowed_users=anybody" | sudo tee /etc/Xwrapper.config >/dev/null
+    echo "needs_root_rights=yes" | sudo tee -a /etc/Xwrapper.config >/dev/null
     # Ellenorzes
     sudo chmod 644 /etc/Xwrapper.config
+}
+
+# Ensure edudisplej user has proper group memberships
+ensure_user_groups() {
+    # Add edudisplej user to necessary groups for X and device access
+    sudo usermod -a -G video,input,tty edudisplej 2>/dev/null || true
+    # On newer systems, also add to render group if it exists
+    getent group render >/dev/null && sudo usermod -a -G render edudisplej 2>/dev/null || true
 }
 
 # Install deps only if not already installed or if PACKAGES_INSTALLED != 1
@@ -24,14 +33,16 @@ ensure_kiosk_deps() {
     if [ $installed_flag -eq 1 ] && command -v chromium >/dev/null 2>&1 && \
        command -v openbox >/dev/null 2>&1 && command -v xinit >/dev/null 2>&1 && \
        command -v unclutter >/dev/null 2>&1 && command -v xmessage >/dev/null 2>&1; then
-        # still ensure xwrapper is configured
+        # still ensure xwrapper is configured and user groups are set
         configure_xwrapper
+        ensure_user_groups
         return 0
     fi
 
     sudo apt update
     sudo apt install -y xserver-xorg x11-xserver-utils x11-utils xinit openbox unclutter chromium
     configure_xwrapper
+    ensure_user_groups
 
     # persist PACKAGES_INSTALLED=1
     if grep -q '^PACKAGES_INSTALLED=' "$CONFIG" 2>/dev/null; then
@@ -139,15 +150,18 @@ After=network-online.target systemd-user-sessions.service
 Wants=network-online.target
 
 [Service]
+Type=simple
 User=edudisplej
+Group=edudisplej
 Environment=HOME=/home/edudisplej
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 WorkingDirectory=/home/edudisplej
 StandardOutput=journal
 StandardError=journal
-# Switch to VT7 to satisfy console-user expectations (optional with Xwrapper=anybody)
-ExecStartPre=/usr/bin/chvt 7
-# Run xinit with our X client wrapper; pipe output to log
-ExecStart=/usr/bin/bash -lc 'echo "[INFO] xinit starting $(date)" | tee -a /var/log/kioskchrome.log; /usr/bin/xinit /home/edudisplej/init/xclient.sh -- :0 vt7 -nolisten tcp 2>&1 | tee -a /var/log/kioskchrome.log'
+PAMName=login
+TTYPath=/dev/tty7
+# Run xinit with our X client wrapper
+ExecStart=/usr/bin/xinit /home/edudisplej/init/xclient.sh -- :0 vt7 -nolisten tcp
 Restart=no
 
 [Install]
