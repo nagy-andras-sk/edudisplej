@@ -1,4 +1,3 @@
-
 #!/bin/bash
 # EduDisplej main init (modular, ASCII, inactivity timeout, kioskchrome.service) 
 #Elore beallitott script, amely raspberry inditasakor indul
