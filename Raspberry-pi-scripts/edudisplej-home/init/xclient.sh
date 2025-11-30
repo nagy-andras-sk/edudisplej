@@ -123,9 +123,9 @@ start_chromium() {
             # Wait for Chromium to exit
             wait $CHROMIUM_PID
             
-            # If Chromium exits, restart it
+            # Chromium exited - reset attempt counter for restarts (not a startup failure)
             echo "[xclient] Chromium exited, restarting..."
-            ((attempt++))
+            attempt=1
         else
             echo "[xclient] Chromium failed to start, retrying..."
             ((attempt++))

@@ -182,6 +182,13 @@ print_info "$(t boot_f12_prompt)"
 # Flag for menu entry
 ENTER_MENU=false
 
+# Function to restore terminal settings
+restore_terminal() {
+    if [[ -n "${OLD_STTY:-}" ]]; then
+        stty "$OLD_STTY" 2>/dev/null
+    fi
+}
+
 # Check if mode file exists
 if [[ ! -f "$MODE_FILE" ]]; then
     # No mode file - automatically enter menu
@@ -195,10 +202,15 @@ else
     # Set terminal to raw mode to capture key presses
     if [[ -t 0 ]]; then
         # Save terminal settings
-        OLD_STTY=$(stty -g 2>/dev/null)
+        OLD_STTY=$(stty -g 2>/dev/null) || OLD_STTY=""
+        
+        # Set trap to restore terminal on exit
+        trap restore_terminal EXIT
         
         # Set raw mode
-        stty raw -echo 2>/dev/null
+        if [[ -n "$OLD_STTY" ]]; then
+            stty raw -echo 2>/dev/null
+        fi
         
         # Read with timeout
         for i in {5..1}; do
@@ -214,7 +226,8 @@ else
         done
         
         # Restore terminal settings
-        stty "$OLD_STTY" 2>/dev/null
+        restore_terminal
+        trap - EXIT
         echo ""
     else
         # Not a TTY - just wait 5 seconds

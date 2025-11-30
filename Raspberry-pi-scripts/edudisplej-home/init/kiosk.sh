@@ -36,12 +36,8 @@ start_x_server() {
     
     export DISPLAY=:0
     
-    # Start X server using systemd-run for proper session tracking
-    if command -v systemd-run &> /dev/null; then
-        systemd-run --user --scope xinit "${INIT_DIR}/xclient.sh" -- :0 vt1 -nolisten tcp &
-    else
-        xinit "${INIT_DIR}/xclient.sh" -- :0 vt1 -nolisten tcp &
-    fi
+    # Start X server - direct xinit for reliable operation during system boot
+    xinit "${INIT_DIR}/xclient.sh" -- :0 vt1 -nolisten tcp &
     
     # Wait for X to start
     local attempts=0

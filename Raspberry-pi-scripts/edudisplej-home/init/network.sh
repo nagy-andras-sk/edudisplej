@@ -16,7 +16,7 @@ fi
 get_current_ip() {
     local iface="${1:-}"
     if [[ -n "$iface" ]]; then
-        ip -4 addr show "$iface" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
+        ip -4 addr show "$iface" 2>/dev/null | awk '/inet / {print $2}' | cut -d'/' -f1
     else
         hostname -I 2>/dev/null | awk '{print $1}'
     fi
@@ -81,14 +81,24 @@ connect_wifi_wpa() {
     
     print_info "$(t network_connecting)"
     
-    # Create wpa_supplicant configuration
-    sudo bash -c "cat >> $wpa_conf << EOF
-
-network={
-    ssid=\"${ssid}\"
-    psk=\"${password}\"
-}
-EOF"
+    # Sanitize SSID and password to prevent configuration corruption
+    # Remove potentially dangerous characters
+    local safe_ssid="${ssid//[\"\\]/}"
+    local safe_password="${password//[\"\\]/}"
+    
+    # Validate inputs
+    if [[ -z "$safe_ssid" ]]; then
+        print_error "Invalid SSID"
+        return 1
+    fi
+    
+    # Use wpa_passphrase for secure password hashing if available
+    if command -v wpa_passphrase &> /dev/null; then
+        wpa_passphrase "$safe_ssid" "$safe_password" 2>/dev/null | sudo tee -a "$wpa_conf" > /dev/null
+    else
+        # Fallback to plain text (less secure)
+        printf '\nnetwork={\n    ssid="%s"\n    psk="%s"\n}\n' "$safe_ssid" "$safe_password" | sudo tee -a "$wpa_conf" > /dev/null
+    fi
     
     # Restart wpa_supplicant
     sudo systemctl restart wpa_supplicant 2>/dev/null
