@@ -11,3 +11,4 @@ set_resolution() {
     [ -n "$NEWRES" ] && sudo fbset -g $(echo "$NEWRES" | sed 's/x/ /') 32
     whiptail --infobox "$(T res_set_to) $NEWRES" 8 60
     sleep 2
+}
