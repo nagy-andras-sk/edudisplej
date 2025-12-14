@@ -299,7 +299,7 @@ get_mac_suffix() {
     local mac
     mac=$(ip link show | grep -A1 "eth0\|wlan0" | grep ether | head -1 | awk '{print $2}')
     if [[ -n "$mac" ]]; then
-        echo "${mac: -8}" | tr -d ':'
+        echo "${mac:(-8)}" | tr -d ':'
     else
         echo "unknown"
     fi
