@@ -121,6 +121,8 @@ echo ""
 # 3. Fájl letöltés / Download file
 print_header "Fájlok letöltése / Downloading files"
 
+# Note: HTTP is used as specified in requirements. For production,
+# consider using HTTPS to ensure secure downloads.
 DOWNLOAD_URL="http://edudisplej.sk/install/install.zip"
 TEMP_DIR=$(mktemp -d)
 DOWNLOAD_FILE="${TEMP_DIR}/install.zip"
