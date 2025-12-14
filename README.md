@@ -2,6 +2,31 @@
 
 EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk mode using Chromium browser.
 
+## Quick Installation
+
+Install EduDisplej on your Raspberry Pi with a single command:
+
+```bash
+# Quick installation (recommended)
+curl -fsSL http://edudisplej.sk/install/install.sh | sudo bash
+```
+
+Or download and run manually:
+
+```bash
+# Manual installation
+wget http://edudisplej.sk/install/install.sh
+chmod +x install.sh
+sudo ./install.sh
+```
+
+The installer will:
+- Check and install required packages (zip, unzip, curl, wget)
+- Download the latest EduDisplej files
+- Install to `/opt/edudisplej/`
+- Set proper permissions
+- Provide clear feedback in both Hungarian and English
+
 ## Boot Process Diagram
 
 ```
@@ -30,7 +55,7 @@ EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk m
                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        edudisplej-init.service                               │
-│                 ExecStart=/bin/bash /home/edudisplej/edudisplej-init.sh      │
+│                 ExecStart=/bin/bash /opt/edudisplej/edudisplej-init.sh       │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -133,7 +158,7 @@ EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk m
 ## File Structure
 
 ```
-/home/edudisplej/
+/opt/edudisplej/
 ├── edudisplej-init.sh          # Main init script (started by systemd)
 ├── edudisplej.conf             # Configuration file
 ├── .mode                       # Current mode (EDUDISPLEJ_SERVER, STANDALONE, etc.)
@@ -146,6 +171,8 @@ EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk m
     └── xclient.sh              # X client wrapper for Openbox + Chromium
 ```
 
+**Note**: Previous versions used `/home/edudisplej/` as the installation directory. The new recommended location is `/opt/edudisplej/`.
+
 ## Systemd Services
 
 | Service | Description |
@@ -156,7 +183,7 @@ EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk m
 
 ## Configuration
 
-The configuration is stored in `/home/edudisplej/edudisplej.conf`:
+The configuration is stored in `/opt/edudisplej/edudisplej.conf`:
 
 ```bash
 MODE=EDSERVER           # Operating mode
@@ -177,7 +204,7 @@ edudisplej-init.service: Main process exited, code=exited, status=2/INVALIDARGUM
 Common causes:
 1. **Empty first line in script** - The shebang (`#!/bin/bash`) must be on the first line
 2. **Windows line endings (CRLF)** - Convert to Unix line endings (LF) using `dos2unix`
-3. **Missing init modules** - Ensure all files in `/home/edudisplej/init/` are present
+3. **Missing init modules** - Ensure all files in `/opt/edudisplej/init/` are present
 
 ### Check service status
 
