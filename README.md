@@ -2,6 +2,44 @@
 
 EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk mode using Chromium browser.
 
+## Components
+
+This repository contains two main components:
+
+1. **Raspberry Pi Client** - Digital signage kiosk for Raspberry Pi
+2. **TR2 File Server API** - Web server component for managing file servers with Docker support
+
+## TR2 File Server API
+
+### Fixed Issue: Function Redeclaration Error
+
+The API has been structured to fix the PHP fatal error:
+```
+Fatal error: Cannot redeclare loadEnv() (previously declared in /var/www/api/heartbeat.php:12) 
+in /var/www/api/qbit-password-manager.php on line 10
+```
+
+The `loadEnv()` function is now defined only once in `config.php` and included by all other PHP files, preventing redeclaration errors.
+
+### Docker Deployment
+
+Deploy the TR2 File Server with Docker:
+
+```bash
+# Configure environment
+cp api/.env.example .env
+# Edit .env and set your configuration (especially TR2_PAIRING_ID and TR2_UPNP_ENABLED=false)
+
+# Build and start services
+docker compose up -d
+
+# Check logs
+docker compose logs -f tr2-server
+```
+
+For detailed API documentation, see [api/README.md](api/README.md).  
+For deployment guide, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Quick Installation
 
 Install EduDisplej on your Raspberry Pi with a single command:
