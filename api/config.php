@@ -58,7 +58,7 @@ $config = [
     'log_file' => '/var/log/tr2-server.log',
     'main_server' => getenv('TR2_MAIN_SERVER') ?: 'https://tr.nagyandras.sk',
     'pairing_id' => getenv('TR2_PAIRING_ID') ?: '',
-    'upnp_enabled' => getenv('TR2_UPNP_ENABLED') !== 'false',
+    'upnp_enabled' => filter_var(getenv('TR2_UPNP_ENABLED') ?: 'false', FILTER_VALIDATE_BOOLEAN),
     'heartbeat_interval' => (int)(getenv('TR2_HEARTBEAT_INTERVAL') ?: 30),
 ];
 

@@ -20,8 +20,11 @@ fi
 if [ "$UPNP_ENABLED" = "false" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [UPnP] UPnP is disabled (TR2_UPNP_ENABLED=false)"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [UPnP] Using API Poll mode - no UPnP configuration needed"
-    # Exit gracefully when UPnP is disabled
-    sleep infinity
+    # Keep running but with signal handling for graceful shutdown
+    trap 'echo "[$(date '+%Y-%m-%d %H:%M:%S')] [UPnP] Shutting down..."; exit 0' SIGTERM SIGINT
+    while true; do
+        sleep 60
+    done
     exit 0
 fi
 
@@ -51,5 +54,8 @@ fi
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] [UPnP] Attempting to configure port forwarding..."
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] [UPnP] Note: UPnP tools not installed - this is expected in Docker"
 
-# Keep running
-sleep infinity
+# Keep running with signal handling for graceful shutdown
+trap 'echo "[$(date '+%Y-%m-%d %H:%M:%S')] [UPnP] Shutting down..."; exit 0' SIGTERM SIGINT
+while true; do
+    sleep 60
+done

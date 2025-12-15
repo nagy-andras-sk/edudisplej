@@ -201,7 +201,7 @@ if (basename(__FILE__) == basename($_SERVER['SCRIPT_FILENAME'])) {
     // Log diagnostic summary
     logMessage(
         "Diagnostics completed: Health = {$results['health']}, " .
-        "⚠️ Found {$results['summary']['total_issues']} issue(s) " .
+        "Found {$results['summary']['total_issues']} issue(s) " .
         "({$results['summary']['critical']} critical)",
         $results['health'] === 'ok' ? 'INFO' : 'WARNING'
     );
