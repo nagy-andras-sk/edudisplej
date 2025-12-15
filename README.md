@@ -37,7 +37,8 @@ docker compose up -d
 docker compose logs -f tr2-server
 ```
 
-For detailed API documentation, see [api/README.md](api/README.md).
+For detailed API documentation, see [api/README.md](api/README.md).  
+For deployment guide, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Quick Installation
 
