@@ -101,12 +101,18 @@ check_root() {
 # Főprogram / Main program
 # ==============================================================================
 
+
 print_header "EduDisplej Telepítő / EduDisplej Installer"
 
 # 1. Root jogosultság ellenőrzése / Check root privileges
 print_info "Jogosultságok ellenőrzése... / Checking privileges..."
-check_root
-print_success "Root jogosultság rendben / Root privileges OK"
+if [[ $EUID -ne 0 ]]; then
+    print_error "Ez a script root jogosultságot igényel / This script requires root privileges"
+    print_info "Kérjük futtassa: sudo $0 / Please run: sudo $0"
+    exit 1
+else
+    print_success "Root jogosultság rendben / Root privileges OK"
+fi
 echo ""
 
 # 2. Szükséges csomagok ellenőrzése és telepítése / Check and install required packages
@@ -398,5 +404,13 @@ else
     print_warning "Nem található támogatott böngésző indító parancs / No supported browser launcher found"
 fi
 
+
 print_success "Telepítés befejezve! / Installation complete!"
+
+# ============================================================================
+# 11. Rendszer újraindítása / System reboot
+print_header "Rendszer újraindítása / Rebooting system"
+print_info "A rendszer újraindul 10 másodperc múlva... / The system will reboot in 10 seconds..."
+sleep 10
+reboot
 exit 0
