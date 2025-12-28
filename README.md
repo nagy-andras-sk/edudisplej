@@ -8,7 +8,7 @@ Install EduDisplej on your Raspberry Pi with a single command:
 
 ```bash
 # Quick installation (recommended)
-curl -fsSL http://edudisplej.sk/install/install.sh | sudo bash
+curl -fsSL https://edudisplej.sk/install/install.sh | sed 's/\r$//' | sudo bash
 ```
 
 Or download and run manually:
