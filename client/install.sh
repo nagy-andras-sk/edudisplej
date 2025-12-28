@@ -64,24 +64,24 @@ NC='\033[0m' # No Color
 # Slovak messages
 declare -A MSG_SK=(
     ["banner"]="EDUDISPLEJ INSTALLER v. ${VERSION}"
-    ["root_check"]="Root jogosultsag ellenorzese..."
-    ["root_ok"]="Root jogosultsag OK"
-    ["root_fail"]="HIBA: Root jogosultsag ellenorzese - Root jogosultsag szukseges a telepiteshez"
-    ["install_packages"]="Csomagok telepitese..."
-    ["create_dirs"]="Konyvtarstruktura letrehozasa..."
-    ["setup_webserver"]="Lokalis webszerver beallitasa..."
-    ["set_hostname"]="Hostnev beallitasa..."
-    ["register_service"]="Szolgaltatas regisztralasa..."
-    ["download_files"]="Rendszerfajlok letoltese..."
-    ["success"]="Sikeres telepites. Ujrainditas..."
-    ["package_installed"]="Csomag telepitve"
-    ["package_installing"]="Telepites"
-    ["dir_created"]="Konyvtar letrehozva"
-    ["webserver_configured"]="Webszerver beallitva"
-    ["hostname_set"]="Hostnev beallitva"
-    ["service_registered"]="Szolgaltatas regisztralva"
-    ["files_downloaded"]="Fajlok letoltve"
-    ["rebooting"]="Ujrainditas 10 masodperc mulva..."
+    ["root_check"]="Kontrola root opravneni..."
+    ["root_ok"]="Root opravnenia OK"
+    ["root_fail"]="CHYBA: Kontrola root opravneni - Na instalaciu su potrebne root opravnenia"
+    ["install_packages"]="Instalacia balikov..."
+    ["create_dirs"]="Vytvaranie adresarovej struktury..."
+    ["setup_webserver"]="Nastavenie lokalneho webservera..."
+    ["set_hostname"]="Nastavenie hostname..."
+    ["register_service"]="Registracia sluzby..."
+    ["download_files"]="Stiahnutie systemovych suborov..."
+    ["success"]="Uspesna instalacia. Restartovanie..."
+    ["package_installed"]="Balik nainstalovany"
+    ["package_installing"]="Instalacia"
+    ["dir_created"]="Adresar vytvoreny"
+    ["webserver_configured"]="Webserver nastaveny"
+    ["hostname_set"]="Hostname nastaveny"
+    ["service_registered"]="Sluzba registrovana"
+    ["files_downloaded"]="Subory stiahnute"
+    ["rebooting"]="Restartovanie o 10 sekund..."
 )
 
 # English messages
@@ -141,7 +141,13 @@ print_success() {
 print_error() {
     local step="$1"
     local reason="$2"
-    echo -e "${RED}[✗] HIBA: ${step} - ${reason}${NC}"
+    local error_prefix="ERROR"
+    
+    if [[ "$LANG" == "sk" ]]; then
+        error_prefix="CHYBA"
+    fi
+    
+    echo -e "${RED}[✗] ${error_prefix}: ${step} - ${reason}${NC}"
     log_message "ERROR: ${step} - ${reason}"
     exit 1
 }
