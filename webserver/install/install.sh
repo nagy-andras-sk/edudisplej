@@ -1,3 +1,18 @@
+#!/bin/bash
+# ==============================================================================
+# DEPRECATED: This is the legacy installer
+# ==============================================================================
+# This installer is kept for backward compatibility only.
+# Please use the new installer instead:
+#   curl -fsSL https://edudisplej.sk/client/install.sh | sudo bash
+#
+# The new installer offers:
+# - Better error handling
+# - Idempotent installation
+# - Comprehensive logging
+# - Bilingual support (Slovak/English)
+# ==============================================================================
+
 # ============================================================================
 # 9. Apache2 telepítése és beállítása / Install and configure Apache2
 print_header "Apache2 telepítése és beállítása / Installing and configuring Apache2"

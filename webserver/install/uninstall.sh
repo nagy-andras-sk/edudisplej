@@ -1,10 +1,13 @@
 #!/bin/bash
-# ============================================================================
-# EduDisplej Uninstall Script
-# ============================================================================
-# Ez a script eltávolítja az EduDisplej rendszert, törli a service-t és minden fájlt
+# ==============================================================================
+# DEPRECATED: Legacy Uninstaller
+# ==============================================================================
+# This is the old uninstaller, kept for backward compatibility.
+# For new installations, use: https://edudisplej.sk/client/uninstall.sh
+# ==============================================================================
+# Ez a script eltavolitja az EduDisplej rendszert, torli a service-t es minden fajlt
 # This script removes the EduDisplej system, deletes the service and all files
-# ============================================================================
+# ==============================================================================
 
 set -e
 
