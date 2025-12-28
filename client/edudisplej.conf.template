@@ -1,0 +1,30 @@
+# EduDisplej Configuration File
+# This file is created during installation and stores system configuration
+
+# Installation paths
+EDUDISPLEJ_HOME=/opt/edudisplej
+EDUDISPLEJ_SYSTEM=/opt/edudisplej/system
+EDUDISPLEJ_WEBSERVER=/opt/edudisplej/wserver
+
+# Webserver settings
+# Port for local Apache webserver (default: 8080)
+EDUDISPLEJ_HTTP_PORT=8080
+
+# Source URL for downloading system files
+# This URL should point to the webserver hosting EduDisplej files
+EDUDISPLEJ_SOURCE_URL=http://edudisplej.sk/install
+
+# Language setting (sk = Slovak, en = English)
+EDUDISPLEJ_LANG=sk
+
+# Operating mode (set by init script)
+# Possible values: EDSERVER, STANDALONE
+MODE=EDSERVER
+
+# Kiosk URL (default URL to display)
+KIOSK_URL=https://www.edudisplej.sk/edserver/demo/client
+
+# Installation metadata (auto-generated)
+INSTALL_DATE=
+INSTALL_VERSION=
+PACKAGES_INSTALLED=0

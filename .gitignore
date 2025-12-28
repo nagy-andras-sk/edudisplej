@@ -1,0 +1,28 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+/tmp/
+*.tmp
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Backup files
+*.backup
+*.bak
+
+# Installation artifacts (if testing locally)
+/test-install/
+
+# Node modules (if any JS tooling is added)
+node_modules/
