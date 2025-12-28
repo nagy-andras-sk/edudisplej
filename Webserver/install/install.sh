@@ -277,49 +277,5 @@ echo "  2. Állítsd be a systemd service-t / Set up the systemd service:"
 echo "     (Lásd a dokumentációt / See documentation)"
 echo ""
 
-
-# ============================================================================
-# 8. Systemd service létrehozása / Create systemd service
-print_header "Systemd service létrehozása / Creating systemd service"
-
-SERVICE_FILE="/etc/systemd/system/edudisplej.service"
-SYNC_SCRIPT="${TARGET_DIR}/edudisplej-sync.sh"
-
-print_info "Service fájl: $SERVICE_FILE"
-
-cat > "$SERVICE_FILE" << EOF
-
-cat > "$SERVICE_FILE" << EOF
-[Unit]
-Description=EduDisplej Service (syncs and runs)
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=$SYNC_SCRIPT
-Restart=always
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-print_success "Service fájl létrehozva / Service file created"
-
-# Engedélyezés és indítás / Enable and start service
-print_info "Service engedélyezése és indítása / Enabling and starting service..."
-systemctl daemon-reload
-systemctl enable edudisplej.service
-systemctl restart edudisplej.service
-print_success "Service engedélyezve és elindítva / Service enabled and started"
-echo ""
-
-# ============================================================================
-# 9. Újraindítás / Reboot
-print_header "Újraindítás / Reboot"
-print_info "A rendszer újraindul / The system will reboot now..."
-sleep 3
-reboot
-
 print_success "Telepítés befejezve! / Installation complete!"
 exit 0
