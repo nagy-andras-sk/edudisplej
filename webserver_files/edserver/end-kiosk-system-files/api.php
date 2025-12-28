@@ -1,13 +1,12 @@
 <?php
 // ============================================================================
-// EduDisplej System Files Index
+// EduDisplej System Files API
 // ============================================================================
-// Ez az endpoint zip fájlban kiszolgálja az aktuális rendszerfájlokat
-// This endpoint serves the current system files as a zip
+// Ez az endpoint zip fájlban rekurzívan kiszolgálja az aktuális rendszerfájlokat
+// This endpoint serves all system files recursively as a zip
 // ============================================================================
 
 $baseDir = __DIR__;
-$filesDir = $baseDir;
 $zipName = 'system-files.zip';
 $tmpZip = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('edudisplej_', true) . '.zip';
 
@@ -18,17 +17,19 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-// Fájlok listája (init és társai)
-$includeFiles = [
-    'common.sh',
-    'display.sh',
-    'kiosk.sh',
-    'language.sh',
-    'network.sh',
-    'xclient.sh',
-];
-
-$initDir = $filesDir . '/init';
+function addDirToZip($dir, $zip, $basePathLen) {
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+    foreach ($files as $file) {
+        $filePath = $file->getPathname();
+        $localPath = substr($filePath, $basePathLen + 1); // relatív útvonal
+        if ($file->isFile()) {
+            $zip->addFile($filePath, $localPath);
+        }
+    }
+}
 
 $zip = new ZipArchive();
 if ($zip->open($tmpZip, ZipArchive::CREATE) !== TRUE) {
@@ -37,19 +38,12 @@ if ($zip->open($tmpZip, ZipArchive::CREATE) !== TRUE) {
     exit;
 }
 
-foreach ($includeFiles as $file) {
-    $filePath = $initDir . '/' . $file;
-    if (file_exists($filePath)) {
-        $zip->addFile($filePath, $file);
-    }
-}
+addDirToZip($baseDir, $zip, strlen($baseDir));
 $zip->close();
 
 header('Content-Type: application/zip');
 header('Content-Disposition: attachment; filename=' . $zipName);
 header('Content-Length: ' . filesize($tmpZip));
 readfile($tmpZip);
-
-// Törlés a kiszolgálás után
 unlink($tmpZip);
 exit;

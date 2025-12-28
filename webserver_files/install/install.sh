@@ -1,3 +1,36 @@
+# ============================================================================
+# 9. Apache2 telepítése és beállítása / Install and configure Apache2
+print_header "Apache2 telepítése és beállítása / Installing and configuring Apache2"
+
+if ! command_exists apache2; then
+    print_info "Apache2 telepítése... / Installing Apache2..."
+    apt-get install -y apache2 || {
+        print_error "Apache2 telepítése sikertelen / Failed to install Apache2"
+        exit 1
+    }
+    print_success "Apache2 telepítve / Apache2 installed"
+else
+    print_success "Apache2 már telepítve / Apache2 already installed"
+fi
+
+# Webroot beállítása / Set webroot
+APACHE_WWW="/var/www/html"
+EDUDISPLEJ_LOCAL="/opt/edudisplej/local"
+mkdir -p "$EDUDISPLEJ_LOCAL"
+
+# index.html szimbolikus link létrehozása, ha nem létezik
+if [ ! -L "$APACHE_WWW/index.html" ]; then
+    rm -f "$APACHE_WWW/index.html"
+    ln -s "$EDUDISPLEJ_LOCAL/index.html" "$APACHE_WWW/index.html"
+    print_success "index.html szimbolikus link létrehozva: $APACHE_WWW/index.html -> $EDUDISPLEJ_LOCAL/index.html"
+else
+    print_info "index.html szimbolikus link már létezik"
+fi
+
+# Apache újraindítása
+systemctl restart apache2
+print_success "Apache2 újraindítva / Apache2 restarted"
+echo ""
 #!/bin/bash
 # ==============================================================================
 # EduDisplej Telepítő Script / EduDisplej Installation Script
@@ -244,9 +277,21 @@ find "$TARGET_DIR" -type f -name "*.conf" -exec chmod 644 {} \; || {
 print_success "Config fájlok (.conf): 644"
 echo ""
 
-# 6. Takarítás / Cleanup
-print_header "Takarítás / Cleanup"
 
+# 6. Szinkronizáló script telepítése / Install sync script
+print_header "Szinkronizáló script telepítése / Installing sync script"
+SYNC_SCRIPT_SRC="$(dirname "$0")/edudisplej-sync.sh"
+SYNC_SCRIPT_DST="$TARGET_DIR/edudisplej-sync.sh"
+if [ -f "$SYNC_SCRIPT_SRC" ]; then
+    cp "$SYNC_SCRIPT_SRC" "$SYNC_SCRIPT_DST"
+    chmod 755 "$SYNC_SCRIPT_DST"
+    print_success "Szinkronizáló script bemásolva: $SYNC_SCRIPT_DST"
+else
+    print_warning "Szinkronizáló script nem található: $SYNC_SCRIPT_SRC"
+fi
+
+# 7. Takarítás / Cleanup
+print_header "Takarítás / Cleanup"
 print_info "Ideiglenes fájlok törlése... / Removing temporary files..."
 rm -rf "$TEMP_DIR" || {
     print_warning "Ideiglenes fájlok törlése sikertelen / Failed to remove temporary files"
@@ -278,48 +323,80 @@ echo "     (Lásd a dokumentációt / See documentation)"
 echo ""
 
 
-# ============================================================================
-# 8. Systemd service létrehozása / Create systemd service
-print_header "Systemd service létrehozása / Creating systemd service"
 
-SERVICE_FILE="/etc/systemd/system/edudisplej.service"
+# ============================================================================
+# 8. Systemd service és timer létrehozása / Create systemd service and timer
+print_header "Systemd service és timer létrehozása / Creating systemd service and timer"
+
+SERVICE_FILE="/etc/systemd/system/edudisplej-sync.service"
+TIMER_FILE="/etc/systemd/system/edudisplej-sync.timer"
 SYNC_SCRIPT="${TARGET_DIR}/edudisplej-sync.sh"
 
 print_info "Service fájl: $SERVICE_FILE"
-
-cat > "$SERVICE_FILE" << EOF
-
 cat > "$SERVICE_FILE" << EOF
 [Unit]
-Description=EduDisplej Service (syncs and runs)
+Description=EduDisplej Sync Service (24h file sync)
 After=network.target
 
 [Service]
-Type=simple
+Type=oneshot
 ExecStart=$SYNC_SCRIPT
-Restart=always
 User=root
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-print_success "Service fájl létrehozva / Service file created"
+print_info "Timer fájl: $TIMER_FILE"
+cat > "$TIMER_FILE" << EOF
+[Unit]
+Description=Futtatja a szinkronizálást 24 óránként / Runs edudisplej-sync every 24h
 
-# Engedélyezés és indítás / Enable and start service
-print_info "Service engedélyezése és indítása / Enabling and starting service..."
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=24h
+Unit=edudisplej-sync.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+print_success "Service és timer fájlok létrehozva / Service and timer files created"
+
+# Engedélyezés és indítás / Enable and start service and timer
+print_info "Service és timer engedélyezése és indítása / Enabling and starting service and timer..."
 systemctl daemon-reload
-systemctl enable edudisplej.service
-systemctl restart edudisplej.service
-print_success "Service engedélyezve és elindítva / Service enabled and started"
+systemctl enable --now edudisplej-sync.service
+systemctl enable --now edudisplej-sync.timer
+print_success "Service és timer engedélyezve és elindítva / Service and timer enabled and started"
 echo ""
 
+
 # ============================================================================
-# 9. Újraindítás / Reboot
-print_header "Újraindítás / Reboot"
-print_info "A rendszer újraindul / The system will reboot now..."
-sleep 3
-reboot
+# 10. Böngésző automatikus indítása / Auto-launch browser
+print_header "Böngésző indítása / Launching browser"
+
+LAUNCH_URL="http://localhost/index.html"
+BROWSER=""
+if command_exists xdg-open; then
+    BROWSER="xdg-open"
+elif command_exists sensible-browser; then
+    BROWSER="sensible-browser"
+elif command_exists firefox; then
+    BROWSER="firefox"
+elif command_exists chromium-browser; then
+    BROWSER="chromium-browser"
+elif command_exists google-chrome; then
+    BROWSER="google-chrome"
+fi
+
+if [ -n "$BROWSER" ]; then
+    print_info "Böngésző indítása: $BROWSER $LAUNCH_URL"
+    sudo -u $(logname) $BROWSER "$LAUNCH_URL" &
+    print_success "Böngésző elindítva / Browser launched"
+else
+    print_warning "Nem található támogatott böngésző indító parancs / No supported browser launcher found"
+fi
 
 print_success "Telepítés befejezve! / Installation complete!"
 exit 0
