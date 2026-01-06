@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Középre igazított óra – kisebb másodpercek, külön HM kettőspont</title>
+  <style>
+    /* Teljes fekete háttér, fehér szöveg, középre igazítás */
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .center {
+      height: 100%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    /* Nagy, reszponzív óra (HH:MM) */
+    .clock {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.25em;
+      font-weight: 800;
+      line-height: 1;
+      font-variant-numeric: tabular-nums lining-nums;
+      font-size: clamp(56px, 13vw, 180px); /* nagy betűk */
+      letter-spacing: 0.02em;
+    }
+
+    /* Óra:perc – fehér, statikus */
+    .hm {
+      color: #fff;
+      opacity: 0.98;
+      display: inline-flex;
+      gap: 0.15em;
+      align-items: baseline;
+    }
+
+    /* Külön stílus a HM kettőspontnak: kisebb és más szín */
+    .sepHM {
+      font-size: 0.6em;         /* kisebb, mint HH:MM */
+      color: #9aa0a6;           /* szürkés eltérés – állítható */
+      opacity: 0.9;
+      padding: 0 0.05em;
+      user-select: none;
+      transform: translateY(0.05em); /* finom optikai igazítás */
+    }
+
+    /* Másodpercek: kisebb és külön szín */
+    .sec {
+      color: #4aa3ff;                 /* módosítható szín */
+      text-shadow: 0 0 18px rgba(74,163,255,0.28);
+      display: inline-flex;
+      gap: 0.04em;
+      font-size: 0.58em;              /* kisebb a HH:MM-hez képest */
+      transform: translateY(0.08em);  /* optikai igazítás a baseline-hoz */
+      margin-left: 0.15em;            /* kis térköz MM és másodperc között */
+    }
+
+    /* Egy számjegy ablaka: fel/le csúszó váltás */
+    .digit-window {
+      position: relative;
+      width: 0.65em;  /* 1 számjegy szélessége */
+      height: 1em;    /* látható sor magassága */
+      overflow: hidden;
+    }
+    .column {
+      position: absolute;
+      left: 0; right: 0;
+      top: 0;
+      display: grid;
+      grid-template-rows: 1em 1em;  /* current + next */
+      transform: translateY(0);
+      transition: transform 260ms ease;
+      will-change: transform;
+    }
+    .row {
+      height: 1em;
+      display: grid;
+      place-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="center">
+    <div class="clock" aria-label="Középre igazított óra">
+      <!-- Óra + Perc (statikus) -->
+      <div class="hm">
+        <span id="hh">00</span>
+        <span class="sepHM">:</span>  <!-- csak HH és MM között -->
+        <span id="mm">00</span>
+      </div>
+
+      <!-- Másodpercek (animált, kisebb, más szín) — NINCS kettőspont -->
+      <div class="sec" aria-label="Másodpercek">
+        <!-- tizesek (S10) -->
+        <div class="digit-window">
+          <div class="column" id="s10-col">
+            <div class="row" id="s10-cur">0</div>
+            <div class="row" id="s10-next">1</div>
+          </div>
+        </div>
+        <!-- egyesek (S1) -->
+        <div class="digit-window">
+          <div class="column" id="s1-col">
+            <div class="row" id="s1-cur">0</div>
+            <div class="row" id="s1-next">1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* Kétjegyű formázás az HH:MM-hez */
+    const pad2 = n => String(n).padStart(2, '0');
+
+    /* Statikus elemek (HH:MM) */
+    const hhEl = document.getElementById('hh');
+    const mmEl = document.getElementById('mm');
+
+    /* Másodpercek számjegyeinek referenciái */
+    const s10 = {
+      col:  document.getElementById('s10-col'),
+      cur:  document.getElementById('s10-cur'),
+      next: document.getElementById('s10-next'),
+      prev: -1
+    };
+    const s1 = {
+      col:  document.getElementById('s1-col'),
+      cur:  document.getElementById('s1-cur'),
+      next: document.getElementById('s1-next'),
+      prev: -1
+    };
+
+    /* Egy számjegy váltása – csak az adott számjegy csúszik */
+    function slideDigit(digit, current, next) {
+      if (current === digit.prev) return;
+
+      digit.cur.textContent  = String(current);
+      digit.next.textContent = String(next);
+
+      digit.col.style.transition = 'none';
+      digit.col.style.transform  = 'translateY(0)';
+      void digit.col.offsetWidth; // reflow
+
+      digit.col.style.transition = 'transform 260ms ease';
+      digit.col.style.transform  = 'translateY(-1em)';
+
+      setTimeout(() => {
+        digit.cur.textContent = String(next);
+        digit.col.style.transition = 'none';
+        digit.col.style.transform  = 'translateY(0)';
+        void digit.col.offsetWidth;
+        digit.col.style.transition = 'transform 260ms ease';
+      }, 270);
+
+      digit.prev = current;
+    }
+
+    function updateOnce() {
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const s = now.getSeconds();
+
+      // HH:MM frissítés (statikus megjelenítés)
+      hhEl.textContent = pad2(h);
+      mmEl.textContent = pad2(m);
+
+      // Másodpercek számjegyei
+      const s10Val = Math.floor(s / 10);
+      const s1Val  = s % 10;
+
+      const nextS = (s + 1) % 60;
+      const nextS10Val = Math.floor(nextS / 10);
+      const nextS1Val  = nextS % 10;
+
+      // Egyesek minden másodpercben vált
+      slideDigit(s1, s1Val, nextS1Val);
+      // Tizesek csak akkor, ha tényleg változik
+      if (s10Val !== nextS10Val) slideDigit(s10, s10Val, nextS10Val);
+    }
+
+    function tick() {
+      updateOnce();
+      const ms = new Date().getMilliseconds();
+      const delay = 1000 - ms + 4; // drift korrekció
+      setTimeout(tick, delay);
+    }
+
+    (function init() {
+      const now = new Date();
+      hhEl.textContent = pad2(now.getHours());
+      mmEl.textContent = pad2(now.getMinutes());
+
+      const s = now.getSeconds();
+      const s10Val = Math.floor(s / 10);
+      const s1Val  = s % 10;
+      const nextS  = (s + 1) % 60;
+
+      s10.cur.textContent  = String(s10Val);
+      s10.next.textContent = String(Math.floor(nextS / 10));
+      s10.prev = s10Val;
+
+      s1.cur.textContent   = String(s1Val);
+      s1.next.textContent  = String(nextS % 10);
+      s1.prev = s1Val;
+
+      tick();
+    })();
+
+    // Fókuszba visszatérve újraszinkronizál
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        s10.prev = -1; s1.prev = -1;
+        updateOnce();
+      }
+    });
+  </script>
+</body>
+</html>

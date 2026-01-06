@@ -1,8 +1,5 @@
 #!/bin/bash
-# edudisplej-init.sh - Main initialization script for EduDisplej
-# This script is executed by systemd on boot
-# All text is in Slovak (without diacritics) or English
-
+# edudisplej-init.sh - EduDisplej initialization script
 # =============================================================================
 # Initialization
 # =============================================================================
@@ -13,15 +10,33 @@ INIT_DIR="${EDUDISPLEJ_HOME}/init"
 CONFIG_FILE="${EDUDISPLEJ_HOME}/edudisplej.conf"
 MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 LAST_ONLINE_FILE="${EDUDISPLEJ_HOME}/.last_online"
+LOCAL_WEB_DIR="${EDUDISPLEJ_HOME}/localweb"
 
 # Versioning and update source
-CURRENT_VERSION="20260106-1"
+CURRENT_VERSION="20260107-1"
 INIT_BASE="https://install.edudisplej.sk/init"
 VERSION_URL="${INIT_BASE}/version.txt"
 FILES_LIST_URL="${INIT_BASE}/download.php?getfiles"
 DOWNLOAD_URL="${INIT_BASE}/download.php?streamfile="
 APT_LOG="${EDUDISPLEJ_HOME}/apt.log"
 UPDATE_LOG="${EDUDISPLEJ_HOME}/update.log"
+
+# Ensure home/init directories and permissions exist
+ensure_edudisplej_home() {
+    if [[ ! -d "$EDUDISPLEJ_HOME" ]]; then
+        if ! mkdir -p "$EDUDISPLEJ_HOME"; then
+            print_error "Unable to create $EDUDISPLEJ_HOME"
+            exit 1
+        fi
+    fi
+
+    mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" || true
+    touch "$APT_LOG" "$UPDATE_LOG" 2>/dev/null || true
+
+    if check_root && id -u edudisplej >/dev/null 2>&1; then
+        chown -R edudisplej:edudisplej "$EDUDISPLEJ_HOME" 2>/dev/null || print_warning "Could not change owner of $EDUDISPLEJ_HOME"
+    fi
+}
 
 # Export display for X operations
 export DISPLAY=:0
@@ -78,6 +93,13 @@ else
     print_error "language.sh not found!"
 fi
 
+if [[ -f "${INIT_DIR}/services.sh" ]]; then
+    source "${INIT_DIR}/services.sh"
+    print_success "services.sh loaded"
+else
+    print_warning "services.sh not found (service management disabled)"
+fi
+
 echo ""
 
 # =============================================================================
@@ -88,16 +110,27 @@ show_banner
 
 print_info "$(t boot_version) ${CURRENT_VERSION}"
 
+# Ensure base directory exists and is writable
+ensure_edudisplej_home
+
 # Load configuration early so defaults are available
 if ! load_config; then
     print_warning "Configuration not found, using defaults"
+    KIOSK_URL="${DEFAULT_KIOSK_URL}"
+    if save_config; then
+        print_success "Default configuration created at ${CONFIG_FILE}"
+    else
+        print_error "Failed to create default configuration at ${CONFIG_FILE}"
+    fi
 fi
 
 # =============================================================================
 # Helper Functions
 # =============================================================================
 
-REQUIRED_PACKAGES=(midori openbox xinit unclutter curl x11-utils xserver-xorg)
+BROWSER_CANDIDATES=(chromium-browser chromium)
+BROWSER_BIN=""
+REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
 APT_UPDATED=false
 
 # Check and install required packages
@@ -165,6 +198,49 @@ ensure_required_packages() {
     fi
 }
 
+# Ensure a supported browser is installed and pick one
+ensure_browser() {
+    for candidate in "${BROWSER_CANDIDATES[@]}"; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            BROWSER_BIN="$candidate"
+            export BROWSER_BIN
+            print_success "Using browser: ${candidate}"
+            return 0
+        fi
+    done
+
+    if [[ "${INTERNET_AVAILABLE:-1}" -ne 0 ]]; then
+        print_error "No supported browser installed and internet unavailable to install."
+        return 1
+    fi
+
+    if [[ "$APT_UPDATED" == false ]]; then
+        print_info "Updating package lists..."
+        if ! apt-get update -y 2>&1 | tee -a "$APT_LOG"; then
+            print_error "apt-get update failed"
+            return 1
+        fi
+        APT_UPDATED=true
+    fi
+
+    for candidate in "${BROWSER_CANDIDATES[@]}"; do
+        print_info "Installing browser: ${candidate}"
+        if apt-get install -y "$candidate" 2>&1 | tee -a "$APT_LOG"; then
+            if command -v "$candidate" >/dev/null 2>&1; then
+                BROWSER_BIN="$candidate"
+                export BROWSER_BIN
+                print_success "Installed browser: ${candidate}"
+                return 0
+            fi
+        else
+            print_warning "Installation failed for ${candidate}, trying next option."
+        fi
+    done
+
+    print_error "Unable to install supported browser (tried: ${BROWSER_CANDIDATES[*]})"
+    return 1
+}
+
 # Fetch latest version string from server
 fetch_remote_version() {
     local out
@@ -207,6 +283,10 @@ download_init_files() {
     done <<< "$files_list"
 
     cp -f "${tmpdir}"/* "$INIT_DIR"/
+    if [[ -f "${tmpdir}/clock.html" ]]; then
+        mkdir -p "$LOCAL_WEB_DIR"
+        cp -f "${tmpdir}/clock.html" "$LOCAL_WEB_DIR/clock.html"
+    fi
     chmod -R 755 "$INIT_DIR"
     rm -rf "$tmpdir"
     return 0
@@ -250,7 +330,7 @@ show_system_summary() {
     print_info "$(t boot_summary)"
     echo "-------------------------------------------"
     echo "Mode: ${current_mode}"
-    echo "Kiosk URL: ${KIOSK_URL:-https://www.edudisplej.sk/edserver/demo/client}"
+    echo "Kiosk URL: ${KIOSK_URL:-$DEFAULT_KIOSK_URL}"
     echo "Language: ${CURRENT_LANG}"
     echo "IP: $(get_current_ip)"
     echo "Gateway: $(get_gateway)"
@@ -300,7 +380,22 @@ fi
 echo ""
 
 # Try to install missing packages (when internet is up)
-ensure_required_packages
+if ! ensure_required_packages; then
+    # Stop boot early if dependencies are missing
+    print_error "Required packages missing or failed to install. Fix issues and reboot."
+    exit 1
+fi
+
+# Ensure browser exists (chromium-browser/chromium)
+if ! ensure_browser; then
+    print_error "No supported browser available. Fix installation and reboot."
+    exit 1
+fi
+
+# Ensure kiosk service unit exists
+if command -v systemctl >/dev/null 2>&1; then
+    ensure_chromium_kiosk_service || print_warning "Could not ensure kiosk service"
+fi
 
 # Check for newer init bundle and self-update
 if [[ "$INTERNET_AVAILABLE" -eq 0 ]]; then
@@ -325,7 +420,11 @@ main_menu() {
             [[ -z "$saved_mode" ]] && saved_mode="EDSERVER"
             set_mode "$saved_mode"
             save_config
-            start_kiosk_mode
+            if command -v systemctl >/dev/null 2>&1; then
+                start_or_restart_chromium_kiosk_service || start_kiosk_mode
+            else
+                start_kiosk_mode
+            fi
             break
         fi
         
@@ -334,9 +433,13 @@ main_menu() {
                 # EduServer mode
                 print_info "$(t menu_eduserver)"
                 set_mode "EDSERVER"
-                KIOSK_URL="https://www.edudisplej.sk/edserver/demo/client"
+                KIOSK_URL="https://server.edudisplej.sk/demo/client/"
                 save_config
-                start_kiosk_mode
+                if command -v systemctl >/dev/null 2>&1; then
+                    start_or_restart_chromium_kiosk_service || start_kiosk_mode
+                else
+                    start_kiosk_mode
+                fi
                 break
                 ;;
             1)
@@ -346,7 +449,7 @@ main_menu() {
                 echo ""
                 read -rp "Enter URL / Zadajte URL: " KIOSK_URL
                 if [[ -z "$KIOSK_URL" ]]; then
-                    KIOSK_URL="https://www.edudisplej.sk/edserver/demo/client"
+                    KIOSK_URL="${DEFAULT_KIOSK_URL}"
                 fi
                 save_config
                 start_kiosk_mode
@@ -367,7 +470,11 @@ main_menu() {
             5)
                 # Exit (just start kiosk with defaults)
                 print_info "$(t menu_exit)"
-                start_kiosk_mode
+                if command -v systemctl >/dev/null 2>&1; then
+                    start_or_restart_chromium_kiosk_service || start_kiosk_mode
+                else
+                    start_kiosk_mode
+                fi
                 break
                 ;;
             *)
@@ -413,8 +520,12 @@ else
         set_mode "$SAVED_MODE"
     fi
     
-    # Start kiosk mode
-    start_kiosk_mode
+    # Start kiosk service if available, else direct kiosk
+    if command -v systemctl >/dev/null 2>&1; then
+        start_or_restart_chromium_kiosk_service || start_kiosk_mode
+    else
+        start_kiosk_mode
+    fi
 fi
 
 # =============================================================================

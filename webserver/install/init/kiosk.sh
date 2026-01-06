@@ -1,11 +1,20 @@
 #!/bin/bash
-# kiosk.sh - X server and Midori kiosk setup
+# kiosk.sh - X server and kiosk browser setup
 # All text is in Slovak (without diacritics) or English
 
 # Source common functions if not already sourced
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -z "${TRANS_SK+x}" ]]; then
     source "${SCRIPT_DIR}/common.sh"
+fi
+
+DEFAULT_BROWSER_CANDIDATES=("chromium-browser" "chromium")
+if [[ ${#BROWSER_CANDIDATES[@]} -eq 0 ]]; then
+    BROWSER_CANDIDATES=("${DEFAULT_BROWSER_CANDIDATES[@]}")
+fi
+
+if [[ -z "${BROWSER_BIN:-}" ]]; then
+    BROWSER_BIN=""
 fi
 
 # =============================================================================
@@ -20,6 +29,10 @@ cleanup_x_sessions() {
     pkill -9 Xorg 2>/dev/null
     pkill -9 xinit 2>/dev/null
     pkill -9 chromium 2>/dev/null
+    pkill -9 chromium-browser 2>/dev/null
+    if [[ -n "$BROWSER_BIN" ]]; then
+        pkill -9 "$BROWSER_BIN" 2>/dev/null
+    fi
     
     # Remove X lock files
     rm -f /tmp/.X0-lock 2>/dev/null
@@ -66,44 +79,73 @@ start_x_server() {
 }
 
 # =============================================================================
-# Midori Functions
+# Browser Functions
 # =============================================================================
 
-# Get Midori flags for kiosk mode
-get_midori_flags() {
-    local url="${1:-$KIOSK_URL}"
-    echo "--private --plain --no-plugins --app ${url}"
+detect_browser() {
+    if [[ -n "${BROWSER_BIN:-}" ]] && command -v "$BROWSER_BIN" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    for candidate in "${BROWSER_CANDIDATES[@]}"; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            BROWSER_BIN="$candidate"
+            return 0
+        fi
+    done
+
+    print_error "No supported browser found (tried: ${BROWSER_CANDIDATES[*]})"
+    return 1
 }
 
-# Start Midori in kiosk mode
-start_midori_kiosk() {
+get_browser_flags() {
+    local url="${1:-$KIOSK_URL}"
+    local profile_dir="${EDUDISPLEJ_HOME:-/opt/edudisplej}/chromium-profile"
+    case "$BROWSER_BIN" in
+        chromium-browser|chromium)
+            echo "--kiosk --noerrdialogs --disable-infobars --start-maximized --incognito --no-sandbox --disable-dev-shm-usage --disable-gpu --user-data-dir=${profile_dir} --no-first-run --no-default-browser-check --password-store=basic --use-mock-keychain --disable-translate --disable-sync --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache --enable-low-end-device-mode --renderer-process-limit=1 --no-zygote --single-process ${url}"
+            ;;
+        *)
+            echo "${url}"
+            ;;
+    esac
+}
+
+start_browser_kiosk() {
     local url="${1:-$KIOSK_URL}"
     local max_attempts=3
     local attempt=1
     local delay=15
-    
-    print_info "$(t kiosk_starting_midori)"
+
+    if ! detect_browser; then
+        return 1
+    fi
+
+    print_info "$(t kiosk_starting_browser) ${BROWSER_BIN}"
     
     while [[ $attempt -le $max_attempts ]]; do
         print_info "Attempt ${attempt}/${max_attempts}..."
         
-        # Kill any existing Midori instances
-        pkill -9 midori 2>/dev/null
+        # Kill any existing browser instances
+        pkill -9 "$BROWSER_BIN" 2>/dev/null
         sleep 1
         
-        # Clear Midori session data
-        rm -rf ~/.config/midori/session* 2>/dev/null
-        rm -rf ~/.cache/midori 2>/dev/null
+        # Clear per-browser session data
+        case "$BROWSER_BIN" in
+            chromium|chromium-browser)
+                rm -rf ~/.config/chromium/Default/Preferences.lock 2>/dev/null
+                ;;
+        esac
         
-        # Start Midori
+        # Start browser
         export DISPLAY=:0
-        midori $(get_midori_flags "$url") &
-        MIDORI_PID=$!
+        "$BROWSER_BIN" $(get_browser_flags "$url") &
+        BROWSER_PID=$!
         
-        # Wait and check if Midori is running
+        # Wait and check if browser is running
         sleep 5
-        if kill -0 $MIDORI_PID 2>/dev/null; then
-            print_success "Midori started successfully"
+        if kill -0 $BROWSER_PID 2>/dev/null; then
+            print_success "Browser started successfully"
             return 0
         fi
         
@@ -120,7 +162,7 @@ start_midori_kiosk() {
 # Full Kiosk Start
 # =============================================================================
 
-# Start full kiosk mode (X + Midori)
+# Start full kiosk mode (X + browser)
 start_kiosk_mode() {
     local url="${1:-$KIOSK_URL}"
     
@@ -132,9 +174,9 @@ start_kiosk_mode() {
         return 1
     fi
     
-    # Start Midori
-    if ! start_midori_kiosk "$url"; then
-        print_error "Could not start Midori"
+    # Start selected browser
+    if ! start_browser_kiosk "$url"; then
+        print_error "Could not start browser"
         return 1
     fi
     
@@ -144,8 +186,9 @@ start_kiosk_mode() {
 # Stop kiosk mode
 stop_kiosk_mode() {
     print_info "Stopping kiosk mode..."
-    
-    pkill -9 midori 2>/dev/null
+
+    pkill -9 chromium 2>/dev/null
+    pkill -9 chromium-browser 2>/dev/null
     pkill -9 openbox 2>/dev/null
     pkill -9 unclutter 2>/dev/null
     pkill -9 Xorg 2>/dev/null

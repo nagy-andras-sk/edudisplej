@@ -4,6 +4,7 @@ set -euo pipefail
 
 TARGET_DIR="/opt/edudisplej"
 INIT_DIR="${TARGET_DIR}/init"
+LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 INIT_BASE="https://install.edudisplej.sk/init"
 
 echo "[*] Kontrola opravneni root..."
@@ -35,8 +36,8 @@ if [ -d "$TARGET_DIR" ]; then
   mv "$TARGET_DIR" "$BACKUP"
 fi
 
-# Init konyvtar letrehozasa
-mkdir -p "$INIT_DIR"
+# Init es localweb konyvtar letrehozasa
+mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR"
 
 echo "[*] Nacitavame zoznam suborov : ${INIT_BASE}/download.php?getfiles"
 FILES_LIST="$(curl -s "${INIT_BASE}/download.php?getfiles" | tr -d '\r')"
@@ -71,6 +72,9 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
             echo "[!] Shebang hianyzik, hozzaadjuk: #!/bin/bash"
             sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
         fi
+    elif [[ "${NAME}" == *.html ]]; then
+      # HTML fajlok atmasolasa localweb konyvtarba
+      cp -f "${INIT_DIR}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"
     fi
 done <<< "$FILES_LIST"
 

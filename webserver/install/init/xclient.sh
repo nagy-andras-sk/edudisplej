@@ -1,9 +1,11 @@
 #!/bin/bash
-# xclient.sh - X client wrapper for Openbox + Midori
+# xclient.sh - X client wrapper for Openbox + Chromium
 # This script is started by xinit and runs inside the X session
 # All text is in Slovak (without diacritics) or English
 
-# Set display
+# Set locale and display for GUI apps
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
 export DISPLAY=:0
 
 # Path to init directory
@@ -16,8 +18,8 @@ if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
 fi
 
-# Default URL if not set
-KIOSK_URL="${KIOSK_URL:-https://www.edudisplej.sk/edserver/demo/client}"
+# Default URL if not set (prefer local clock)
+KIOSK_URL="${KIOSK_URL:-file:///opt/edudisplej/localweb/clock.html}"
 
 # Log file for debugging
 LOG_FILE="${EDUDISPLEJ_HOME}/xclient.log"
@@ -36,6 +38,9 @@ xset -dpms 2>/dev/null
 
 # Disable screen blanking
 xset dpms 0 0 0 2>/dev/null
+
+# Ensure localweb directory exists
+mkdir -p /opt/edudisplej/localweb 2>/dev/null || true
 
 # Set background to white initially (loading screen)
 if command -v xsetroot &> /dev/null; then
@@ -63,72 +68,91 @@ if command -v openbox &> /dev/null; then
 fi
 
 # =============================================================================
-# Midori Kiosk
+# Chromium Kiosk
 # =============================================================================
 
-# Check if Midori is installed
-if ! command -v midori &> /dev/null; then
-    echo "[xclient] ERROR: Midori not found!" | tee -a "$LOG_FILE"
-    # Set background to red to indicate error
+# Detect browser (prefer BROWSER_BIN env, then chromium-browser, chromium)
+detect_browser() {
+    local candidates=("${BROWSER_BIN:-}" "chromium-browser" "chromium")
+    for candidate in "${candidates[@]}"; do
+        [[ -z "$candidate" ]] && continue
+        if command -v "$candidate" &> /dev/null; then
+            BROWSER_BIN="$candidate"
+            echo "[xclient] Browser set to: ${BROWSER_BIN}" | tee -a "$LOG_FILE"
+            return 0
+        fi
+    done
+    echo "[xclient] ERROR: Chromium not found!" | tee -a "$LOG_FILE"
     xsetroot -solid red 2>/dev/null
     sleep 30
-    exit 1
-fi
-
-echo "[xclient] Midori found at: $(which midori)" | tee -a "$LOG_FILE"
-
-# Get Midori flags
-get_midori_flags() {
-    echo "--private --plain --no-plugins --app"
-}
-
-# Clear Midori session data to avoid restore prompts
-rm -rf ~/.config/midori/session* 2>/dev/null
-rm -rf ~/.cache/midori 2>/dev/null
-
-# Function to start Midori with retry logic
-start_midori() {
-    local max_attempts=3
-    local attempt=1
-    local delay=15
-    
-    while [[ $attempt -le $max_attempts ]]; do
-        echo "[xclient] Starting Midori (attempt ${attempt}/${max_attempts})..." | tee -a "$LOG_FILE"
-        
-        # Kill any existing Midori instances
-        pkill -9 midori 2>/dev/null
-        sleep 1
-        
-        # Start Midori with logging
-        echo "[xclient] Command: midori $(get_midori_flags) ${KIOSK_URL}" | tee -a "$LOG_FILE"
-        midori $(get_midori_flags) "${KIOSK_URL}" >> "$LOG_FILE" 2>&1 &
-        MIDORI_PID=$!
-        
-        # Wait a bit and check if still running
-        sleep 5
-        
-        if kill -0 $MIDORI_PID 2>/dev/null; then
-            echo "[xclient] Midori started successfully (PID: ${MIDORI_PID})"
-            
-            # Wait for Midori to exit and then restart
-            wait $MIDORI_PID
-            echo "[xclient] Midori exited, restarting..."
-            attempt=1
-        else
-            echo "[xclient] Midori failed to start, retrying..."
-            ((attempt++))
-        fi
-        
-        sleep $delay
-    done
-    
-    echo "[xclient] Midori failed to start after ${max_attempts} attempts"
     return 1
 }
 
-# Main loop - keep Midori running
-while true; do
-    start_midori
-    echo "[xclient] Waiting before restart..."
-    sleep 10
-done
+prepare_runtime() {
+    export LIBGL_ALWAYS_SOFTWARE=1
+    export QT_X11_NO_MITSHM=1
+    export XDG_RUNTIME_DIR="/tmp/edudisplej-runtime"
+    mkdir -p "$XDG_RUNTIME_DIR" "${EDUDISPLEJ_HOME}/chromium-profile" || true
+    chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    chown edudisplej:edudisplej "$XDG_RUNTIME_DIR" "${EDUDISPLEJ_HOME}/chromium-profile" 2>/dev/null || true
+}
+
+get_chromium_flags() {
+    local profile_dir="${EDUDISPLEJ_HOME}/chromium-profile"
+    echo "--kiosk --noerrdialogs --disable-infobars --start-maximized --incognito --no-sandbox --disable-dev-shm-usage --disable-gpu --user-data-dir=${profile_dir} --no-first-run --no-default-browser-check --password-store=basic --use-mock-keychain --disable-translate --disable-sync --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache --enable-low-end-device-mode --renderer-process-limit=1 --no-zygote --single-process --enable-features=OverlayScrollbar"
+}
+
+clear_browser_state() {
+    # Avoid restore prompts or locked profiles
+    rm -rf ~/.config/chromium/Default/Preferences.lock 2>/dev/null
+    rm -rf "${EDUDISPLEJ_HOME}/chromium-profile/Singleton*" 2>/dev/null
+}
+
+start_chromium() {
+    local max_attempts=3
+    local attempt=1
+    local delay=15
+
+    while [[ $attempt -le $max_attempts ]]; do
+        echo "[xclient] Starting ${BROWSER_BIN:-chromium} (attempt ${attempt}/${max_attempts})..." | tee -a "$LOG_FILE"
+
+        pkill -9 chromium 2>/dev/null
+        pkill -9 chromium-browser 2>/dev/null
+        sleep 1
+
+        clear_browser_state
+        prepare_runtime
+
+        echo "[xclient] Command: ${BROWSER_BIN:-chromium} $(get_chromium_flags) ${KIOSK_URL}" | tee -a "$LOG_FILE"
+        "${BROWSER_BIN:-chromium}" $(get_chromium_flags) "${KIOSK_URL}" >> "$LOG_FILE" 2>&1 &
+        BROWSER_PID=$!
+
+        sleep 5
+
+        if kill -0 $BROWSER_PID 2>/dev/null; then
+            echo "[xclient] Browser started successfully (PID: ${BROWSER_PID})"
+            wait $BROWSER_PID
+            echo "[xclient] Browser exited, restarting..."
+            attempt=1
+        else
+            echo "[xclient] Browser failed to start, retrying..."
+            ((attempt++))
+        fi
+
+        sleep $delay
+    done
+
+    echo "[xclient] Browser failed to start after ${max_attempts} attempts"
+    return 1
+}
+
+# Main loop - keep browser running
+if detect_browser; then
+    while true; do
+        start_chromium
+        echo "[xclient] Waiting before restart..." | tee -a "$LOG_FILE"
+        sleep 10
+    done
+else
+    exit 1
+fi

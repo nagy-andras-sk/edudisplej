@@ -11,6 +11,7 @@ MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 # Default values
 DEFAULT_LANG="sk"
 CURRENT_LANG="${DEFAULT_LANG}"
+DEFAULT_KIOSK_URL="file:///opt/edudisplej/localweb/clock.html"
 
 # =============================================================================
 # Translation System
@@ -68,8 +69,7 @@ declare -A TRANS_SK=(
 
     # Kiosk
     ["kiosk_starting_x"]="Spustam X server..."
-    ["kiosk_starting_chromium"]="Spustam Chromium..."
-    ["kiosk_starting_midori"]="Spustam Midori..."
+    ["kiosk_starting_browser"]="Spustam prehliadac Chromium..."
     ["kiosk_retry"]="Pokus o znovuspustenie..."
     ["kiosk_failed"]="Spustenie zlyhal po 3 pokusoch!"
     ["boot_pkg_check"]="Kontrolujem potrebne balicky..."
@@ -147,8 +147,7 @@ declare -A TRANS_EN=(
 
     # Kiosk
     ["kiosk_starting_x"]="Starting X server..."
-    ["kiosk_starting_chromium"]="Starting Chromium..."
-    ["kiosk_starting_midori"]="Starting Midori..."
+    ["kiosk_starting_browser"]="Starting Chromium browser..."
     ["kiosk_retry"]="Retrying..."
     ["kiosk_failed"]="Failed after 3 attempts!"
     ["boot_pkg_check"]="Checking required packages..."
@@ -208,7 +207,7 @@ save_config() {
     cat > "$CONFIG_FILE" << EOF
 # EduDisplej Configuration File
 MODE=${MODE:-EDSERVER}
-KIOSK_URL=${KIOSK_URL:-https://www.edudisplej.sk/edserver/demo/client}
+KIOSK_URL=${KIOSK_URL:-$DEFAULT_KIOSK_URL}
 LANG=${CURRENT_LANG}
 PACKAGES_INSTALLED=${PACKAGES_INSTALLED:-0}
 EOF
