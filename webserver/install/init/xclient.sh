@@ -1,5 +1,5 @@
 #!/bin/bash
-# xclient.sh - X client wrapper for Openbox + Chromium
+# xclient.sh - X client wrapper for Openbox + Midori
 # This script is started by xinit and runs inside the X session
 # All text is in Slovak (without diacritics) or English
 
@@ -19,6 +19,12 @@ fi
 # Default URL if not set
 KIOSK_URL="${KIOSK_URL:-https://www.edudisplej.sk/edserver/demo/client}"
 
+# Log file for debugging
+LOG_FILE="${EDUDISPLEJ_HOME}/xclient.log"
+exec 2>"$LOG_FILE"
+echo "[xclient] Starting at $(date)" | tee -a "$LOG_FILE"
+echo "[xclient] KIOSK_URL: ${KIOSK_URL}" | tee -a "$LOG_FILE"
+
 # =============================================================================
 # X Environment Setup
 # =============================================================================
@@ -31,9 +37,10 @@ xset -dpms 2>/dev/null
 # Disable screen blanking
 xset dpms 0 0 0 2>/dev/null
 
-# Set background to black
+# Set background to white initially (loading screen)
 if command -v xsetroot &> /dev/null; then
-    xsetroot -solid black 2>/dev/null
+    xsetroot -solid white 2>/dev/null
+    echo "[xclient] Background set to white" | tee -a "$LOG_FILE"
 fi
 
 # =============================================================================
@@ -56,91 +63,72 @@ if command -v openbox &> /dev/null; then
 fi
 
 # =============================================================================
-# Chromium Kiosk
+# Midori Kiosk
 # =============================================================================
 
-# Get Chromium flags
-get_chromium_flags() {
-    echo "--kiosk \
-          --start-fullscreen \
-          --start-maximized \
-          --noerrdialogs \
-          --disable-infobars \
-          --disable-session-crashed-bubble \
-          --disable-restore-session-state \
-          --disable-features=TranslateUI \
-          --incognito \
-          --no-first-run \
-          --disable-pinch \
-          --overscroll-history-navigation=0 \
-          --check-for-update-interval=31536000 \
-          --disable-backgrounding-occluded-windows \
-          --disable-component-update \
-          --disable-breakpad \
-          --disable-client-side-phishing-detection \
-          --disable-default-apps \
-          --disable-extensions \
-          --disable-hang-monitor \
-          --disable-popup-blocking \
-          --disable-prompt-on-repost \
-          --disable-sync \
-          --disable-translate \
-          --metrics-recording-only \
-          --no-default-browser-check \
-          --password-store=basic \
-          --use-mock-keychain"
+# Check if Midori is installed
+if ! command -v midori &> /dev/null; then
+    echo "[xclient] ERROR: Midori not found!" | tee -a "$LOG_FILE"
+    # Set background to red to indicate error
+    xsetroot -solid red 2>/dev/null
+    sleep 30
+    exit 1
+fi
+
+echo "[xclient] Midori found at: $(which midori)" | tee -a "$LOG_FILE"
+
+# Get Midori flags
+get_midori_flags() {
+    echo "--private --plain --no-plugins --app"
 }
 
-# Clear Chromium crash data to prevent "restore session" prompts
-rm -rf ~/.config/chromium/Singleton* 2>/dev/null
-rm -rf ~/.config/chromium/Default/Preferences 2>/dev/null
-rm -rf ~/.config/chromium/.org.chromium.Chromium.* 2>/dev/null
+# Clear Midori session data to avoid restore prompts
+rm -rf ~/.config/midori/session* 2>/dev/null
+rm -rf ~/.cache/midori 2>/dev/null
 
-# Function to start Chromium with retry logic
-start_chromium() {
+# Function to start Midori with retry logic
+start_midori() {
     local max_attempts=3
     local attempt=1
-    local delay=20
+    local delay=15
     
     while [[ $attempt -le $max_attempts ]]; do
-        echo "[xclient] Starting Chromium (attempt ${attempt}/${max_attempts})..."
+        echo "[xclient] Starting Midori (attempt ${attempt}/${max_attempts})..." | tee -a "$LOG_FILE"
         
-        # Kill any existing Chromium instances
-        pkill -9 chromium 2>/dev/null
-        pkill -9 chromium-browser 2>/dev/null
+        # Kill any existing Midori instances
+        pkill -9 midori 2>/dev/null
         sleep 1
         
-        # Start Chromium
-        chromium-browser $(get_chromium_flags) "${KIOSK_URL}" &
-        CHROMIUM_PID=$!
+        # Start Midori with logging
+        echo "[xclient] Command: midori $(get_midori_flags) ${KIOSK_URL}" | tee -a "$LOG_FILE"
+        midori $(get_midori_flags) "${KIOSK_URL}" >> "$LOG_FILE" 2>&1 &
+        MIDORI_PID=$!
         
         # Wait a bit and check if still running
         sleep 5
         
-        if kill -0 $CHROMIUM_PID 2>/dev/null; then
-            echo "[xclient] Chromium started successfully (PID: ${CHROMIUM_PID})"
+        if kill -0 $MIDORI_PID 2>/dev/null; then
+            echo "[xclient] Midori started successfully (PID: ${MIDORI_PID})"
             
-            # Wait for Chromium to exit
-            wait $CHROMIUM_PID
-            
-            # Chromium exited - reset attempt counter for restarts (not a startup failure)
-            echo "[xclient] Chromium exited, restarting..."
+            # Wait for Midori to exit and then restart
+            wait $MIDORI_PID
+            echo "[xclient] Midori exited, restarting..."
             attempt=1
         else
-            echo "[xclient] Chromium failed to start, retrying..."
+            echo "[xclient] Midori failed to start, retrying..."
             ((attempt++))
         fi
         
         sleep $delay
     done
     
-    echo "[xclient] Chromium failed to start after ${max_attempts} attempts"
+    echo "[xclient] Midori failed to start after ${max_attempts} attempts"
     return 1
 }
 
-# Main loop - keep Chromium running
+# Main loop - keep Midori running
 while true; do
-    start_chromium
+    start_midori
     echo "[xclient] Waiting before restart..."
     sleep 10
 done

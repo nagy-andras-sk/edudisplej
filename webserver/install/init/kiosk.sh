@@ -1,5 +1,5 @@
 #!/bin/bash
-# kiosk.sh - X server and Chromium kiosk setup
+# kiosk.sh - X server and Midori kiosk setup
 # All text is in Slovak (without diacritics) or English
 
 # Source common functions if not already sourced
@@ -32,6 +32,17 @@ cleanup_x_sessions() {
 start_x_server() {
     print_info "$(t kiosk_starting_x)"
     
+    # Verify xinit is installed
+    if ! command -v xinit &> /dev/null; then
+        print_error "xinit not found. Attempting to install..."
+        apt-get update -y && apt-get install -y xinit xserver-xorg x11-utils 2>/dev/null
+        if ! command -v xinit &> /dev/null; then
+            print_error "Failed to install xinit - cannot start X server"
+            return 1
+        fi
+        print_success "xinit installed successfully"
+    fi
+    
     cleanup_x_sessions
     
     export DISPLAY=:0
@@ -55,72 +66,44 @@ start_x_server() {
 }
 
 # =============================================================================
-# Chromium Functions
+# Midori Functions
 # =============================================================================
 
-# Get Chromium flags for kiosk mode
-get_chromium_flags() {
+# Get Midori flags for kiosk mode
+get_midori_flags() {
     local url="${1:-$KIOSK_URL}"
-    
-    echo "--kiosk \
-          --start-fullscreen \
-          --start-maximized \
-          --noerrdialogs \
-          --disable-infobars \
-          --disable-session-crashed-bubble \
-          --disable-restore-session-state \
-          --disable-features=TranslateUI \
-          --incognito \
-          --no-first-run \
-          --disable-pinch \
-          --overscroll-history-navigation=0 \
-          --check-for-update-interval=31536000 \
-          --disable-backgrounding-occluded-windows \
-          --disable-component-update \
-          --disable-breakpad \
-          --disable-client-side-phishing-detection \
-          --disable-default-apps \
-          --disable-extensions \
-          --disable-hang-monitor \
-          --disable-popup-blocking \
-          --disable-prompt-on-repost \
-          --disable-sync \
-          --disable-translate \
-          --metrics-recording-only \
-          --no-default-browser-check \
-          --password-store=basic \
-          --use-mock-keychain \
-          ${url}"
+    echo "--private --plain --no-plugins --app ${url}"
 }
 
-# Start Chromium in kiosk mode
-start_chromium_kiosk() {
+# Start Midori in kiosk mode
+start_midori_kiosk() {
     local url="${1:-$KIOSK_URL}"
     local max_attempts=3
     local attempt=1
-    local delay=20
+    local delay=15
     
-    print_info "$(t kiosk_starting_chromium)"
+    print_info "$(t kiosk_starting_midori)"
     
     while [[ $attempt -le $max_attempts ]]; do
         print_info "Attempt ${attempt}/${max_attempts}..."
         
-        # Kill any existing Chromium instances
-        pkill -9 chromium 2>/dev/null
+        # Kill any existing Midori instances
+        pkill -9 midori 2>/dev/null
         sleep 1
         
-        # Clear Chromium crash data
-        rm -rf ~/.config/chromium/Singleton* 2>/dev/null
-        rm -rf ~/.config/chromium/Default/Preferences 2>/dev/null
+        # Clear Midori session data
+        rm -rf ~/.config/midori/session* 2>/dev/null
+        rm -rf ~/.cache/midori 2>/dev/null
         
-        # Start Chromium
+        # Start Midori
         export DISPLAY=:0
-        chromium-browser $(get_chromium_flags "$url") &
+        midori $(get_midori_flags "$url") &
+        MIDORI_PID=$!
         
-        # Wait and check if Chromium is running
+        # Wait and check if Midori is running
         sleep 5
-        if pgrep -x "chromium" > /dev/null || pgrep -x "chromium-browser" > /dev/null; then
-            print_success "Chromium started successfully"
+        if kill -0 $MIDORI_PID 2>/dev/null; then
+            print_success "Midori started successfully"
             return 0
         fi
         
@@ -137,7 +120,7 @@ start_chromium_kiosk() {
 # Full Kiosk Start
 # =============================================================================
 
-# Start full kiosk mode (X + Chromium)
+# Start full kiosk mode (X + Midori)
 start_kiosk_mode() {
     local url="${1:-$KIOSK_URL}"
     
@@ -149,9 +132,9 @@ start_kiosk_mode() {
         return 1
     fi
     
-    # Start Chromium
-    if ! start_chromium_kiosk "$url"; then
-        print_error "Could not start Chromium"
+    # Start Midori
+    if ! start_midori_kiosk "$url"; then
+        print_error "Could not start Midori"
         return 1
     fi
     
@@ -162,8 +145,7 @@ start_kiosk_mode() {
 stop_kiosk_mode() {
     print_info "Stopping kiosk mode..."
     
-    pkill -9 chromium 2>/dev/null
-    pkill -9 chromium-browser 2>/dev/null
+    pkill -9 midori 2>/dev/null
     pkill -9 openbox 2>/dev/null
     pkill -9 unclutter 2>/dev/null
     pkill -9 Xorg 2>/dev/null

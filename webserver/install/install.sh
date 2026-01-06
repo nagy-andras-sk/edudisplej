@@ -1,5 +1,7 @@
 
 #!/bin/bash
+set -euo pipefail
+
 TARGET_DIR="/opt/edudisplej"
 INIT_DIR="${TARGET_DIR}/init"
 INIT_BASE="https://install.edudisplej.sk/init"
@@ -11,14 +13,14 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # Ellenorzes: curl telepitve van?
-if ! command -v curl >/dev/null; then
+if ! command -v curl >/dev/null 2>&1; then
   echo "[*] Instalacia curl..."
   apt-get update && apt-get install -y curl
 fi
 
 # GUI ellenorzes (csak info)
 echo "[*] Kontrola GUI prostredia..."
-if pgrep -x "Xorg" >/dev/null; then
+if pgrep -x "Xorg" >/dev/null 2>&1; then
     echo "[*] GUI bezi."
     GUI_AVAILABLE=true
 else
@@ -37,7 +39,7 @@ fi
 mkdir -p "$INIT_DIR"
 
 echo "[*] Nacitavame zoznam suborov : ${INIT_BASE}/download.php?getfiles"
-FILES_LIST=$(curl -s "${INIT_BASE}/download.php?getfiles" | tr -d '\r')
+FILES_LIST="$(curl -s "${INIT_BASE}/download.php?getfiles" | tr -d '\r')"
 
 if [ -z "$FILES_LIST" ]; then
   echo "[!] Chyba: Nepodarilo sa nacitat zoznam suborov."
@@ -48,8 +50,9 @@ echo "[DEBUG] Zoznam suborov:"
 echo "$FILES_LIST"
 
 # Letoltes egyenkent + CRLF javitas + shebang ellenorzes
-echo "$FILES_LIST" | while IFS=";" read -r NAME SIZE MODIFIED; do
-    [ -z "$NAME" ] && continue
+# DÔLEŽITÉ: while bez pipe (aby exit vo vnútri ukončil skript)
+while IFS=";" read -r NAME SIZE MODIFIED; do
+    [ -z "${NAME:-}" ] && continue
 
     echo "[*] Stahovanie: $NAME ($SIZE bajtov)"
     curl -sL "${INIT_BASE}/download.php?streamfile=${NAME}" -o "${INIT_DIR}/${NAME}" || {
@@ -63,13 +66,13 @@ echo "$FILES_LIST" | while IFS=";" read -r NAME SIZE MODIFIED; do
     # Ha .sh fajl, ellenorizzuk a shebang-et
     if [[ "${NAME}" == *.sh ]]; then
         chmod +x "${INIT_DIR}/${NAME}"
-        FIRST_LINE=$(head -n1 "${INIT_DIR}/${NAME}")
-        if [[ "$FIRST_LINE" != "#!"* ]]; then
+        FIRST_LINE="$(head -n1 "${INIT_DIR}/${NAME}" || true)"
+        if [[ "${FIRST_LINE}" != "#!"* ]]; then
             echo "[!] Shebang hianyzik, hozzaadjuk: #!/bin/bash"
             sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
         fi
     fi
-done
+done <<< "$FILES_LIST"
 
 # Ellenorzes: edudisplej-init.sh letezik?
 if [ ! -f "${INIT_DIR}/edudisplej-init.sh" ]; then
@@ -81,42 +84,52 @@ fi
 chmod -R 755 "$TARGET_DIR"
 
 # Konzol felhasznalo meghatarozasa (altalaban pi)
-CONSOLE_USER=$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1)
-[ -z "$CONSOLE_USER" ] && CONSOLE_USER="pi"
+CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
+[ -z "${CONSOLE_USER}" ] && CONSOLE_USER="pi"
 
-echo "[*] Nastavenie autologinu pre uzivatela: $CONSOLE_USER"
-mkdir -p /etc/systemd/system/getty@tty1.service.d
-cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin $CONSOLE_USER --noclear %I \$TERM
-EOF
+# --- KIOSK NA TTY1: BEZ GETTY / BEZ AUTOLOGIN ---
+# Odstránime prípadnú starú autologin konfiguráciu pre getty@tty1 (ak by tam bola)
+if [ -d /etc/systemd/system/getty@tty1.service.d ]; then
+  echo "[*] Odstranujem /etc/systemd/system/getty@tty1.service.d (autologin conf)..."
+  rm -rf /etc/systemd/system/getty@tty1.service.d
+fi
 
-systemctl daemon-reload
-systemctl restart getty@tty1.service
-
-# Systemd service letrehozasa (ha van GUI, XAUTHORITY beallitva)
-
-cat > /etc/systemd/system/edudisplej-init.service <<EOF
+# Vytvoríme systemd službu, ktorá si tty1 výlučne drží
+cat > /etc/systemd/system/edudisplej-init.service <<'EOF'
 [Unit]
-Description=EduDisplej Init (Console Mode)
-After=multi-user.target network-online.target
+Description=EduDisplej Init (Console Kiosk on tty1)
+After=network-online.target
+Wants=network-online.target
+Conflicts=getty@tty1.service
 
 [Service]
-ExecStart=${INIT_DIR}/edudisplej-init.sh
-WorkingDirectory=${INIT_DIR}
-Restart=always
+Type=simple
+ExecStart=/opt/edudisplej/init/edudisplej-init.sh
+WorkingDirectory=/opt/edudisplej/init
+Restart=on-failure
+RestartSec=2
+
+# TTY pinning
 StandardInput=tty
 StandardOutput=tty
 TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+#TTYVTDisallocate=yes
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-
-# Systemd ujratoltese es engedelyezese
+# Systemd ujratoltese
 systemctl daemon-reload
+
+# Zakážeme getty na tty1 (nech tam nikdy nevyskočí shell)
+echo "[*] getty@tty1 disable + stop"
+systemctl disable --now getty@tty1.service || true
+
+# Povolíme kiosk službu
+echo "[*] edudisplej-init.service enable + start"
 systemctl enable --now edudisplej-init.service
 
 echo "[✓] Instalacia dokoncena. Restart za 10 sekund..."

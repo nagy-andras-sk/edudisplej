@@ -69,8 +69,22 @@ declare -A TRANS_SK=(
     # Kiosk
     ["kiosk_starting_x"]="Spustam X server..."
     ["kiosk_starting_chromium"]="Spustam Chromium..."
+    ["kiosk_starting_midori"]="Spustam Midori..."
     ["kiosk_retry"]="Pokus o znovuspustenie..."
     ["kiosk_failed"]="Spustenie zlyhal po 3 pokusoch!"
+    ["boot_pkg_check"]="Kontrolujem potrebne balicky..."
+    ["boot_pkg_missing"]="Chybajuce balicky:"
+    ["boot_pkg_ok"]="Vsetky balicky nainstalovane"
+    ["boot_pkg_installing"]="Instalujem balicky:"
+    ["boot_pkg_install_failed"]="Instalacia balickov zlyhala"
+    ["boot_summary"]="Zhrnutie systemu pred startom"
+    ["boot_countdown"]="Stlacte M alebo F12 pre menu"
+    ["boot_version"]="Verzia:"
+    ["boot_update_check"]="Kontrolujem aktualizacie..."
+    ["boot_update_available"]="Nova verzia dostupna:"
+    ["boot_update_downloading"]="Stahujem aktualizovane skripty..."
+    ["boot_update_done"]="Aktualizacia dokoncena, restartujem skript..."
+    ["boot_update_failed"]="Aktualizacia zlyhala"
 
     # General
     ["press_enter"]="Stlacte ENTER pre pokracovanie..."
@@ -134,8 +148,22 @@ declare -A TRANS_EN=(
     # Kiosk
     ["kiosk_starting_x"]="Starting X server..."
     ["kiosk_starting_chromium"]="Starting Chromium..."
+    ["kiosk_starting_midori"]="Starting Midori..."
     ["kiosk_retry"]="Retrying..."
     ["kiosk_failed"]="Failed after 3 attempts!"
+    ["boot_pkg_check"]="Checking required packages..."
+    ["boot_pkg_missing"]="Missing packages:"
+    ["boot_pkg_ok"]="All required packages installed"
+    ["boot_pkg_installing"]="Installing packages:"
+    ["boot_pkg_install_failed"]="Package installation failed"
+    ["boot_summary"]="System summary before start"
+    ["boot_countdown"]="Press M or F12 to enter menu"
+    ["boot_version"]="Version:"
+    ["boot_update_check"]="Checking for updates..."
+    ["boot_update_available"]="New version available:"
+    ["boot_update_downloading"]="Downloading updated scripts..."
+    ["boot_update_done"]="Update finished, restarting script..."
+    ["boot_update_failed"]="Update failed"
 
     # General
     ["press_enter"]="Press ENTER to continue..."
@@ -213,7 +241,7 @@ print_color() {
         red)    echo -e "\033[0;31m${text}\033[0m" ;;
         green)  echo -e "\033[0;32m${text}\033[0m" ;;
         yellow) echo -e "\033[0;33m${text}\033[0m" ;;
-        blue)   echo -e "\033[0;34m${text}\033[0m" ;;
+        blue)   echo -e "\033[0;94m${text}\033[0m" ;;
         *)      echo "$text" ;;
     esac
 }
@@ -299,7 +327,9 @@ get_mac_suffix() {
     local mac
     mac=$(ip link show | grep -A1 "eth0\|wlan0" | grep ether | head -1 | awk '{print $2}')
     if [[ -n "$mac" ]]; then
-        echo "${mac:(-8)}" | tr -d ':'
+        local clean_mac
+        clean_mac=${mac//:/}
+        echo "${clean_mac: -6}"
     else
         echo "unknown"
     fi
