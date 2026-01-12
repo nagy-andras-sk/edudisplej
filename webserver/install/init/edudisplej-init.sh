@@ -12,6 +12,15 @@ CONFIG_FILE="${EDUDISPLEJ_HOME}/edudisplej.conf"
 MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 LAST_ONLINE_FILE="${EDUDISPLEJ_HOME}/.last_online"
 LOCAL_WEB_DIR="${EDUDISPLEJ_HOME}/localweb"
+SESSION_LOG="${EDUDISPLEJ_HOME}/session.log"
+
+# Clean old session log on startup (keep only current session)
+if [[ -f "$SESSION_LOG" ]]; then
+    mv "$SESSION_LOG" "${SESSION_LOG}.old" 2>/dev/null || true
+fi
+
+# Redirect all output to session log
+exec > >(tee -a "$SESSION_LOG") 2>&1
 
 # Versioning and update source
 CURRENT_VERSION="20260107-1"
@@ -94,6 +103,13 @@ else
     print_error "language.sh not found!"
 fi
 
+if [[ -f "${INIT_DIR}/registration.sh" ]]; then
+    source "${INIT_DIR}/registration.sh"
+    print_success "registration.sh loaded"
+else
+    print_warning "registration.sh not found! Device registration will be skipped."
+fi
+
 echo ""
 
 # =============================================================================
@@ -124,8 +140,8 @@ fi
 
 BROWSER_CANDIDATES=(chromium-browser chromium)
 BROWSER_BIN=""
-# >>> ADDED: xorg és openbox itt már benne volt, jó
-REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
+# Core packages needed for kiosk mode
+REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg chromium-browser)
 APT_UPDATED=false
 
 # Check and install required packages
@@ -408,6 +424,11 @@ INTERNET_AVAILABLE=$?
 
 if [[ $INTERNET_AVAILABLE -eq 0 ]]; then
     date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LAST_ONLINE_FILE"
+    
+    # Try to register device to remote server (only if not already registered)
+    if command -v register_device >/dev/null 2>&1; then
+        register_device || print_warning "Device registration failed (will retry on next boot)"
+    fi
 fi
 
 echo ""
