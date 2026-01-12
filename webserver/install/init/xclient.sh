@@ -21,9 +21,8 @@ MAX_LOG_SIZE=2097152  # 2MB max log size
 
 # Clean old log on startup to prevent disk fill (keep only current session)
 if [[ -f "$LOG_FILE" ]]; then
-    local size
-    size=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
-    if [[ $size -gt $MAX_LOG_SIZE ]]; then
+    log_size=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+    if [[ $log_size -gt $MAX_LOG_SIZE ]]; then
         mv "$LOG_FILE" "${LOG_FILE}.old"
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Log rotated (previous log moved to xclient.log.old)" > "$LOG_FILE"
     fi

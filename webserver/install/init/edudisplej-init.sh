@@ -28,13 +28,14 @@ INIT_BASE="https://install.edudisplej.sk/init"
 VERSION_URL="${INIT_BASE}/version.txt"
 FILES_LIST_URL="${INIT_BASE}/download.php?getfiles"
 DOWNLOAD_URL="${INIT_BASE}/download.php?streamfile="
+MAX_LOG_SIZE=2097152  # 2MB max log size
 APT_LOG="${EDUDISPLEJ_HOME}/apt.log"
 UPDATE_LOG="${EDUDISPLEJ_HOME}/update.log"
 
 # Clean old apt log on startup (keep only current session)
 if [[ -f "$APT_LOG" ]]; then
     log_size=$(stat -f%z "$APT_LOG" 2>/dev/null || stat -c%s "$APT_LOG" 2>/dev/null || echo 0)
-    if [[ $log_size -gt 2097152 ]]; then  # 2MB max
+    if [[ $log_size -gt $MAX_LOG_SIZE ]]; then
         mv "$APT_LOG" "${APT_LOG}.old" 2>/dev/null || true
     fi
 fi

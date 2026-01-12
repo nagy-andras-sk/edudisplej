@@ -81,14 +81,21 @@ start_watchdog() {
             
             # Restart chromium through xclient.sh
             if [[ -f "${EDUDISPLEJ_HOME}/init/xclient.sh" ]]; then
-                # Kill any zombie processes first
+                # Kill any zombie processes first using graceful termination
                 local zombie_pids
                 zombie_pids=$(pgrep -x "chromium" 2>/dev/null; pgrep -x "chromium-browser" 2>/dev/null)
                 if [[ -n "$zombie_pids" ]]; then
                     for pid in $zombie_pids; do
-                        kill -9 "$pid" 2>/dev/null
+                        kill -TERM "$pid" 2>/dev/null || true
                     done
                     sleep 2
+                    # Force kill if still running
+                    for pid in $zombie_pids; do
+                        if kill -0 "$pid" 2>/dev/null; then
+                            kill -KILL "$pid" 2>/dev/null || true
+                        fi
+                    done
+                    sleep 1
                 fi
                 
                 # Don't restart xclient.sh, it should be running in a loop already

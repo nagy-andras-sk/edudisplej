@@ -15,6 +15,8 @@
 header('Content-Type: application/json');
 
 // Database configuration
+// NOTE: These credentials are for the server-side database at server.edudisplej.sk
+// This API endpoint is hosted on the server and connects to its local database
 define('DB_HOST', 'localhost');
 define('DB_USER', 'edud_server');
 define('DB_PASS', '6)mb5Tr[bx56kHih');
