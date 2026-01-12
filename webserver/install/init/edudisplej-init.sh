@@ -31,6 +31,14 @@ DOWNLOAD_URL="${INIT_BASE}/download.php?streamfile="
 APT_LOG="${EDUDISPLEJ_HOME}/apt.log"
 UPDATE_LOG="${EDUDISPLEJ_HOME}/update.log"
 
+# Clean old apt log on startup (keep only current session)
+if [[ -f "$APT_LOG" ]]; then
+    log_size=$(stat -f%z "$APT_LOG" 2>/dev/null || stat -c%s "$APT_LOG" 2>/dev/null || echo 0)
+    if [[ $log_size -gt 2097152 ]]; then  # 2MB max
+        mv "$APT_LOG" "${APT_LOG}.old" 2>/dev/null || true
+    fi
+fi
+
 # Ensure home/init directories and permissions exist
 ensure_edudisplej_home() {
     if [[ ! -d "$EDUDISPLEJ_HOME" ]]; then
@@ -377,45 +385,6 @@ countdown_or_menu() {
 }
 
 # =============================================================================
-# >>> ADDED: Ensure X session (Xorg + openbox) runs before kiosk
-# =============================================================================
-ensure_x_session() {
-    # Ha már fut Xorg/Xwayland, semmit nem kell tenni
-    if pgrep -x Xorg >/dev/null || pgrep -x Xwayland >/dev/null; then
-        print_success "X server already running"
-        return 0
-    fi
-
-    print_info "Starting X session on ${DISPLAY:-:0} ..."
-
-    # .xinitrc létrehozása a $HOME-ban (/opt/edudisplej)
-    cat > "${HOME}/.xinitrc" << 'EOF'
-# Disable power management & screen saver
-xset -dpms
-xset s off
-
-# Start openbox (lightweight window manager)
-exec openbox &
-sleep 1
-
-# Start kiosk client (Chromium via xclient.sh)
-"/opt/edudisplej/init/xclient.sh" &
-EOF
-
-    # Xorg indítása startx-szel logba
-    nohup startx -- :0 > /opt/edudisplej/xsession.log 2>&1 &
-    sleep 2
-
-    if pgrep -x Xorg >/dev/null || pgrep -x Xwayland >/dev/null; then
-        print_success "X session started"
-        return 0
-    else
-        print_error "Failed to start X session (see /opt/edudisplej/xsession.log)"
-        return 1
-    fi
-}
-
-# =============================================================================
 # Wait for Internet Connection
 # =============================================================================
 
@@ -470,11 +439,6 @@ main_menu() {
             set_mode "$saved_mode"
             save_config
 
-            # >>> CHANGED: előbb X session, aztán kiosk
-            if ! ensure_x_session; then
-                print_error "X session failed to start; aborting kiosk start."
-                break
-            fi
             start_kiosk_mode
             break
         fi
@@ -486,10 +450,6 @@ main_menu() {
                 set_mode "EDSERVER"
                 KIOSK_URL="https://server.edudisplej.sk/demo/client/"
                 save_config
-                if ! ensure_x_session; then
-                    print_error "X session failed to start; aborting kiosk start."
-                    break
-                fi
                 start_kiosk_mode
                 break
                 ;;
@@ -503,10 +463,6 @@ main_menu() {
                     KIOSK_URL="${DEFAULT_KIOSK_URL}"
                 fi
                 save_config
-                if ! ensure_x_session; then
-                    print_error "X session failed to start; aborting kiosk start."
-                    break
-                fi
                 start_kiosk_mode
                 break
                 ;;
@@ -525,10 +481,6 @@ main_menu() {
             5)
                 # Exit (just start kiosk with defaults)
                 print_info "$(t menu_exit)"
-                if ! ensure_x_session; then
-                    print_error "X session failed to start; aborting kiosk start."
-                    break
-                fi
                 start_kiosk_mode
                 break
                 ;;
@@ -575,11 +527,6 @@ else
         set_mode "$SAVED_MODE"
     fi
 
-    # >>> CHANGED: Start X session first, then kiosk
-    if ! ensure_x_session; then
-        print_error "X session failed to start; aborting kiosk start."
-        exit 1
-    fi
     start_kiosk_mode
 fi
 
