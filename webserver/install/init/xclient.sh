@@ -17,6 +17,16 @@ EDUDISPLEJ_HOME="/opt/edudisplej"
 INIT_DIR="${EDUDISPLEJ_HOME}/init"
 CONFIG_FILE="${EDUDISPLEJ_HOME}/edudisplej.conf"
 LOG_FILE="${EDUDISPLEJ_HOME}/xclient.log"
+MAX_LOG_SIZE=2097152  # 2MB max log size
+
+# Clean old log on startup to prevent disk fill (keep only current session)
+if [[ -f "$LOG_FILE" ]]; then
+    log_size=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+    if [[ $log_size -gt $MAX_LOG_SIZE ]]; then
+        mv "$LOG_FILE" "${LOG_FILE}.old"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Log rotated (previous log moved to xclient.log.old)" > "$LOG_FILE"
+    fi
+fi
 
 # Log: stdout+stderr with timestamps
 mkdir -p "${EDUDISPLEJ_HOME}" >/dev/null 2>&1 || true
@@ -80,10 +90,11 @@ get_chromium_flags() {
 --disable-infobars \
 --start-maximized \
 --incognito \
---ozone-platform=x11 \
+--no-sandbox \
+--disable-dev-shm-usage \
 --disable-gpu \
 --use-gl=swiftshader \
---in-process-gpu \
+--ozone-platform=x11 \
 --user-data-dir=${profile_dir} \
 --no-first-run \
 --no-default-browser-check \
@@ -92,7 +103,7 @@ get_chromium_flags() {
 --disable-sync \
 --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache \
 --enable-low-end-device-mode \
---enable-features=OverlayScrollbar"
+--renderer-process-limit=1"
 }
 
 clear_browser_state() {
@@ -159,10 +170,26 @@ start_chromium() {
         fi
 
         echo "[xclient] Starting ${BROWSER_BIN:-chromium} (attempt ${attempt}/${max_attempts})..."
-        # Gentle stop any remnants
-        pkill -x chromium >/dev/null 2>&1 || true
-        pkill -x chromium-browser >/dev/null 2>&1 || true
-        sleep 1
+        # Stop any remnants using specific PIDs
+        local old_pids
+        old_pids=$(pgrep -x "chromium" 2>/dev/null)
+        old_pids="$old_pids $(pgrep -x "chromium-browser" 2>/dev/null)"
+        if [[ -n "$old_pids" ]] && [[ "$old_pids" != " " ]]; then
+            echo "[xclient] Stopping old browser processes: $old_pids"
+            for pid in $old_pids; do
+                [[ -z "$pid" ]] && continue
+                kill -TERM "$pid" 2>/dev/null || true
+            done
+            sleep 2
+            # Force kill if still running
+            for pid in $old_pids; do
+                [[ -z "$pid" ]] && continue
+                if kill -0 "$pid" 2>/dev/null; then
+                    kill -KILL "$pid" 2>/dev/null || true
+                fi
+            done
+            sleep 1
+        fi
 
         clear_browser_state
         prepare_runtime

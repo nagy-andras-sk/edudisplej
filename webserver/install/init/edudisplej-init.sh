@@ -12,6 +12,15 @@ CONFIG_FILE="${EDUDISPLEJ_HOME}/edudisplej.conf"
 MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 LAST_ONLINE_FILE="${EDUDISPLEJ_HOME}/.last_online"
 LOCAL_WEB_DIR="${EDUDISPLEJ_HOME}/localweb"
+SESSION_LOG="${EDUDISPLEJ_HOME}/session.log"
+
+# Clean old session log on startup (keep only current session)
+if [[ -f "$SESSION_LOG" ]]; then
+    mv "$SESSION_LOG" "${SESSION_LOG}.old" 2>/dev/null || true
+fi
+
+# Redirect all output to session log
+exec > >(tee -a "$SESSION_LOG") 2>&1
 
 # Versioning and update source
 CURRENT_VERSION="20260107-1"
@@ -19,8 +28,17 @@ INIT_BASE="https://install.edudisplej.sk/init"
 VERSION_URL="${INIT_BASE}/version.txt"
 FILES_LIST_URL="${INIT_BASE}/download.php?getfiles"
 DOWNLOAD_URL="${INIT_BASE}/download.php?streamfile="
+MAX_LOG_SIZE=2097152  # 2MB max log size
 APT_LOG="${EDUDISPLEJ_HOME}/apt.log"
 UPDATE_LOG="${EDUDISPLEJ_HOME}/update.log"
+
+# Clean old apt log on startup (keep only current session)
+if [[ -f "$APT_LOG" ]]; then
+    log_size=$(stat -f%z "$APT_LOG" 2>/dev/null || stat -c%s "$APT_LOG" 2>/dev/null || echo 0)
+    if [[ $log_size -gt $MAX_LOG_SIZE ]]; then
+        mv "$APT_LOG" "${APT_LOG}.old" 2>/dev/null || true
+    fi
+fi
 
 # Ensure home/init directories and permissions exist
 ensure_edudisplej_home() {
@@ -94,6 +112,13 @@ else
     print_error "language.sh not found!"
 fi
 
+if [[ -f "${INIT_DIR}/registration.sh" ]]; then
+    source "${INIT_DIR}/registration.sh"
+    print_success "registration.sh loaded"
+else
+    print_warning "registration.sh not found! Device registration will be skipped."
+fi
+
 echo ""
 
 # =============================================================================
@@ -124,8 +149,8 @@ fi
 
 BROWSER_CANDIDATES=(chromium-browser chromium)
 BROWSER_BIN=""
-# >>> ADDED: xorg és openbox itt már benne volt, jó
-REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
+# Core packages needed for kiosk mode
+REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg chromium-browser)
 APT_UPDATED=false
 
 # Check and install required packages
@@ -361,45 +386,6 @@ countdown_or_menu() {
 }
 
 # =============================================================================
-# >>> ADDED: Ensure X session (Xorg + openbox) runs before kiosk
-# =============================================================================
-ensure_x_session() {
-    # Ha már fut Xorg/Xwayland, semmit nem kell tenni
-    if pgrep -x Xorg >/dev/null || pgrep -x Xwayland >/dev/null; then
-        print_success "X server already running"
-        return 0
-    fi
-
-    print_info "Starting X session on ${DISPLAY:-:0} ..."
-
-    # .xinitrc létrehozása a $HOME-ban (/opt/edudisplej)
-    cat > "${HOME}/.xinitrc" << 'EOF'
-# Disable power management & screen saver
-xset -dpms
-xset s off
-
-# Start openbox (lightweight window manager)
-exec openbox &
-sleep 1
-
-# Start kiosk client (Chromium via xclient.sh)
-"/opt/edudisplej/init/xclient.sh" &
-EOF
-
-    # Xorg indítása startx-szel logba
-    nohup startx -- :0 > /opt/edudisplej/xsession.log 2>&1 &
-    sleep 2
-
-    if pgrep -x Xorg >/dev/null || pgrep -x Xwayland >/dev/null; then
-        print_success "X session started"
-        return 0
-    else
-        print_error "Failed to start X session (see /opt/edudisplej/xsession.log)"
-        return 1
-    fi
-}
-
-# =============================================================================
 # Wait for Internet Connection
 # =============================================================================
 
@@ -408,6 +394,11 @@ INTERNET_AVAILABLE=$?
 
 if [[ $INTERNET_AVAILABLE -eq 0 ]]; then
     date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LAST_ONLINE_FILE"
+    
+    # Try to register device to remote server (only if not already registered)
+    if command -v register_device >/dev/null 2>&1; then
+        register_device || print_warning "Device registration failed (will retry on next boot)"
+    fi
 fi
 
 echo ""
@@ -449,11 +440,6 @@ main_menu() {
             set_mode "$saved_mode"
             save_config
 
-            # >>> CHANGED: előbb X session, aztán kiosk
-            if ! ensure_x_session; then
-                print_error "X session failed to start; aborting kiosk start."
-                break
-            fi
             start_kiosk_mode
             break
         fi
@@ -465,10 +451,6 @@ main_menu() {
                 set_mode "EDSERVER"
                 KIOSK_URL="https://server.edudisplej.sk/demo/client/"
                 save_config
-                if ! ensure_x_session; then
-                    print_error "X session failed to start; aborting kiosk start."
-                    break
-                fi
                 start_kiosk_mode
                 break
                 ;;
@@ -482,10 +464,6 @@ main_menu() {
                     KIOSK_URL="${DEFAULT_KIOSK_URL}"
                 fi
                 save_config
-                if ! ensure_x_session; then
-                    print_error "X session failed to start; aborting kiosk start."
-                    break
-                fi
                 start_kiosk_mode
                 break
                 ;;
@@ -504,10 +482,6 @@ main_menu() {
             5)
                 # Exit (just start kiosk with defaults)
                 print_info "$(t menu_exit)"
-                if ! ensure_x_session; then
-                    print_error "X session failed to start; aborting kiosk start."
-                    break
-                fi
                 start_kiosk_mode
                 break
                 ;;
@@ -554,11 +528,6 @@ else
         set_mode "$SAVED_MODE"
     fi
 
-    # >>> CHANGED: Start X session first, then kiosk
-    if ! ensure_x_session; then
-        print_error "X session failed to start; aborting kiosk start."
-        exit 1
-    fi
     start_kiosk_mode
 fi
 

@@ -25,14 +25,42 @@ fi
 cleanup_x_sessions() {
     print_info "Cleaning up old X sessions..."
     
-    # Kill any existing X processes
-    pkill -9 Xorg 2>/dev/null
-    pkill -9 xinit 2>/dev/null
-    pkill -9 chromium 2>/dev/null
-    pkill -9 chromium-browser 2>/dev/null
-    if [[ -n "$BROWSER_BIN" ]]; then
-        pkill -9 "$BROWSER_BIN" 2>/dev/null
+    # Kill any existing X processes using specific PIDs
+    local xorg_pids
+    xorg_pids=$(pgrep -x "Xorg" 2>/dev/null)
+    if [[ -n "$xorg_pids" ]]; then
+        for pid in $xorg_pids; do
+            kill -TERM "$pid" 2>/dev/null || true
+        done
     fi
+    
+    local xinit_pids
+    xinit_pids=$(pgrep -x "xinit" 2>/dev/null)
+    if [[ -n "$xinit_pids" ]]; then
+        for pid in $xinit_pids; do
+            kill -TERM "$pid" 2>/dev/null || true
+        done
+    fi
+    
+    local chromium_pids
+    chromium_pids=$(pgrep -x "chromium" 2>/dev/null)
+    chromium_pids="$chromium_pids $(pgrep -x "chromium-browser" 2>/dev/null)"
+    if [[ -n "$chromium_pids" ]] && [[ "$chromium_pids" != " " ]]; then
+        for pid in $chromium_pids; do
+            [[ -z "$pid" ]] && continue
+            kill -TERM "$pid" 2>/dev/null || true
+        done
+    fi
+    
+    sleep 1
+    
+    # Force kill if still running
+    for pid in $xorg_pids $xinit_pids $chromium_pids; do
+        [[ -z "$pid" ]] && continue
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
     
     # Remove X lock files
     rm -f /tmp/.X0-lock 2>/dev/null
@@ -103,7 +131,7 @@ get_browser_flags() {
     local profile_dir="${EDUDISPLEJ_HOME:-/opt/edudisplej}/chromium-profile"
     case "$BROWSER_BIN" in
         chromium-browser|chromium)
-            echo "--kiosk --noerrdialogs --disable-infobars --start-maximized --incognito --no-sandbox --disable-dev-shm-usage --disable-gpu --user-data-dir=${profile_dir} --no-first-run --no-default-browser-check --password-store=basic --use-mock-keychain --disable-translate --disable-sync --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache --enable-low-end-device-mode --renderer-process-limit=1 --no-zygote --single-process ${url}"
+            echo "--kiosk --noerrdialogs --disable-infobars --start-maximized --incognito --no-sandbox --disable-dev-shm-usage --disable-gpu --use-gl=swiftshader --ozone-platform=x11 --user-data-dir=${profile_dir} --no-first-run --no-default-browser-check --password-store=basic --disable-translate --disable-sync --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache --enable-low-end-device-mode --renderer-process-limit=1 ${url}"
             ;;
         *)
             echo "${url}"
@@ -126,9 +154,22 @@ start_browser_kiosk() {
     while [[ $attempt -le $max_attempts ]]; do
         print_info "Attempt ${attempt}/${max_attempts}..."
         
-        # Kill any existing browser instances
-        pkill -9 "$BROWSER_BIN" 2>/dev/null
-        sleep 1
+        # Kill any existing browser instances using specific PIDs
+        local browser_pids
+        browser_pids=$(pgrep -x "$BROWSER_BIN" 2>/dev/null)
+        if [[ -n "$browser_pids" ]]; then
+            for pid in $browser_pids; do
+                kill -TERM "$pid" 2>/dev/null || true
+            done
+            sleep 1
+            # Force kill if still running
+            for pid in $browser_pids; do
+                if kill -0 "$pid" 2>/dev/null; then
+                    kill -KILL "$pid" 2>/dev/null || true
+                fi
+            done
+            sleep 1
+        fi
         
         # Clear per-browser session data
         case "$BROWSER_BIN" in
@@ -187,12 +228,52 @@ start_kiosk_mode() {
 stop_kiosk_mode() {
     print_info "Stopping kiosk mode..."
 
-    pkill -9 chromium 2>/dev/null
-    pkill -9 chromium-browser 2>/dev/null
-    pkill -9 openbox 2>/dev/null
-    pkill -9 unclutter 2>/dev/null
-    pkill -9 Xorg 2>/dev/null
-    pkill -9 xinit 2>/dev/null
+    # Kill processes using specific PIDs
+    local chromium_pids
+    chromium_pids=$(pgrep -x "chromium" 2>/dev/null)
+    chromium_pids="$chromium_pids $(pgrep -x "chromium-browser" 2>/dev/null)"
+    for pid in $chromium_pids; do
+        [[ -z "$pid" ]] && continue
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    
+    local openbox_pids
+    openbox_pids=$(pgrep -x "openbox" 2>/dev/null)
+    for pid in $openbox_pids; do
+        [[ -z "$pid" ]] && continue
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    
+    local unclutter_pids
+    unclutter_pids=$(pgrep -x "unclutter" 2>/dev/null)
+    for pid in $unclutter_pids; do
+        [[ -z "$pid" ]] && continue
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    
+    local xorg_pids
+    xorg_pids=$(pgrep -x "Xorg" 2>/dev/null)
+    for pid in $xorg_pids; do
+        [[ -z "$pid" ]] && continue
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    
+    local xinit_pids
+    xinit_pids=$(pgrep -x "xinit" 2>/dev/null)
+    for pid in $xinit_pids; do
+        [[ -z "$pid" ]] && continue
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    
+    sleep 1
+    
+    # Force kill if still running
+    for pid in $chromium_pids $openbox_pids $unclutter_pids $xorg_pids $xinit_pids; do
+        [[ -z "$pid" ]] && continue
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
     
     rm -f /tmp/.X0-lock 2>/dev/null
     rm -rf /tmp/.X11-unix/X0 2>/dev/null
