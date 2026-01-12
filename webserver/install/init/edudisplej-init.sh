@@ -1,3 +1,4 @@
+
 #!/bin/bash
 # edudisplej-init.sh - EduDisplej initialization script
 # =============================================================================
@@ -93,13 +94,6 @@ else
     print_error "language.sh not found!"
 fi
 
-if [[ -f "${INIT_DIR}/services.sh" ]]; then
-    source "${INIT_DIR}/services.sh"
-    print_success "services.sh loaded"
-else
-    print_warning "services.sh not found (service management disabled)"
-fi
-
 echo ""
 
 # =============================================================================
@@ -130,6 +124,7 @@ fi
 
 BROWSER_CANDIDATES=(chromium-browser chromium)
 BROWSER_BIN=""
+# >>> ADDED: xorg és openbox itt már benne volt, jó
 REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
 APT_UPDATED=false
 
@@ -137,7 +132,7 @@ APT_UPDATED=false
 ensure_required_packages() {
     local missing=()
     local still_missing=()
-    
+
     print_info "$(t boot_pkg_check)"
     for pkg in "${REQUIRED_PACKAGES[@]}"; do
         if dpkg -s "$pkg" >/dev/null 2>&1; then
@@ -146,7 +141,7 @@ ensure_required_packages() {
             missing+=("$pkg")
         fi
     done
-    
+
     if [[ ${#missing[@]} -eq 0 ]]; then
         print_success "$(t boot_pkg_ok)"
         return 0
@@ -159,7 +154,7 @@ ensure_required_packages() {
     fi
 
     print_info "$(t boot_pkg_installing) ${missing[*]}"
-    
+
     # Update package lists
     if [[ "$APT_UPDATED" == false ]]; then
         print_info "Updating package lists..."
@@ -173,7 +168,7 @@ ensure_required_packages() {
     # Try to install missing packages
     print_info "Installing packages: ${missing[*]}"
     apt-get install -y "${missing[@]}" 2>&1 | tee -a "$APT_LOG"
-    
+
     # Verify each package was actually installed
     for pkg in "${missing[@]}"; do
         if ! dpkg -s "$pkg" >/dev/null 2>&1; then
@@ -183,7 +178,7 @@ ensure_required_packages() {
             print_success "Installed: ${pkg}"
         fi
     done
-    
+
     if [[ ${#still_missing[@]} -eq 0 ]]; then
         print_success "$(t boot_pkg_ok)"
         return 0
@@ -366,9 +361,47 @@ countdown_or_menu() {
 }
 
 # =============================================================================
+# >>> ADDED: Ensure X session (Xorg + openbox) runs before kiosk
+# =============================================================================
+ensure_x_session() {
+    # Ha már fut Xorg/Xwayland, semmit nem kell tenni
+    if pgrep -x Xorg >/dev/null || pgrep -x Xwayland >/dev/null; then
+        print_success "X server already running"
+        return 0
+    fi
+
+    print_info "Starting X session on ${DISPLAY:-:0} ..."
+
+    # .xinitrc létrehozása a $HOME-ban (/opt/edudisplej)
+    cat > "${HOME}/.xinitrc" << 'EOF'
+# Disable power management & screen saver
+xset -dpms
+xset s off
+
+# Start openbox (lightweight window manager)
+exec openbox &
+sleep 1
+
+# Start kiosk client (Chromium via xclient.sh)
+"/opt/edudisplej/init/xclient.sh" &
+EOF
+
+    # Xorg indítása startx-szel logba
+    nohup startx -- :0 > /opt/edudisplej/xsession.log 2>&1 &
+    sleep 2
+
+    if pgrep -x Xorg >/dev/null || pgrep -x Xwayland >/dev/null; then
+        print_success "X session started"
+        return 0
+    else
+        print_error "Failed to start X session (see /opt/edudisplej/xsession.log)"
+        return 1
+    fi
+}
+
+# =============================================================================
 # Wait for Internet Connection
 # =============================================================================
-
 
 wait_for_internet
 INTERNET_AVAILABLE=$?
@@ -392,11 +425,6 @@ if ! ensure_browser; then
     exit 1
 fi
 
-# Ensure kiosk service unit exists
-if command -v systemctl >/dev/null 2>&1; then
-    ensure_chromium_kiosk_service || print_warning "Could not ensure kiosk service"
-fi
-
 # Check for newer init bundle and self-update
 if [[ "$INTERNET_AVAILABLE" -eq 0 ]]; then
     self_update_if_needed "$@"
@@ -410,7 +438,7 @@ fi
 
 main_menu() {
     local choice
-    
+
     while true; do
         show_main_menu
         if ! read -rp "> " -t $COUNTDOWN_SECONDS choice; then
@@ -420,14 +448,16 @@ main_menu() {
             [[ -z "$saved_mode" ]] && saved_mode="EDSERVER"
             set_mode "$saved_mode"
             save_config
-            if command -v systemctl >/dev/null 2>&1; then
-                start_or_restart_chromium_kiosk_service || start_kiosk_mode
-            else
-                start_kiosk_mode
+
+            # >>> CHANGED: előbb X session, aztán kiosk
+            if ! ensure_x_session; then
+                print_error "X session failed to start; aborting kiosk start."
+                break
             fi
+            start_kiosk_mode
             break
         fi
-        
+
         case "$choice" in
             0)
                 # EduServer mode
@@ -435,11 +465,11 @@ main_menu() {
                 set_mode "EDSERVER"
                 KIOSK_URL="https://server.edudisplej.sk/demo/client/"
                 save_config
-                if command -v systemctl >/dev/null 2>&1; then
-                    start_or_restart_chromium_kiosk_service || start_kiosk_mode
-                else
-                    start_kiosk_mode
+                if ! ensure_x_session; then
+                    print_error "X session failed to start; aborting kiosk start."
+                    break
                 fi
+                start_kiosk_mode
                 break
                 ;;
             1)
@@ -452,6 +482,10 @@ main_menu() {
                     KIOSK_URL="${DEFAULT_KIOSK_URL}"
                 fi
                 save_config
+                if ! ensure_x_session; then
+                    print_error "X session failed to start; aborting kiosk start."
+                    break
+                fi
                 start_kiosk_mode
                 break
                 ;;
@@ -470,11 +504,11 @@ main_menu() {
             5)
                 # Exit (just start kiosk with defaults)
                 print_info "$(t menu_exit)"
-                if command -v systemctl >/dev/null 2>&1; then
-                    start_or_restart_chromium_kiosk_service || start_kiosk_mode
-                else
-                    start_kiosk_mode
+                if ! ensure_x_session; then
+                    print_error "X session failed to start; aborting kiosk start."
+                    break
                 fi
+                start_kiosk_mode
                 break
                 ;;
             *)
@@ -510,22 +544,22 @@ if [[ "$ENTER_MENU" == true ]]; then
 else
     # Load existing mode and start kiosk
     print_info "$(t boot_loading_mode)"
-    
+
     SAVED_MODE=$(get_mode)
-    
+
     if [[ -n "$SAVED_MODE" ]]; then
         print_info "Mode: ${SAVED_MODE}"
     else
         SAVED_MODE="EDSERVER"
         set_mode "$SAVED_MODE"
     fi
-    
-    # Start kiosk service if available, else direct kiosk
-    if command -v systemctl >/dev/null 2>&1; then
-        start_or_restart_chromium_kiosk_service || start_kiosk_mode
-    else
-        start_kiosk_mode
+
+    # >>> CHANGED: Start X session first, then kiosk
+    if ! ensure_x_session; then
+        print_error "X session failed to start; aborting kiosk start."
+        exit 1
     fi
+    start_kiosk_mode
 fi
 
 # =============================================================================
@@ -534,4 +568,3 @@ fi
 
 echo ""
 print_info "EduDisplej init script completed."
-exit 0

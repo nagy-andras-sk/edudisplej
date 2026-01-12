@@ -1,90 +1,63 @@
+
 #!/bin/bash
 # xclient.sh - X client wrapper for Openbox + Chromium
 # This script is started by xinit and runs inside the X session
 # All text is in Slovak (without diacritics) or English
 
-# Set locale and display for GUI apps
+set -u
+
+# -----------------------------------------------------------------------------
+# Environment
+# -----------------------------------------------------------------------------
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
-export DISPLAY=:0
+export DISPLAY=${DISPLAY:-:0}
 
-# Path to init directory
 EDUDISPLEJ_HOME="/opt/edudisplej"
 INIT_DIR="${EDUDISPLEJ_HOME}/init"
 CONFIG_FILE="${EDUDISPLEJ_HOME}/edudisplej.conf"
+LOG_FILE="${EDUDISPLEJ_HOME}/xclient.log"
 
-# Load configuration
+# Log: stdout+stderr with timestamps
+mkdir -p "${EDUDISPLEJ_HOME}" >/dev/null 2>&1 || true
+exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }' | tee -a "$LOG_FILE") 2>&1
+
+echo "[xclient] Starting at $(date)"
+echo "[xclient] DISPLAY=${DISPLAY}"
+
+# Load configuration (if present)
 if [[ -f "$CONFIG_FILE" ]]; then
+    # shellcheck source=/dev/null
     source "$CONFIG_FILE"
 fi
 
 # Default URL if not set (prefer local clock)
 KIOSK_URL="${KIOSK_URL:-file:///opt/edudisplej/localweb/clock.html}"
+echo "[xclient] KIOSK_URL: ${KIOSK_URL}"
 
-# Log file for debugging
-LOG_FILE="${EDUDISPLEJ_HOME}/xclient.log"
-exec 2>"$LOG_FILE"
-echo "[xclient] Starting at $(date)" | tee -a "$LOG_FILE"
-echo "[xclient] KIOSK_URL: ${KIOSK_URL}" | tee -a "$LOG_FILE"
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+x_alive() {
+    xset q >/dev/null 2>&1
+}
 
-# =============================================================================
-# X Environment Setup
-# =============================================================================
-
-# Disable screensaver
-xset s off 2>/dev/null
-xset s noblank 2>/dev/null
-xset -dpms 2>/dev/null
-
-# Disable screen blanking
-xset dpms 0 0 0 2>/dev/null
-
-# Ensure localweb directory exists
-mkdir -p /opt/edudisplej/localweb 2>/dev/null || true
-
-# Set background to white initially (loading screen)
-if command -v xsetroot &> /dev/null; then
-    xsetroot -solid white 2>/dev/null
-    echo "[xclient] Background set to white" | tee -a "$LOG_FILE"
-fi
-
-# =============================================================================
-# Hide Cursor
-# =============================================================================
-
-# Start unclutter to hide cursor when idle
-if command -v unclutter &> /dev/null; then
-    unclutter -idle 0.5 -root &
-fi
-
-# =============================================================================
-# Window Manager
-# =============================================================================
-
-# Start Openbox window manager
-if command -v openbox &> /dev/null; then
-    openbox &
-    sleep 1
-fi
-
-# =============================================================================
-# Chromium Kiosk
-# =============================================================================
-
-# Detect browser (prefer BROWSER_BIN env, then chromium-browser, chromium)
 detect_browser() {
-    local candidates=("${BROWSER_BIN:-}" "chromium-browser" "chromium")
+    local candidates=()
+    # Prefer externally provided BROWSER_BIN, then chromium-browser, chromium
+    [[ -n "${BROWSER_BIN:-}" ]] && candidates+=("$BROWSER_BIN")
+    candidates+=("chromium-browser" "chromium")
+
     for candidate in "${candidates[@]}"; do
         [[ -z "$candidate" ]] && continue
-        if command -v "$candidate" &> /dev/null; then
+        if command -v "$candidate" >/dev/null 2>&1; then
             BROWSER_BIN="$candidate"
-            echo "[xclient] Browser set to: ${BROWSER_BIN}" | tee -a "$LOG_FILE"
+            export BROWSER_BIN
+            echo "[xclient] Browser set to: ${BROWSER_BIN}"
             return 0
         fi
     done
-    echo "[xclient] ERROR: Chromium not found!" | tee -a "$LOG_FILE"
-    xsetroot -solid red 2>/dev/null
-    sleep 30
+    echo "[xclient] ERROR: Chromium not found!"
     return 1
 }
 
@@ -94,65 +67,153 @@ prepare_runtime() {
     export XDG_RUNTIME_DIR="/tmp/edudisplej-runtime"
     mkdir -p "$XDG_RUNTIME_DIR" "${EDUDISPLEJ_HOME}/chromium-profile" || true
     chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
-    chown edudisplej:edudisplej "$XDG_RUNTIME_DIR" "${EDUDISPLEJ_HOME}/chromium-profile" 2>/dev/null || true
+    # A futtató user tipikusan edudisplej; ha root, ne chown-oljunk hibásan
+    if id -u edudisplej >/dev/null 2>&1; then
+        chown edudisplej:edudisplej "$XDG_RUNTIME_DIR" "${EDUDISPLEJ_HOME}/chromium-profile" 2>/dev/null || true
+    fi
 }
 
 get_chromium_flags() {
     local profile_dir="${EDUDISPLEJ_HOME}/chromium-profile"
-    echo "--kiosk --noerrdialogs --disable-infobars --start-maximized --incognito --no-sandbox --disable-dev-shm-usage --disable-gpu --user-data-dir=${profile_dir} --no-first-run --no-default-browser-check --password-store=basic --use-mock-keychain --disable-translate --disable-sync --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache --enable-low-end-device-mode --renderer-process-limit=1 --no-zygote --single-process --enable-features=OverlayScrollbar"
+    echo "--kiosk \
+--noerrdialogs \
+--disable-infobars \
+--start-maximized \
+--incognito \
+--ozone-platform=x11 \
+--disable-gpu \
+--use-gl=swiftshader \
+--in-process-gpu \
+--user-data-dir=${profile_dir} \
+--no-first-run \
+--no-default-browser-check \
+--password-store=basic \
+--disable-translate \
+--disable-sync \
+--disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache \
+--enable-low-end-device-mode \
+--enable-features=OverlayScrollbar"
 }
 
 clear_browser_state() {
     # Avoid restore prompts or locked profiles
-    rm -rf ~/.config/chromium/Default/Preferences.lock 2>/dev/null
-    rm -rf "${EDUDISPLEJ_HOME}/chromium-profile/Singleton*" 2>/dev/null
+    rm -rf ~/.config/chromium/Default/Preferences.lock 2>/dev/null || true
+    rm -rf "${EDUDISPLEJ_HOME}/chromium-profile/Singleton*" 2>/dev/null || true
 }
 
+start_unclutter() {
+    if command -v unclutter >/dev/null 2>&1; then
+        if ! pgrep -x unclutter >/dev/null 2>&1; then
+            unclutter -idle 0.5 -root &
+            echo "[xclient] Unclutter started"
+        fi
+    fi
+}
+
+start_openbox_if_needed() {
+    if command -v openbox >/dev/null 2>&1; then
+        if ! pgrep -x openbox >/dev/null 2>&1; then
+            openbox &
+            echo "[xclient] Openbox started"
+            sleep 1
+        else
+            echo "[xclient] Openbox already running"
+        fi
+    fi
+}
+
+set_background() {
+    if command -v xsetroot >/dev/null 2>&1; then
+        xsetroot -solid white 2>/dev/null || true
+        echo "[xclient] Background set to white"
+    fi
+}
+
+setup_x_env() {
+    # Disable screensaver / DPMS
+    xset s off 2>/dev/null || true
+    xset s noblank 2>/dev/null || true
+    xset -dpms 2>/dev/null || true
+    xset dpms 0 0 0 2>/dev/null || true
+
+    mkdir -p /opt/edudisplej/localweb 2>/dev/null || true
+    set_background
+    start_unclutter
+    start_openbox_if_needed
+}
+
+# -----------------------------------------------------------------------------
+# Chromium start/restart loop
+# -----------------------------------------------------------------------------
 start_chromium() {
     local max_attempts=3
     local attempt=1
     local delay=15
 
     while [[ $attempt -le $max_attempts ]]; do
-        echo "[xclient] Starting ${BROWSER_BIN:-chromium} (attempt ${attempt}/${max_attempts})..." | tee -a "$LOG_FILE"
+        # Ensure X is alive before each attempt
+        if ! x_alive; then
+            echo "[xclient] X not available on ${DISPLAY}; waiting..."
+            sleep 3
+            continue
+        fi
 
-        pkill -9 chromium 2>/dev/null
-        pkill -9 chromium-browser 2>/dev/null
+        echo "[xclient] Starting ${BROWSER_BIN:-chromium} (attempt ${attempt}/${max_attempts})..."
+        # Gentle stop any remnants
+        pkill -x chromium >/dev/null 2>&1 || true
+        pkill -x chromium-browser >/dev/null 2>&1 || true
         sleep 1
 
         clear_browser_state
         prepare_runtime
+        setup_x_env
 
-        echo "[xclient] Command: ${BROWSER_BIN:-chromium} $(get_chromium_flags) ${KIOSK_URL}" | tee -a "$LOG_FILE"
-        "${BROWSER_BIN:-chromium}" $(get_chromium_flags) "${KIOSK_URL}" >> "$LOG_FILE" 2>&1 &
+        local flags
+        flags="$(get_chromium_flags)"
+        echo "[xclient] Command: ${BROWSER_BIN:-chromium} ${flags} ${KIOSK_URL}"
+        "${BROWSER_BIN:-chromium}" ${flags} "${KIOSK_URL}" &
         BROWSER_PID=$!
 
+        # short settle time
         sleep 5
 
-        if kill -0 $BROWSER_PID 2>/dev/null; then
+        if kill -0 "$BROWSER_PID" >/dev/null 2>&1; then
             echo "[xclient] Browser started successfully (PID: ${BROWSER_PID})"
-            wait $BROWSER_PID
-            echo "[xclient] Browser exited, restarting..."
+            # Wait until it exits, then restart (keep-alive)
+            wait "$BROWSER_PID"
+            echo "[xclient] Browser exited; restarting after ${delay}s"
             attempt=1
         else
             echo "[xclient] Browser failed to start, retrying..."
             ((attempt++))
         fi
 
-        sleep $delay
+        sleep "$delay"
     done
 
     echo "[xclient] Browser failed to start after ${max_attempts} attempts"
     return 1
 }
 
-# Main loop - keep browser running
+# -----------------------------------------------------------------------------
+# Main
+# -----------------------------------------------------------------------------
+# Basic X availability check before doing anything
+if ! x_alive; then
+    echo "[xclient] WARNING: X connection test failed on ${DISPLAY}. Ensure Xorg/Xwayland is running."
+fi
+
 if detect_browser; then
     while true; do
         start_chromium
-        echo "[xclient] Waiting before restart..." | tee -a "$LOG_FILE"
+        echo "[xclient] Waiting before restart..."
         sleep 10
     done
 else
+    # Set a visible red background to indicate failure
+    if command -v xsetroot >/dev/null 2>&1; then
+        xsetroot -solid red 2>/dev/null || true
+    fi
+    echo "[xclient] Exiting (browser not found)."
     exit 1
 fi
