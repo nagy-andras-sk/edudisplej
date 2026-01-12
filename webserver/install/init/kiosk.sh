@@ -88,8 +88,17 @@ start_x_server() {
     
     export DISPLAY=:0
     
+    # Ensure xclient.sh is executable
+    if [[ -f "${INIT_DIR}/xclient.sh" ]]; then
+        chmod +x "${INIT_DIR}/xclient.sh"
+    else
+        print_error "xclient.sh not found at ${INIT_DIR}/xclient.sh"
+        return 1
+    fi
+    
     # Start X server - direct xinit for reliable operation during system boot
     xinit "${INIT_DIR}/xclient.sh" -- :0 vt1 -nolisten tcp &
+    XINIT_PID=$!
     
     # Wait for X to start
     local attempts=0

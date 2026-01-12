@@ -147,7 +147,8 @@ fi
 # Helper Functions
 # =============================================================================
 
-BROWSER_CANDIDATES=(chromium-browser chromium)
+# Browser candidates - epiphany-browser works on older ARM without NEON support
+BROWSER_CANDIDATES=(epiphany-browser chromium-browser chromium)
 BROWSER_BIN=""
 # Core packages needed for kiosk mode (browser installed separately via ensure_browser)
 REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
@@ -558,8 +559,19 @@ else
 fi
 
 # =============================================================================
-# End of Script
+# Keep running - monitor kiosk processes
 # =============================================================================
 
 echo ""
-print_info "EduDisplej init script completed."
+print_info "EduDisplej kiosk is running. Press Ctrl+C to stop."
+print_info "Logs: session.log, xclient.log"
+echo ""
+
+# Keep the script alive - monitor xinit/X processes
+while true; do
+    if ! pgrep -x xinit >/dev/null 2>&1 && ! pgrep -x Xorg >/dev/null 2>&1; then
+        print_warning "X server stopped. Restarting..."
+        start_kiosk_mode
+    fi
+    sleep 10
+done

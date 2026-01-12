@@ -29,14 +29,21 @@ fi
 
 # Log: stdout+stderr with timestamps
 mkdir -p "${EDUDISPLEJ_HOME}" >/dev/null 2>&1 || true
+touch "$LOG_FILE" 2>/dev/null || true
 
 # Redirect output to log file (simple, direct approach)
-exec 1> >(tee -a "$LOG_FILE")
-exec 2>&1
+exec 1> >(tee -a "$LOG_FILE") 2>&1 || {
+    # Fallback if tee fails - direct write
+    exec 1>>"$LOG_FILE" 2>&1
+}
 
+echo "[xclient] =========================================="
 echo "[xclient] Starting at $(date)"
+echo "[xclient] =========================================="
 echo "[xclient] DISPLAY=${DISPLAY}"
 echo "[xclient] UID=$(id -u), GID=$(id -g)"
+echo "[xclient] PWD=$(pwd)"
+echo "[xclient] HOME=${HOME}"
 
 # Load configuration (if present)
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -58,22 +65,69 @@ x_alive() {
     xset q >/dev/null 2>&1
 }
 
+# Check if system has NEON support (ARM only)
+has_neon_support() {
+    local arch
+    arch=$(uname -m)
+    
+    # Only check on ARM systems
+    if [[ "$arch" != "armv"* && "$arch" != "aarch64" ]]; then
+        return 0  # Non-ARM systems don't need NEON check
+    fi
+    
+    # Check for NEON support in /proc/cpuinfo
+    if grep -qi 'neon' /proc/cpuinfo 2>/dev/null; then
+        echo "[xclient] ARM system with NEON support detected"
+        return 0
+    else
+        echo "[xclient] ARM system WITHOUT NEON support detected - modern Chromium will not work"
+        return 1
+    fi
+}
+
 detect_browser() {
     local candidates=()
-    # Prefer externally provided BROWSER_BIN, then chromium-browser, chromium
+    
+    # Prefer externally provided BROWSER_BIN, then try actual binaries
     [[ -n "${BROWSER_BIN:-}" ]] && candidates+=("$BROWSER_BIN")
-    candidates+=("chromium-browser" "chromium")
+    
+    # On ARM systems without NEON, prioritize Epiphany (lightweight, works on older Pi)
+    if ! has_neon_support; then
+        echo "[xclient] System lacks NEON support - prioritizing Epiphany browser"
+        candidates+=(
+            "epiphany-browser"
+            # Try older Chromium versions that might be installed
+            "/usr/lib/chromium-browser/chromium-browser"
+            "/usr/lib/chromium/chromium"
+            "chromium-browser"
+            "chromium"
+        )
+    else
+        # Try real chromium binaries first, then epiphany (lightweight, works on older Pi)
+        candidates+=(
+            "/usr/lib/chromium-browser/chromium-browser"
+            "/usr/lib/chromium/chromium"
+            "chromium-browser"
+            "chromium"
+            "epiphany-browser"
+        )
+    fi
 
     for candidate in "${candidates[@]}"; do
         [[ -z "$candidate" ]] && continue
-        if command -v "$candidate" >/dev/null 2>&1; then
+        # Check if it's an actual executable file or command
+        if [[ -x "$candidate" ]] || command -v "$candidate" >/dev/null 2>&1; then
             BROWSER_BIN="$candidate"
             export BROWSER_BIN
             echo "[xclient] Browser set to: ${BROWSER_BIN}"
+            # Verify it's not just a shell wrapper
+            local browser_type
+            browser_type=$(file "$BROWSER_BIN" 2>/dev/null || echo "unknown")
+            echo "[xclient] Browser type: ${browser_type}"
             return 0
         fi
     done
-    echo "[xclient] ERROR: Chromium not found!"
+    echo "[xclient] ERROR: Browser not found (chromium/epiphany)"
     return 1
 }
 
@@ -128,6 +182,18 @@ get_chromium_flags() {
 --safebrowsing-disable-auto-update \
 --enable-automation \
 --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache"
+}
+
+get_browser_flags() {
+    case "$BROWSER_BIN" in
+        *epiphany-browser*)
+            # Minimal flags; application-mode makes it borderless
+            echo "--application-mode"
+            ;;
+        *)
+            get_chromium_flags
+            ;;
+    esac
 }
 
 clear_browser_state() {
@@ -263,7 +329,7 @@ start_chromium() {
         setup_x_env
 
         local flags
-        flags="$(get_chromium_flags)"
+        flags="$(get_browser_flags)"
         echo "[xclient] Command: ${BROWSER_BIN:-chromium} ${flags} ${KIOSK_URL}"
         "${BROWSER_BIN:-chromium}" ${flags} "${KIOSK_URL}" &
         BROWSER_PID=$!
