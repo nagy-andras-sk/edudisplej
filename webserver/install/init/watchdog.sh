@@ -5,7 +5,7 @@
 EDUDISPLEJ_HOME="/opt/edudisplej"
 WATCHDOG_LOG="${EDUDISPLEJ_HOME}/watchdog.log"
 WATCHDOG_PID_FILE="${EDUDISPLEJ_HOME}/.watchdog.pid"
-MAX_LOG_SIZE=1048576  # 1MB max log size
+MAX_LOG_SIZE=2097152  # 2MB max log size (consistent with other scripts)
 
 # Log rotation - keep log file small
 rotate_log() {

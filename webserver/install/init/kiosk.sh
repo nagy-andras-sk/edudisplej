@@ -43,9 +43,11 @@ cleanup_x_sessions() {
     fi
     
     local chromium_pids
-    chromium_pids=$(pgrep -x "chromium" 2>/dev/null; pgrep -x "chromium-browser" 2>/dev/null)
-    if [[ -n "$chromium_pids" ]]; then
+    chromium_pids=$(pgrep -x "chromium" 2>/dev/null)
+    chromium_pids="$chromium_pids $(pgrep -x "chromium-browser" 2>/dev/null)"
+    if [[ -n "$chromium_pids" ]] && [[ "$chromium_pids" != " " ]]; then
         for pid in $chromium_pids; do
+            [[ -z "$pid" ]] && continue
             kill -TERM "$pid" 2>/dev/null || true
         done
     fi
@@ -54,6 +56,7 @@ cleanup_x_sessions() {
     
     # Force kill if still running
     for pid in $xorg_pids $xinit_pids $chromium_pids; do
+        [[ -z "$pid" ]] && continue
         if kill -0 "$pid" 2>/dev/null; then
             kill -KILL "$pid" 2>/dev/null || true
         fi
@@ -227,32 +230,38 @@ stop_kiosk_mode() {
 
     # Kill processes using specific PIDs
     local chromium_pids
-    chromium_pids=$(pgrep -x "chromium" 2>/dev/null; pgrep -x "chromium-browser" 2>/dev/null)
+    chromium_pids=$(pgrep -x "chromium" 2>/dev/null)
+    chromium_pids="$chromium_pids $(pgrep -x "chromium-browser" 2>/dev/null)"
     for pid in $chromium_pids; do
+        [[ -z "$pid" ]] && continue
         kill -TERM "$pid" 2>/dev/null || true
     done
     
     local openbox_pids
     openbox_pids=$(pgrep -x "openbox" 2>/dev/null)
     for pid in $openbox_pids; do
+        [[ -z "$pid" ]] && continue
         kill -TERM "$pid" 2>/dev/null || true
     done
     
     local unclutter_pids
     unclutter_pids=$(pgrep -x "unclutter" 2>/dev/null)
     for pid in $unclutter_pids; do
+        [[ -z "$pid" ]] && continue
         kill -TERM "$pid" 2>/dev/null || true
     done
     
     local xorg_pids
     xorg_pids=$(pgrep -x "Xorg" 2>/dev/null)
     for pid in $xorg_pids; do
+        [[ -z "$pid" ]] && continue
         kill -TERM "$pid" 2>/dev/null || true
     done
     
     local xinit_pids
     xinit_pids=$(pgrep -x "xinit" 2>/dev/null)
     for pid in $xinit_pids; do
+        [[ -z "$pid" ]] && continue
         kill -TERM "$pid" 2>/dev/null || true
     done
     
@@ -260,6 +269,7 @@ stop_kiosk_mode() {
     
     # Force kill if still running
     for pid in $chromium_pids $openbox_pids $unclutter_pids $xorg_pids $xinit_pids; do
+        [[ -z "$pid" ]] && continue
         if kill -0 "$pid" 2>/dev/null; then
             kill -KILL "$pid" 2>/dev/null || true
         fi

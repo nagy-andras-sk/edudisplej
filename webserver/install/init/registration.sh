@@ -15,13 +15,13 @@ REGISTRATION_LOG="${EDUDISPLEJ_HOME}/registration.log"
 
 # =============================================================================
 # Registration Functions
-# =============================================================================
-
 # Get primary MAC address
 get_primary_mac() {
     local mac
+    local iface
+    
     # Try to get MAC from eth0 first, then wlan0, then any interface
-    for iface in eth0 wlan0 $(ls /sys/class/net/ 2>/dev/null | grep -v lo); do
+    for iface in eth0 wlan0; do
         if [[ -f "/sys/class/net/$iface/address" ]]; then
             mac=$(cat "/sys/class/net/$iface/address" 2>/dev/null)
             if [[ -n "$mac" && "$mac" != "00:00:00:00:00:00" ]]; then
@@ -30,6 +30,23 @@ get_primary_mac() {
             fi
         fi
     done
+    
+    # Try other interfaces (excluding loopback)
+    if [[ -d /sys/class/net ]]; then
+        for iface_path in /sys/class/net/*; do
+            [[ ! -d "$iface_path" ]] && continue
+            iface=$(basename "$iface_path")
+            [[ "$iface" == "lo" ]] && continue
+            
+            if [[ -f "/sys/class/net/$iface/address" ]]; then
+                mac=$(cat "/sys/class/net/$iface/address" 2>/dev/null)
+                if [[ -n "$mac" && "$mac" != "00:00:00:00:00:00" ]]; then
+                    echo "$mac"
+                    return 0
+                fi
+            fi
+        done
+    fi
     
     # Fallback: use ip command
     mac=$(ip link show | grep -A1 "state UP" | grep ether | head -1 | awk '{print $2}')

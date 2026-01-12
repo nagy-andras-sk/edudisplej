@@ -172,15 +172,18 @@ start_chromium() {
         echo "[xclient] Starting ${BROWSER_BIN:-chromium} (attempt ${attempt}/${max_attempts})..."
         # Stop any remnants using specific PIDs
         local old_pids
-        old_pids=$(pgrep -x "chromium" 2>/dev/null; pgrep -x "chromium-browser" 2>/dev/null)
-        if [[ -n "$old_pids" ]]; then
+        old_pids=$(pgrep -x "chromium" 2>/dev/null)
+        old_pids="$old_pids $(pgrep -x "chromium-browser" 2>/dev/null)"
+        if [[ -n "$old_pids" ]] && [[ "$old_pids" != " " ]]; then
             echo "[xclient] Stopping old browser processes: $old_pids"
             for pid in $old_pids; do
+                [[ -z "$pid" ]] && continue
                 kill -TERM "$pid" 2>/dev/null || true
             done
             sleep 2
             # Force kill if still running
             for pid in $old_pids; do
+                [[ -z "$pid" ]] && continue
                 if kill -0 "$pid" 2>/dev/null; then
                     kill -KILL "$pid" 2>/dev/null || true
                 fi
