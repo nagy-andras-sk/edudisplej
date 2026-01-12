@@ -209,17 +209,15 @@ start_kiosk_mode() {
     
     print_info "$(t boot_starting_kiosk)"
     
-    # Start X server
+    # Start X server (xclient.sh will handle the browser)
     if ! start_x_server; then
         print_error "Could not start X server"
         return 1
     fi
     
-    # Start selected browser
-    if ! start_browser_kiosk "$url"; then
-        print_error "Could not start browser"
-        return 1
-    fi
+    # Browser is now started by xclient.sh (via xinit)
+    # No need to start it here anymore
+    print_success "X server and kiosk environment started"
     
     return 0
 }

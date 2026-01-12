@@ -410,10 +410,10 @@ countdown_or_menu() {
     done
     echo ""
 }
- - non-blocking, will try to install if needed
-if ! ensure_browser; then
-    print_warning "No supported browser available yet. Will try offline mode or clock display."
-    # Don't exit - allow the system to continue and show clock or attempt recovery=====================================================================
+
+# =============================================================================
+# Wait for Internet Connection
+# =============================================================================
 
 wait_for_internet
 INTERNET_AVAILABLE=$?
@@ -436,10 +436,10 @@ if ! ensure_required_packages; then
     exit 1
 fi
 
-# Ensure browser exists (chromium-browser/chromium)
+# Ensure browser exists (chromium-browser/chromium) - non-blocking, will try to install if needed
 if ! ensure_browser; then
-    print_error "No supported browser available. Fix installation and reboot."
-    exit 1
+    print_warning "No supported browser available yet. Will try offline mode or clock display."
+    # Don't exit - allow the system to continue and show clock or attempt recovery
 fi
 
 # Check for newer init bundle and self-update
