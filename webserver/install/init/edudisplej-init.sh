@@ -149,8 +149,8 @@ fi
 
 BROWSER_CANDIDATES=(chromium-browser chromium)
 BROWSER_BIN=""
-# Core packages needed for kiosk mode
-REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg chromium-browser)
+# Core packages needed for kiosk mode (browser installed separately via ensure_browser)
+REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
 APT_UPDATED=false
 
 # Check and install required packages
@@ -346,24 +346,50 @@ show_system_summary() {
     current_mode=$(get_mode)
     [[ -z "$current_mode" ]] && current_mode="${MODE:-EDSERVER}"
 
+    # Get device info
+    local device_model
+    device_model=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0' || echo "Unknown")
+    
+    # Get MAC address (try eth0, wlan0, or first available)
+    local mac_addr
+    mac_addr=$(cat /sys/class/net/eth0/address 2>/dev/null || \
+               cat /sys/class/net/wlan0/address 2>/dev/null || \
+               ip link show | grep -A1 "state UP" | grep "link/ether" | awk '{print $2}' | head -n1 || \
+               echo "N/A")
+    
+    # Get CPU info
+    local cpu_temp
+    cpu_temp=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2 || echo "N/A")
+    
+    # Get memory info
+    local mem_info
+    mem_info=$(free -h | awk '/^Mem:/ {print $2 " total, " $3 " used, " $4 " free"}')
+
     echo ""
     print_info "$(t boot_summary)"
+    echo "==========================================="
+    echo "Device: ${device_model}"
+    echo "MAC Address: ${mac_addr}"
+    echo "Hostname: $(hostname)"
+    echo "IP Address: $(get_current_ip)"
+    echo "Gateway: $(get_gateway)"
     echo "-------------------------------------------"
     echo "Mode: ${current_mode}"
     echo "Kiosk URL: ${KIOSK_URL:-$DEFAULT_KIOSK_URL}"
     echo "Language: ${CURRENT_LANG}"
-    echo "IP: $(get_current_ip)"
-    echo "Gateway: $(get_gateway)"
-    echo "Wi-Fi SSID: $(get_current_ssid)"
-    echo "Wi-Fi signal: $(get_current_signal)"
-    if [[ -f "$LAST_ONLINE_FILE" ]]; then
-        echo "Last online: $(cat "$LAST_ONLINE_FILE")"
-    else
-        echo "Last online: unknown"
-    fi
-    echo "Resolution: $(get_current_resolution)"
-    echo "Hostname: $(hostname)"
     echo "-------------------------------------------"
+    echo "Wi-Fi SSID: $(get_current_ssid)"
+    echo "Wi-Fi Signal: $(get_current_signal)"
+    if [[ -f "$LAST_ONLINE_FILE" ]]; then
+        echo "Last Online: $(cat "$LAST_ONLINE_FILE")"
+    else
+        echo "Last Online: unknown"
+    fi
+    echo "-------------------------------------------"
+    echo "Resolution: $(get_current_resolution)"
+    echo "CPU Temp: ${cpu_temp}"
+    echo "Memory: ${mem_info}"
+    echo "==========================================="
     echo ""
 }
 
@@ -384,10 +410,10 @@ countdown_or_menu() {
     done
     echo ""
 }
-
-# =============================================================================
-# Wait for Internet Connection
-# =============================================================================
+ - non-blocking, will try to install if needed
+if ! ensure_browser; then
+    print_warning "No supported browser available yet. Will try offline mode or clock display."
+    # Don't exit - allow the system to continue and show clock or attempt recovery=====================================================================
 
 wait_for_internet
 INTERNET_AVAILABLE=$?
