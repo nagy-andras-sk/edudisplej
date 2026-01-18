@@ -343,124 +343,108 @@ xset dpms 0 0 0      # Žiadny timeout
 
 Toto je hlavný wrapper skript pre spustenie webového prehliadača v kiosk móde.
 
+**UPOZORNENIE:** Tento skript bol zjednodušený 18.1.2026 z 417 riadkov na 209 riadkov (50% redukcia) pre zvýšenie stability a zníženie chybovosti. Pozri [SIMPLIFIED_ARCHITECTURE.md](SIMPLIFIED_ARCHITECTURE.md) pre detaily.
+
 #### **Detekcia prehliadača**
 
 **Funkcia:** `detect_browser()`
 
-**Stratégia detekcie:**
+**Zjednodušená stratégia detekcie:**
 
-1. **Kontrola NEON podpory** (iba ARM):
-   ```bash
-   grep -qi 'neon' /proc/cpuinfo
-   ```
-   
-2. **Priorita prehliadačov:**
+Priorita prehliadačov (pre všetky systémy):
+```
+1. epiphany-browser      (ľahký, funguje na všetkých ARM)
+2. chromium-browser       (štandardný Chromium)
+3. chromium               (alternatívny Chromium)
+4. firefox-esr            (fallback)
+```
 
-   **Systém BEZ NEON** (staršie Raspberry Pi):
-   ```
-   1. epiphany-browser      (ľahký, funguje bez NEON)
-   2. chromium-browser       (starší, možno funguje)
-   3. chromium               (fallback)
-   ```
-
-   **Systém S NEON** (moderný Raspberry Pi, x86):
-   ```
-   1. chromium-browser       (primárny)
-   2. chromium               (alternatíva)
-   3. epiphany-browser       (fallback)
-   ```
-
-3. **Overenie existencie:**
-   ```bash
-   command -v "$candidate" >/dev/null 2>&1
-   ```
+**Poznámka:** Odstránená zložitá kontrola NEON podpory - Epiphany funguje na všetkých zariadeniach.
 
 #### **Príprava prostredia**
 
-**Funkcia:** `prepare_runtime()`
+**Funkcia:** `setup_x_env()`
 
 ```bash
 export LIBGL_ALWAYS_SOFTWARE=1      # Softvérové GL rendering
-export QT_X11_NO_MITSHM=1           # Disable shared memory
 export XDG_RUNTIME_DIR="/tmp/edudisplej-runtime"
 ```
 
-**Vytvorené adresáre:**
-- `/tmp/edudisplej-runtime` - runtime súbory (700 oprávnenia)
-- `/opt/edudisplej/chromium-profile` - profil prehliadača
+**X prostredie:**
+- Vypnutie screensavera (`xset s off`, `xset -dpms`)
+- Skrytie kurzora myši (`unclutter -idle 1`)
+- Spustenie Openbox window managera
 
-#### **Chromium Flagy**
+#### **Browser Flagy (Zjednodušené)**
 
-**Funkcia:** `get_chromium_flags()`
-
-**Optimalizované pre Raspberry Pi:**
-
+**Epiphany:**
 ```bash
---kiosk                              # Fullscreen bez UI
---noerrdialogs                       # Bez error dialógov
---disable-infobars                   # Bez info lišty
---start-maximized                    # Maximalizované okno
---incognito                          # Privátny režim
---no-sandbox                         # Bez sandboxu (rýchlosť)
---disable-dev-shm-usage              # Bez /dev/shm (RAM)
---disable-gpu                        # Softvérové rendering
---disable-software-rasterizer        # Disable SW rasterizer
---disable-extensions                 # Bez rozšírení
---user-data-dir=/opt/edudisplej/chromium-profile
---no-first-run                       # Preskočiť first run wizard
---disable-translate                  # Bez prekladu stránok
---disable-sync                       # Bez synchronizácie
---disable-features=Translate,OptimizationHints,MediaRouter
+epiphany-browser --application-mode URL
 ```
 
-#### **Epiphany Flagy**
-
-**Funkcia:** `get_browser_flags()`
-
-**Stratégia:**
-- **Epiphany:** Žiadne špeciálne flagy, iba URL
-- **Chromium:** Použije `get_chromium_flags()`
-
-**Dôvod:** Epiphany akceptuje **BUĎTO** `--application-mode=desktop_file` **ALEBO** URL, ale **NIE oboje naraz**.
-
+**Chromium (iba 8 základných flagov):**
 ```bash
-case "$BROWSER_BIN" in
-    *epiphany-browser*)
-        # Epiphany: no special flags needed, just pass URL directly
-        echo ""
-        ;;
-    *)
-        get_chromium_flags
-        ;;
-esac
+--kiosk                    # Fullscreen režim
+--no-sandbox               # Potrebné pre root
+--disable-gpu              # Software rendering
+--disable-infobars         # Bez info lišty
+--noerrdialogs             # Bez error dialógov
+--incognito                # Privátny režim
+--no-first-run             # Preskočiť wizard
+--disable-translate        # Bez prekladu
 ```
+
+**Firefox ESR:**
+```bash
+firefox-esr --kiosk --private-window URL
+```
+
+**Poznámka:** Odstránených 22+ zložitých flagov, ktoré spôsobovali crashe.
 
 #### **Spustenie prehliadača**
 
-**Funkcia:** `start_chromium()`
+**Funkcia:** `start_browser()`
 
-**Stratégia:**
-1. **Keep-alive cyklus** - nekonečné reštarty
-2. **Max 3 pokusy** pri chybe spustenia
-3. **15s delay** medzi pokusmi
-4. **Crash recovery** - automatický reštart po zlyhani
-5. **Rate limiting** - aby nedošlo k príliš častým reštartom
+**Zjednodušená stratégia:**
+1. Nastavenie prostredia
+2. Vyčistenie starých procesov (pomocou kill s PID, nie pkill)
+3. Spustenie prehliadača
+4. Čakanie na ukončenie
+5. Reštart po 10s
 
 **Príklad príkazu:**
 ```bash
-# Chromium
-chromium-browser --kiosk --no-sandbox ... file:///opt/edudisplej/localweb/clock.html
-
 # Epiphany
-epiphany-browser file:///opt/edudisplej/localweb/clock.html
+epiphany-browser --application-mode file:///opt/edudisplej/localweb/clock.html
+
+# Chromium (zjednodušené)
+chromium-browser --kiosk --no-sandbox --disable-gpu ... file:///opt/edudisplej/localweb/clock.html
 ```
+
+#### **Zber hardvérových informácií**
+
+Pri štarte X session sa automaticky volá:
+```bash
+/opt/edudisplej/init/hwinfo.sh generate
+```
+
+Zbiera informácie o:
+- CPU (model, teплота, NEON podpora)
+- Pamäť (celkom, voľná, dostupná)
+- Disk (využitie)
+- Sieť (MAC, IP, gateway, WiFi SSID)
+- Displej (rozlíšenie z xrandr)
+- Raspberry Pi (model, serial, firmware, napätie)
+- Browser (nainštalované prehliadače)
+
+Ukladá sa do: `/opt/edudisplej/hwinfo.conf`
 
 **Log:** `/opt/edudisplej/xclient.log`
 
 **Vlastnosti:**
 - Automatická rotácia logov (max 2MB)
+- Jednoduchšie logovanie (priame, bez tee)
 - Timestamp pre každý záznam
-- Detailné informácie o spustení
 
 ---
 
