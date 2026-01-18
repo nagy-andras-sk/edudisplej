@@ -188,7 +188,9 @@ get_browser_flags() {
     case "$BROWSER_BIN" in
         *epiphany-browser*)
             # Epiphany needs a .desktop file for --application-mode
-            local desktop_file="/tmp/edudisplej-kiosk.desktop"
+            # Use XDG_RUNTIME_DIR if available, fallback to /tmp
+            local desktop_dir="${XDG_RUNTIME_DIR:-/tmp}"
+            local desktop_file="${desktop_dir}/edudisplej-kiosk.desktop"
             # Create desktop file with error handling
             if cat > "$desktop_file" <<EOF
 [Desktop Entry]
