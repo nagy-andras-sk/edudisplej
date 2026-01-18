@@ -247,22 +247,38 @@ print_color() {
 
 # Print info message
 print_info() {
-    print_color "blue" "[INFO] $1"
+    local caller_info=""
+    if [[ "${SHOW_CALLER_INFO:-false}" == true && -n "${BASH_SOURCE[1]:-}" ]]; then
+        local file=$(basename "${BASH_SOURCE[1]}")
+        local line="${BASH_LINENO[0]}"
+        caller_info=" [${file}:${line}]"
+    fi
+    print_color "blue" "[INFO]${caller_info} $1"
 }
 
 # Print success message
 print_success() {
-    print_color "green" "[OK] $1"
+    local caller_info=""
+    if [[ "${SHOW_CALLER_INFO:-false}" == true && -n "${BASH_SOURCE[1]:-}" ]]; then
+        local file=$(basename "${BASH_SOURCE[1]}")
+        local line="${BASH_LINENO[0]}"
+        caller_info=" [${file}:${line}]"
+    fi
+    print_color "green" "[OK]${caller_info} $1"
 }
 
 # Print warning message
 print_warning() {
-    print_color "yellow" "[$(t warning)] $1"
+    local file=$(basename "${BASH_SOURCE[1]:-unknown}")
+    local line="${BASH_LINENO[0]:-?}"
+    print_color "yellow" "[$(t warning)] [${file}:${line}] $1"
 }
 
 # Print error message
 print_error() {
-    print_color "red" "[$(t error)] $1"
+    local file=$(basename "${BASH_SOURCE[1]:-unknown}")
+    local line="${BASH_LINENO[0]:-?}"
+    print_color "red" "[$(t error)] [${file}:${line}] $1"
 }
 
 # Show banner using figlet if available
@@ -312,6 +328,31 @@ wait_for_enter() {
 # =============================================================================
 # Utility Functions
 # =============================================================================
+
+# Retry a command with exponential backoff
+# Usage: retry_command <max_attempts> <command> [args...]
+retry_command() {
+    local max_attempts="$1"
+    shift
+    local attempt=1
+    local delay=1
+    
+    while [[ $attempt -le $max_attempts ]]; do
+        if "$@"; then
+            return 0
+        fi
+        
+        if [[ $attempt -lt $max_attempts ]]; then
+            print_warning "Command failed (attempt $attempt/$max_attempts), retrying in ${delay}s..."
+            sleep "$delay"
+            delay=$((delay * 2))
+            ((attempt++))
+        else
+            print_error "Command failed after $max_attempts attempts"
+            return 1
+        fi
+    done
+}
 
 # Check if running as root
 check_root() {

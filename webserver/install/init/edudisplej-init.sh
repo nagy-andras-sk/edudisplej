@@ -439,8 +439,9 @@ fi
 
 # Ensure browser exists (chromium-browser/chromium) - non-blocking, will try to install if needed
 if ! ensure_browser; then
-    print_warning "No supported browser available yet. Will try offline mode or clock display."
-    # Don't exit - allow the system to continue and show clock or attempt recovery
+    print_warning "No supported browser available yet. System may not start correctly."
+    print_warning "Kiosk mode will attempt to install browser automatically."
+    # Don't exit - allow the system to continue and let minimal-kiosk handle it
 fi
 
 # Check for newer init bundle and self-update
@@ -564,14 +565,39 @@ fi
 
 echo ""
 print_info "EduDisplej kiosk is running. Press Ctrl+C to stop."
-print_info "Logs: session.log, xclient.log"
+print_info "Logs: session.log, kiosk.log"
 echo ""
 
-# Keep the script alive - monitor xinit/X processes
+# Keep the script alive - monitor xinit/X processes with safety limit
+MAX_RESTART_LOOPS=5
+restart_loop_count=0
+last_restart_time=0
+MIN_UPTIME_FOR_RESET=300  # 5 minutes uptime resets the counter
+
 while true; do
+    sleep 10
+    
     if ! pgrep -x xinit >/dev/null 2>&1 && ! pgrep -x Xorg >/dev/null 2>&1; then
-        print_warning "X server stopped. Restarting..."
+        current_time=$(date +%s)
+        uptime=$((current_time - last_restart_time))
+        
+        # Reset counter if system ran for long enough
+        if [[ $last_restart_time -gt 0 && $uptime -ge $MIN_UPTIME_FOR_RESET ]]; then
+            print_info "System ran for ${uptime}s, resetting restart counter"
+            restart_loop_count=0
+        fi
+        
+        ((restart_loop_count++))
+        
+        if [[ $restart_loop_count -ge $MAX_RESTART_LOOPS ]]; then
+            print_error "X server restart limit reached ($MAX_RESTART_LOOPS attempts)"
+            print_error "FATAL: Too many restart failures, stopping to prevent infinite loop"
+            print_error "Check logs: session.log, kiosk.log, /var/log/Xorg.0.log"
+            exit 1
+        fi
+        
+        print_warning "X server stopped. Restarting (attempt $restart_loop_count/$MAX_RESTART_LOOPS)..."
+        last_restart_time=$(date +%s)
         start_kiosk_mode
     fi
-    sleep 10
 done
