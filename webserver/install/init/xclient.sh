@@ -187,8 +187,27 @@ get_chromium_flags() {
 get_browser_flags() {
     case "$BROWSER_BIN" in
         *epiphany-browser*)
-            # Minimal flags; application-mode makes it borderless
-            echo "--application-mode"
+            # Epiphany needs a .desktop file for --application-mode
+            # Use XDG_RUNTIME_DIR if available, fallback to /tmp
+            local desktop_dir="${XDG_RUNTIME_DIR:-/tmp}"
+            local desktop_file="${desktop_dir}/edudisplej-kiosk.desktop"
+            # Create desktop file with error handling
+            if cat > "$desktop_file" <<EOF
+[Desktop Entry]
+Name=EduDisplej Kiosk
+Comment=EduDisplej Kiosk Display
+Exec=epiphany-browser "${KIOSK_URL}"
+Type=Application
+Categories=Network;WebBrowser;
+EOF
+            then
+                chmod 600 "$desktop_file" 2>/dev/null || true
+                echo "--application-mode=${desktop_file}"
+            else
+                echo "[xclient] ERROR: Failed to create desktop file for Epiphany" >&2
+                # Fallback: try without application-mode (window will have decorations)
+                echo ""
+            fi
             ;;
         *)
             get_chromium_flags
