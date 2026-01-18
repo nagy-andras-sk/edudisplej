@@ -48,7 +48,7 @@ Simplified the code to focus on core functionality:
   - `--no-sandbox` - Required for root operation
   - `--disable-gpu` - Software rendering
   - `--disable-infobars` - No info bars
-  - `--no-error-dialogs` - No error dialogs
+  - `--noerrdialogs` - No error dialogs
   - `--incognito` - Private mode
   - `--no-first-run` - Skip first run wizard
   - `--disable-translate` - No translation prompts

@@ -107,17 +107,33 @@ start_kiosk_mode() {
 stop_kiosk_mode() {
     print_info "Stopping kiosk mode..."
 
-    # Kill processes using specific PIDs
-    local all_pids=""
-    all_pids=$(pgrep -x "chromium" 2>/dev/null || true)
-    all_pids="$all_pids $(pgrep -x "chromium-browser" 2>/dev/null || true)"
-    all_pids="$all_pids $(pgrep -x "epiphany-browser" 2>/dev/null || true)"
-    all_pids="$all_pids $(pgrep -x "openbox" 2>/dev/null || true)"
-    all_pids="$all_pids $(pgrep -x "unclutter" 2>/dev/null || true)"
-    all_pids="$all_pids $(pgrep -x "Xorg" 2>/dev/null || true)"
-    all_pids="$all_pids $(pgrep -x "xinit" 2>/dev/null || true)"
+    # Kill processes using specific PIDs - collect in array
+    local all_pids=()
+    local pids
     
-    for pid in $all_pids; do
+    pids=$(pgrep -x "chromium" 2>/dev/null || true)
+    [[ -n "$pids" ]] && all_pids+=($pids)
+    
+    pids=$(pgrep -x "chromium-browser" 2>/dev/null || true)
+    [[ -n "$pids" ]] && all_pids+=($pids)
+    
+    pids=$(pgrep -x "epiphany-browser" 2>/dev/null || true)
+    [[ -n "$pids" ]] && all_pids+=($pids)
+    
+    pids=$(pgrep -x "openbox" 2>/dev/null || true)
+    [[ -n "$pids" ]] && all_pids+=($pids)
+    
+    pids=$(pgrep -x "unclutter" 2>/dev/null || true)
+    [[ -n "$pids" ]] && all_pids+=($pids)
+    
+    pids=$(pgrep -x "Xorg" 2>/dev/null || true)
+    [[ -n "$pids" ]] && all_pids+=($pids)
+    
+    pids=$(pgrep -x "xinit" 2>/dev/null || true)
+    [[ -n "$pids" ]] && all_pids+=($pids)
+    
+    # TERM signal first
+    for pid in "${all_pids[@]}"; do
         [[ -z "$pid" ]] && continue
         kill -TERM "$pid" 2>/dev/null || true
     done
@@ -125,7 +141,7 @@ stop_kiosk_mode() {
     sleep 1
     
     # Force kill if still running
-    for pid in $all_pids; do
+    for pid in "${all_pids[@]}"; do
         [[ -z "$pid" ]] && continue
         if kill -0 "$pid" 2>/dev/null; then
             kill -KILL "$pid" 2>/dev/null || true

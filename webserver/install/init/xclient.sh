@@ -138,15 +138,24 @@ start_browser() {
     save_hwinfo
     
     # Clean old browser processes using specific PIDs
-    local old_pids=""
-    old_pids=$(pgrep -x chromium 2>/dev/null || true)
-    old_pids="$old_pids $(pgrep -x chromium-browser 2>/dev/null || true)"
-    old_pids="$old_pids $(pgrep -x epiphany-browser 2>/dev/null || true)"
-    old_pids="$old_pids $(pgrep -x firefox-esr 2>/dev/null || true)"
+    local old_pids=()
+    local pids
     
-    if [[ -n "$old_pids" ]] && [[ "$old_pids" != " " ]]; then
-        echo "Stopping old browser processes: $old_pids"
-        for pid in $old_pids; do
+    pids=$(pgrep -x chromium 2>/dev/null || true)
+    [[ -n "$pids" ]] && old_pids+=($pids)
+    
+    pids=$(pgrep -x chromium-browser 2>/dev/null || true)
+    [[ -n "$pids" ]] && old_pids+=($pids)
+    
+    pids=$(pgrep -x epiphany-browser 2>/dev/null || true)
+    [[ -n "$pids" ]] && old_pids+=($pids)
+    
+    pids=$(pgrep -x firefox-esr 2>/dev/null || true)
+    [[ -n "$pids" ]] && old_pids+=($pids)
+    
+    if [[ ${#old_pids[@]} -gt 0 ]]; then
+        echo "Stopping old browser processes: ${old_pids[*]}"
+        for pid in "${old_pids[@]}"; do
             [[ -z "$pid" ]] && continue
             kill -TERM "$pid" 2>/dev/null || true
         done
@@ -166,7 +175,7 @@ start_browser() {
                 --no-sandbox \
                 --disable-gpu \
                 --disable-infobars \
-                --no-error-dialogs \
+                --noerrdialogs \
                 --incognito \
                 --no-first-run \
                 --disable-translate \
