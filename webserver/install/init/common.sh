@@ -352,12 +352,12 @@ retry_command() {
             print_warning "Command failed (attempt $attempt/$max_attempts), retrying in ${delay}s..."
             sleep "$delay"
             delay=$((delay * 2))
-            ((attempt++))
-        else
-            print_error "Command failed after $max_attempts attempts"
-            return 1
         fi
+        ((attempt++))
     done
+    
+    print_error "Command failed after $max_attempts attempts"
+    return 1
 }
 
 # Check if running as root

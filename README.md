@@ -14,6 +14,17 @@ EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk m
 
 **EDUDISPLEJ INSTALLER v. 28 12 2025**
 
+## Key Features
+
+- **Automatic Error Recovery**: Self-healing mechanisms with retry logic
+- **Clear Error Messages**: All errors show file name and line number for easy debugging
+- **Loop Prevention**: Safety limits prevent infinite restart loops
+- **URL Fallback**: Automatic fallback to working URLs if primary fails
+- **Detailed Logging**: Comprehensive logs with timestamps and context
+- **Unattended Operation**: Designed to run reliably without manual intervention
+
+See [ERROR_HANDLING.md](ERROR_HANDLING.md) for detailed documentation on error handling features.
+
 ## Quick Installation
 
 Install EduDisplej on your Raspberry Pi or any Debian-based system with a single command:
@@ -67,8 +78,10 @@ DISPLAY=:0 xrandr
 
 ### Log Files
 
-- `/opt/edudisplej/kiosk.log` - Minimal kiosk script logs
+- `/opt/edudisplej/kiosk.log` - Minimal kiosk script logs (includes [file:line] for errors)
 - `/opt/edudisplej/service.log` - Systemd service logs  
-- `/opt/edudisplej/session.log` - Main init script logs
+- `/opt/edudisplej/session.log` - Main init script logs (includes [file:line] for errors)
 - `/opt/edudisplej/xclient.log` - X client logs (legacy)
+- `/opt/edudisplej/apt.log` - Package installation logs
+- `/var/log/Xorg.0.log` - X server error logs
 

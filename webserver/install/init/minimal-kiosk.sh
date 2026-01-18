@@ -29,7 +29,7 @@ if [[ -f "$CONFIG_FILE" ]]; then
         set +u  # Temporarily allow unset variables during source
         source "$CONFIG_FILE"
         set -u  # Re-enable unset variable checking
-        echo "✓ [minimal-kiosk.sh:$(($LINENO-4))] Config loaded: $CONFIG_FILE"
+        echo "✓ [minimal-kiosk.sh] Config loaded: $CONFIG_FILE"
     else
         echo "⚠ [minimal-kiosk.sh:$LINENO] Config file exists but is not readable or empty: $CONFIG_FILE"
     fi
@@ -54,10 +54,8 @@ check_url() {
         return 0
     fi
     # Try to fetch headers with timeout
-    if command -v curl >/dev/null 2>&1; then
-        if curl -fsSL --max-time 10 --head "$url" >/dev/null 2>&1; then
-            return 0
-        fi
+    if command -v curl >/dev/null 2>&1 && curl -fsSL --max-time 10 --head "$url" >/dev/null 2>&1; then
+        return 0
     fi
     return 1
 }
