@@ -162,12 +162,11 @@ start_browser() {
             ;;
         *chromium*)
             # Chromium: minimal flags
-            ${BROWSER_BIN} \
-                --kiosk \
+            ${BROWSER_BIN} --kiosk \
                 --no-sandbox \
                 --disable-gpu \
                 --disable-infobars \
-                --noerrdialogs \
+                --no-error-dialogs \
                 --incognito \
                 --no-first-run \
                 --disable-translate \
