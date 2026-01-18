@@ -187,8 +187,17 @@ get_chromium_flags() {
 get_browser_flags() {
     case "$BROWSER_BIN" in
         *epiphany-browser*)
-            # Minimal flags; application-mode makes it borderless
-            echo "--application-mode"
+            # Epiphany needs a .desktop file for --application-mode
+            local desktop_file="/tmp/edudisplej-kiosk.desktop"
+            cat > "$desktop_file" <<EOF
+[Desktop Entry]
+Name=EduDisplej Kiosk
+Comment=EduDisplej Kiosk Display
+Exec=epiphany-browser ${KIOSK_URL}
+Type=Application
+Categories=Network;WebBrowser;
+EOF
+            echo "--application-mode=${desktop_file}"
             ;;
         *)
             get_chromium_flags
