@@ -96,6 +96,7 @@ detect_browser() {
         echo "[xclient] System lacks NEON support - prioritizing Epiphany browser"
         candidates+=(
             "epiphany-browser"
+            "firefox-esr"
             # Try older Chromium versions that might be installed
             "/usr/lib/chromium-browser/chromium-browser"
             "/usr/lib/chromium/chromium"
@@ -103,13 +104,14 @@ detect_browser() {
             "chromium"
         )
     else
-        # Try real chromium binaries first, then epiphany (lightweight, works on older Pi)
+        # Try real chromium binaries first, then epiphany, then firefox-esr
         candidates+=(
             "/usr/lib/chromium-browser/chromium-browser"
             "/usr/lib/chromium/chromium"
             "chromium-browser"
             "chromium"
             "epiphany-browser"
+            "firefox-esr"
         )
     fi
 
@@ -127,7 +129,7 @@ detect_browser() {
             return 0
         fi
     done
-    echo "[xclient] ERROR: Browser not found (chromium/epiphany)"
+    echo "[xclient] ERROR: Browser not found (chromium/epiphany/firefox-esr)"
     return 1
 }
 
@@ -184,30 +186,43 @@ get_chromium_flags() {
 --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache"
 }
 
+get_firefox_flags() {
+    local profile_dir="${EDUDISPLEJ_HOME}/firefox-profile"
+    
+    # Create profile directory with proper error checking
+    if ! mkdir -p "$profile_dir" 2>/dev/null; then
+        echo "[xclient] ERROR: Cannot create Firefox profile directory: $profile_dir" >&2
+        # Try alternative location
+        profile_dir="/tmp/edudisplej-firefox-profile"
+        mkdir -p "$profile_dir" || {
+            echo "[xclient] ERROR: Cannot create Firefox profile directory in /tmp either" >&2
+            # Return flags without profile dir (Firefox will use default)
+            echo "--kiosk --private-window --new-instance --no-remote"
+            return 0
+        }
+        echo "[xclient] Using fallback Firefox profile directory: $profile_dir" >&2
+    fi
+    
+    chmod 700 "$profile_dir" 2>/dev/null || {
+        echo "[xclient] WARNING: Cannot set secure permissions on Firefox profile directory" >&2
+    }
+    
+    # Firefox ESR kiosk mode flags
+    echo "--kiosk \
+--private-window \
+--new-instance \
+--no-remote \
+-profile ${profile_dir}"
+}
+
 get_browser_flags() {
     case "$BROWSER_BIN" in
         *epiphany-browser*)
-            # Epiphany needs a .desktop file for --application-mode
-            # Use XDG_RUNTIME_DIR if available, fallback to /tmp
-            local desktop_dir="${XDG_RUNTIME_DIR:-/tmp}"
-            local desktop_file="${desktop_dir}/edudisplej-kiosk.desktop"
-            # Create desktop file with error handling
-            if cat > "$desktop_file" <<EOF
-[Desktop Entry]
-Name=EduDisplej Kiosk
-Comment=EduDisplej Kiosk Display
-Exec=epiphany-browser "${KIOSK_URL}"
-Type=Application
-Categories=Network;WebBrowser;
-EOF
-            then
-                chmod 600 "$desktop_file" 2>/dev/null || true
-                echo "--application-mode=${desktop_file}"
-            else
-                echo "[xclient] ERROR: Failed to create desktop file for Epiphany" >&2
-                # Fallback: try without application-mode (window will have decorations)
-                echo ""
-            fi
+            # Epiphany: no special flags needed, just pass URL directly
+            echo ""
+            ;;
+        *firefox-esr*|*firefox*)
+            get_firefox_flags
             ;;
         *)
             get_chromium_flags
@@ -326,6 +341,8 @@ start_chromium() {
         local old_pids
         old_pids=$(pgrep -x "chromium" 2>/dev/null)
         old_pids="$old_pids $(pgrep -x "chromium-browser" 2>/dev/null)"
+        old_pids="$old_pids $(pgrep -x "epiphany-browser" 2>/dev/null)"
+        old_pids="$old_pids $(pgrep -x "firefox-esr" 2>/dev/null)"
         if [[ -n "$old_pids" ]] && [[ "$old_pids" != " " ]]; then
             echo "[xclient] Stopping old browser processes: $old_pids"
             for pid in $old_pids; do
