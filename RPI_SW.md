@@ -343,7 +343,7 @@ xset dpms 0 0 0      # Žiadny timeout
 
 Toto je hlavný wrapper skript pre spustenie webového prehliadača v kiosk móde.
 
-**UPOZORNENIE:** Tento skript bol zjednodušený 18.1.2026 z 417 riadkov na 209 riadkov (50% redukcia) pre zvýšenie stability a zníženie chybovosti. Pozri [SIMPLIFIED_ARCHITECTURE.md](SIMPLIFIED_ARCHITECTURE.md) pre detaily.
+**UPOZORNENIE:** Tento skript bol zjednodušený 18.1.2026 z 417 riadkov na 229 riadkov (45% redukcia) pre zvýšenie stability a zníženie chybovosti. Pozri [SIMPLIFIED_ARCHITECTURE.md](SIMPLIFIED_ARCHITECTURE.md) pre detaily.
 
 #### **Detekcia prehliadača**
 

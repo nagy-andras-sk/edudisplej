@@ -24,7 +24,7 @@ Simplified the code to focus on core functionality:
 
 ## Changes Made
 
-### xclient.sh: 417 → 209 lines (50% reduction)
+### xclient.sh: 417 → 229 lines (45% reduction)
 
 **Simplified:**
 - Browser detection: Simple priority order (epiphany → chromium → firefox)
@@ -54,7 +54,7 @@ Simplified the code to focus on core functionality:
   - `--disable-translate` - No translation prompts
 - **Firefox**: `--kiosk --private-window URL`
 
-### kiosk.sh: 290 → 140 lines (52% reduction)
+### kiosk.sh: 290 → 177 lines (39% reduction)
 
 **Simplified:**
 - Removed duplicate browser detection (handled in xclient.sh)
@@ -107,9 +107,9 @@ This information is saved to `/opt/edudisplej/hwinfo.conf` for reference.
 
 | File | Original | Simplified | Reduction |
 |------|----------|-----------|-----------|
-| xclient.sh | 417 lines | 209 lines | 50% |
-| kiosk.sh | 290 lines | 140 lines | 52% |
-| **Total** | **707 lines** | **349 lines** | **51%** |
+| xclient.sh | 417 lines | 229 lines | 45% |
+| kiosk.sh | 290 lines | 177 lines | 39% |
+| **Total** | **707 lines** | **406 lines** | **43%** |
 
 ## Benefits
 
