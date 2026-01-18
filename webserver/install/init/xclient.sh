@@ -42,43 +42,23 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 
 # Default URL
-KIOSK_URL="${KIOSK_URL:-file:///opt/edudisplej/localweb/clock.html}"
+KIOSK_URL="${KIOSK_URL:-https://www.time.is}"
 echo "KIOSK_URL=${KIOSK_URL}"
 
 # -----------------------------------------------------------------------------
 # Simplified browser detection and startup
 # -----------------------------------------------------------------------------
 
-# Detect available browser (priority: epiphany → chromium → firefox)
+# Detect available browser (chromium-browser only)
 detect_browser() {
-    # Try Epiphany first (lightweight, works on older ARM)
-    if command -v epiphany-browser >/dev/null 2>&1; then
-        BROWSER_BIN="epiphany-browser"
-        echo "Browser: epiphany-browser"
-        return 0
-    fi
-    
-    # Try Chromium
+    # Use chromium-browser exclusively
     if command -v chromium-browser >/dev/null 2>&1; then
         BROWSER_BIN="chromium-browser"
         echo "Browser: chromium-browser"
         return 0
     fi
     
-    if command -v chromium >/dev/null 2>&1; then
-        BROWSER_BIN="chromium"
-        echo "Browser: chromium"
-        return 0
-    fi
-    
-    # Try Firefox as last resort
-    if command -v firefox-esr >/dev/null 2>&1; then
-        BROWSER_BIN="firefox-esr"
-        echo "Browser: firefox-esr"
-        return 0
-    fi
-    
-    echo "ERROR: No browser found"
+    echo "ERROR: chromium-browser not found"
     return 1
 }
 
@@ -141,25 +121,7 @@ start_browser() {
     local old_pids=()
     local pids temp_pids
     
-    pids=$(pgrep -x chromium 2>/dev/null || true)
-    if [[ -n "$pids" ]]; then
-        readarray -t temp_pids <<< "$pids"
-        old_pids+=("${temp_pids[@]}")
-    fi
-    
     pids=$(pgrep -x chromium-browser 2>/dev/null || true)
-    if [[ -n "$pids" ]]; then
-        readarray -t temp_pids <<< "$pids"
-        old_pids+=("${temp_pids[@]}")
-    fi
-    
-    pids=$(pgrep -x epiphany-browser 2>/dev/null || true)
-    if [[ -n "$pids" ]]; then
-        readarray -t temp_pids <<< "$pids"
-        old_pids+=("${temp_pids[@]}")
-    fi
-    
-    pids=$(pgrep -x firefox-esr 2>/dev/null || true)
     if [[ -n "$pids" ]]; then
         readarray -t temp_pids <<< "$pids"
         old_pids+=("${temp_pids[@]}")
@@ -176,28 +138,16 @@ start_browser() {
     
     echo "Starting browser: ${BROWSER_BIN}"
     
-    case "$BROWSER_BIN" in
-        *epiphany*)
-            # Epiphany: simple and lightweight
-            epiphany-browser --application-mode "${KIOSK_URL}" &
-            ;;
-        *chromium*)
-            # Chromium: minimal flags
-            ${BROWSER_BIN} --kiosk \
-                --no-sandbox \
-                --disable-gpu \
-                --disable-infobars \
-                --no-error-dialogs \
-                --incognito \
-                --no-first-run \
-                --disable-translate \
-                "${KIOSK_URL}" &
-            ;;
-        *firefox*)
-            # Firefox: kiosk mode
-            firefox-esr --kiosk --private-window "${KIOSK_URL}" &
-            ;;
-    esac
+    # Start chromium-browser in kiosk mode
+    chromium-browser --kiosk \
+        --no-sandbox \
+        --disable-gpu \
+        --disable-infobars \
+        --no-error-dialogs \
+        --incognito \
+        --no-first-run \
+        --disable-translate \
+        "${KIOSK_URL}" &
     
     BROWSER_PID=$!
     sleep 3
