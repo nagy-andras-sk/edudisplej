@@ -14,8 +14,16 @@ echo "========== Kiosk Start: $(date) =========="
 
 # Load config
 if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
-    echo "✓ Config loaded: $CONFIG_FILE"
+    # Validate config file is readable and not empty
+    if [[ -r "$CONFIG_FILE" && -s "$CONFIG_FILE" ]]; then
+        # Source config with explicit variable handling
+        set +u  # Temporarily allow unset variables during source
+        source "$CONFIG_FILE"
+        set -u  # Re-enable unset variable checking
+        echo "✓ Config loaded: $CONFIG_FILE"
+    else
+        echo "⚠ Config file exists but is not readable or empty: $CONFIG_FILE"
+    fi
 fi
 
 KIOSK_URL="${KIOSK_URL:-https://www.time.is}"
@@ -43,9 +51,18 @@ install_dependencies() {
     
     if [[ ${#missing[@]} -gt 0 ]]; then
         echo "   Installing: ${missing[*]}"
-        apt-get update -qq
-        apt-get install -y "${missing[@]}"
-        echo "✓ Dependencies installed"
+        if ! apt-get update -qq 2>&1; then
+            echo "✗ Failed to update package lists"
+            echo "⚠ Continuing with existing package cache..."
+        fi
+        
+        if apt-get install -y "${missing[@]}" 2>&1; then
+            echo "✓ Dependencies installed"
+        else
+            echo "✗ Failed to install some packages: ${missing[*]}"
+            echo "⚠ Please check network connection and package availability"
+            return 1
+        fi
     else
         echo "✓ All dependencies present"
     fi
@@ -173,32 +190,34 @@ start_chromium() {
     # Wait for window manager
     sleep 2
     
-    # Start Chromium
-    chromium-browser \
-        --kiosk \
-        --no-sandbox \
-        --disable-gpu \
-        --disable-infobars \
-        --no-first-run \
-        --incognito \
-        --noerrdialogs \
-        --disable-translate \
-        --disable-features=TranslateUI \
-        --disable-session-crashed-bubble \
-        --check-for-update-interval=31536000 \
-        "$KIOSK_URL" &
-    
-    CHROMIUM_PID=$!
-    echo "✓ Chromium started (PID: $CHROMIUM_PID)"
-    
-    # Monitor Chromium
-    while kill -0 $CHROMIUM_PID 2>/dev/null; do
+    # Monitor and restart Chromium in a loop (no recursion)
+    while true; do
+        # Start Chromium
+        chromium-browser \
+            --kiosk \
+            --no-sandbox \
+            --disable-gpu \
+            --disable-infobars \
+            --no-first-run \
+            --incognito \
+            --noerrdialogs \
+            --disable-translate \
+            --disable-features=TranslateUI \
+            --disable-session-crashed-bubble \
+            --check-for-update-interval=31536000 \
+            "$KIOSK_URL" &
+        
+        CHROMIUM_PID=$!
+        echo "✓ Chromium started (PID: $CHROMIUM_PID)"
+        
+        # Monitor Chromium
+        while kill -0 $CHROMIUM_PID 2>/dev/null; do
+            sleep 10
+        done
+        
+        echo "✗ Chromium exited, restarting in 10s..."
         sleep 10
     done
-    
-    echo "✗ Chromium exited, restarting in 10s..."
-    sleep 10
-    start_chromium
 }
 
 # Main execution
