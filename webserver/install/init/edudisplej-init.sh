@@ -147,8 +147,8 @@ fi
 # Helper Functions
 # =============================================================================
 
-# Browser candidates - epiphany-browser works on older ARM without NEON support
-BROWSER_CANDIDATES=(epiphany-browser chromium-browser chromium)
+# Browser candidates - chromium-browser only
+BROWSER_CANDIDATES=(chromium-browser)
 BROWSER_BIN=""
 # Core packages needed for kiosk mode (browser installed separately via ensure_browser)
 REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
