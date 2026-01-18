@@ -96,6 +96,7 @@ detect_browser() {
         echo "[xclient] System lacks NEON support - prioritizing Epiphany browser"
         candidates+=(
             "epiphany-browser"
+            "firefox-esr"
             # Try older Chromium versions that might be installed
             "/usr/lib/chromium-browser/chromium-browser"
             "/usr/lib/chromium/chromium"
@@ -103,13 +104,14 @@ detect_browser() {
             "chromium"
         )
     else
-        # Try real chromium binaries first, then epiphany (lightweight, works on older Pi)
+        # Try real chromium binaries first, then epiphany, then firefox-esr
         candidates+=(
             "/usr/lib/chromium-browser/chromium-browser"
             "/usr/lib/chromium/chromium"
             "chromium-browser"
             "chromium"
             "epiphany-browser"
+            "firefox-esr"
         )
     fi
 
@@ -127,7 +129,7 @@ detect_browser() {
             return 0
         fi
     done
-    echo "[xclient] ERROR: Browser not found (chromium/epiphany)"
+    echo "[xclient] ERROR: Browser not found (chromium/epiphany/firefox-esr)"
     return 1
 }
 
@@ -184,11 +186,25 @@ get_chromium_flags() {
 --disable-features=Translate,OptimizationHints,MediaRouter,BackForwardCache"
 }
 
+get_firefox_flags() {
+    local profile_dir="${EDUDISPLEJ_HOME}/firefox-profile"
+    mkdir -p "$profile_dir" 2>/dev/null || true
+    # Firefox ESR kiosk mode flags
+    echo "--kiosk \
+--private-window \
+--new-instance \
+--no-remote \
+-profile ${profile_dir}"
+}
+
 get_browser_flags() {
     case "$BROWSER_BIN" in
         *epiphany-browser*)
             # Epiphany: no special flags needed, just pass URL directly
             echo ""
+            ;;
+        *firefox-esr*|*firefox*)
+            get_firefox_flags
             ;;
         *)
             get_chromium_flags
@@ -307,6 +323,8 @@ start_chromium() {
         local old_pids
         old_pids=$(pgrep -x "chromium" 2>/dev/null)
         old_pids="$old_pids $(pgrep -x "chromium-browser" 2>/dev/null)"
+        old_pids="$old_pids $(pgrep -x "epiphany-browser" 2>/dev/null)"
+        old_pids="$old_pids $(pgrep -x "firefox-esr" 2>/dev/null)"
         if [[ -n "$old_pids" ]] && [[ "$old_pids" != " " ]]; then
             echo "[xclient] Stopping old browser processes: $old_pids"
             for pid in $old_pids; do
