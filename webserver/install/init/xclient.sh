@@ -188,7 +188,25 @@ get_chromium_flags() {
 
 get_firefox_flags() {
     local profile_dir="${EDUDISPLEJ_HOME}/firefox-profile"
-    mkdir -p "$profile_dir" 2>/dev/null || true
+    
+    # Create profile directory with proper error checking
+    if ! mkdir -p "$profile_dir" 2>/dev/null; then
+        echo "[xclient] ERROR: Cannot create Firefox profile directory: $profile_dir" >&2
+        # Try alternative location
+        profile_dir="/tmp/edudisplej-firefox-profile"
+        mkdir -p "$profile_dir" || {
+            echo "[xclient] ERROR: Cannot create Firefox profile directory in /tmp either" >&2
+            # Return flags without profile dir (Firefox will use default)
+            echo "--kiosk --private-window --new-instance --no-remote"
+            return 0
+        }
+        echo "[xclient] Using fallback Firefox profile directory: $profile_dir" >&2
+    fi
+    
+    chmod 700 "$profile_dir" 2>/dev/null || {
+        echo "[xclient] WARNING: Cannot set secure permissions on Firefox profile directory" >&2
+    }
+    
     # Firefox ESR kiosk mode flags
     echo "--kiosk \
 --private-window \

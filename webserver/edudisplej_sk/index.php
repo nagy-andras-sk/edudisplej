@@ -32,7 +32,7 @@ require_once 'header.php';
         <div style="padding: 1.5rem; border: 2px solid #667eea; border-radius: 8px; text-align: center;">
             <h3 style="color: #667eea;">🛡️ Watchdog</h3>
             <p style="color: #666; margin-top: 1rem;">
-                Inteligentný watchdog s automatickým prechodom na Firefox ESR pri opakovaných zlyha niach.
+                Inteligentný watchdog s automatickým prechodom na Firefox ESR pri opakovaných zlyh aniach.
             </p>
         </div>
     </div>

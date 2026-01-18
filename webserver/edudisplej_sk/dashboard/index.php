@@ -32,7 +32,7 @@ require_once '../header.php';
         <p style="color: #666; margin: 1rem 0;">
             Systémové štatistiky a monitoring.
         </p>
-        <button class="btn" onclick="alert('Funkcia sa pripravuje');" style="background: #667eea;">Zobra ziť štatistiky</button>
+        <button class="btn" onclick="alert('Funkcia sa pripravuje');" style="background: #667eea;">Zobraziť štatistiky</button>
     </div>
 </div>
 

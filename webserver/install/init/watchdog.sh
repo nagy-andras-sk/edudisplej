@@ -90,15 +90,24 @@ install_firefox_esr() {
         return 0
     fi
     
-    # Install Firefox ESR
-    apt-get update >> "${EDUDISPLEJ_HOME}/apt.log" 2>&1
-    apt-get install -y firefox-esr >> "${EDUDISPLEJ_HOME}/apt.log" 2>&1
+    # Install Firefox ESR with error checking
+    log_msg "Running apt-get update..."
+    if ! apt-get update >> "${EDUDISPLEJ_HOME}/apt.log" 2>&1; then
+        log_msg "ERROR: apt-get update failed - check ${EDUDISPLEJ_HOME}/apt.log"
+        return 1
+    fi
+    
+    log_msg "Installing firefox-esr package..."
+    if ! apt-get install -y firefox-esr >> "${EDUDISPLEJ_HOME}/apt.log" 2>&1; then
+        log_msg "ERROR: apt-get install firefox-esr failed - check ${EDUDISPLEJ_HOME}/apt.log"
+        return 1
+    fi
     
     if command -v firefox-esr >/dev/null 2>&1; then
         log_msg "Firefox ESR installed successfully"
         return 0
     else
-        log_msg "ERROR: Failed to install Firefox ESR"
+        log_msg "ERROR: Firefox ESR binary not found after installation"
         return 1
     fi
 }
@@ -211,16 +220,22 @@ start_watchdog() {
             # Restart browser through xclient.sh
             if [[ -f "${EDUDISPLEJ_HOME}/init/xclient.sh" ]]; then
                 # Kill any zombie processes first using graceful termination
-                local zombie_pids
-                zombie_pids=$(pgrep -x "chromium" 2>/dev/null; pgrep -x "chromium-browser" 2>/dev/null; pgrep -x "epiphany-browser" 2>/dev/null; pgrep -x "firefox-esr" 2>/dev/null)
-                if [[ -n "$zombie_pids" ]]; then
-                    for pid in $zombie_pids; do
+                local zombie_pids=()
+                local browsers=("chromium" "chromium-browser" "epiphany-browser" "firefox-esr")
+                
+                for browser in "${browsers[@]}"; do
+                    local pids=$(pgrep -x "$browser" 2>/dev/null)
+                    [[ -n "$pids" ]] && zombie_pids+=($pids)
+                done
+                
+                if [[ ${#zombie_pids[@]} -gt 0 ]]; then
+                    for pid in "${zombie_pids[@]}"; do
                         [[ -z "$pid" ]] && continue
                         kill -TERM "$pid" 2>/dev/null || true
                     done
                     sleep 2
                     # Force kill if still running
-                    for pid in $zombie_pids; do
+                    for pid in "${zombie_pids[@]}"; do
                         [[ -z "$pid" ]] && continue
                         if kill -0 "$pid" 2>/dev/null; then
                             kill -KILL "$pid" 2>/dev/null || true

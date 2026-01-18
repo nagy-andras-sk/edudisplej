@@ -167,9 +167,11 @@ generate_hwinfo() {
     for browser in chromium-browser chromium epiphany-browser firefox-esr; do
         if command -v "$browser" >/dev/null 2>&1; then
             local version=$("$browser" --version 2>/dev/null | head -1 || echo "installed")
-            echo "BROWSER_${browser^^}=$version" >> "$temp_file"
+            local var_name=$(echo "BROWSER_${browser}" | tr '[:lower:]-' '[:upper:]_')
+            echo "${var_name}=$version" >> "$temp_file"
         else
-            echo "BROWSER_${browser^^}=not_installed" >> "$temp_file"
+            local var_name=$(echo "BROWSER_${browser}" | tr '[:lower:]-' '[:upper:]_')
+            echo "${var_name}=not_installed" >> "$temp_file"
         fi
     done
     
