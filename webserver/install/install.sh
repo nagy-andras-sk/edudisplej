@@ -13,13 +13,13 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-# Ellenorzes: curl telepitve van?
+# Kontrola: curl nainstalovany?
 if ! command -v curl >/dev/null 2>&1; then
   echo "[*] Instalacia curl..."
   apt-get update && apt-get install -y curl
 fi
 
-# GUI ellenorzes (csak info)
+# Kontrola GUI (len info)
 echo "[*] Kontrola GUI prostredia..."
 if pgrep -x "Xorg" >/dev/null 2>&1; then
     echo "[*] GUI bezi."
@@ -29,14 +29,14 @@ else
     GUI_AVAILABLE=false
 fi
 
-# Ha letezik a celkonyvtar, backup keszitese
+# Ak existuje cielovy priecinok, vytvorit zalohu
 if [ -d "$TARGET_DIR" ]; then
   BACKUP="${TARGET_DIR}.bak.$(date +%s)"
   echo "[*] Zalohovanie: $TARGET_DIR -> $BACKUP"
   mv "$TARGET_DIR" "$BACKUP"
 fi
 
-# Init es localweb konyvtar letrehozasa
+# Vytvorenie init a localweb priecinkov
 mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR"
 
 echo "[*] Nacitavame zoznam suborov : ${INIT_BASE}/download.php?getfiles"
@@ -50,7 +50,7 @@ fi
 echo "[DEBUG] Zoznam suborov:"
 echo "$FILES_LIST"
 
-# Letoltes egyenkent + CRLF javitas + shebang ellenorzes
+# Stiahnutie jednotlivo + CRLF oprava + kontrola shebang
 # DÔLEŽITÉ: while bez pipe (aby exit vo vnútri ukončil skript)
 while IFS=";" read -r NAME SIZE MODIFIED; do
     [ -z "${NAME:-}" ] && continue
@@ -61,7 +61,7 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
         exit 1
     }
 
-    # Sorvegek javitasa (CRLF -> LF)
+    # Oprava konca riadkov (CRLF -> LF)
     sed -i 's/\r$//' "${INIT_DIR}/${NAME}"
 
     # Ha .sh fajl, ellenorizzuk a shebang-et
@@ -69,25 +69,25 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
         chmod +x "${INIT_DIR}/${NAME}"
         FIRST_LINE="$(head -n1 "${INIT_DIR}/${NAME}" || true)"
         if [[ "${FIRST_LINE}" != "#!"* ]]; then
-            echo "[!] Shebang hianyzik, hozzaadjuk: #!/bin/bash"
+            echo "[!] Chyba shebang, pridavam: #!/bin/bash"
             sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
         fi
     elif [[ "${NAME}" == *.html ]]; then
-      # HTML fajlok atmasolasa localweb konyvtarba
+      # HTML subory presun do localweb priecinka
       cp -f "${INIT_DIR}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"
     fi
 done <<< "$FILES_LIST"
 
-# Ellenorzes: edudisplej-init.sh letezik?
+# Kontrola: edudisplej-init.sh existuje?
 if [ ! -f "${INIT_DIR}/edudisplej-init.sh" ]; then
     echo "[!] Chyba: edudisplej-init.sh sa nenachadza medzi stiahnutymi subormi."
     exit 1
 fi
 
-# Jogosultsagok beallitasa
+# Nastavenie opravneni
 chmod -R 755 "$TARGET_DIR"
 
-# Konzol felhasznalo meghatarozasa (altalaban pi)
+# Urcenie konzoloveho pouzivatela (zvycajne pi)
 CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
 [ -z "${CONSOLE_USER}" ] && CONSOLE_USER="pi"
 
@@ -125,7 +125,7 @@ TTYVHangup=yes
 WantedBy=multi-user.target
 EOF
 
-# Systemd ujratoltese
+# Systemd reload
 systemctl daemon-reload
 
 # Zakážeme getty na tty1 (nech tam nikdy nevyskočí shell)

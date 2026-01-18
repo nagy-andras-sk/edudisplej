@@ -11,7 +11,7 @@ MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 # Default values
 DEFAULT_LANG="sk"
 CURRENT_LANG="${DEFAULT_LANG}"
-DEFAULT_KIOSK_URL="file:///opt/edudisplej/localweb/clock.html"
+DEFAULT_KIOSK_URL="https://www.time.is"
 
 # =============================================================================
 # Translation System
@@ -69,7 +69,7 @@ declare -A TRANS_SK=(
 
     # Kiosk
     ["kiosk_starting_x"]="Spustam X server..."
-    ["kiosk_starting_browser"]="Spustam prehliadac Chromium..."
+    ["kiosk_starting_browser"]="Spustam prehliadac chromium-browser..."
     ["kiosk_retry"]="Pokus o znovuspustenie..."
     ["kiosk_failed"]="Spustenie zlyhal po 3 pokusoch!"
     ["boot_pkg_check"]="Kontrolujem potrebne balicky..."
@@ -147,7 +147,7 @@ declare -A TRANS_EN=(
 
     # Kiosk
     ["kiosk_starting_x"]="Starting X server..."
-    ["kiosk_starting_browser"]="Starting Chromium browser..."
+    ["kiosk_starting_browser"]="Starting chromium-browser..."
     ["kiosk_retry"]="Retrying..."
     ["kiosk_failed"]="Failed after 3 attempts!"
     ["boot_pkg_check"]="Checking required packages..."
