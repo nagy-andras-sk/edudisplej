@@ -136,6 +136,22 @@ systemctl disable --now getty@tty1.service || true
 echo "[*] edudisplej-init.service enable + start"
 systemctl enable --now edudisplej-init.service
 
+# Install minimal kiosk service
+echo "[*] Installing minimal kiosk service..."
+cp "${INIT_DIR}/chromiumkiosk-minimal.service" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable chromiumkiosk-minimal.service
+echo "[✓] Service enabled"
+
+echo ""
+echo "=========================================="
+echo "Telepítés kész! / Installation Complete!"
+echo "=========================================="
+echo ""
+echo "Újraindításhoz / To reboot: sudo reboot"
+echo "Szolgáltatás indítása / Start service: sudo systemctl start chromiumkiosk-minimal"
+echo "Logok / Logs: /opt/edudisplej/kiosk.log, /opt/edudisplej/service.log"
+echo ""
 echo "[✓] Instalacia dokoncena. Restart za 10 sekund..."
 sleep 10
 reboot

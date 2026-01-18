@@ -1,5 +1,8 @@
 #!/bin/bash
 # kiosk.sh - Simplified X server and kiosk setup
+# NOTE: This file is being transitioned to minimal-kiosk.sh for improved reliability.
+#       The start_kiosk_mode() function now delegates to minimal-kiosk.sh.
+#       Other functions in this file are retained for backwards compatibility.
 
 # Source common functions if not already sourced
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -90,17 +93,19 @@ start_x_server() {
 
 # Start full kiosk mode (X + browser via xclient.sh)
 start_kiosk_mode() {
-    print_info "$(t boot_starting_kiosk)"
+    print_info "Starting minimal kiosk mode..."
     
-    if ! start_x_server; then
-        print_error "Could not start X server"
+    # Stop old service if running
+    systemctl stop chromiumkiosk-minimal 2>/dev/null || true
+    
+    # Start minimal kiosk
+    if [[ -x "${INIT_DIR}/minimal-kiosk.sh" ]]; then
+        "${INIT_DIR}/minimal-kiosk.sh" &
+        print_success "Kiosk started"
+    else
+        print_error "minimal-kiosk.sh not found or not executable"
         return 1
     fi
-    
-    # Browser is started by xclient.sh (via xinit)
-    print_success "X server and kiosk environment started"
-    
-    return 0
 }
 
 # Stop kiosk mode
