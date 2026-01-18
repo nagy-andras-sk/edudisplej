@@ -45,6 +45,7 @@ FALLBACK_URLS=(
 )
 
 KIOSK_URL="${KIOSK_URL:-https://www.time.is}"
+PRIMARY_URL="$KIOSK_URL"  # Store original URL
 
 # Verify URL accessibility and use fallback if needed
 check_url() {
@@ -65,8 +66,8 @@ WORKING_URL="$KIOSK_URL"
 if ! check_url "$WORKING_URL"; then
     echo "⚠ [minimal-kiosk.sh:$LINENO] Primary URL not accessible: $WORKING_URL"
     for fallback in "${FALLBACK_URLS[@]}"; do
-        if [[ "$fallback" == "$WORKING_URL" ]]; then
-            continue
+        if [[ "$fallback" == "$PRIMARY_URL" ]]; then
+            continue  # Skip if same as primary
         fi
         echo "   [minimal-kiosk.sh:$LINENO] Trying fallback: $fallback"
         if check_url "$fallback"; then
@@ -325,10 +326,12 @@ start_chromium() {
 
 # Main execution
 main() {
-    echo "[minimal-kiosk.sh:$LINENO] === Main execution started ==="
+    local line_main_start=$LINENO
+    echo "[minimal-kiosk.sh:$line_main_start] === Main execution started ==="
     
     if ! install_dependencies; then
-        echo "✗ [minimal-kiosk.sh:$LINENO] FATAL: Failed to install dependencies"
+        local line_fail=$LINENO
+        echo "✗ [minimal-kiosk.sh:$line_fail] FATAL: Failed to install dependencies"
         exit 1
     fi
     
@@ -336,7 +339,8 @@ main() {
     setup_openbox
     
     if ! start_x; then
-        echo "✗ [minimal-kiosk.sh:$LINENO] FATAL: Cannot start X server"
+        local line_fail=$LINENO
+        echo "✗ [minimal-kiosk.sh:$line_fail] FATAL: Cannot start X server"
         exit 1
     fi
     
