@@ -189,15 +189,23 @@ get_browser_flags() {
         *epiphany-browser*)
             # Epiphany needs a .desktop file for --application-mode
             local desktop_file="/tmp/edudisplej-kiosk.desktop"
-            cat > "$desktop_file" <<EOF
+            # Create desktop file with error handling
+            if cat > "$desktop_file" <<EOF
 [Desktop Entry]
 Name=EduDisplej Kiosk
 Comment=EduDisplej Kiosk Display
-Exec=epiphany-browser ${KIOSK_URL}
+Exec=epiphany-browser "${KIOSK_URL}"
 Type=Application
 Categories=Network;WebBrowser;
 EOF
-            echo "--application-mode=${desktop_file}"
+            then
+                chmod 600 "$desktop_file" 2>/dev/null || true
+                echo "--application-mode=${desktop_file}"
+            else
+                echo "[xclient] ERROR: Failed to create desktop file for Epiphany" >&2
+                # Fallback: try without application-mode (window will have decorations)
+                echo ""
+            fi
             ;;
         *)
             get_chromium_flags
