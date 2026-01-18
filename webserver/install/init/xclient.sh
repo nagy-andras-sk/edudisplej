@@ -107,8 +107,8 @@ save_hwinfo() {
     fi
 }
 
-# Start browser with minimal configuration
-start_browser() {
+# Start terminal for debugging (instead of browser)
+start_terminal() {
     # Setup environment
     export LIBGL_ALWAYS_SOFTWARE=1
     export XDG_RUNTIME_DIR="/tmp/edudisplej-runtime"
@@ -117,63 +117,50 @@ start_browser() {
     setup_x_env
     save_hwinfo
     
-    # Clean old browser processes using specific PIDs
-    local old_pids=()
-    local pids temp_pids
+    echo "Starting terminal for debugging..."
     
-    pids=$(pgrep -x chromium-browser 2>/dev/null || true)
-    if [[ -n "$pids" ]]; then
-        readarray -t temp_pids <<< "$pids"
-        old_pids+=("${temp_pids[@]}")
+    # Try different terminal emulators in order of preference
+    TERMINAL_BIN=""
+    if command -v xterm >/dev/null 2>&1; then
+        TERMINAL_BIN="xterm"
+    elif command -v x-terminal-emulator >/dev/null 2>&1; then
+        TERMINAL_BIN="x-terminal-emulator"
+    elif command -v lxterminal >/dev/null 2>&1; then
+        TERMINAL_BIN="lxterminal"
+    elif command -v xfce4-terminal >/dev/null 2>&1; then
+        TERMINAL_BIN="xfce4-terminal"
     fi
     
-    if [[ ${#old_pids[@]} -gt 0 ]]; then
-        echo "Stopping old browser processes: ${old_pids[*]}"
-        for pid in "${old_pids[@]}"; do
-            [[ -z "$pid" ]] && continue
-            kill -TERM "$pid" 2>/dev/null || true
-        done
-        sleep 1
+    if [[ -z "$TERMINAL_BIN" ]]; then
+        echo "ERROR: No terminal emulator found"
+        sleep 30
+        return
     fi
     
-    echo "Starting browser: ${BROWSER_BIN}"
+    echo "Using terminal: ${TERMINAL_BIN}"
     
-    # Start chromium-browser in kiosk mode
-    chromium-browser --kiosk \
-        --no-sandbox \
-        --disable-gpu \
-        --disable-infobars \
-        --no-error-dialogs \
-        --incognito \
-        --no-first-run \
-        --disable-translate \
-        "${KIOSK_URL}" &
-    
-    BROWSER_PID=$!
-    sleep 3
-    
-    if kill -0 "$BROWSER_PID" 2>/dev/null; then
-        echo "Browser started (PID: ${BROWSER_PID})"
-        wait "$BROWSER_PID"
-        echo "Browser exited, restarting in 10s..."
+    # Start terminal in maximized mode
+    if [[ "$TERMINAL_BIN" == "xterm" ]]; then
+        xterm -maximized -fa 'Monospace' -fs 12 -bg black -fg white &
     else
-        echo "Browser failed to start"
+        "$TERMINAL_BIN" &
     fi
     
-    sleep 10
+    TERMINAL_PID=$!
+    echo "Terminal started (PID: ${TERMINAL_PID})"
+    
+    wait "$TERMINAL_PID"
+    echo "Terminal exited, restarting in 5s..."
+    sleep 5
 }
 
 # -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
-echo "Detecting browser..."
-if ! detect_browser; then
-    echo "ERROR: No browser found. Cannot start kiosk."
-    exit 1
-fi
+echo "Starting terminal mode for debugging..."
+echo "NOTE: Browser detection skipped, running terminal instead"
 
-echo "Starting kiosk mode..."
 while true; do
-    start_browser
+    start_terminal
 done
 
