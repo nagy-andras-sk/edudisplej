@@ -109,28 +109,49 @@ stop_kiosk_mode() {
 
     # Kill processes using specific PIDs - collect in array
     local all_pids=()
-    local pids
+    local pids temp_pids
     
     pids=$(pgrep -x "chromium" 2>/dev/null || true)
-    [[ -n "$pids" ]] && all_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        all_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x "chromium-browser" 2>/dev/null || true)
-    [[ -n "$pids" ]] && all_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        all_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x "epiphany-browser" 2>/dev/null || true)
-    [[ -n "$pids" ]] && all_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        all_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x "openbox" 2>/dev/null || true)
-    [[ -n "$pids" ]] && all_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        all_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x "unclutter" 2>/dev/null || true)
-    [[ -n "$pids" ]] && all_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        all_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x "Xorg" 2>/dev/null || true)
-    [[ -n "$pids" ]] && all_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        all_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x "xinit" 2>/dev/null || true)
-    [[ -n "$pids" ]] && all_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        all_pids+=("${temp_pids[@]}")
+    fi
     
     # TERM signal first
     for pid in "${all_pids[@]}"; do

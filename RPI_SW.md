@@ -388,7 +388,7 @@ epiphany-browser --application-mode URL
 --no-sandbox               # Potrebné pre root
 --disable-gpu              # Software rendering
 --disable-infobars         # Bez info lišty
---noerrdialogs             # Bez error dialógov
+--no-error-dialogs         # Bez error dialógov
 --incognito                # Privátny režim
 --no-first-run             # Preskočiť wizard
 --disable-translate        # Bez prekladu

@@ -139,19 +139,31 @@ start_browser() {
     
     # Clean old browser processes using specific PIDs
     local old_pids=()
-    local pids
+    local pids temp_pids
     
     pids=$(pgrep -x chromium 2>/dev/null || true)
-    [[ -n "$pids" ]] && old_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        old_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x chromium-browser 2>/dev/null || true)
-    [[ -n "$pids" ]] && old_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        old_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x epiphany-browser 2>/dev/null || true)
-    [[ -n "$pids" ]] && old_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        old_pids+=("${temp_pids[@]}")
+    fi
     
     pids=$(pgrep -x firefox-esr 2>/dev/null || true)
-    [[ -n "$pids" ]] && old_pids+=($pids)
+    if [[ -n "$pids" ]]; then
+        readarray -t temp_pids <<< "$pids"
+        old_pids+=("${temp_pids[@]}")
+    fi
     
     if [[ ${#old_pids[@]} -gt 0 ]]; then
         echo "Stopping old browser processes: ${old_pids[*]}"
@@ -175,7 +187,7 @@ start_browser() {
                 --no-sandbox \
                 --disable-gpu \
                 --disable-infobars \
-                --noerrdialogs \
+                --no-error-dialogs \
                 --incognito \
                 --no-first-run \
                 --disable-translate \
