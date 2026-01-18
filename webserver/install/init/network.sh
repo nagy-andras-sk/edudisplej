@@ -32,6 +32,33 @@ get_dns() {
     cat /etc/resolv.conf 2>/dev/null | grep nameserver | awk '{print $2}' | head -1
 }
 
+# Get current Wi-Fi SSID
+get_current_ssid() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null | awk -F: '$1=="yes" {print $2; exit}'
+    elif command -v iwgetid &> /dev/null; then
+        iwgetid -r 2>/dev/null
+    else
+        echo "unknown"
+    fi
+}
+
+# Get current Wi-Fi signal (0-100 if available)
+get_current_signal() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1=="*" {print $2"%"; exit}'
+    else
+        # Fallback via iwconfig
+        local quality total
+        read quality total <<<$(iwconfig 2>/dev/null | awk -F'[ =/]+' '/Link Quality/ {print $4" " $5; exit}')
+        if [[ -n "$quality" && -n "$total" ]]; then
+            echo "$quality/$total"
+        else
+            echo "unknown"
+        fi
+    fi
+}
+
 # List available network interfaces
 list_interfaces() {
     ip link show | grep -E "^[0-9]+:" | awk -F': ' '{print $2}' | grep -v lo
