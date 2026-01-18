@@ -22,11 +22,3 @@ Install EduDisplej on your Raspberry Pi or any Debian-based system with a single
 # Quick installation with default settings (recommended)
 
 curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
-
-
----
-Alapoktol elteres:
-/opt/edudisplej/
-és service.
-
-Jelenlegi hiba: midori es csomagokat nem tolti le init..

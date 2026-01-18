@@ -1,0 +1,21 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Explicitly set shell scripts to always use LF line endings
+*.sh text eol=lf
+
+# Configuration files should also use LF
+*.conf text eol=lf
+
+# Markdown files
+*.md text eol=lf
+
+# Git specific files
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
