@@ -1,6 +1,6 @@
 # EduDisplej
 
-EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk mode using the Chromium browser. It provides a robust, unattended installation system for Debian/Ubuntu/Raspberry Pi OS.
+EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk mode using chromium-browser. It provides a robust, unattended installation system for Debian/Ubuntu/Raspberry Pi OS.
 
 ## Boot Flow (Chromium-based)
 
