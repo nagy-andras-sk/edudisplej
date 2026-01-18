@@ -181,19 +181,43 @@ ensure_required_packages() {
 
     print_info "$(t boot_pkg_installing) ${missing[*]}"
 
-    # Update package lists
+    # Update package lists with retry
     if [[ "$APT_UPDATED" == false ]]; then
         print_info "Updating package lists..."
-        if ! apt-get update -y 2>&1 | tee "$APT_LOG"; then
-            print_error "apt-get update failed"
-            return 1
+        local apt_update_success=false
+        for attempt in 1 2 3; do
+            if apt-get update -y 2>&1 | tee "$APT_LOG"; then
+                apt_update_success=true
+                break
+            else
+                print_warning "apt-get update failed (attempt $attempt/3)"
+                if [[ $attempt -lt 3 ]]; then
+                    sleep 5
+                fi
+            fi
+        done
+        
+        if [[ "$apt_update_success" == false ]]; then
+            print_error "apt-get update failed after 3 attempts"
+            print_warning "Continuing with cached package lists..."
         fi
         APT_UPDATED=true
     fi
 
-    # Try to install missing packages
+    # Try to install missing packages with retry
     print_info "Installing packages: ${missing[*]}"
-    apt-get install -y "${missing[@]}" 2>&1 | tee -a "$APT_LOG"
+    local install_success=false
+    for attempt in 1 2; do
+        if apt-get install -y "${missing[@]}" 2>&1 | tee -a "$APT_LOG"; then
+            install_success=true
+            break
+        else
+            print_warning "apt-get install failed (attempt $attempt/2)"
+            if [[ $attempt -lt 2 ]]; then
+                sleep 10
+            fi
+        fi
+    done
 
     # Verify each package was actually installed
     for pkg in "${missing[@]}"; do
@@ -237,8 +261,21 @@ ensure_browser() {
 
     if [[ "$APT_UPDATED" == false ]]; then
         print_info "Updating package lists..."
-        if ! apt-get update -y 2>&1 | tee -a "$APT_LOG"; then
-            print_error "apt-get update failed"
+        local apt_update_success=false
+        for attempt in 1 2 3; do
+            if apt-get update -y 2>&1 | tee -a "$APT_LOG"; then
+                apt_update_success=true
+                break
+            else
+                print_warning "apt-get update failed (attempt $attempt/3)"
+                if [[ $attempt -lt 3 ]]; then
+                    sleep 5
+                fi
+            fi
+        done
+        
+        if [[ "$apt_update_success" == false ]]; then
+            print_error "apt-get update failed after 3 attempts"
             return 1
         fi
         APT_UPDATED=true
@@ -246,13 +283,26 @@ ensure_browser() {
 
     for candidate in "${BROWSER_CANDIDATES[@]}"; do
         print_info "Installing browser: ${candidate}"
-        if apt-get install -y "$candidate" 2>&1 | tee -a "$APT_LOG"; then
-            if command -v "$candidate" >/dev/null 2>&1; then
-                BROWSER_BIN="$candidate"
-                export BROWSER_BIN
-                print_success "Installed browser: ${candidate}"
-                return 0
+        
+        # Try installation with retry
+        local install_success=false
+        for attempt in 1 2; do
+            if apt-get install -y "$candidate" 2>&1 | tee -a "$APT_LOG"; then
+                install_success=true
+                break
+            else
+                print_warning "Installation of ${candidate} failed (attempt $attempt/2)"
+                if [[ $attempt -lt 2 ]]; then
+                    sleep 10
+                fi
             fi
+        done
+        
+        if [[ "$install_success" == true ]] && command -v "$candidate" >/dev/null 2>&1; then
+            BROWSER_BIN="$candidate"
+            export BROWSER_BIN
+            print_success "Installed browser: ${candidate}"
+            return 0
         else
             print_warning "Installation failed for ${candidate}, trying next option."
         fi

@@ -12,6 +12,12 @@ MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 DEFAULT_LANG="sk"
 CURRENT_LANG="${DEFAULT_LANG}"
 DEFAULT_KIOSK_URL="https://www.time.is"
+# Fallback URLs if primary fails
+FALLBACK_URLS=(
+    "https://www.time.is"
+    "file:///opt/edudisplej/localweb/clock.html"
+    "about:blank"
+)
 
 # =============================================================================
 # Translation System
@@ -379,6 +385,58 @@ get_mac_suffix() {
 check_internet() {
     ping -c 1 -W 5 google.com &> /dev/null
     return $?
+}
+
+# Check if URL is accessible
+# Usage: check_url "https://example.com"
+check_url() {
+    local url="$1"
+    
+    # Skip check for local files and about:blank
+    if [[ "$url" == file://* ]] || [[ "$url" == about:* ]]; then
+        return 0
+    fi
+    
+    # Try to fetch headers with timeout
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsSL --max-time 10 --head "$url" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# Get working URL from list (prefers configured, falls back to alternatives)
+# Usage: get_working_url "$KIOSK_URL"
+get_working_url() {
+    local primary_url="$1"
+    
+    # Try primary URL first
+    if check_url "$primary_url"; then
+        echo "$primary_url"
+        return 0
+    fi
+    
+    print_warning "Primary URL not accessible: $primary_url"
+    
+    # Try fallback URLs
+    for fallback in "${FALLBACK_URLS[@]}"; do
+        if [[ "$fallback" == "$primary_url" ]]; then
+            continue  # Skip if same as primary
+        fi
+        
+        print_info "Trying fallback URL: $fallback"
+        if check_url "$fallback"; then
+            echo "$fallback"
+            return 0
+        fi
+    done
+    
+    # Last resort: return first fallback even if not verified
+    print_warning "No URL verified as accessible, using first fallback: ${FALLBACK_URLS[0]}"
+    echo "${FALLBACK_URLS[0]}"
+    return 0
 }
 
 # Wait for internet with retries

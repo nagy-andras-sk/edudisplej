@@ -37,8 +37,49 @@ else
     echo "⚠ [minimal-kiosk.sh:$LINENO] Config file not found: $CONFIG_FILE, using defaults"
 fi
 
+# Default fallback URLs
+FALLBACK_URLS=(
+    "https://www.time.is"
+    "file:///opt/edudisplej/localweb/clock.html"
+    "about:blank"
+)
+
 KIOSK_URL="${KIOSK_URL:-https://www.time.is}"
-echo "✓ [minimal-kiosk.sh:$LINENO] Target URL: $KIOSK_URL"
+
+# Verify URL accessibility and use fallback if needed
+check_url() {
+    local url="$1"
+    # Skip check for local files and about:blank
+    if [[ "$url" == file://* ]] || [[ "$url" == about:* ]]; then
+        return 0
+    fi
+    # Try to fetch headers with timeout
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsSL --max-time 10 --head "$url" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Try to find a working URL
+WORKING_URL="$KIOSK_URL"
+if ! check_url "$WORKING_URL"; then
+    echo "⚠ [minimal-kiosk.sh:$LINENO] Primary URL not accessible: $WORKING_URL"
+    for fallback in "${FALLBACK_URLS[@]}"; do
+        if [[ "$fallback" == "$WORKING_URL" ]]; then
+            continue
+        fi
+        echo "   [minimal-kiosk.sh:$LINENO] Trying fallback: $fallback"
+        if check_url "$fallback"; then
+            WORKING_URL="$fallback"
+            echo "✓ [minimal-kiosk.sh:$LINENO] Using fallback URL: $WORKING_URL"
+            break
+        fi
+    done
+fi
+
+echo "✓ [minimal-kiosk.sh:$LINENO] Target URL: $WORKING_URL"
 
 # Step 1: Install dependencies
 install_dependencies() {
@@ -257,7 +298,7 @@ start_chromium() {
             --disable-features=TranslateUI \
             --disable-session-crashed-bubble \
             --check-for-update-interval=31536000 \
-            "$KIOSK_URL" &
+            "$WORKING_URL" &
         
         CHROMIUM_PID=$!
         echo "✓ [minimal-kiosk.sh:$LINENO] Chromium started (PID: $CHROMIUM_PID, attempt: $CHROMIUM_RESTART_COUNT)"
