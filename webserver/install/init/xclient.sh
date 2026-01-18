@@ -1,5 +1,7 @@
 #!/bin/bash
 # xclient.sh - Simplified X client wrapper for browser kiosk
+# NOTE: This script is legacy code. The system now uses minimal-kiosk.sh for improved reliability.
+#       This file is retained for backwards compatibility and manual testing only.
 # This script is started by xinit and runs inside the X session
 
 set -u

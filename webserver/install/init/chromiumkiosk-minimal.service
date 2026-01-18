@@ -1,0 +1,17 @@
+[Unit]
+Description=Minimal Chromium Kiosk
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/edudisplej
+ExecStart=/opt/edudisplej/init/minimal-kiosk.sh
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/edudisplej/service.log
+StandardError=append:/opt/edudisplej/service.log
+
+[Install]
+WantedBy=multi-user.target

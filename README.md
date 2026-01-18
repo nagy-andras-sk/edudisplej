@@ -22,3 +22,53 @@ Install EduDisplej on your Raspberry Pi or any Debian-based system with a single
 # Quick installation with default settings (recommended)
 
 curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
+```
+
+## Minimal Kiosk Mode
+
+The system includes a minimal kiosk service that provides a bulletproof X11 + Chromium kiosk startup:
+
+### Manual Testing
+
+```bash
+# 1. Run minimal kiosk directly
+sudo /opt/edudisplej/init/minimal-kiosk.sh
+
+# 2. Check logs
+tail -f /opt/edudisplej/kiosk.log
+
+# 3. Verify X server
+DISPLAY=:0 xdpyinfo
+
+# 4. Check Chromium process
+ps aux | grep chromium
+
+# 5. Check service status
+systemctl status chromiumkiosk-minimal
+```
+
+### Debug Commands
+
+```bash
+# View all logs
+tail -f /opt/edudisplej/kiosk.log
+tail -f /opt/edudisplej/service.log
+tail -f /opt/edudisplej/session.log
+
+# Restart minimal kiosk service
+sudo systemctl restart chromiumkiosk-minimal
+
+# Check for X server errors
+cat /var/log/Xorg.0.log
+
+# Test X display
+DISPLAY=:0 xrandr
+```
+
+### Log Files
+
+- `/opt/edudisplej/kiosk.log` - Minimal kiosk script logs
+- `/opt/edudisplej/service.log` - Systemd service logs  
+- `/opt/edudisplej/session.log` - Main init script logs
+- `/opt/edudisplej/xclient.log` - X client logs (legacy)
+
