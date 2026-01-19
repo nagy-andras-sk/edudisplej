@@ -20,29 +20,8 @@ TTYReset=yes
 TTYVHangup=yes
 TTYVTDisallocate=yes
 
-# Run init script if needed, then start X
-ExecStart=/bin/bash -c '\
-  if [ ! -f /opt/edudisplej/.kiosk_system_configured ]; then \
-    clear; \
-    echo "==================================================="; \
-    echo "  EduDisplej - First-time initialization"; \
-    echo "==================================================="; \
-    echo ""; \
-    sudo /opt/edudisplej/init/edudisplej-init.sh; \
-    echo ""; \
-    echo "Initialization complete. Starting X server..."; \
-    sleep 2; \
-  fi; \
-  pkill -TERM Xorg 2>/dev/null || true; \
-  sleep 1; \
-  if command -v startx >/dev/null 2>&1; then \
-    exec startx -- :0 vt1; \
-  else \
-    echo "ERROR: startx not found. Init script may have failed."; \
-    echo "Check logs: sudo journalctl -u edudisplej-kiosk.service"; \
-    sleep 30; \
-    exit 1; \
-  fi'
+# Run wrapper script to handle initialization and X startup
+ExecStart=/opt/edudisplej/init/kiosk-start.sh
 
 Restart=always
 RestartSec=10
