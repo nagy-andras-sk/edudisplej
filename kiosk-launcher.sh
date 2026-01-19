@@ -54,7 +54,7 @@ fi
 
 # Hide mouse cursor (background)
 if command -v unclutter >/dev/null 2>&1; then
-  (unclutter -idle 1 -root >/dev/null 2>&1 & ) || true
+  unclutter -idle 1 -root >/dev/null 2>&1 &
 fi
 
 # Restore cursor if interrupted (Ctrl+C)

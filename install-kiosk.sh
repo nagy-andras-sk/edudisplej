@@ -261,7 +261,7 @@ fi
 
 # Hide mouse cursor (background)
 if command -v unclutter >/dev/null 2>&1; then
-  (unclutter -idle 1 -root >/dev/null 2>&1 & ) || true
+  unclutter -idle 1 -root >/dev/null 2>&1 &
 fi
 
 # Restore cursor if interrupted (Ctrl+C)
@@ -294,20 +294,36 @@ log_info "kiosk-launcher.sh created"
 log_info "Adding xrestart alias to .bashrc..."
 
 BASHRC="$USER_HOME/.bashrc"
-ALIAS_LINE='alias xrestart="for pid in \$(pgrep Xorg); do kill -TERM \$pid 2>/dev/null || true; done; sleep 2; for pid in \$(pgrep Xorg); do kill -KILL \$pid 2>/dev/null || true; done; sleep 1; startx -- :0 vt1"'
+
+# Create xrestart function for better readability
+XRESTART_FUNC='# X restart function
+xrestart() {
+  # Terminate X server safely
+  for pid in $(pgrep Xorg 2>/dev/null || true); do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 2
+  # Force kill if still running
+  for pid in $(pgrep Xorg 2>/dev/null || true); do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  done
+  sleep 1
+  # Start X
+  startx -- :0 vt1
+}'
 
 if [ -f "$BASHRC" ]; then
-    if ! grep -q "alias xrestart=" "$BASHRC"; then
-        echo "# X restart alias" >> "$BASHRC"
-        echo "$ALIAS_LINE" >> "$BASHRC"
-        log_info "Added xrestart alias"
+    if ! grep -q "xrestart()" "$BASHRC"; then
+        echo "$XRESTART_FUNC" >> "$BASHRC"
+        log_info "Added xrestart function"
     else
-        log_info "xrestart alias already exists"
+        log_info "xrestart function already exists"
     fi
 else
-    echo "# X restart alias" > "$BASHRC"
-    echo "$ALIAS_LINE" >> "$BASHRC"
-    log_info "Created .bashrc with xrestart alias"
+    echo "$XRESTART_FUNC" > "$BASHRC"
+    log_info "Created .bashrc with xrestart function"
 fi
 
 chown "$KIOSK_USER:$KIOSK_USER" "$BASHRC"
