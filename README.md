@@ -1,8 +1,188 @@
 # EduDisplej
 
-EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk mode using chromium-browser. It provides a robust, unattended installation system for Debian/Ubuntu/Raspberry Pi OS.
+EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk mode. It provides a robust, unattended installation system for Debian/Ubuntu/Raspberry Pi OS.
 
-## Boot Flow (Chromium-based)
+**The installer automatically detects your device architecture and configures the appropriate kiosk mode:**
+- **ARMv6 (Pi 1 / Zero 1)**: Uses Epiphany browser with visible terminal launcher (auto-detected)
+- **Other architectures (Pi 2+)**: Uses Chromium browser with visible terminal launcher (auto-detected)
+
+**Both modes feature:**
+- Visible xterm terminal displaying ASCII "EDUDISPLEJ" banner
+- 5-second countdown before browser launch
+- Browser watchdog for automatic restart
+- Full-screen kiosk mode
+
+## Quick Installation
+
+Install EduDisplej on your Raspberry Pi or any Debian-based system with a single command:
+
+```bash
+# Quick installation with automatic architecture detection
+curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
+```
+
+The installer will:
+1. Detect your device architecture (ARMv6 vs. other)
+2. Download and install required files from the server
+3. Configure the appropriate kiosk mode automatically
+4. Set up all necessary services and configurations
+5. Reboot the system
+
+## ARMv6 Kiosk Mode (Raspberry Pi 1 / Zero 1)
+
+When the installer detects ARMv6 architecture (armv6l), it automatically configures an Epiphany-based kiosk.
+
+### Target Devices (Automatically Detected)
+- Raspberry Pi 1 (Model A, A+, B, B+)
+- Raspberry Pi Zero 1 (NOT Zero 2)
+- Any ARMv6 (armv6l) device
+
+### Features (ARMv6 Mode)
+- Installs Xorg, Openbox, xterm, Epiphany browser, and utilities (unclutter, xdotool, figlet)
+- Disables/removes conflicting display managers (lightdm, lxdm, sddm, gdm3, plymouth)
+- Configures auto-login on tty1 (no Display Manager)
+- Auto-starts X server + Openbox on boot
+- Launches xterm with a visible terminal showing:
+  - ASCII "EDUDISPLEJ" banner
+  - 5-second countdown
+  - Epiphany browser in fullscreen mode
+- Implements browser watchdog (auto-restart on close)
+- Disables DPMS/screensaver and hides cursor
+- Does **not** install Chromium (not available on ARMv6)
+- Does **not** use systemd service for kiosk (uses direct X auto-start)
+
+### After Installation (ARMv6)
+
+After reboot:
+1. System auto-logins on tty1 as configured user
+2. X server starts automatically on :0
+3. Openbox window manager launches
+4. xterm opens with visible terminal
+5. Terminal shows EDUDISPLEJ banner and countdown
+6. Epiphany browser launches in fullscreen
+7. If browser closes, watchdog restarts it automatically
+
+### URL Configuration
+
+There are several ways to set the kiosk URL:
+
+**Option 1: Edit kiosk-launcher.sh directly (simplest)**
+```bash
+sudo -u <KIOSK_USER> nano ~/kiosk-launcher.sh
+# Change: URL="${1:-https://example.com}"
+# To:     URL="${1:-https://your-url.com}"
+```
+
+**Option 2: Pass URL as environment variable**
+```bash
+# Edit ~/.config/openbox/autostart
+xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "bash -c 'URL=https://your-url.com \$HOME/kiosk-launcher.sh'" &
+```
+
+**Option 3: Pass URL as script argument**
+```bash
+# Edit ~/.config/openbox/autostart
+xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "$HOME/kiosk-launcher.sh https://your-url.com" &
+```
+
+### Testing Without Reboot (ARMv6)
+
+```bash
+# Test as the kiosk user (usually pi or edudisplej)
+sudo -u pi DISPLAY=:0 XDG_VTNR=1 startx -- :0 vt1
+```
+
+### Manual Control (ARMv6)
+
+```bash
+# Restart X server (use the function created by installer)
+xrestart
+
+# Or manually:
+pkill Xorg  # (the installer creates a safer version)
+
+# Check what's running
+ps aux | grep -E "Xorg|openbox|epiphany|xterm"
+```
+
+### Files Created by Installer (ARMv6)
+
+- `/etc/systemd/system/getty@tty1.service.d/autologin.conf` - Auto-login configuration
+- `~/.profile` - Auto-start X on tty1
+- `~/.xinitrc` - Start Openbox session
+- `~/.config/openbox/autostart` - Openbox startup configuration
+- `~/kiosk-launcher.sh` - Terminal launcher script
+- `~/.bashrc` - xrestart function
+
+## Standard Kiosk Mode (Raspberry Pi 2+ with Chromium)
+
+When the installer detects non-ARMv6 architecture, it automatically configures a Chromium-based kiosk.
+
+### Target Devices (Automatically Detected)
+- Raspberry Pi 2, 3, 4, 5
+- Raspberry Pi Zero 2 W
+- Any ARMv7, ARMv8, or x86_64 device
+
+### Features (Chromium Mode)
+- Installs Xorg, Openbox, xterm, Chromium browser, and utilities (unclutter, xdotool, figlet)
+- Disables/removes conflicting display managers (lightdm, lxdm, sddm, gdm3, plymouth)
+- Configures auto-login on tty1 (no Display Manager)
+- Auto-starts X server + Openbox on boot
+- Launches xterm with a visible terminal showing:
+  - ASCII "EDUDISPLEJ" banner
+  - 5-second countdown
+  - Chromium browser in fullscreen kiosk mode
+- Implements browser watchdog (auto-restart on close)
+- Disables DPMS/screensaver and hides cursor
+
+### After Installation (Chromium)
+
+After reboot:
+1. System auto-logins on tty1 as configured user
+2. X server starts automatically on :0
+3. Openbox window manager launches
+4. xterm opens with visible terminal
+5. Terminal shows EDUDISPLEJ banner and countdown
+6. Chromium browser launches in fullscreen kiosk mode
+7. If browser closes, watchdog restarts it automatically
+
+### URL Configuration (Chromium)
+
+Edit the kiosk-launcher.sh file to change the default URL:
+
+```bash
+sudo -u pi nano ~/kiosk-launcher.sh
+# Change: URL="${1:-https://www.time.is}"
+# To:     URL="${1:-https://your-url.com}"
+```
+
+### Testing Without Reboot (Chromium)
+
+```bash
+# Test as the kiosk user (usually pi)
+sudo -u pi DISPLAY=:0 XDG_VTNR=1 startx -- :0 vt1
+```
+
+### Manual Control (Chromium)
+
+```bash
+# Restart X server
+xrestart
+
+# Check what's running
+ps aux | grep -E "Xorg|openbox|chromium|xterm"
+```
+
+### Files Created by Installer (Chromium)
+
+- `/etc/systemd/system/getty@tty1.service.d/autologin.conf` - Auto-login configuration
+- `~/.profile` - Auto-start X on tty1
+- `~/.xinitrc` - Start Openbox session
+- `~/.config/openbox/autostart` - Openbox startup configuration
+- `~/kiosk-launcher.sh` - Terminal launcher script (Chromium version)
+- `~/.bashrc` - xrestart function
+
+## Legacy Boot Flow (for reference)
 
 - install.sh installs and registers the init service that launches [install/init/edudisplej-init.sh](webserver/install/init/edudisplej-init.sh) on boot
 - init script loads modules, installs any missing required packages (chromium-browser, openbox, xinit, unclutter, curl), shows its current version, and self-updates from the install server when a newer bundle is available
@@ -25,17 +205,7 @@ EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk m
 
 See [ERROR_HANDLING.md](ERROR_HANDLING.md) for detailed documentation on error handling features.
 
-## Quick Installation
-
-Install EduDisplej on your Raspberry Pi or any Debian-based system with a single command:
-
-```bash
-# Quick installation with default settings (recommended)
-
-curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
-```
-
-## Minimal Kiosk Mode
+## Minimal Kiosk Mode (Chromium)
 
 The system includes a minimal kiosk service that provides a bulletproof X11 + Chromium kiosk startup:
 
