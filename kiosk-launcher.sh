@@ -57,6 +57,9 @@ if command -v unclutter >/dev/null 2>&1; then
   (unclutter -idle 1 -root >/dev/null 2>&1 & ) || true
 fi
 
+# Restore cursor if interrupted (Ctrl+C)
+trap 'tput cnorm || true' EXIT
+
 # Launch browser in fullscreen (Epiphany is ARMv6-compatible)
 epiphany-browser --fullscreen "${URL}" &
 
@@ -73,6 +76,3 @@ while true; do
     ensure_fullscreen
   fi
 done
-
-# Restore cursor if interrupted (Ctrl+C)
-trap 'tput cnorm || true' EXIT
