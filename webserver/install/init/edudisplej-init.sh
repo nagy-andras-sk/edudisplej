@@ -1006,152 +1006,19 @@ if [[ -f "$KIOSK_CONFIGURED_FILE" ]]; then
 fi
 
 # =============================================================================
-# Main Menu Function
-# =============================================================================
-
-main_menu() {
-    local choice
-
-    while true; do
-        show_main_menu
-        if ! read -rp "> " -t $COUNTDOWN_SECONDS choice; then
-            print_info "No selection detected, starting saved mode..."
-            local saved_mode
-            saved_mode=$(get_mode)
-            [[ -z "$saved_mode" ]] && saved_mode="EDSERVER"
-            set_mode "$saved_mode"
-            save_config
-
-            start_kiosk_mode
-            break
-        fi
-
-        case "$choice" in
-            0)
-                # EduServer mode
-                print_info "$(t menu_eduserver)"
-                set_mode "EDSERVER"
-                KIOSK_URL="https://server.edudisplej.sk/demo/client/"
-                save_config
-                start_kiosk_mode
-                break
-                ;;
-            1)
-                # Standalone mode
-                print_info "$(t menu_standalone)"
-                set_mode "STANDALONE"
-                echo ""
-                read -rp "Enter URL / Zadajte URL: " KIOSK_URL
-                if [[ -z "$KIOSK_URL" ]]; then
-                    KIOSK_URL="${DEFAULT_KIOSK_URL}"
-                fi
-                save_config
-                start_kiosk_mode
-                break
-                ;;
-            2)
-                # Language settings
-                show_language_menu
-                ;;
-            3)
-                # Display settings
-                show_display_menu
-                ;;
-            4)
-                # Network settings
-                show_network_menu
-                ;;
-            5)
-                # Exit (just start kiosk with defaults)
-                print_info "$(t menu_exit)"
-                start_kiosk_mode
-                break
-                ;;
-            *)
-                print_error "$(t menu_invalid)"
-                sleep 1
-                ;;
-        esac
-    done
-}
-
-# =============================================================================
-# Boot Summary + Countdown
+# First-time Setup - Configuration without menu
 # =============================================================================
 
 show_system_summary
 
+# Set default mode if not configured
 if [[ ! -f "$MODE_FILE" ]]; then
-    print_warning "No mode configured - opening menu by default"
-    ENTER_MENU=true
+    print_info "First-time setup - using default mode"
+    set_mode "EDSERVER"
+    KIOSK_URL="https://www.time.is"
+    save_config
 fi
 
-countdown_or_menu "$COUNTDOWN_SECONDS"
-
-echo ""
-
-# =============================================================================
-# Main Logic - Menu or Kiosk
-# =============================================================================
-
-if [[ "$ENTER_MENU" == true ]]; then
-    # Enter interactive menu
-    main_menu
-else
-    # Load existing mode and start kiosk
-    print_info "$(t boot_loading_mode)"
-
-    SAVED_MODE=$(get_mode)
-
-    if [[ -n "$SAVED_MODE" ]]; then
-        print_info "Mode: ${SAVED_MODE}"
-    else
-        SAVED_MODE="EDSERVER"
-        set_mode "$SAVED_MODE"
-    fi
-
-    start_kiosk_mode
-fi
-
-# =============================================================================
-# Keep running - monitor kiosk processes
-# =============================================================================
-
-echo ""
-print_info "EduDisplej kiosk is running. Press Ctrl+C to stop."
-print_info "Logs: session.log, kiosk.log"
-echo ""
-
-# Keep the script alive - monitor xinit/X processes with safety limit
-MAX_RESTART_LOOPS=5
-restart_loop_count=0
-last_restart_time=0
-MIN_UPTIME_FOR_RESET=300  # 5 minutes uptime resets the counter
-
-while true; do
-    sleep 10
-    
-    if ! pgrep -x xinit >/dev/null 2>&1 && ! pgrep -x Xorg >/dev/null 2>&1; then
-        current_time=$(date +%s)
-        uptime=$((current_time - last_restart_time))
-        
-        # Reset counter if system ran for long enough
-        if [[ $last_restart_time -gt 0 && $uptime -ge $MIN_UPTIME_FOR_RESET ]]; then
-            print_info "System ran for ${uptime}s, resetting restart counter"
-            restart_loop_count=0
-        fi
-        
-        ((restart_loop_count++))
-        
-        if [[ $restart_loop_count -ge $MAX_RESTART_LOOPS ]]; then
-            print_error "X server restart limit reached ($MAX_RESTART_LOOPS attempts)"
-            print_error "FATAL: Too many restart failures, stopping to prevent infinite loop"
-            print_error "Check logs: session.log, kiosk.log, /var/log/Xorg.0.log"
-            exit 1
-        fi
-        
-        print_warning "X server stopped. Restarting (attempt $restart_loop_count/$MAX_RESTART_LOOPS)..."
-        last_restart_time=$(date +%s)
-        start_kiosk_mode
-    fi
-done
+print_success "System initialization complete - kiosk configured"
+print_info "System will auto-start kiosk after reboot when user logs in on tty1"
+exit 0
