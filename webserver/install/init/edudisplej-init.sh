@@ -578,7 +578,9 @@ BROWSER_BIN=""
 # Core packages needed for kiosk mode (browser installed separately via ensure_browser)
 REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
 APT_UPDATED=false
-INTERNET_AVAILABLE=1  # Initialize to "not available" by default
+# INTERNET_AVAILABLE will be set by wait_for_internet() in main execution
+# 0 = available, 1 (or non-zero) = not available (following shell exit code convention)
+INTERNET_AVAILABLE=1
 
 # Check and install required packages
 ensure_required_packages() {
