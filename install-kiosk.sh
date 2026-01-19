@@ -220,7 +220,7 @@ echo "URL: ${URL}"
 echo
 
 # Visszaszámlálás
-for ((i=${COUNT_FROM}; i>=1; i--)); do
+for ((i=COUNT_FROM; i>=1; i--)); do
   printf "\rIndítás %2d..." "$i"
   sleep 1
 done
