@@ -23,7 +23,7 @@ fi
 exec > >(tee -a "$SESSION_LOG") 2>&1
 
 # Versioning and update source
-CURRENT_VERSION="20260107-1"
+CURRENT_VERSION="20260119"
 INIT_BASE="https://install.edudisplej.sk/init"
 VERSION_URL="${INIT_BASE}/version.txt"
 FILES_LIST_URL="${INIT_BASE}/download.php?getfiles"
@@ -235,61 +235,38 @@ configure_kiosk_system() {
     # Configure auto-start X on tty1
     print_info "Configuring auto-start X on tty1..."
     local PROFILE_SNIPPET='
-# Auto-start X/Openbox on tty1
+# Auto-start EduDisplej initialization and X on tty1
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  # Wait for edudisplej-init.service to complete (max 30 minutes)
-  echo "Waiting for system initialization to complete..."
-  timeout=1800
-  elapsed=0
-  
-  while [ $elapsed -lt $timeout ]; do
-    status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
-    
-    # Service states:
-    # - "active" = completed successfully (RemainAfterExit=yes)
-    # - "inactive" = completed and exited
-    # - "failed" = service failed
-    # - "activating" = still running
-    
-    case "$status" in
-      active|inactive)
-        echo ""
-        echo "System initialization complete."
-        break
-        ;;
-      failed)
-        echo ""
-        echo "WARNING: System initialization failed."
-        echo "Check logs with: sudo journalctl -u edudisplej-init.service"
-        break
-        ;;
-      *)
-        printf "."
-        sleep 2
-        elapsed=$((elapsed + 2))
-        ;;
-    esac
-  done
-  
-  if [ $elapsed -ge $timeout ]; then
+  # Check if first-time setup is needed
+  if [ ! -f /opt/edudisplej/.kiosk_system_configured ]; then
+    echo "==================================================="
+    echo "  EduDisplej - First-time initialization"
+    echo "==================================================="
     echo ""
-    echo "WARNING: System initialization timed out."
+    
+    # Run init script in foreground (visible on tty1)
+    if [ -x /opt/edudisplej/init/edudisplej-init.sh ]; then
+      sudo /opt/edudisplej/init/edudisplej-init.sh
+    else
+      echo "ERROR: Init script not found or not executable"
+      exit 1
+    fi
+    
+    echo ""
+    echo "Initialization complete. Starting X server..."
+    sleep 2
   fi
-  
-  sleep 2
   
   # Kill any existing X server
-  if pgrep Xorg >/dev/null 2>&1; then
-    for pid in $(pgrep Xorg); do
-      kill -TERM "$pid" 2>/dev/null || true
-    done
-    sleep 2
-    for pid in $(pgrep Xorg); do
-      if kill -0 "$pid" 2>/dev/null; then
-        kill -KILL "$pid" 2>/dev/null || true
-      fi
-    done
-  fi
+  for pid in $(pgrep Xorg 2>/dev/null || true); do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 1
+  for pid in $(pgrep Xorg 2>/dev/null || true); do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  done
   sleep 1
   
   # Start X server
@@ -297,7 +274,7 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
 fi'
     
     if [[ -f "$USER_HOME/.profile" ]]; then
-        if ! grep -q "Auto-start X/Openbox on tty1" "$USER_HOME/.profile"; then
+        if ! grep -q "Auto-start EduDisplej initialization and X on tty1" "$USER_HOME/.profile"; then
             echo "$PROFILE_SNIPPET" >> "$USER_HOME/.profile"
             print_info "Added X auto-start to .profile"
         else

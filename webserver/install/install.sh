@@ -119,16 +119,15 @@ echo "[*] Kiosk mode preference saved: $KIOSK_MODE"
 echo "[*] Console user saved: $CONSOLE_USER"
 echo "[*] Packages and kiosk configuration will be set up by init script on first boot"
 
-# Install and enable edudisplej-init service
-echo "[*] Installing edudisplej-init systemd service..."
-if [ -f "${INIT_DIR}/edudisplej-init.service" ]; then
-    cp "${INIT_DIR}/edudisplej-init.service" /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable edudisplej-init.service
-    echo "[*] edudisplej-init service enabled"
-else
-    echo "[!] Warning: edudisplej-init.service not found"
-fi
+# Configure passwordless sudo for init script (so .profile can run it)
+echo "[*] Configuring passwordless sudo for init script..."
+mkdir -p /etc/sudoers.d
+cat > /etc/sudoers.d/edudisplej <<EOF
+# Allow console user to run edudisplej-init.sh without password
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-init.sh
+EOF
+chmod 0440 /etc/sudoers.d/edudisplej
+echo "[*] Sudoers configuration complete"
 
 # Configure autologin on tty1
 echo "[*] Configuring autologin for $CONSOLE_USER on tty1..."
