@@ -578,6 +578,7 @@ BROWSER_BIN=""
 # Core packages needed for kiosk mode (browser installed separately via ensure_browser)
 REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
 APT_UPDATED=false
+INTERNET_AVAILABLE=1  # Initialize to "not available" by default
 
 # Check and install required packages
 ensure_required_packages() {
@@ -673,14 +674,12 @@ ensure_browser() {
     local BROWSER_CANDIDATES
     BROWSER_CANDIDATES=$(get_browser_candidates)
     
-    for candidate in $BROWSER_CANDIDATES; do
-        if command -v "$candidate" >/dev/null 2>&1; then
-            BROWSER_BIN="$candidate"
-            export BROWSER_BIN
-            print_success "Using browser: ${candidate}"
-            return 0
-        fi
-    done
+    if command -v "$BROWSER_CANDIDATES" >/dev/null 2>&1; then
+        BROWSER_BIN="$BROWSER_CANDIDATES"
+        export BROWSER_BIN
+        print_success "Using browser: ${BROWSER_CANDIDATES}"
+        return 0
+    fi
 
     if [[ "${INTERNET_AVAILABLE:-1}" -ne 0 ]]; then
         print_error "No supported browser installed and internet unavailable to install."
@@ -709,35 +708,31 @@ ensure_browser() {
         APT_UPDATED=true
     fi
 
-    for candidate in $BROWSER_CANDIDATES; do
-        print_info "Installing browser: ${candidate}"
-        
-        # Try installation with retry
-        local install_success=false
-        for attempt in 1 2; do
-            if apt-get install -y "$candidate" 2>&1 | tee -a "$APT_LOG"; then
-                install_success=true
-                break
-            else
-                print_warning "Installation of ${candidate} failed (attempt $attempt/2)"
-                if [[ $attempt -lt 2 ]]; then
-                    sleep 10
-                fi
-            fi
-        done
-        
-        if [[ "$install_success" == true ]] && command -v "$candidate" >/dev/null 2>&1; then
-            BROWSER_BIN="$candidate"
-            export BROWSER_BIN
-            print_success "Installed browser: ${candidate}"
-            return 0
+    print_info "Installing browser: ${BROWSER_CANDIDATES}"
+    
+    # Try installation with retry
+    local install_success=false
+    for attempt in 1 2; do
+        if apt-get install -y "$BROWSER_CANDIDATES" 2>&1 | tee -a "$APT_LOG"; then
+            install_success=true
+            break
         else
-            print_warning "Installation failed for ${candidate}, trying next option."
+            print_warning "Installation of ${BROWSER_CANDIDATES} failed (attempt $attempt/2)"
+            if [[ $attempt -lt 2 ]]; then
+                sleep 10
+            fi
         fi
     done
-
-    print_error "Unable to install supported browser (tried: ${BROWSER_CANDIDATES})"
-    return 1
+    
+    if [[ "$install_success" == true ]] && command -v "$BROWSER_CANDIDATES" >/dev/null 2>&1; then
+        BROWSER_BIN="$BROWSER_CANDIDATES"
+        export BROWSER_BIN
+        print_success "Installed browser: ${BROWSER_CANDIDATES}"
+        return 0
+    else
+        print_error "Unable to install supported browser: ${BROWSER_CANDIDATES}"
+        return 1
+    fi
 }
 
 # Fetch latest version string from server
