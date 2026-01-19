@@ -251,18 +251,27 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
   echo "Waiting for system initialization to complete..."
   local timeout=1800
   local elapsed=0
-  while ! systemctl is-active --quiet edudisplej-init.service && [ $elapsed -lt $timeout ]; do
+  while [ $elapsed -lt $timeout ]; do
+    local status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
+    if [ "$status" = "active" ] || [ "$status" = "inactive" ] || [ "$status" = "failed" ]; then
+      break
+    fi
     echo -n "."
     sleep 2
     elapsed=$((elapsed + 2))
   done
   
-  if [ $elapsed -ge $timeout ]; then
-    echo ""
+  echo ""
+  local final_status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
+  if [ "$final_status" = "active" ]; then
+    echo "System initialization complete."
+  elif [ "$final_status" = "failed" ]; then
+    echo "WARNING: System initialization failed. Some features may not work."
+    echo "Check logs with: sudo journalctl -u edudisplej-init.service"
+  elif [ $elapsed -ge $timeout ]; then
     echo "WARNING: System initialization timed out. Some features may not work."
   else
-    echo ""
-    echo "System initialization complete."
+    echo "System initialization status: $final_status"
   fi
   
   sleep 2
