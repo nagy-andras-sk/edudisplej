@@ -145,14 +145,12 @@ install_kiosk_packages() {
     
     # Update package lists if not already done
     if [[ "$APT_UPDATED" == false ]]; then
-        print_info "Updating package lists..."
         local apt_update_success=false
         for attempt in 1 2 3; do
-            if apt-get update -y 2>&1 | tee -a "$APT_LOG"; then
+            if apt-get update -y >>"$APT_LOG" 2>&1; then
                 apt_update_success=true
                 break
             else
-                print_warning "apt-get update failed (attempt $attempt/3)"
                 if [[ $attempt -lt 3 ]]; then
                     sleep 5
                 fi
@@ -166,14 +164,43 @@ install_kiosk_packages() {
         APT_UPDATED=true
     fi
     
-    # Install packages
-    print_info "Installing: ${packages[*]}"
-    if DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}" 2>&1 | tee -a "$APT_LOG"; then
-        print_success "Kiosk packages installed successfully"
+    # Show progress banner
+    show_installer_banner
+    
+    local total_steps=${#packages[@]}
+    local current_step=0
+    local start_time=$(date +%s)
+    
+    echo ""
+    print_info "Inštalácia kiosk balíčkov: ${total_steps} balíčkov"
+    echo ""
+    
+    # Install packages one by one with progress
+    local installed_count=0
+    for pkg in "${packages[@]}"; do
+        ((current_step++))
+        show_progress_bar $current_step $total_steps "Inštalujem: $pkg" $start_time
+        
+        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
+            ((installed_count++))
+        else
+            # Retry once
+            sleep 2
+            if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
+                ((installed_count++))
+            fi
+        fi
+    done
+    
+    echo ""
+    echo ""
+    
+    if [[ $installed_count -eq ${#packages[@]} ]]; then
+        print_success "Kiosk balíčky úspešne nainštalované (${installed_count}/${total_steps})"
         touch "$configured_file"
         return 0
     else
-        print_error "Failed to install some kiosk packages"
+        print_error "Niektoré kiosk balíčky sa nepodarilo nainštalovať"
         return 1
     fi
 }
@@ -607,18 +634,28 @@ ensure_required_packages() {
         return 1
     fi
 
-    print_info "$(t boot_pkg_installing) ${missing[*]}"
+    # Show installer banner
+    show_installer_banner
+    
+    local total_steps=$((1 + ${#missing[@]}))  # 1 for apt-get update + packages
+    local current_step=0
+    local start_time=$(date +%s)
+    
+    echo ""
+    print_info "Instalacia balickov: ${#missing[@]} balickov na nainstalovanie"
+    echo ""
 
     # Update package lists with retry
     if [[ "$APT_UPDATED" == false ]]; then
-        print_info "Updating package lists..."
+        ((current_step++))
+        show_progress_bar $current_step $total_steps "Aktualizacia zoznamu balickov..." $start_time
+        
         local apt_update_success=false
         for attempt in 1 2 3; do
-            if apt-get update -y 2>&1 | tee "$APT_LOG"; then
+            if apt-get update -y >>"$APT_LOG" 2>&1; then
                 apt_update_success=true
                 break
             else
-                print_warning "apt-get update failed (attempt $attempt/3)"
                 if [[ $attempt -lt 3 ]]; then
                     sleep 5
                 fi
@@ -626,46 +663,51 @@ ensure_required_packages() {
         done
         
         if [[ "$apt_update_success" == false ]]; then
-            print_error "apt-get update failed after 3 attempts"
-            print_warning "Continuing with cached package lists..."
+            echo ""
+            print_error "apt-get update zlyhalo po 3 pokusoch"
+            print_warning "Pokracujem s cache zoznamom balickov..."
         fi
         APT_UPDATED=true
     fi
 
-    # Try to install missing packages with retry
-    print_info "Installing packages: ${missing[*]}"
-    local install_success=false
-    for attempt in 1 2; do
-        if apt-get install -y "${missing[@]}" 2>&1 | tee -a "$APT_LOG"; then
-            install_success=true
-            break
+    # Install packages one by one with progress
+    local installed_count=0
+    for pkg in "${missing[@]}"; do
+        ((current_step++))
+        show_progress_bar $current_step $total_steps "Instalujem: $pkg" $start_time
+        
+        # Try to install the package
+        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
+            ((installed_count++))
         else
-            print_warning "apt-get install failed (attempt $attempt/2)"
-            if [[ $attempt -lt 2 ]]; then
-                sleep 10
+            # Retry once
+            sleep 2
+            if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
+                ((installed_count++))
             fi
         fi
     done
+    
+    echo ""
+    echo ""
 
     # Verify each package was actually installed
     for pkg in "${missing[@]}"; do
         if ! dpkg -s "$pkg" >/dev/null 2>&1; then
             still_missing+=("$pkg")
-            print_error "Failed to install: ${pkg}"
-        else
-            print_success "Installed: ${pkg}"
+            print_error "Nepodarilo sa nainštalovať: ${pkg}"
         fi
     done
 
     if [[ ${#still_missing[@]} -eq 0 ]]; then
-        print_success "$(t boot_pkg_ok)"
+        print_success "$(t boot_pkg_ok) - Nainstalovanych: ${installed_count}/${#missing[@]}"
         return 0
     else
         print_error "$(t boot_pkg_install_failed)"
-        print_error "Still missing: ${still_missing[*]}"
+        print_error "Stale chybaju: ${still_missing[*]}"
         local tail_msg
         tail_msg=$(tail -n 10 "$APT_LOG" 2>/dev/null)
-        echo "Last 10 lines of apt.log:"
+        echo "Poslednych 10 riadkov z apt.log:"
         echo "$tail_msg"
         return 1
     fi
@@ -689,14 +731,12 @@ ensure_browser() {
     fi
 
     if [[ "$APT_UPDATED" == false ]]; then
-        print_info "Updating package lists..."
         local apt_update_success=false
         for attempt in 1 2 3; do
-            if apt-get update -y 2>&1 | tee -a "$APT_LOG"; then
+            if apt-get update -y >>"$APT_LOG" 2>&1; then
                 apt_update_success=true
                 break
             else
-                print_warning "apt-get update failed (attempt $attempt/3)"
                 if [[ $attempt -lt 3 ]]; then
                     sleep 5
                 fi
@@ -710,21 +750,32 @@ ensure_browser() {
         APT_UPDATED=true
     fi
 
-    print_info "Installing browser: ${BROWSER_CANDIDATES}"
+    # Show progress banner
+    show_installer_banner
+    
+    local start_time=$(date +%s)
+    echo ""
+    print_info "Instalacia prehliadaca: ${BROWSER_CANDIDATES}"
+    echo ""
+    
+    show_progress_bar 0 1 "Stahujem a instalujem ${BROWSER_CANDIDATES}..." $start_time
     
     # Try installation with retry
     local install_success=false
     for attempt in 1 2; do
-        if apt-get install -y "$BROWSER_CANDIDATES" 2>&1 | tee -a "$APT_LOG"; then
+        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$BROWSER_CANDIDATES" >>"$APT_LOG" 2>&1; then
             install_success=true
             break
         else
-            print_warning "Installation of ${BROWSER_CANDIDATES} failed (attempt $attempt/2)"
             if [[ $attempt -lt 2 ]]; then
                 sleep 10
             fi
         fi
     done
+    
+    show_progress_bar 1 1 "Dokoncene: ${BROWSER_CANDIDATES}" $start_time
+    echo ""
+    echo ""
     
     if [[ "$install_success" == true ]] && command -v "$BROWSER_CANDIDATES" >/dev/null 2>&1; then
         BROWSER_BIN="$BROWSER_CANDIDATES"
@@ -955,152 +1006,19 @@ if [[ -f "$KIOSK_CONFIGURED_FILE" ]]; then
 fi
 
 # =============================================================================
-# Main Menu Function
-# =============================================================================
-
-main_menu() {
-    local choice
-
-    while true; do
-        show_main_menu
-        if ! read -rp "> " -t $COUNTDOWN_SECONDS choice; then
-            print_info "No selection detected, starting saved mode..."
-            local saved_mode
-            saved_mode=$(get_mode)
-            [[ -z "$saved_mode" ]] && saved_mode="EDSERVER"
-            set_mode "$saved_mode"
-            save_config
-
-            start_kiosk_mode
-            break
-        fi
-
-        case "$choice" in
-            0)
-                # EduServer mode
-                print_info "$(t menu_eduserver)"
-                set_mode "EDSERVER"
-                KIOSK_URL="https://server.edudisplej.sk/demo/client/"
-                save_config
-                start_kiosk_mode
-                break
-                ;;
-            1)
-                # Standalone mode
-                print_info "$(t menu_standalone)"
-                set_mode "STANDALONE"
-                echo ""
-                read -rp "Enter URL / Zadajte URL: " KIOSK_URL
-                if [[ -z "$KIOSK_URL" ]]; then
-                    KIOSK_URL="${DEFAULT_KIOSK_URL}"
-                fi
-                save_config
-                start_kiosk_mode
-                break
-                ;;
-            2)
-                # Language settings
-                show_language_menu
-                ;;
-            3)
-                # Display settings
-                show_display_menu
-                ;;
-            4)
-                # Network settings
-                show_network_menu
-                ;;
-            5)
-                # Exit (just start kiosk with defaults)
-                print_info "$(t menu_exit)"
-                start_kiosk_mode
-                break
-                ;;
-            *)
-                print_error "$(t menu_invalid)"
-                sleep 1
-                ;;
-        esac
-    done
-}
-
-# =============================================================================
-# Boot Summary + Countdown
+# First-time Setup - Configuration without menu
 # =============================================================================
 
 show_system_summary
 
+# Set default mode if not configured
 if [[ ! -f "$MODE_FILE" ]]; then
-    print_warning "No mode configured - opening menu by default"
-    ENTER_MENU=true
+    print_info "First-time setup - using default mode"
+    set_mode "EDSERVER"
+    KIOSK_URL="https://www.time.is"
+    save_config
 fi
 
-countdown_or_menu "$COUNTDOWN_SECONDS"
-
-echo ""
-
-# =============================================================================
-# Main Logic - Menu or Kiosk
-# =============================================================================
-
-if [[ "$ENTER_MENU" == true ]]; then
-    # Enter interactive menu
-    main_menu
-else
-    # Load existing mode and start kiosk
-    print_info "$(t boot_loading_mode)"
-
-    SAVED_MODE=$(get_mode)
-
-    if [[ -n "$SAVED_MODE" ]]; then
-        print_info "Mode: ${SAVED_MODE}"
-    else
-        SAVED_MODE="EDSERVER"
-        set_mode "$SAVED_MODE"
-    fi
-
-    start_kiosk_mode
-fi
-
-# =============================================================================
-# Keep running - monitor kiosk processes
-# =============================================================================
-
-echo ""
-print_info "EduDisplej kiosk is running. Press Ctrl+C to stop."
-print_info "Logs: session.log, kiosk.log"
-echo ""
-
-# Keep the script alive - monitor xinit/X processes with safety limit
-MAX_RESTART_LOOPS=5
-restart_loop_count=0
-last_restart_time=0
-MIN_UPTIME_FOR_RESET=300  # 5 minutes uptime resets the counter
-
-while true; do
-    sleep 10
-    
-    if ! pgrep -x xinit >/dev/null 2>&1 && ! pgrep -x Xorg >/dev/null 2>&1; then
-        current_time=$(date +%s)
-        uptime=$((current_time - last_restart_time))
-        
-        # Reset counter if system ran for long enough
-        if [[ $last_restart_time -gt 0 && $uptime -ge $MIN_UPTIME_FOR_RESET ]]; then
-            print_info "System ran for ${uptime}s, resetting restart counter"
-            restart_loop_count=0
-        fi
-        
-        ((restart_loop_count++))
-        
-        if [[ $restart_loop_count -ge $MAX_RESTART_LOOPS ]]; then
-            print_error "X server restart limit reached ($MAX_RESTART_LOOPS attempts)"
-            print_error "FATAL: Too many restart failures, stopping to prevent infinite loop"
-            print_error "Check logs: session.log, kiosk.log, /var/log/Xorg.0.log"
-            exit 1
-        fi
-        
-        print_warning "X server stopped. Restarting (attempt $restart_loop_count/$MAX_RESTART_LOOPS)..."
-        last_restart_time=$(date +%s)
-        start_kiosk_mode
-    fi
-done
+print_success "System initialization complete - kiosk configured"
+print_info "System will auto-start kiosk after reboot when user logs in on tty1"
+exit 0
