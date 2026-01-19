@@ -28,9 +28,32 @@ if [ ! -f "$KIOSK_CONFIGURED_FLAG" ]; then
     sleep 2
 fi
 
-# Kill any existing X server
-pkill -TERM Xorg 2>/dev/null || true
-sleep 1
+# Kill any existing X server and wait for clean termination
+xorg_pids=$(pgrep Xorg 2>/dev/null || true)
+if [ -n "$xorg_pids" ]; then
+    echo "Terminating existing X server..."
+    for pid in $xorg_pids; do
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    
+    # Wait up to 5 seconds for graceful termination
+    for i in {1..5}; do
+        if ! pgrep Xorg >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+    
+    # Force kill if still running
+    xorg_pids=$(pgrep Xorg 2>/dev/null || true)
+    if [ -n "$xorg_pids" ]; then
+        echo "Force killing X server..."
+        for pid in $xorg_pids; do
+            kill -KILL "$pid" 2>/dev/null || true
+        done
+        sleep 1
+    fi
+fi
 
 # Start X server
 if command -v startx >/dev/null 2>&1; then

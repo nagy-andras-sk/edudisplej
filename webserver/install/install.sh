@@ -134,8 +134,17 @@ if [ -f "${INIT_DIR}/edudisplej-kiosk.service" ]; then
         "${INIT_DIR}/edudisplej-kiosk.service" > /etc/systemd/system/edudisplej-kiosk.service
     chmod 644 /etc/systemd/system/edudisplej-kiosk.service
     echo "[*] Service file installed for user: $CONSOLE_USER"
+    
+    # Also ensure wrapper script is executable
+    if [ -f "${INIT_DIR}/kiosk-start.sh" ]; then
+        chmod +x "${INIT_DIR}/kiosk-start.sh"
+        echo "[*] Wrapper script configured"
+    fi
 else
-    echo "[!] Warning: Service file not found, skipping service installation"
+    echo "[!] ERROR: Service file not found at ${INIT_DIR}/edudisplej-kiosk.service"
+    echo "[!] Systemd service installation failed. System will not auto-start."
+    echo "[!] Manual configuration will be required."
+    # Continue anyway, but warn user
 fi
 
 # Create sudoers configuration for init script
@@ -153,11 +162,16 @@ echo "[*] Disabling getty@tty1..."
 systemctl disable getty@tty1.service 2>/dev/null || true
 echo "[*] getty@tty1 disabled"
 
-# Enable and start kiosk service
-echo "[*] Enabling kiosk service..."
-systemctl daemon-reload
-systemctl enable edudisplej-kiosk.service 2>/dev/null || true
-echo "[*] Systemd service installed and enabled"
+# Enable and start kiosk service (only if service file exists)
+if [ -f "/etc/systemd/system/edudisplej-kiosk.service" ]; then
+    echo "[*] Enabling kiosk service..."
+    systemctl daemon-reload
+    systemctl enable edudisplej-kiosk.service 2>/dev/null || true
+    echo "[*] Systemd service installed and enabled"
+else
+    echo "[!] WARNING: Systemd service not enabled (service file missing)"
+    echo "[!] System will not auto-start on boot"
+fi
 
 echo ""
 echo "=========================================="
