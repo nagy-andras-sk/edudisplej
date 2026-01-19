@@ -1,0 +1,17 @@
+[Unit]
+Description=EduDisplej Initialization Service
+After=network-online.target
+Wants=network-online.target
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+WorkingDirectory=/opt/edudisplej
+ExecStart=/opt/edudisplej/init/edudisplej-init.sh
+StandardOutput=append:/opt/edudisplej/session.log
+StandardError=append:/opt/edudisplej/session.log
+
+[Install]
+WantedBy=multi-user.target
