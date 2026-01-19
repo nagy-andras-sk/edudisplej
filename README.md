@@ -4,7 +4,13 @@ EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk m
 
 **The installer automatically detects your device architecture and configures the appropriate kiosk mode:**
 - **ARMv6 (Pi 1 / Zero 1)**: Uses Epiphany browser with visible terminal launcher (auto-detected)
-- **Other architectures (Pi 2+)**: Uses Chromium browser with minimal background service (auto-detected)
+- **Other architectures (Pi 2+)**: Uses Chromium browser with visible terminal launcher (auto-detected)
+
+**Both modes feature:**
+- Visible xterm terminal displaying ASCII "EDUDISPLEJ" banner
+- 5-second countdown before browser launch
+- Browser watchdog for automatic restart
+- Full-screen kiosk mode
 
 ## Quick Installation
 
@@ -118,8 +124,65 @@ When the installer detects non-ARMv6 architecture, it automatically configures a
 - Any ARMv7, ARMv8, or x86_64 device
 
 ### Features (Chromium Mode)
+- Installs Xorg, Openbox, xterm, Chromium browser, and utilities (unclutter, xdotool, figlet)
+- Disables/removes conflicting display managers (lightdm, lxdm, sddm, gdm3, plymouth)
+- Configures auto-login on tty1 (no Display Manager)
+- Auto-starts X server + Openbox on boot
+- Launches xterm with a visible terminal showing:
+  - ASCII "EDUDISPLEJ" banner
+  - 5-second countdown
+  - Chromium browser in fullscreen kiosk mode
+- Implements browser watchdog (auto-restart on close)
+- Disables DPMS/screensaver and hides cursor
 
-### Boot Flow
+### After Installation (Chromium)
+
+After reboot:
+1. System auto-logins on tty1 as configured user
+2. X server starts automatically on :0
+3. Openbox window manager launches
+4. xterm opens with visible terminal
+5. Terminal shows EDUDISPLEJ banner and countdown
+6. Chromium browser launches in fullscreen kiosk mode
+7. If browser closes, watchdog restarts it automatically
+
+### URL Configuration (Chromium)
+
+Edit the kiosk-launcher.sh file to change the default URL:
+
+```bash
+sudo -u pi nano ~/kiosk-launcher.sh
+# Change: URL="${1:-https://www.time.is}"
+# To:     URL="${1:-https://your-url.com}"
+```
+
+### Testing Without Reboot (Chromium)
+
+```bash
+# Test as the kiosk user (usually pi)
+sudo -u pi DISPLAY=:0 XDG_VTNR=1 startx -- :0 vt1
+```
+
+### Manual Control (Chromium)
+
+```bash
+# Restart X server
+xrestart
+
+# Check what's running
+ps aux | grep -E "Xorg|openbox|chromium|xterm"
+```
+
+### Files Created by Installer (Chromium)
+
+- `/etc/systemd/system/getty@tty1.service.d/autologin.conf` - Auto-login configuration
+- `~/.profile` - Auto-start X on tty1
+- `~/.xinitrc` - Start Openbox session
+- `~/.config/openbox/autostart` - Openbox startup configuration
+- `~/kiosk-launcher.sh` - Terminal launcher script (Chromium version)
+- `~/.bashrc` - xrestart function
+
+## Legacy Boot Flow (for reference)
 
 - install.sh installs and registers the init service that launches [install/init/edudisplej-init.sh](webserver/install/init/edudisplej-init.sh) on boot
 - init script loads modules, installs any missing required packages (chromium-browser, openbox, xinit, unclutter, curl), shows its current version, and self-updates from the install server when a newer bundle is available

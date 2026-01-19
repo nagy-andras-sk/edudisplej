@@ -1,4 +1,3 @@
-
 #!/bin/bash
 set -euo pipefail
 
@@ -129,60 +128,231 @@ if [ "$KIOSK_MODE" = "epiphany" ]; then
 fi
 
 # --- KIOSK CONFIGURATION ---
+# Both modes now use terminal launcher approach
+echo "[*] Installing common packages for terminal-based kiosk..."
+COMMON_PACKAGES=(
+    "xterm"
+    "xdotool"
+    "figlet"
+    "dbus-x11"
+)
+apt-get update -qq || true
+DEBIAN_FRONTEND=noninteractive apt-get install -y "${COMMON_PACKAGES[@]}" || {
+    echo "[!] Warning: Some packages failed to install"
+}
+
 if [ "$KIOSK_MODE" = "chromium" ]; then
-    # Original Chromium-based kiosk setup
-    echo "[*] Setting up Chromium kiosk mode..."
+    # Chromium-based kiosk setup with terminal launcher
+    echo "[*] Setting up Chromium kiosk mode (with terminal launcher)..."
     
-    # Odstránime prípadnú starú autologin konfiguráciu pre getty@tty1 (ak by tam bola)
-    if [ -d /etc/systemd/system/getty@tty1.service.d ]; then
-      echo "[*] Odstranujem /etc/systemd/system/getty@tty1.service.d (autologin conf)..."
-      rm -rf /etc/systemd/system/getty@tty1.service.d
-    fi
+    # Disable/remove display managers
+    echo "[*] Disabling display managers..."
+    DISPLAY_MANAGERS=("lightdm" "lxdm" "sddm" "gdm3" "gdm" "xdm" "plymouth")
+    for dm in "${DISPLAY_MANAGERS[@]}"; do
+        if systemctl list-unit-files | grep -q "^${dm}.service"; then
+            echo "[*] Disabling $dm..."
+            systemctl disable --now "${dm}.service" 2>/dev/null || true
+            systemctl mask "${dm}.service" 2>/dev/null || true
+        fi
+        if dpkg -l | grep -q "^ii  $dm "; then
+            echo "[*] Removing package $dm..."
+            DEBIAN_FRONTEND=noninteractive apt-get purge -y "$dm" 2>/dev/null || true
+        fi
+    done
     
-    # Vytvoríme systemd službu, ktorá si tty1 výlučne drží
-    cat > /etc/systemd/system/edudisplej-init.service <<'EOF'
-[Unit]
-Description=EduDisplej Init (Console Kiosk on tty1)
-After=network-online.target
-Wants=network-online.target
-Conflicts=getty@tty1.service
-
+    # Set up autologin on tty1
+    echo "[*] Configuring autologin on tty1..."
+    GETTY_DIR="/etc/systemd/system/getty@tty1.service.d"
+    mkdir -p "$GETTY_DIR"
+    cat > "$GETTY_DIR/autologin.conf" <<EOF
 [Service]
-Type=simple
-ExecStart=/opt/edudisplej/init/edudisplej-init.sh
-WorkingDirectory=/opt/edudisplej/init
-Restart=on-failure
-RestartSec=2
-
-# TTY pinning
-StandardInput=tty
-StandardOutput=tty
-TTYPath=/dev/tty1
-TTYReset=yes
-TTYVHangup=yes
-#TTYVTDisallocate=yes
-
-[Install]
-WantedBy=multi-user.target
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $CONSOLE_USER --noclear %I 38400 linux
 EOF
+    
+    # Configure auto-start X on tty1
+    echo "[*] Configuring auto-start X on tty1..."
+    PROFILE_SNIPPET='
+# Auto-start X/Openbox on tty1
+if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  # Safely terminate any existing X server
+  if pgrep Xorg >/dev/null 2>&1; then
+    XORG_PIDS=$(pgrep Xorg)
+    for pid in $XORG_PIDS; do
+      kill -TERM "$pid" 2>/dev/null || true
+    done
+    sleep 2
+    # Force kill if still running
+    for pid in $XORG_PIDS; do
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+      fi
+    done
+  fi
+  sleep 1
+  startx -- :0 vt1
+fi'
+    
+    if [ -f "$USER_HOME/.profile" ]; then
+        if ! grep -q "Auto-start X/Openbox on tty1" "$USER_HOME/.profile"; then
+            echo "$PROFILE_SNIPPET" >> "$USER_HOME/.profile"
+            echo "[*] Added X auto-start to .profile"
+        else
+            echo "[*] .profile already configured"
+        fi
+    else
+        echo "$PROFILE_SNIPPET" > "$USER_HOME/.profile"
+        echo "[*] Created .profile with X auto-start"
+    fi
+    chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.profile"
+    
+    # Create .xinitrc
+    echo "[*] Creating .xinitrc..."
+    cat > "$USER_HOME/.xinitrc" <<'EOF'
+#!/bin/bash
+# Start Openbox session
+exec openbox-session
+EOF
+    chmod +x "$USER_HOME/.xinitrc"
+    chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.xinitrc"
+    
+    # Create Openbox autostart
+    echo "[*] Creating Openbox autostart configuration..."
+    mkdir -p "$USER_HOME/.config/openbox"
+    cat > "$USER_HOME/.config/openbox/autostart" <<EOF
+# Disable DPMS/screensaver
+xset -dpms
+xset s off
+xset s noblank
 
-    # Systemd reload
+# Hide mouse after inactivity
+unclutter -idle 1 &
+
+# Start TERMINAL with launcher for CHROMIUM
+xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "\$HOME/kiosk-launcher.sh" &
+EOF
+    chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config"
+    
+    # Create kiosk-launcher.sh for Chromium
+    echo "[*] Creating kiosk-launcher.sh for Chromium..."
+    cat > "$USER_HOME/kiosk-launcher.sh" <<'EOF'
+#!/bin/bash
+# kiosk-launcher.sh - Terminal launcher for Chromium browser kiosk mode
+set -euo pipefail
+
+# Configuration
+URL="${1:-https://www.time.is}"
+COUNT_FROM=5
+
+# Function to ensure fullscreen with F11
+ensure_fullscreen() {
+  if command -v xdotool >/dev/null 2>&1; then
+    xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
+  fi
+}
+
+# Terminal appearance: hide cursor, clear screen
+tput civis || true
+clear
+
+# ASCII banner (figlet)
+if command -v figlet >/dev/null 2>&1; then
+  figlet -w 120 "EDUDISPLEJ"
+else
+  echo "==== EDUDISPLEJ ===="
+fi
+echo
+
+# Brief description
+echo "Starting... Browser will launch in ${COUNT_FROM} seconds."
+echo "URL: ${URL}"
+echo
+
+# Countdown
+for ((i=COUNT_FROM; i>=1; i--)); do
+  printf "\rStarting in %2d..." "$i"
+  sleep 1
+done
+echo -e "\rStarting now!     "
+sleep 0.3
+
+# Disable screensaver/power management (if running under X)
+if command -v xset >/dev/null 2>&1; then
+  xset -dpms
+  xset s off
+  xset s noblank
+fi
+
+# Hide mouse cursor (background)
+if command -v unclutter >/dev/null 2>&1; then
+  unclutter -idle 1 -root >/dev/null 2>&1 &
+fi
+
+# Restore cursor if interrupted (Ctrl+C)
+trap 'tput cnorm || true' EXIT
+
+# Launch browser in fullscreen (Chromium for standard platforms)
+chromium-browser --kiosk --no-sandbox --disable-gpu --disable-infobars \
+  --no-first-run --incognito --noerrdialogs --disable-translate \
+  --disable-features=TranslateUI --disable-session-crashed-bubble \
+  --check-for-update-interval=31536000 "${URL}" &
+
+# Optional: ensure fullscreen is active with F11
+sleep 3
+ensure_fullscreen
+
+# Optional watchdog: restart Chromium if it closes
+while true; do
+  sleep 2
+  if ! pgrep -x "chromium-browser" >/dev/null; then
+    chromium-browser --kiosk --no-sandbox --disable-gpu --disable-infobars \
+      --no-first-run --incognito --noerrdialogs --disable-translate \
+      --disable-features=TranslateUI --disable-session-crashed-bubble \
+      --check-for-update-interval=31536000 "${URL}" &
+    sleep 3
+    ensure_fullscreen
+  fi
+done
+EOF
+    chmod +x "$USER_HOME/kiosk-launcher.sh"
+    chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/kiosk-launcher.sh"
+    
+    # Add xrestart function to .bashrc
+    echo "[*] Adding xrestart function to .bashrc..."
+    BASHRC="$USER_HOME/.bashrc"
+    XRESTART_FUNC='# X restart function
+xrestart() {
+  # Terminate X server safely
+  for pid in $(pgrep Xorg 2>/dev/null || true); do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 2
+  # Force kill if still running
+  for pid in $(pgrep Xorg 2>/dev/null || true); do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  done
+  sleep 1
+  # Start X
+  startx -- :0 vt1
+}'
+    
+    if [ -f "$BASHRC" ]; then
+        if ! grep -q "xrestart()" "$BASHRC"; then
+            echo "$XRESTART_FUNC" >> "$BASHRC"
+            echo "[*] Added xrestart function"
+        else
+            echo "[*] xrestart function already exists"
+        fi
+    else
+        echo "$XRESTART_FUNC" > "$BASHRC"
+        echo "[*] Created .bashrc with xrestart function"
+    fi
+    chown "$CONSOLE_USER:$CONSOLE_USER" "$BASHRC"
+    
+    # Reload systemd
     systemctl daemon-reload
-    
-    # Zakážeme getty na tty1 (nech tam nikdy nevyskočí shell)
-    echo "[*] getty@tty1 disable + stop"
-    systemctl disable --now getty@tty1.service || true
-    
-    # Povolíme kiosk službu
-    echo "[*] edudisplej-init.service enable + start"
-    systemctl enable --now edudisplej-init.service
-    
-    # Install minimal kiosk service
-    echo "[*] Installing minimal kiosk service..."
-    cp "${INIT_DIR}/chromiumkiosk-minimal.service" /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable chromiumkiosk-minimal.service
-    echo "[✓] Service enabled"
     
 else
     # ARMv6 Epiphany-based kiosk setup
