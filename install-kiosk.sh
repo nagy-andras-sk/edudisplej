@@ -60,7 +60,11 @@ if ! id "$KIOSK_USER" &>/dev/null; then
 fi
 
 # Get user home directory
-USER_HOME="$(eval echo ~"$KIOSK_USER")"
+USER_HOME="$(getent passwd "$KIOSK_USER" | cut -d: -f6)"
+if [ -z "$USER_HOME" ]; then
+    log_error "Could not determine home directory for user: $KIOSK_USER"
+    exit 1
+fi
 log_info "User home: $USER_HOME"
 
 # Step 1: Install required packages
@@ -135,7 +139,20 @@ log_info "Step 4/7: Configuring auto-start X on tty1..."
 PROFILE_SNIPPET='
 # Auto-start X/Openbox on tty1
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  pkill -9 Xorg 2>/dev/null || true
+  # Safely terminate any existing X server
+  if pgrep Xorg >/dev/null 2>&1; then
+    XORG_PIDS=$(pgrep Xorg)
+    for pid in $XORG_PIDS; do
+      kill -TERM "$pid" 2>/dev/null || true
+    done
+    sleep 2
+    # Force kill if still running
+    for pid in $XORG_PIDS; do
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+      fi
+    done
+  fi
   sleep 1
   startx -- :0 vt1
 fi'
@@ -196,17 +213,25 @@ log_info "Step 7/7: Creating kiosk-launcher.sh..."
 
 cat > "$USER_HOME/kiosk-launcher.sh" <<'EOF'
 #!/bin/bash
+# kiosk-launcher.sh - Terminal launcher for Epiphany browser kiosk mode
 set -euo pipefail
 
-# Beállítások
-URL="${1:-https://example.com}"   # átírhatod fix URL-re vagy add át paraméterként
+# Configuration
+URL="${1:-https://example.com}"
 COUNT_FROM=5
 
-# Terminál kinézet: kurzor elrejt, tisztít
+# Function to ensure fullscreen with F11
+ensure_fullscreen() {
+  if command -v xdotool >/dev/null 2>&1; then
+    xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
+  fi
+}
+
+# Terminal appearance: hide cursor, clear screen
 tput civis || true
 clear
 
-# ASCII felirat (figlet)
+# ASCII banner (figlet)
 if command -v figlet >/dev/null 2>&1; then
   figlet -w 120 "EDUDISPLEJ"
 else
@@ -214,53 +239,49 @@ else
 fi
 echo
 
-# Rövid leírás
-echo "Indítás folyamatban... A böngésző ${COUNT_FROM} másodperc múlva elindul."
+# Brief description
+echo "Starting... Browser will launch in ${COUNT_FROM} seconds."
 echo "URL: ${URL}"
 echo
 
-# Visszaszámlálás
+# Countdown
 for ((i=COUNT_FROM; i>=1; i--)); do
-  printf "\rIndítás %2d..." "$i"
+  printf "\rStarting in %2d..." "$i"
   sleep 1
 done
-echo -e "\rIndítás most!     "
+echo -e "\rStarting now!     "
 sleep 0.3
 
-# Képernyőkímélő/energiagazdálkodás tiltása (ha X alatt fut)
+# Disable screensaver/power management (if running under X)
 if command -v xset >/dev/null 2>&1; then
   xset -dpms
   xset s off
   xset s noblank
 fi
 
-# Egérkurzor eltüntetése (háttérbe)
+# Hide mouse cursor (background)
 if command -v unclutter >/dev/null 2>&1; then
   (unclutter -idle 1 -root >/dev/null 2>&1 & ) || true
 fi
 
-# Böngésző indítása fullscreenben (Epiphany ARMv6-kompatibilis)
+# Launch browser in fullscreen (Epiphany is ARMv6-compatible)
 epiphany-browser --fullscreen "${URL}" &
 
-# Opcionális: ha a fullscreen mégsem lenne aktív, „rácsapunk" egy F11-et.
+# Optional: ensure fullscreen is active with F11
 sleep 3
-if command -v xdotool >/dev/null 2>&1; then
-  xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
-fi
+ensure_fullscreen
 
-# Opcionális watchdog: ha bezárják az Epiphany-t, újraindítja
+# Optional watchdog: restart Epiphany if it closes
 while true; do
   sleep 2
   if ! pgrep -x "epiphany-browser" >/dev/null; then
-    epiphany-browser --incognito --fullscreen "${URL}" &
+    epiphany-browser --fullscreen "${URL}" &
     sleep 3
-    if command -v xdotool >/dev/null 2>&1; then
-      xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
-    fi
+    ensure_fullscreen
   fi
 done
 
-# Visszaállítjuk a kurzort, ha valaki megszakítja (Ctrl+C)
+# Restore cursor if interrupted (Ctrl+C)
 trap 'tput cnorm || true' EXIT
 EOF
 
@@ -273,7 +294,7 @@ log_info "kiosk-launcher.sh created"
 log_info "Adding xrestart alias to .bashrc..."
 
 BASHRC="$USER_HOME/.bashrc"
-ALIAS_LINE='alias xrestart="pkill -9 Xorg; sleep 1; startx -- :0 vt1"'
+ALIAS_LINE='alias xrestart="for pid in \$(pgrep Xorg); do kill -TERM \$pid 2>/dev/null || true; done; sleep 2; for pid in \$(pgrep Xorg); do kill -KILL \$pid 2>/dev/null || true; done; sleep 1; startx -- :0 vt1"'
 
 if [ -f "$BASHRC" ]; then
     if ! grep -q "alias xrestart=" "$BASHRC"; then
