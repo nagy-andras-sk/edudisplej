@@ -2,20 +2,36 @@
 
 EduDisplej is a Raspberry Pi-based digital signage solution that runs in kiosk mode. It provides a robust, unattended installation system for Debian/Ubuntu/Raspberry Pi OS.
 
-**Two installation modes are available:**
-- **ARMv6 Kiosk (Pi 1 / Zero 1)**: Uses Epiphany browser with visible terminal launcher
-- **Standard Kiosk (Pi 2+)**: Uses Chromium browser with minimal background service
+**The installer automatically detects your device architecture and configures the appropriate kiosk mode:**
+- **ARMv6 (Pi 1 / Zero 1)**: Uses Epiphany browser with visible terminal launcher (auto-detected)
+- **Other architectures (Pi 2+)**: Uses Chromium browser with minimal background service (auto-detected)
+
+## Quick Installation
+
+Install EduDisplej on your Raspberry Pi or any Debian-based system with a single command:
+
+```bash
+# Quick installation with automatic architecture detection
+curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
+```
+
+The installer will:
+1. Detect your device architecture (ARMv6 vs. other)
+2. Download and install required files from the server
+3. Configure the appropriate kiosk mode automatically
+4. Set up all necessary services and configurations
+5. Reboot the system
 
 ## ARMv6 Kiosk Mode (Raspberry Pi 1 / Zero 1)
 
-For older Raspberry Pi devices with ARMv6 architecture (Pi 1, Zero 1 - **not** Zero 2), use the specialized ARMv6 installer that uses Epiphany browser instead of Chromium.
+When the installer detects ARMv6 architecture (armv6l), it automatically configures an Epiphany-based kiosk.
 
-### Target Devices
+### Target Devices (Automatically Detected)
 - Raspberry Pi 1 (Model A, A+, B, B+)
 - Raspberry Pi Zero 1 (NOT Zero 2)
 - Any ARMv6 (armv6l) device
 
-### What This Script Does
+### Features (ARMv6 Mode)
 - Installs Xorg, Openbox, xterm, Epiphany browser, and utilities (unclutter, xdotool, figlet)
 - Disables/removes conflicting display managers (lightdm, lxdm, sddm, gdm3, plymouth)
 - Configures auto-login on tty1 (no Display Manager)
@@ -26,22 +42,19 @@ For older Raspberry Pi devices with ARMv6 architecture (Pi 1, Zero 1 - **not** Z
   - Epiphany browser in fullscreen mode
 - Implements browser watchdog (auto-restart on close)
 - Disables DPMS/screensaver and hides cursor
-
-### What This Script Does NOT Do
 - Does **not** install Chromium (not available on ARMv6)
 - Does **not** use systemd service for kiosk (uses direct X auto-start)
-- Does **not** provide interactive configuration menu
-- Does **not** auto-update from remote server
 
-### Installation
+### After Installation (ARMv6)
 
-```bash
-# Download and run the ARMv6 installer
-curl -O https://raw.githubusercontent.com/nagy-andras-sk/edudisplej/main/install-kiosk.sh
-sudo bash install-kiosk.sh
-```
-
-The script is idempotent and safe to run multiple times.
+After reboot:
+1. System auto-logins on tty1 as configured user
+2. X server starts automatically on :0
+3. Openbox window manager launches
+4. xterm opens with visible terminal
+5. Terminal shows EDUDISPLEJ banner and countdown
+6. Epiphany browser launches in fullscreen
+7. If browser closes, watchdog restarts it automatically
 
 ### URL Configuration
 
@@ -66,65 +79,45 @@ xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "bash -c 'URL=https://your-
 xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "$HOME/kiosk-launcher.sh https://your-url.com" &
 ```
 
-### Testing Without Reboot
+### Testing Without Reboot (ARMv6)
 
 ```bash
-# Test as the kiosk user
-sudo -u <KIOSK_USER> DISPLAY=:0 XDG_VTNR=1 startx -- :0 vt1
+# Test as the kiosk user (usually pi or edudisplej)
+sudo -u pi DISPLAY=:0 XDG_VTNR=1 startx -- :0 vt1
 ```
 
-### Reboot to Start Kiosk
+### Manual Control (ARMv6)
 
 ```bash
-sudo reboot
-```
-
-After reboot:
-1. System auto-logins on tty1 as configured user
-2. X server starts automatically on :0
-3. Openbox window manager launches
-4. xterm opens with visible terminal
-5. Terminal shows EDUDISPLEJ banner and countdown
-6. Epiphany browser launches in fullscreen
-7. If browser closes, watchdog restarts it automatically
-
-### Manual Control
-
-```bash
-# Restart X server (use the alias created by installer)
+# Restart X server (use the function created by installer)
 xrestart
 
 # Or manually:
-pkill -9 Xorg
-sleep 1
-startx -- :0 vt1
-
-# Stop kiosk (kill X server)
-pkill -9 Xorg
+pkill Xorg  # (the installer creates a safer version)
 
 # Check what's running
 ps aux | grep -E "Xorg|openbox|epiphany|xterm"
 ```
 
-### Files Created by Installer
+### Files Created by Installer (ARMv6)
 
 - `/etc/systemd/system/getty@tty1.service.d/autologin.conf` - Auto-login configuration
 - `~/.profile` - Auto-start X on tty1
 - `~/.xinitrc` - Start Openbox session
 - `~/.config/openbox/autostart` - Openbox startup configuration
 - `~/kiosk-launcher.sh` - Terminal launcher script
-- `~/.bashrc` - xrestart alias
+- `~/.bashrc` - xrestart function
 
 ## Standard Kiosk Mode (Raspberry Pi 2+ with Chromium)
 
-For newer Raspberry Pi devices (Pi 2, 3, 4, 5, Zero 2), use the standard installer that uses Chromium browser.
+When the installer detects non-ARMv6 architecture, it automatically configures a Chromium-based kiosk.
 
-### Installation
+### Target Devices (Automatically Detected)
+- Raspberry Pi 2, 3, 4, 5
+- Raspberry Pi Zero 2 W
+- Any ARMv7, ARMv8, or x86_64 device
 
-```bash
-# Quick installation with default settings (recommended)
-curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
-```
+### Features (Chromium Mode)
 
 ### Boot Flow
 
