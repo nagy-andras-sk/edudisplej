@@ -253,7 +253,14 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
   local elapsed=0
   while [ $elapsed -lt $timeout ]; do
     local status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
+    # For oneshot services with RemainAfterExit=yes:
+    # - "activating" means service is still running
+    # - "active" means service completed successfully
+    # - "inactive" means service completed (some systemd versions)
+    # - "failed" means service failed
+    # - "deactivating" means service is stopping
     if [ "$status" = "active" ] || [ "$status" = "inactive" ] || [ "$status" = "failed" ]; then
+      # Service has completed (successfully or not)
       break
     fi
     echo -n "."
@@ -264,6 +271,9 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
   echo ""
   local final_status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
   if [ "$final_status" = "active" ]; then
+    echo "System initialization complete."
+  elif [ "$final_status" = "inactive" ]; then
+    # For oneshot services, inactive after activating usually means success
     echo "System initialization complete."
   elif [ "$final_status" = "failed" ]; then
     echo "WARNING: System initialization failed. Some features may not work."
