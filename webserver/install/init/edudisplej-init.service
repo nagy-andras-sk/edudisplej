@@ -1,8 +1,6 @@
 [Unit]
 Description=EduDisplej Initialization Service
-After=network-online.target
-Wants=network-online.target
-Before=getty@tty1.service
+After=network.target
 
 [Service]
 Type=oneshot
@@ -10,6 +8,7 @@ RemainAfterExit=yes
 User=root
 WorkingDirectory=/opt/edudisplej
 ExecStart=/opt/edudisplej/init/edudisplej-init.sh
+TimeoutStartSec=1800
 StandardOutput=append:/opt/edudisplej/session.log
 StandardError=append:/opt/edudisplej/session.log
 

@@ -247,6 +247,26 @@ EOF
     local PROFILE_SNIPPET='
 # Auto-start X/Openbox on tty1
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  # Wait for edudisplej-init.service to complete (max 30 minutes)
+  echo "Waiting for system initialization to complete..."
+  local timeout=1800
+  local elapsed=0
+  while ! systemctl is-active --quiet edudisplej-init.service && [ $elapsed -lt $timeout ]; do
+    echo -n "."
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  
+  if [ $elapsed -ge $timeout ]; then
+    echo ""
+    echo "WARNING: System initialization timed out. Some features may not work."
+  else
+    echo ""
+    echo "System initialization complete."
+  fi
+  
+  sleep 2
+  
   # Safely terminate any existing X server
   if pgrep Xorg >/dev/null 2>&1; then
     XORG_PIDS=$(pgrep Xorg)
@@ -961,9 +981,10 @@ read_kiosk_preferences
 
 # Try to install missing packages (when internet is up)
 if ! ensure_required_packages; then
-    # Stop boot early if dependencies are missing
-    print_error "Required packages missing or failed to install. Fix issues and reboot."
-    exit 1
+    # Don't stop boot if dependencies are missing - they may have been installed by install.sh
+    # or can be installed on next boot when internet is available
+    print_warning "Required packages missing or failed to install. Will retry on next boot."
+    # Continue anyway - the system may still function partially
 fi
 
 # Install kiosk-specific packages based on mode
