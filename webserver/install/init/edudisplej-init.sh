@@ -943,6 +943,21 @@ else
 fi
 
 # =============================================================================
+# Check if running as service (one-time setup mode)
+# =============================================================================
+
+# If kiosk system is configured, we're done with first-time setup
+# The .profile approach will handle starting X and kiosk
+KIOSK_CONFIGURED_FILE="${EDUDISPLEJ_HOME}/.kiosk_system_configured"
+if [[ -f "$KIOSK_CONFIGURED_FILE" ]]; then
+    print_success "System initialization complete"
+    print_info "Kiosk will start automatically after user login"
+    print_info "User $CONSOLE_USER will auto-login on tty1"
+    print_info "X server will start automatically via .profile"
+    exit 0
+fi
+
+# =============================================================================
 # Main Menu Function
 # =============================================================================
 

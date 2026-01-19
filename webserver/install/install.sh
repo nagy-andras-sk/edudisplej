@@ -119,6 +119,17 @@ echo "[*] Kiosk mode preference saved: $KIOSK_MODE"
 echo "[*] Console user saved: $CONSOLE_USER"
 echo "[*] Packages and kiosk configuration will be set up by init script on first boot"
 
+# Install and enable edudisplej-init service
+echo "[*] Installing edudisplej-init systemd service..."
+if [ -f "${INIT_DIR}/edudisplej-init.service" ]; then
+    cp "${INIT_DIR}/edudisplej-init.service" /etc/systemd/system/
+    systemctl daemon-reload
+    systemctl enable edudisplej-init.service
+    echo "[*] edudisplej-init service enabled"
+else
+    echo "[!] Warning: edudisplej-init.service not found"
+fi
+
 echo ""
 echo "=========================================="
 echo "Telepítés kész! / Installation Complete!"
