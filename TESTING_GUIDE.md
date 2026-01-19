@@ -11,37 +11,40 @@ curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
 **Expected Behavior:**
 - Downloads all required files from server
 - Creates `/opt/edudisplej/` directory structure
-- Creates systemd service `edudisplej-init.service`
-- Disables getty on tty1
+- Configures passwordless sudo for init script
+- Configures autologin on tty1
 - Reboots system after 10 seconds
 
 **Verify:**
 - [ ] All files downloaded successfully
 - [ ] No CRLF line ending issues
-- [ ] Systemd service created
+- [ ] Sudoers configuration created in `/etc/sudoers.d/edudisplej`
+- [ ] Autologin configured for tty1
 - [ ] System reboots automatically
 
 ### Test 2: Post-Reboot System Start
 After reboot, the system should:
 
 **Expected Behavior:**
-- System boots to tty1 without login prompt
-- `edudisplej-init.service` starts automatically
+- System boots to tty1 and auto-logs in as console user
+- User's `.profile` checks if first-time setup is needed
+- If first boot: init script runs in foreground (visible on tty1)
 - Shows EduDisplej banner and loading messages
 - Waits for internet connection (up to 60 seconds)
-- Checks and installs required packages
+- Checks and installs required packages with progress bar
 - Registers device to server (if internet available)
 - Shows system summary
-- Auto-starts kiosk mode after 10 second countdown
+- X server starts automatically after initialization
 
 **Verify:**
-- [ ] No getty login prompt on tty1
-- [ ] Service starts automatically on boot
+- [ ] Auto-login works on tty1
+- [ ] Init script runs visibly on first boot
+- [ ] Progress bar shows package installation
 - [ ] Internet connectivity check works
 - [ ] Required packages installed (openbox, xinit, unclutter, chromium-browser, etc.)
 - [ ] Device registration succeeds
 - [ ] System summary displays correct information
-- [ ] Kiosk mode starts automatically
+- [ ] X server and kiosk mode start automatically
 
 ## Component Testing
 
@@ -94,7 +97,8 @@ cat /opt/edudisplej/registration.log
 
 # Force re-registration (for testing):
 sudo rm /opt/edudisplej/.registration.json
-sudo systemctl restart edudisplej-init.service
+# Then reboot or manually run:
+sudo /opt/edudisplej/init/edudisplej-init.sh
 ```
 
 ### Test 5: Logging System
@@ -164,10 +168,10 @@ tail -f /opt/edudisplej/xclient.log
 
 **Manual Test:**
 ```bash
-# Remove a package and restart:
+# Remove a package and reboot:
 sudo apt remove unclutter
-sudo systemctl restart edudisplej-init.service
-# Check if it reinstalls:
+sudo reboot
+# After reboot, check if it reinstalls:
 dpkg -l | grep unclutter
 ```
 
@@ -245,12 +249,11 @@ pkill chromium
 
 # Test 2: Kill X server
 sudo pkill Xorg
-# Verify: Service restarts via systemd
+# Verify: System returns to login prompt, user auto-logs in, X restarts
 
-# Test 3: Kill edudisplej service
-sudo systemctl stop edudisplej-init.service
-sudo systemctl start edudisplej-init.service
-# Verify: Everything restarts cleanly
+# Test 3: Manually restart initialization
+sudo /opt/edudisplej/init/edudisplej-init.sh
+# Verify: Init script runs and everything restarts cleanly
 ```
 
 ### Test 12: Menu System
@@ -392,8 +395,9 @@ top -b -n 1
 # Check chromium flags:
 ps aux | grep chromium
 
-# Restart service:
-sudo systemctl restart edudisplej-init.service
+# Restart X server:
+sudo pkill Xorg
+# System will auto-login and restart X via .profile
 ```
 
 ### Issue: Logs filling disk
