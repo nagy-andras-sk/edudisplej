@@ -172,14 +172,14 @@ install_kiosk_packages() {
     local start_time=$(date +%s)
     
     echo ""
-    print_info "Instalacia kiosk balickov: ${total_steps} balickov"
+    print_info "Inštalácia kiosk balíčkov: ${total_steps} balíčkov"
     echo ""
     
     # Install packages one by one with progress
     local installed_count=0
     for pkg in "${packages[@]}"; do
         ((current_step++))
-        show_progress_bar $current_step $total_steps "Instalujem: $pkg" $start_time
+        show_progress_bar $current_step $total_steps "Inštalujem: $pkg" $start_time
         
         if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
             ((installed_count++))
@@ -196,11 +196,11 @@ install_kiosk_packages() {
     echo ""
     
     if [[ $installed_count -eq ${#packages[@]} ]]; then
-        print_success "Kiosk balicky uspesne nainstalovane (${installed_count}/${total_steps})"
+        print_success "Kiosk balíčky úspešne nainštalované (${installed_count}/${total_steps})"
         touch "$configured_file"
         return 0
     else
-        print_error "Niektore kiosk balicky sa nepodarilo nainštalovať"
+        print_error "Niektoré kiosk balíčky sa nepodarilo nainštalovať"
         return 1
     fi
 }

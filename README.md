@@ -60,8 +60,7 @@ Systém automaticky:
 9. **Nakonfiguruje kiosk** - autologin, .profile, .xinitrc, kiosk-launcher.sh
 10. **Skontroluje aktualizácie** - porovná verziu, stiahne novú ak existuje
 11. **Zobrazí zhrnutie** - hostname, IP, MAC, kiosk URL, rozlíšenie
-12. **Odpočítavanie** - 10s na vstup do menu (F12 alebo M)
-13. **Štart kiosk módu** - spustí X server + browser
+12. **Štart kiosk módu** - spustí X server + browser
 
 **Čo sa inštaluje:**
 
