@@ -145,14 +145,12 @@ install_kiosk_packages() {
     
     # Update package lists if not already done
     if [[ "$APT_UPDATED" == false ]]; then
-        print_info "Updating package lists..."
         local apt_update_success=false
         for attempt in 1 2 3; do
-            if apt-get update -y 2>&1 | tee -a "$APT_LOG"; then
+            if apt-get update -y >>"$APT_LOG" 2>&1; then
                 apt_update_success=true
                 break
             else
-                print_warning "apt-get update failed (attempt $attempt/3)"
                 if [[ $attempt -lt 3 ]]; then
                     sleep 5
                 fi
@@ -166,14 +164,43 @@ install_kiosk_packages() {
         APT_UPDATED=true
     fi
     
-    # Install packages
-    print_info "Installing: ${packages[*]}"
-    if DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}" 2>&1 | tee -a "$APT_LOG"; then
-        print_success "Kiosk packages installed successfully"
+    # Show progress banner
+    show_installer_banner
+    
+    local total_steps=${#packages[@]}
+    local current_step=0
+    local start_time=$(date +%s)
+    
+    echo ""
+    print_info "Instalacia kiosk balickov: ${total_steps} balickov"
+    echo ""
+    
+    # Install packages one by one with progress
+    local installed_count=0
+    for pkg in "${packages[@]}"; do
+        ((current_step++))
+        show_progress_bar $current_step $total_steps "Instalujem: $pkg" $start_time
+        
+        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
+            ((installed_count++))
+        else
+            # Retry once
+            sleep 2
+            if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
+                ((installed_count++))
+            fi
+        fi
+    done
+    
+    echo ""
+    echo ""
+    
+    if [[ $installed_count -eq ${#packages[@]} ]]; then
+        print_success "Kiosk balicky uspesne nainstalovane (${installed_count}/${total_steps})"
         touch "$configured_file"
         return 0
     else
-        print_error "Failed to install some kiosk packages"
+        print_error "Niektore kiosk balicky sa nepodarilo nainštalovať"
         return 1
     fi
 }
@@ -607,18 +634,28 @@ ensure_required_packages() {
         return 1
     fi
 
-    print_info "$(t boot_pkg_installing) ${missing[*]}"
+    # Show installer banner
+    show_installer_banner
+    
+    local total_steps=$((1 + ${#missing[@]}))  # 1 for apt-get update + packages
+    local current_step=0
+    local start_time=$(date +%s)
+    
+    echo ""
+    print_info "Instalacia balickov: ${#missing[@]} balickov na nainstalovanie"
+    echo ""
 
     # Update package lists with retry
     if [[ "$APT_UPDATED" == false ]]; then
-        print_info "Updating package lists..."
+        ((current_step++))
+        show_progress_bar $current_step $total_steps "Aktualizacia zoznamu balickov..." $start_time
+        
         local apt_update_success=false
         for attempt in 1 2 3; do
-            if apt-get update -y 2>&1 | tee "$APT_LOG"; then
+            if apt-get update -y >>"$APT_LOG" 2>&1; then
                 apt_update_success=true
                 break
             else
-                print_warning "apt-get update failed (attempt $attempt/3)"
                 if [[ $attempt -lt 3 ]]; then
                     sleep 5
                 fi
@@ -626,46 +663,51 @@ ensure_required_packages() {
         done
         
         if [[ "$apt_update_success" == false ]]; then
-            print_error "apt-get update failed after 3 attempts"
-            print_warning "Continuing with cached package lists..."
+            echo ""
+            print_error "apt-get update zlyhalo po 3 pokusoch"
+            print_warning "Pokracujem s cache zoznamom balickov..."
         fi
         APT_UPDATED=true
     fi
 
-    # Try to install missing packages with retry
-    print_info "Installing packages: ${missing[*]}"
-    local install_success=false
-    for attempt in 1 2; do
-        if apt-get install -y "${missing[@]}" 2>&1 | tee -a "$APT_LOG"; then
-            install_success=true
-            break
+    # Install packages one by one with progress
+    local installed_count=0
+    for pkg in "${missing[@]}"; do
+        ((current_step++))
+        show_progress_bar $current_step $total_steps "Instalujem: $pkg" $start_time
+        
+        # Try to install the package
+        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
+            ((installed_count++))
         else
-            print_warning "apt-get install failed (attempt $attempt/2)"
-            if [[ $attempt -lt 2 ]]; then
-                sleep 10
+            # Retry once
+            sleep 2
+            if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
+                ((installed_count++))
             fi
         fi
     done
+    
+    echo ""
+    echo ""
 
     # Verify each package was actually installed
     for pkg in "${missing[@]}"; do
         if ! dpkg -s "$pkg" >/dev/null 2>&1; then
             still_missing+=("$pkg")
-            print_error "Failed to install: ${pkg}"
-        else
-            print_success "Installed: ${pkg}"
+            print_error "Nepodarilo sa nainštalovať: ${pkg}"
         fi
     done
 
     if [[ ${#still_missing[@]} -eq 0 ]]; then
-        print_success "$(t boot_pkg_ok)"
+        print_success "$(t boot_pkg_ok) - Nainstalovanych: ${installed_count}/${#missing[@]}"
         return 0
     else
         print_error "$(t boot_pkg_install_failed)"
-        print_error "Still missing: ${still_missing[*]}"
+        print_error "Stale chybaju: ${still_missing[*]}"
         local tail_msg
         tail_msg=$(tail -n 10 "$APT_LOG" 2>/dev/null)
-        echo "Last 10 lines of apt.log:"
+        echo "Poslednych 10 riadkov z apt.log:"
         echo "$tail_msg"
         return 1
     fi
@@ -689,14 +731,12 @@ ensure_browser() {
     fi
 
     if [[ "$APT_UPDATED" == false ]]; then
-        print_info "Updating package lists..."
         local apt_update_success=false
         for attempt in 1 2 3; do
-            if apt-get update -y 2>&1 | tee -a "$APT_LOG"; then
+            if apt-get update -y >>"$APT_LOG" 2>&1; then
                 apt_update_success=true
                 break
             else
-                print_warning "apt-get update failed (attempt $attempt/3)"
                 if [[ $attempt -lt 3 ]]; then
                     sleep 5
                 fi
@@ -710,21 +750,32 @@ ensure_browser() {
         APT_UPDATED=true
     fi
 
-    print_info "Installing browser: ${BROWSER_CANDIDATES}"
+    # Show progress banner
+    show_installer_banner
+    
+    local start_time=$(date +%s)
+    echo ""
+    print_info "Instalacia prehliadaca: ${BROWSER_CANDIDATES}"
+    echo ""
+    
+    show_progress_bar 0 1 "Stahujem a instalujem ${BROWSER_CANDIDATES}..." $start_time
     
     # Try installation with retry
     local install_success=false
     for attempt in 1 2; do
-        if apt-get install -y "$BROWSER_CANDIDATES" 2>&1 | tee -a "$APT_LOG"; then
+        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$BROWSER_CANDIDATES" >>"$APT_LOG" 2>&1; then
             install_success=true
             break
         else
-            print_warning "Installation of ${BROWSER_CANDIDATES} failed (attempt $attempt/2)"
             if [[ $attempt -lt 2 ]]; then
                 sleep 10
             fi
         fi
     done
+    
+    show_progress_bar 1 1 "Dokoncene: ${BROWSER_CANDIDATES}" $start_time
+    echo ""
+    echo ""
     
     if [[ "$install_success" == true ]] && command -v "$BROWSER_CANDIDATES" >/dev/null 2>&1; then
         BROWSER_BIN="$BROWSER_CANDIDATES"

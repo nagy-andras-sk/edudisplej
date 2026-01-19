@@ -299,6 +299,65 @@ show_banner() {
     echo ""
 }
 
+# Show installer banner with ASCII art
+show_installer_banner() {
+    clear_screen
+    echo ""
+    echo "╔════════════════════════════════════════════════════════════╗"
+    echo "║                                                            ║"
+    echo "║   ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗    ║"
+    echo "║   ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗   ║"
+    echo "║   █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝   ║"
+    echo "║   ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝    ║"
+    echo "║   ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║        ║"
+    echo "║   ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝        ║"
+    echo "║                                                            ║"
+    echo "║              I N S T A L L E R   v. 07 01 2026            ║"
+    echo "║                                                            ║"
+    echo "╚════════════════════════════════════════════════════════════╝"
+    echo ""
+}
+
+# Progress bar display function
+# Usage: show_progress_bar <current> <total> <description> [start_time]
+show_progress_bar() {
+    local current="$1"
+    local total="$2"
+    local description="$3"
+    local start_time="${4:-$(date +%s)}"
+    
+    local percent=$((current * 100 / total))
+    local bar_width=50
+    local filled=$((percent * bar_width / 100))
+    local empty=$((bar_width - filled))
+    
+    # Calculate ETA
+    local elapsed=$(($(date +%s) - start_time))
+    local eta="--:--"
+    if [[ $current -gt 0 ]] && [[ $elapsed -gt 0 ]]; then
+        local avg_time=$((elapsed / current))
+        local remaining=$((total - current))
+        local eta_seconds=$((avg_time * remaining))
+        local eta_min=$((eta_seconds / 60))
+        local eta_sec=$((eta_seconds % 60))
+        eta=$(printf "%02d:%02d" $eta_min $eta_sec)
+    fi
+    
+    # Build progress bar
+    local bar="["
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=0; i<empty; i++)); do bar+="░"; done
+    bar+="]"
+    
+    # Print progress bar with description
+    printf "\r\033[K%s %3d%% %s  ETA: %s" "$bar" "$percent" "$description" "$eta"
+    
+    # New line when complete
+    if [[ $current -eq $total ]]; then
+        echo ""
+    fi
+}
+
 # Clear screen
 clear_screen() {
     clear 2>/dev/null || printf '\033[2J\033[H'
