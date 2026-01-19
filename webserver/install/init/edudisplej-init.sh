@@ -232,16 +232,6 @@ configure_kiosk_system() {
         fi
     done
     
-    # Set up autologin on tty1
-    print_info "Configuring autologin on tty1..."
-    local GETTY_DIR="/etc/systemd/system/getty@tty1.service.d"
-    mkdir -p "$GETTY_DIR"
-    cat > "$GETTY_DIR/autologin.conf" <<EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin $CONSOLE_USER --noclear %I 38400 linux
-EOF
-    
     # Configure auto-start X on tty1
     print_info "Configuring auto-start X on tty1..."
     local PROFILE_SNIPPET='
@@ -249,58 +239,60 @@ EOF
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
   # Wait for edudisplej-init.service to complete (max 30 minutes)
   echo "Waiting for system initialization to complete..."
-  local timeout=1800
-  local elapsed=0
+  timeout=1800
+  elapsed=0
+  
   while [ $elapsed -lt $timeout ]; do
-    local status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
-    # For oneshot services with RemainAfterExit=yes:
-    # - "activating" means service is still running
-    # - "active" means service completed successfully
-    # - "inactive" means service completed (some systemd versions)
-    # - "failed" means service failed
-    # - "deactivating" means service is stopping
-    if [ "$status" = "active" ] || [ "$status" = "inactive" ] || [ "$status" = "failed" ]; then
-      # Service has completed (successfully or not)
-      break
-    fi
-    echo -n "."
-    sleep 2
-    elapsed=$((elapsed + 2))
+    status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
+    
+    # Service states:
+    # - "active" = completed successfully (RemainAfterExit=yes)
+    # - "inactive" = completed and exited
+    # - "failed" = service failed
+    # - "activating" = still running
+    
+    case "$status" in
+      active|inactive)
+        echo ""
+        echo "System initialization complete."
+        break
+        ;;
+      failed)
+        echo ""
+        echo "WARNING: System initialization failed."
+        echo "Check logs with: sudo journalctl -u edudisplej-init.service"
+        break
+        ;;
+      *)
+        printf "."
+        sleep 2
+        elapsed=$((elapsed + 2))
+        ;;
+    esac
   done
   
-  echo ""
-  local final_status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
-  if [ "$final_status" = "active" ]; then
-    echo "System initialization complete."
-  elif [ "$final_status" = "inactive" ]; then
-    # For oneshot services, inactive after activating usually means success
-    echo "System initialization complete."
-  elif [ "$final_status" = "failed" ]; then
-    echo "WARNING: System initialization failed. Some features may not work."
-    echo "Check logs with: sudo journalctl -u edudisplej-init.service"
-  elif [ $elapsed -ge $timeout ]; then
-    echo "WARNING: System initialization timed out. Some features may not work."
-  else
-    echo "System initialization status: $final_status"
+  if [ $elapsed -ge $timeout ]; then
+    echo ""
+    echo "WARNING: System initialization timed out."
   fi
   
   sleep 2
   
-  # Safely terminate any existing X server
+  # Kill any existing X server
   if pgrep Xorg >/dev/null 2>&1; then
-    XORG_PIDS=$(pgrep Xorg)
-    for pid in $XORG_PIDS; do
+    for pid in $(pgrep Xorg); do
       kill -TERM "$pid" 2>/dev/null || true
     done
     sleep 2
-    # Force kill if still running
-    for pid in $XORG_PIDS; do
+    for pid in $(pgrep Xorg); do
       if kill -0 "$pid" 2>/dev/null; then
         kill -KILL "$pid" 2>/dev/null || true
       fi
     done
   fi
   sleep 1
+  
+  # Start X server
   startx -- :0 vt1
 fi'
     

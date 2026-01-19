@@ -130,6 +130,17 @@ else
     echo "[!] Warning: edudisplej-init.service not found"
 fi
 
+# Configure autologin on tty1
+echo "[*] Configuring autologin for $CONSOLE_USER on tty1..."
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $CONSOLE_USER --noclear %I 38400 linux
+EOF
+systemctl daemon-reload
+echo "[*] Autologin configured for $CONSOLE_USER"
+
 echo ""
 echo "=========================================="
 echo "Telepítés kész! / Installation Complete!"
