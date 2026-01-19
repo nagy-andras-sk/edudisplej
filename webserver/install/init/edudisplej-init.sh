@@ -205,7 +205,7 @@ install_kiosk_packages() {
     fi
 }
 
-# Configure kiosk system (autologin, .profile, .xinitrc, kiosk-launcher.sh)
+# Configure kiosk system (.xinitrc, openbox autostart, kiosk-launcher.sh)
 configure_kiosk_system() {
     local configured_file="${EDUDISPLEJ_HOME}/.kiosk_system_configured"
     
@@ -232,60 +232,6 @@ configure_kiosk_system() {
         fi
     done
     
-    # Configure auto-start X on tty1
-    print_info "Configuring auto-start X on tty1..."
-    local PROFILE_SNIPPET='
-# Auto-start EduDisplej initialization and X on tty1
-if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-  # Check if first-time setup is needed
-  if [ ! -f /opt/edudisplej/.kiosk_system_configured ]; then
-    echo "==================================================="
-    echo "  EduDisplej - First-time initialization"
-    echo "==================================================="
-    echo ""
-    
-    # Run init script in foreground (visible on tty1)
-    if [ -x /opt/edudisplej/init/edudisplej-init.sh ]; then
-      sudo /opt/edudisplej/init/edudisplej-init.sh
-    else
-      echo "ERROR: Init script not found or not executable"
-      exit 1
-    fi
-    
-    echo ""
-    echo "Initialization complete. Starting X server..."
-    sleep 2
-  fi
-  
-  # Kill any existing X server
-  for pid in $(pgrep Xorg 2>/dev/null || true); do
-    kill -TERM "$pid" 2>/dev/null || true
-  done
-  sleep 1
-  for pid in $(pgrep Xorg 2>/dev/null || true); do
-    if kill -0 "$pid" 2>/dev/null; then
-      kill -KILL "$pid" 2>/dev/null || true
-    fi
-  done
-  sleep 1
-  
-  # Start X server
-  startx -- :0 vt1
-fi'
-    
-    if [[ -f "$USER_HOME/.profile" ]]; then
-        if ! grep -q "Auto-start EduDisplej initialization and X on tty1" "$USER_HOME/.profile"; then
-            echo "$PROFILE_SNIPPET" >> "$USER_HOME/.profile"
-            print_info "Added X auto-start to .profile"
-        else
-            print_info ".profile already configured"
-        fi
-    else
-        echo "$PROFILE_SNIPPET" > "$USER_HOME/.profile"
-        print_info "Created .profile with X auto-start"
-    fi
-    chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.profile" 2>/dev/null || true
-    
     # Create .xinitrc
     print_info "Creating .xinitrc..."
     cat > "$USER_HOME/.xinitrc" <<'XINITRC_EOF'
@@ -308,7 +254,7 @@ xset s noblank
 # Hide mouse after inactivity
 unclutter -idle 1 &
 
-# Start TERMINAL with launcher
+# Show ASCII logo in xterm
 xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "\$HOME/kiosk-launcher.sh" &
 AUTOSTART_EOF
     chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
@@ -341,13 +287,12 @@ clear
 if command -v figlet >/dev/null 2>&1; then
   figlet -w 120 "EDUDISPLEJ"
 else
-  echo "==== EDUDISPLEJ ===="
+  echo "===================================="
+  echo "      E D U D I S P L E J"
+  echo "===================================="
 fi
 echo
-
-# Brief description
-echo "Starting... Browser will launch in ${COUNT_FROM} seconds."
-echo "URL: ${URL}"
+echo "Loading..."
 echo
 
 # Countdown
@@ -415,13 +360,12 @@ clear
 if command -v figlet >/dev/null 2>&1; then
   figlet -w 120 "EDUDISPLEJ"
 else
-  echo "==== EDUDISPLEJ ===="
+  echo "===================================="
+  echo "      E D U D I S P L E J"
+  echo "===================================="
 fi
 echo
-
-# Brief description
-echo "Starting... Browser will launch in ${COUNT_FROM} seconds."
-echo "URL: ${URL}"
+echo "Loading..."
 echo
 
 # Countdown
@@ -1004,13 +948,10 @@ fi
 # =============================================================================
 
 # If kiosk system is configured, we're done with first-time setup
-# The .profile approach will handle starting X and kiosk
 KIOSK_CONFIGURED_FILE="${EDUDISPLEJ_HOME}/.kiosk_system_configured"
 if [[ -f "$KIOSK_CONFIGURED_FILE" ]]; then
     print_success "System initialization complete"
-    print_info "Kiosk will start automatically after user login"
-    print_info "User $CONSOLE_USER will auto-login on tty1"
-    print_info "X server will start automatically via .profile"
+    print_info "All packages installed, kiosk configured"
     exit 0
 fi
 
@@ -1023,11 +964,11 @@ show_system_summary
 # Set default mode if not configured
 if [[ ! -f "$MODE_FILE" ]]; then
     print_info "First-time setup - using default mode"
-    set_mode "EDSERVER"
-    KIOSK_URL="https://www.time.is"
+    set_mode "STANDALONE"
+    KIOSK_URL="${DEFAULT_KIOSK_URL}"
     save_config
 fi
 
 print_success "System initialization complete - kiosk configured"
-print_info "System will auto-start kiosk after reboot when user logs in on tty1"
+print_info "X server will start automatically after this script exits"
 exit 0
