@@ -964,8 +964,10 @@ show_system_summary
 # Set default mode if not configured
 if [[ ! -f "$MODE_FILE" ]]; then
     print_info "First-time setup - using default mode"
-    # STANDALONE mode is the default for kiosk systems that work independently
-    # without connecting to a central EduServer
+    # Available modes:
+    # - STANDALONE: Kiosk works independently without connecting to a central server
+    # - EDSERVER: Kiosk connects to and is managed by a central EduServer
+    # Default is STANDALONE for simple, independent operation
     set_mode "STANDALONE"
     KIOSK_URL="${DEFAULT_KIOSK_URL}"
     save_config

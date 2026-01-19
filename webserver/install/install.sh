@@ -5,6 +5,7 @@ TARGET_DIR="/opt/edudisplej"
 INIT_DIR="${TARGET_DIR}/init"
 LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 INIT_BASE="https://install.edudisplej.sk/init"
+SERVICE_FILE="/etc/systemd/system/edudisplej-kiosk.service"
 
 echo "[*] Kontrola opravneni root..."
 if [ "$(id -u)" -ne 0 ]; then
@@ -131,8 +132,8 @@ if [ -f "${INIT_DIR}/edudisplej-kiosk.service" ]; then
         -e "s|WorkingDirectory=/home/edudisplej|WorkingDirectory=$USER_HOME|g" \
         -e "s|Environment=HOME=/home/edudisplej|Environment=HOME=$USER_HOME|g" \
         -e "s/Environment=USER=edudisplej/Environment=USER=$CONSOLE_USER/g" \
-        "${INIT_DIR}/edudisplej-kiosk.service" > /etc/systemd/system/edudisplej-kiosk.service
-    chmod 644 /etc/systemd/system/edudisplej-kiosk.service
+        "${INIT_DIR}/edudisplej-kiosk.service" > "$SERVICE_FILE"
+    chmod 644 "$SERVICE_FILE"
     echo "[*] Service file installed for user: $CONSOLE_USER"
     
     # Also ensure wrapper script is executable
@@ -163,7 +164,7 @@ systemctl disable getty@tty1.service 2>/dev/null || true
 echo "[*] getty@tty1 disabled"
 
 # Enable and start kiosk service (only if service file exists)
-if [ -f "/etc/systemd/system/edudisplej-kiosk.service" ]; then
+if [ -f "$SERVICE_FILE" ]; then
     echo "[*] Enabling kiosk service..."
     systemctl daemon-reload
     systemctl enable edudisplej-kiosk.service 2>/dev/null || true
