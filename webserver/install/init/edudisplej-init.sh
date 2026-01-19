@@ -247,6 +247,45 @@ EOF
     local PROFILE_SNIPPET='
 # Auto-start X/Openbox on tty1
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  # Wait for edudisplej-init.service to complete (max 30 minutes)
+  echo "Waiting for system initialization to complete..."
+  local timeout=1800
+  local elapsed=0
+  while [ $elapsed -lt $timeout ]; do
+    local status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
+    # For oneshot services with RemainAfterExit=yes:
+    # - "activating" means service is still running
+    # - "active" means service completed successfully
+    # - "inactive" means service completed (some systemd versions)
+    # - "failed" means service failed
+    # - "deactivating" means service is stopping
+    if [ "$status" = "active" ] || [ "$status" = "inactive" ] || [ "$status" = "failed" ]; then
+      # Service has completed (successfully or not)
+      break
+    fi
+    echo -n "."
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  
+  echo ""
+  local final_status=$(systemctl is-active edudisplej-init.service 2>/dev/null || echo "unknown")
+  if [ "$final_status" = "active" ]; then
+    echo "System initialization complete."
+  elif [ "$final_status" = "inactive" ]; then
+    # For oneshot services, inactive after activating usually means success
+    echo "System initialization complete."
+  elif [ "$final_status" = "failed" ]; then
+    echo "WARNING: System initialization failed. Some features may not work."
+    echo "Check logs with: sudo journalctl -u edudisplej-init.service"
+  elif [ $elapsed -ge $timeout ]; then
+    echo "WARNING: System initialization timed out. Some features may not work."
+  else
+    echo "System initialization status: $final_status"
+  fi
+  
+  sleep 2
+  
   # Safely terminate any existing X server
   if pgrep Xorg >/dev/null 2>&1; then
     XORG_PIDS=$(pgrep Xorg)
@@ -961,9 +1000,10 @@ read_kiosk_preferences
 
 # Try to install missing packages (when internet is up)
 if ! ensure_required_packages; then
-    # Stop boot early if dependencies are missing
-    print_error "Required packages missing or failed to install. Fix issues and reboot."
-    exit 1
+    # Don't stop boot if dependencies are missing - they may have been installed by install.sh
+    # or can be installed on next boot when internet is available
+    print_warning "Required packages missing or failed to install. Will retry on next boot."
+    # Continue anyway - the system may still function partially
 fi
 
 # Install kiosk-specific packages based on mode

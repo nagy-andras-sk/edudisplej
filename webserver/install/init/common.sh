@@ -499,8 +499,10 @@ get_working_url() {
 }
 
 # Wait for internet with retries
+# Reduced from 30 attempts (60s) to 10 attempts (20s) to speed up boot
+# when internet is not available. Package installation will be retried on next boot.
 wait_for_internet() {
-    local max_attempts=30
+    local max_attempts=10
     local attempt=1
     print_info "$(t boot_waiting_network)"
     while [[ $attempt -le $max_attempts ]]; do
