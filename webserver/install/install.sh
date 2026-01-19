@@ -5,6 +5,7 @@ TARGET_DIR="/opt/edudisplej"
 INIT_DIR="${TARGET_DIR}/init"
 LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 INIT_BASE="https://install.edudisplej.sk/init"
+SERVICE_FILE="/etc/systemd/system/edudisplej-kiosk.service"
 
 echo "[*] Kontrola opravneni root..."
 if [ "$(id -u)" -ne 0 ]; then
@@ -119,26 +120,59 @@ echo "[*] Kiosk mode preference saved: $KIOSK_MODE"
 echo "[*] Console user saved: $CONSOLE_USER"
 echo "[*] Packages and kiosk configuration will be set up by init script on first boot"
 
-# Configure passwordless sudo for init script (so .profile can run it)
+# === SYSTEMD SERVICE INSTALLATION ===
+
+echo "[*] Installing systemd service..."
+
+# Copy and customize service file
+if [ -f "${INIT_DIR}/edudisplej-kiosk.service" ]; then
+    # Customize service file with actual user
+    sed -e "s/User=edudisplej/User=$CONSOLE_USER/g" \
+        -e "s/Group=edudisplej/Group=$CONSOLE_USER/g" \
+        -e "s|WorkingDirectory=/home/edudisplej|WorkingDirectory=$USER_HOME|g" \
+        -e "s|Environment=HOME=/home/edudisplej|Environment=HOME=$USER_HOME|g" \
+        -e "s/Environment=USER=edudisplej/Environment=USER=$CONSOLE_USER/g" \
+        "${INIT_DIR}/edudisplej-kiosk.service" > "$SERVICE_FILE"
+    chmod 644 "$SERVICE_FILE"
+    echo "[*] Service file installed for user: $CONSOLE_USER"
+    
+    # Also ensure wrapper script is executable
+    if [ -f "${INIT_DIR}/kiosk-start.sh" ]; then
+        chmod +x "${INIT_DIR}/kiosk-start.sh"
+        echo "[*] Wrapper script configured"
+    fi
+else
+    echo "[!] ERROR: Service file not found at ${INIT_DIR}/edudisplej-kiosk.service"
+    echo "[!] Systemd service installation failed. System will not auto-start."
+    echo "[!] Manual configuration will be required."
+    # Continue anyway, but warn user
+fi
+
+# Create sudoers configuration for init script
 echo "[*] Configuring passwordless sudo for init script..."
 mkdir -p /etc/sudoers.d
 cat > /etc/sudoers.d/edudisplej <<EOF
-# Allow console user to run edudisplej-init.sh without password
+# Allow console user to run init script without password
 $CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-init.sh
 EOF
 chmod 0440 /etc/sudoers.d/edudisplej
 echo "[*] Sudoers configuration complete"
 
-# Configure autologin on tty1
-echo "[*] Configuring autologin for $CONSOLE_USER on tty1..."
-mkdir -p /etc/systemd/system/getty@tty1.service.d
-cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin $CONSOLE_USER --noclear %I 38400 linux
-EOF
-systemctl daemon-reload
-echo "[*] Autologin configured for $CONSOLE_USER"
+# Disable getty@tty1 (kiosk service will take over)
+echo "[*] Disabling getty@tty1..."
+systemctl disable getty@tty1.service 2>/dev/null || true
+echo "[*] getty@tty1 disabled"
+
+# Enable and start kiosk service (only if service file exists)
+if [ -f "$SERVICE_FILE" ]; then
+    echo "[*] Enabling kiosk service..."
+    systemctl daemon-reload
+    systemctl enable edudisplej-kiosk.service 2>/dev/null || true
+    echo "[*] Systemd service installed and enabled"
+else
+    echo "[!] WARNING: Systemd service not enabled (service file missing)"
+    echo "[!] System will not auto-start on boot"
+fi
 
 echo ""
 echo "=========================================="
