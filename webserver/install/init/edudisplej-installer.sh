@@ -36,20 +36,23 @@ check_packages_installed() {
     
     ensure_data_directory || return 1
     
-    if [[ ! -f "$PACKAGES_JSON" ]]; then
-        return 1  # Not installed
-    fi
-    
-    # Check if package group is marked as installed
-    if command -v jq >/dev/null 2>&1; then
+    # Try jq-based check first
+    if [[ -f "$PACKAGES_JSON" ]] && command -v jq >/dev/null 2>&1; then
         if jq -e ".packages.\"$package_group\".installed == true" "$PACKAGES_JSON" >/dev/null 2>&1; then
             return 0  # Already installed
         fi
-    else
-        # Fallback: simple grep check
-        if grep -q "\"$package_group\"" "$PACKAGES_JSON" 2>/dev/null; then
-            return 0  # Assume installed
-        fi
+    fi
+    
+    # Fallback: check marker file
+    local marker_file="${DATA_DIR}/.installed_${package_group}"
+    if [[ -f "$marker_file" ]]; then
+        return 0  # Already installed
+    fi
+    
+    # Fallback: simple grep check on tracking file
+    local tracking_file="${DATA_DIR}/installed_packages.txt"
+    if [[ -f "$tracking_file" ]] && grep -q "^${package_group}|" "$tracking_file" 2>/dev/null; then
+        return 0  # Assume installed
     fi
     
     return 1  # Not installed
@@ -96,33 +99,16 @@ EOF
            '.packages[$group] = {installed: true, date: $date, versions: $versions} | .last_update = $date' \
            "$PACKAGES_JSON" > "$temp_file" && mv "$temp_file" "$PACKAGES_JSON"
     else
-        # Fallback: Read existing data and merge
-        local temp_file="${PACKAGES_JSON}.tmp"
-        local existing_packages=""
+        # Fallback: Simple append-only approach (creates a marker file per package group)
+        # This is simpler and more reliable than trying to parse/merge JSON without jq
+        local marker_file="${DATA_DIR}/.installed_${package_group}"
+        echo "$timestamp" > "$marker_file"
         
-        # Read existing packages if file exists and has data
-        if [[ -f "$PACKAGES_JSON" ]] && [[ -s "$PACKAGES_JSON" ]]; then
-            # Extract existing packages (simple parsing)
-            existing_packages=$(sed -n '/"packages":/,/}/p' "$PACKAGES_JSON" | grep -v "\"$package_group\"" | grep "\".*\":" || true)
-        fi
+        # Also update a simple text-based tracking file
+        local tracking_file="${DATA_DIR}/installed_packages.txt"
+        echo "${package_group}|${timestamp}|${packages[*]}" >> "$tracking_file"
         
-        # Build new JSON with merged data
-        {
-            echo "{"
-            echo "  \"packages\": {"
-            if [[ -n "$existing_packages" ]]; then
-                echo "$existing_packages"
-                echo "    ,"
-            fi
-            echo "    \"$package_group\": {"
-            echo "      \"installed\": true,"
-            echo "      \"date\": \"$timestamp\","
-            echo "      \"versions\": {$versions}"
-            echo "    }"
-            echo "  },"
-            echo "  \"last_update\": \"$timestamp\""
-            echo "}"
-        } > "$temp_file" && mv "$temp_file" "$PACKAGES_JSON"
+        print_warning "jq nie je k dispozicii, pouziva sa zjednodusene sledovanie -- jq not available, using simplified tracking"
     fi
     
     print_success "Zaznamena instalacia balickov: $package_group"
