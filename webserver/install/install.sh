@@ -7,6 +7,50 @@ LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 INIT_BASE="https://install.edudisplej.sk/init"
 SERVICE_FILE="/etc/systemd/system/edudisplej-kiosk.service"
 
+# Cleanup function for graceful exit
+cleanup_on_error() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        echo ""
+        echo "[!] =========================================="
+        echo "[!] CHYBA: Inštalácia zlyhala (exit code: $exit_code)"
+        echo "[!] =========================================="
+        echo ""
+        echo "Možné riešenia:"
+        echo "  1. Skontrolujte internetové pripojenie"
+        echo "  2. Skúste spustiť inštaláciu znova"
+        echo "  3. Skontrolujte logy vyššie pre detaily"
+        echo ""
+    fi
+    # Stop heartbeat if running
+    stop_heartbeat
+}
+
+trap cleanup_on_error EXIT
+
+# Heartbeat function to show the script is still running
+HEARTBEAT_PID=""
+start_heartbeat() {
+    local message="${1:-Processing...}"
+    stop_heartbeat  # Stop any existing heartbeat
+    (
+        while true; do
+            echo -n "."
+            sleep 2
+        done
+    ) &
+    HEARTBEAT_PID=$!
+}
+
+stop_heartbeat() {
+    if [ -n "$HEARTBEAT_PID" ] && kill -0 "$HEARTBEAT_PID" 2>/dev/null; then
+        kill "$HEARTBEAT_PID" 2>/dev/null || true
+        wait "$HEARTBEAT_PID" 2>/dev/null || true
+        HEARTBEAT_PID=""
+        echo ""  # New line after dots
+    fi
+}
+
 echo "[*] Kontrola opravneni root..."
 if [ "$(id -u)" -ne 0 ]; then
   echo "[!] Spusti skript s sudo!"
@@ -29,7 +73,10 @@ fi
 # Kontrola: curl nainstalovany?
 if ! command -v curl >/dev/null 2>&1; then
   echo "[*] Instalacia curl..."
-  apt-get update && apt-get install -y curl
+  start_heartbeat "Instalujem curl"
+  apt-get update -qq && apt-get install -y curl >/dev/null 2>&1
+  stop_heartbeat
+  echo "[✓] curl nainstalovany"
 fi
 
 # Kontrola GUI (len info)
@@ -53,26 +100,61 @@ fi
 mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR"
 
 echo "[*] Nacitavame zoznam suborov : ${INIT_BASE}/download.php?getfiles"
-FILES_LIST="$(curl -s "${INIT_BASE}/download.php?getfiles" | tr -d '\r')"
+
+# Add timeout to prevent freezing
+FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles" 2>&1 | tr -d '\r')"
 
 if [ -z "$FILES_LIST" ]; then
   echo "[!] Chyba: Nepodarilo sa nacitat zoznam suborov."
+  echo "[!] Skontrolujte internetove pripojenie a skuste znova."
   exit 1
 fi
 
 echo "[DEBUG] Zoznam suborov:"
 echo "$FILES_LIST"
 
+# Count total files for progress tracking
+TOTAL_FILES=$(echo "$FILES_LIST" | grep -c "^[^;]*;")
+CURRENT_FILE=0
+
+echo ""
+echo "=========================================="
+echo "Stahovanie suborov: ${TOTAL_FILES} suborov"
+echo "=========================================="
+echo ""
+
 # Stiahnutie jednotlivo + CRLF oprava + kontrola shebang
 # DÔLEŽITÉ: while bez pipe (aby exit vo vnútri ukončil skript)
 while IFS=";" read -r NAME SIZE MODIFIED; do
     [ -z "${NAME:-}" ] && continue
 
-    echo "[*] Stahovanie: $NAME ($SIZE bajtov)"
-    curl -sL "${INIT_BASE}/download.php?streamfile=${NAME}" -o "${INIT_DIR}/${NAME}" || {
+    CURRENT_FILE=$((CURRENT_FILE + 1))
+    PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
+    
+    echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) Stahovanie: ${NAME}"
+    echo "    Velkost: ${SIZE} bajtov"
+    
+    # Download with timeout and progress indication
+    if curl -sL --max-time 60 --connect-timeout 10 \
+        "${INIT_BASE}/download.php?streamfile=${NAME}" \
+        -o "${INIT_DIR}/${NAME}" 2>&1; then
+        echo "    [OK] Stiahnuty uspesne"
+    else
         echo "[!] Chyba: Stahovanie $NAME zlyhalo."
-        exit 1
-    }
+        echo "[!] Skontrolujte internetove pripojenie."
+        # Try once more
+        echo "[*] Skusam znova..."
+        sleep 2
+        if curl -sL --max-time 60 --connect-timeout 10 \
+            "${INIT_BASE}/download.php?streamfile=${NAME}" \
+            -o "${INIT_DIR}/${NAME}" 2>&1; then
+            echo "    [OK] Stiahnuty uspesne pri druhom pokuse"
+        else
+            echo "[!] Chyba: Stahovanie $NAME zlyhalo aj pri druhom pokuse."
+            exit 1
+        fi
+    fi
+    echo ""
 
     # Oprava konca riadkov (CRLF -> LF)
     sed -i 's/\r$//' "${INIT_DIR}/${NAME}"
@@ -179,17 +261,45 @@ echo "=========================================="
 echo "Telepítés kész! / Installation Complete!"
 echo "=========================================="
 echo ""
-echo "Files downloaded and configured!"
-echo "Kiosk mode: $KIOSK_MODE"
-echo "User: $CONSOLE_USER"
+echo "[✓] Vsetky subory uspesne stiahnuté a nakonfigurovane!"
 echo ""
-echo "After reboot, the init script will:"
-echo "  - Install required packages (X11, browser, utilities)"
-echo "  - Configure kiosk mode automatically"
-echo "  - Start the display system"
+echo "Konfigurácia:"
+echo "  - Kiosk mód: $KIOSK_MODE"
+echo "  - Používateľ: $CONSOLE_USER"
+echo "  - Domovský adresár: $USER_HOME"
 echo ""
-echo "Logok / Logs: /opt/edudisplej/session.log, /opt/edudisplej/apt.log"
+echo "Po reštarte systém automaticky:"
+echo "  1. Nainštaluje potrebné balíčky (X11, browser, utility)"
+echo "  2. Nakonfiguruje kiosk mód"
+echo "  3. Spustí displej systém"
 echo ""
-echo "[✓] Instalacia dokoncena. Restart za 10 sekund..."
-sleep 10
-reboot
+echo "Log súbory:"
+echo "  - Init log: /opt/edudisplej/session.log"
+echo "  - APT log: /opt/edudisplej/apt.log"
+echo ""
+echo "=========================================="
+echo ""
+
+# Offer manual restart option
+read -t 30 -p "Restartovať teraz? [Y/n] (automaticky za 30s): " response || response="y"
+echo ""
+
+case "$response" in
+    [nN]|[nN][oO])
+        echo "[*] Reštart preskočený."
+        echo "[*] Pre dokončenie inštalácie spustite manuálne:"
+        echo "    sudo reboot"
+        ;;
+    *)
+        echo "[*] Zastavujem služby pred reštartom..."
+        # Stop any running services gracefully
+        systemctl stop getty@tty1.service 2>/dev/null || true
+        
+        echo "[*] Synchronizujem disky..."
+        sync
+        
+        echo "[*] Reštartujem systém..."
+        sleep 3
+        reboot
+        ;;
+esac
