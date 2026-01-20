@@ -142,7 +142,7 @@ echo "Stahovanie suborov: ${TOTAL_FILES} suborov"
 echo "=========================================="
 echo ""
 
-# Stiahnutie jednotlivo + CRLF oprava + kontrola shebang
+# Stiahnutie jednotlivo + CRLF oprava + kontrola shebang + verifikacia velkosti
 # DÔLEŽITÉ: while bez pipe (aby exit vo vnútri ukončil skript)
 while IFS=";" read -r NAME SIZE MODIFIED; do
     [ -z "${NAME:-}" ] && continue
@@ -151,27 +151,59 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
     PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
     
     echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) Stahovanie: ${NAME}"
-    echo "    Velkost: ${SIZE} bajtov"
+    echo "    Ocakavana velkost: ${SIZE} bajtov"
     
     # Download with timeout and progress indication
-    if curl -sL --max-time 60 --connect-timeout 10 \
-        "${INIT_BASE}/download.php?streamfile=${NAME}" \
-        -o "${INIT_DIR}/${NAME}" 2>&1; then
-        echo "    [OK] Stiahnuty uspesne"
-    else
-        echo "[!] Chyba: Stahovanie $NAME zlyhalo."
-        echo "[!] Skontrolujte internetove pripojenie."
-        # Try once more
-        echo "[*] Skusam znova..."
-        sleep 2
+    MAX_DOWNLOAD_ATTEMPTS=3
+    DOWNLOAD_SUCCESS=false
+    
+    for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
         if curl -sL --max-time 60 --connect-timeout 10 \
             "${INIT_BASE}/download.php?streamfile=${NAME}" \
             -o "${INIT_DIR}/${NAME}" 2>&1; then
-            echo "    [OK] Stiahnuty uspesne pri druhom pokuse"
+            
+            # Verify file size matches expected size
+            ACTUAL_SIZE=$(stat -c%s "${INIT_DIR}/${NAME}" 2>/dev/null || echo "0")
+            
+            if [ "$ACTUAL_SIZE" -eq "$SIZE" ]; then
+                echo "    [OK] Stiahnuty uspesne a overeny (${ACTUAL_SIZE} bajtov)"
+                DOWNLOAD_SUCCESS=true
+                break
+            else
+                echo "    [!] CHYBA: Velkost sa nezhoduje!"
+                echo "        Ocakavane: ${SIZE} bajtov"
+                echo "        Skutocne: ${ACTUAL_SIZE} bajtov"
+                echo "        Subor moze byt poskodeny alebo neuplne stiahnuty!"
+                
+                if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
+                    echo "[*] Pokus ${attempt}/${MAX_DOWNLOAD_ATTEMPTS} zlyhal, skusam znova..."
+                    sleep 2
+                    rm -f "${INIT_DIR}/${NAME}"
+                fi
+            fi
         else
-            echo "[!] Chyba: Stahovanie $NAME zlyhalo aj pri druhom pokuse."
-            exit 1
+            echo "[!] Chyba: Stahovanie $NAME zlyhalo v pokuse ${attempt}/${MAX_DOWNLOAD_ATTEMPTS}."
+            if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
+                echo "[*] Skontrolujte internetove pripojenie. Skusam znova..."
+                sleep 2
+            fi
         fi
+    done
+    
+    if [ "$DOWNLOAD_SUCCESS" != "true" ]; then
+        echo ""
+        echo "[!] =========================================="
+        echo "[!] KRITICKÁ CHYBA: Subor $NAME sa nepodarilo korektne stiahnut"
+        echo "[!] po ${MAX_DOWNLOAD_ATTEMPTS} pokusoch!"
+        echo "[!] =========================================="
+        echo ""
+        echo "Mozne priciny:"
+        echo "  1. Nestabilne internetove pripojenie"
+        echo "  2. Server ukoncil prenos predcasne"
+        echo "  3. Problemy s PHP output buffering na serveri"
+        echo ""
+        echo "Viac informacii: pozrite filestreamerror.md"
+        exit 1
     fi
     echo ""
 
@@ -186,6 +218,7 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
             echo "[!] Chyba shebang, pridavam: #!/bin/bash"
             sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
         fi
+        
     elif [[ "${NAME}" == *.html ]]; then
       # HTML subory presun do localweb priecinka
       cp -f "${INIT_DIR}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"

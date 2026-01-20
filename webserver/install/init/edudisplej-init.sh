@@ -41,8 +41,33 @@ echo ""
 
 # Közös függvények -- Spoločné funkcie
 if [[ -f "${INIT_DIR}/common.sh" ]]; then
-    source "${INIT_DIR}/common.sh"
-    print_success "✓ common.sh betöltve -- načítaný"
+    # Try to source the file - the source command itself will detect syntax errors
+    # We rely on file size verification during download to catch truncation
+    if source "${INIT_DIR}/common.sh" 2>/dev/null; then
+        print_success "✓ common.sh betöltve -- načítaný"
+    else
+        echo "==========================================="
+        echo "[KRITICKÁ HIBA / CRITICAL ERROR]"
+        echo "==========================================="
+        echo ""
+        echo "Nepodarilo sa načítať common.sh!"
+        echo "Failed to load common.sh!"
+        echo ""
+        echo "Súbor môže obsahovať syntax chyby,"
+        echo "môže byť poškodený alebo neúplne stiahnutý."
+        echo ""
+        echo "File may contain syntax errors,"
+        echo "may be corrupted or incompletely downloaded."
+        echo ""
+        echo "RIEŠENIE / SOLUTION:"
+        echo "Znova spustite inštaláciu:"
+        echo "curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash"
+        echo ""
+        echo "Viac informácií: /opt/edudisplej/filestreamerror.md"
+        echo "==========================================="
+        sleep 10
+        exit 1
+    fi
 else
     echo "[HIBA/CHYBA] common.sh nem található!"
     exit 1
