@@ -319,6 +319,13 @@ tput civis || true
 clear
 
 # =============================================================================
+# Source common functions if available
+# =============================================================================
+if [[ -f /opt/edudisplej/init/common.sh ]]; then
+    source /opt/edudisplej/init/common.sh 2>/dev/null || true
+fi
+
+# =============================================================================
 # Boot Screen Display
 # =============================================================================
 
@@ -339,48 +346,13 @@ echo "╔═══════════════════════�
 echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
 echo "╠═══════════════════════════════════════════════════════════════════════════╣"
 
-# Get system info
-get_current_ssid() {
-    if command -v nmcli &> /dev/null; then
-        nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null | awk -F: '$1=="yes" {print $2; exit}'
-    elif command -v iwgetid &> /dev/null; then
-        iwgetid -r 2>/dev/null
-    else
-        echo "unknown"
-    fi
-}
-
-get_current_signal() {
-    if command -v nmcli &> /dev/null; then
-        nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1=="*" {print $2"%"; exit}'
-    else
-        local quality total
-        read quality total <<<$(iwconfig 2>/dev/null | awk -F'[ =/]+' '/Link Quality/ {print $4" " $5; exit}')
-        if [[ -n "$quality" && -n "$total" ]]; then
-            echo "$quality/$total"
-        else
-            echo "unknown"
-        fi
-    fi
-}
-
-get_screen_resolution() {
-    if command -v xrandr &> /dev/null && [[ -n "${DISPLAY:-}" ]]; then
-        xrandr 2>/dev/null | grep -oP '\d+x\d+' | head -1
-    elif [[ -f /sys/class/graphics/fb0/virtual_size ]]; then
-        cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | tr ',' 'x'
-    else
-        echo "unknown"
-    fi
-}
-
 # Display system status
 internet_status="✗ Nedostupny / Not available"
 wifi_info=""
-if ping -c 1 -W 2 google.com &> /dev/null; then
+if check_internet 2>/dev/null || ping -c 1 -W 2 google.com &> /dev/null; then
     internet_status="✓ Dostupny / Available"
-    ssid=$(get_current_ssid)
-    signal=$(get_current_signal)
+    ssid=$(get_current_ssid 2>/dev/null || echo "unknown")
+    signal=$(get_current_signal 2>/dev/null || echo "unknown")
     if [[ -n "$ssid" && "$ssid" != "unknown" ]]; then
         wifi_info="  WiFi SSID: $ssid | Signal: $signal"
     fi
@@ -391,7 +363,7 @@ if [[ -n "$wifi_info" ]]; then
     printf "║ %-73s ║\n" "$wifi_info"
 fi
 
-resolution=$(get_screen_resolution)
+resolution=$(get_screen_resolution 2>/dev/null || echo "unknown")
 printf "║ %-73s ║\n" "Rozlisenie / Resolution: $resolution"
 
 echo "╚═══════════════════════════════════════════════════════════════════════════╝"
@@ -486,6 +458,13 @@ tput civis || true
 clear
 
 # =============================================================================
+# Source common functions if available
+# =============================================================================
+if [[ -f /opt/edudisplej/init/common.sh ]]; then
+    source /opt/edudisplej/init/common.sh 2>/dev/null || true
+fi
+
+# =============================================================================
 # Boot Screen Display
 # =============================================================================
 
@@ -506,48 +485,13 @@ echo "╔═══════════════════════�
 echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
 echo "╠═══════════════════════════════════════════════════════════════════════════╣"
 
-# Get system info
-get_current_ssid() {
-    if command -v nmcli &> /dev/null; then
-        nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null | awk -F: '$1=="yes" {print $2; exit}'
-    elif command -v iwgetid &> /dev/null; then
-        iwgetid -r 2>/dev/null
-    else
-        echo "unknown"
-    fi
-}
-
-get_current_signal() {
-    if command -v nmcli &> /dev/null; then
-        nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1=="*" {print $2"%"; exit}'
-    else
-        local quality total
-        read quality total <<<$(iwconfig 2>/dev/null | awk -F'[ =/]+' '/Link Quality/ {print $4" " $5; exit}')
-        if [[ -n "$quality" && -n "$total" ]]; then
-            echo "$quality/$total"
-        else
-            echo "unknown"
-        fi
-    fi
-}
-
-get_screen_resolution() {
-    if command -v xrandr &> /dev/null && [[ -n "${DISPLAY:-}" ]]; then
-        xrandr 2>/dev/null | grep -oP '\d+x\d+' | head -1
-    elif [[ -f /sys/class/graphics/fb0/virtual_size ]]; then
-        cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | tr ',' 'x'
-    else
-        echo "unknown"
-    fi
-}
-
 # Display system status
 internet_status="✗ Nedostupny / Not available"
 wifi_info=""
-if ping -c 1 -W 2 google.com &> /dev/null; then
+if check_internet 2>/dev/null || ping -c 1 -W 2 google.com &> /dev/null; then
     internet_status="✓ Dostupny / Available"
-    ssid=$(get_current_ssid)
-    signal=$(get_current_signal)
+    ssid=$(get_current_ssid 2>/dev/null || echo "unknown")
+    signal=$(get_current_signal 2>/dev/null || echo "unknown")
     if [[ -n "$ssid" && "$ssid" != "unknown" ]]; then
         wifi_info="  WiFi SSID: $ssid | Signal: $signal"
     fi
@@ -558,7 +502,7 @@ if [[ -n "$wifi_info" ]]; then
     printf "║ %-73s ║\n" "$wifi_info"
 fi
 
-resolution=$(get_screen_resolution)
+resolution=$(get_screen_resolution 2>/dev/null || echo "unknown")
 printf "║ %-73s ║\n" "Rozlisenie / Resolution: $resolution"
 
 echo "╚═══════════════════════════════════════════════════════════════════════════╝"
