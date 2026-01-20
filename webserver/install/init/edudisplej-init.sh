@@ -743,7 +743,7 @@ ensure_browser() {
 # Fetch latest version string from server
 fetch_remote_version() {
     local out
-    if ! out=$(curl -fsSL "$VERSION_URL" 2>&1); then
+    if ! out=$(curl -fsSL --max-time 10 --connect-timeout 5 "$VERSION_URL" 2>&1); then
         print_error "$(t boot_update_failed) ${out}"
         return 1
     fi
@@ -756,7 +756,8 @@ download_init_files() {
     tmpdir=$(mktemp -d) || return 1
 
     local files_list
-    if ! files_list=$(curl -fsSL "$FILES_LIST_URL" 2>>"$UPDATE_LOG" | tr -d '\r'); then
+    print_info "$(t boot_update_downloading)"
+    if ! files_list=$(curl -fsSL --max-time 30 --connect-timeout 10 "$FILES_LIST_URL" 2>>"$UPDATE_LOG" | tr -d '\r'); then
         print_error "$(t boot_update_failed) $(tail -n 5 "$UPDATE_LOG" 2>/dev/null)"
         return 1
     fi
@@ -764,12 +765,24 @@ download_init_files() {
         return 1
     fi
 
+    local file_count=0
+    local total_files
+    total_files=$(echo "$files_list" | grep -c "^[^;]*;" || echo 0)
+    
+    print_info "Stahujem ${total_files} suborov..."
+
     while IFS=";" read -r NAME SIZE MODIFIED; do
         [[ -z "${NAME:-}" ]] && continue
-        if ! curl -fsSL "${DOWNLOAD_URL}${NAME}" -o "${tmpdir}/${NAME}" 2>>"$UPDATE_LOG"; then
+        ((file_count++))
+        
+        echo -n "[${file_count}/${total_files}] ${NAME}..."
+        if ! curl -fsSL --max-time 60 --connect-timeout 10 "${DOWNLOAD_URL}${NAME}" -o "${tmpdir}/${NAME}" 2>>"$UPDATE_LOG"; then
+            echo " CHYBA"
             print_error "$(t boot_update_failed) $(tail -n 5 "$UPDATE_LOG" 2>/dev/null)"
             return 1
         fi
+        echo " OK"
+        
         sed -i 's/\r$//' "${tmpdir}/${NAME}"
         if [[ "${NAME}" == *.sh ]]; then
             chmod +x "${tmpdir}/${NAME}"
