@@ -73,18 +73,6 @@ else
     exit 1
 fi
 
-# Halozati fuggvenyek -- Sietove funkcie
-if [[ -f "${INIT_DIR}/network.sh" ]]; then
-    source "${INIT_DIR}/network.sh"
-    print_success "✓ network.sh betoltve -- nacitany"
-fi
-
-# Nyelvbeallitasok -- Jazykove nastavenia
-if [[ -f "${INIT_DIR}/language.sh" ]]; then
-    source "${INIT_DIR}/language.sh"
-    print_success "✓ language.sh betoltve -- nacitany"
-fi
-
 # Ellenorzo szkript -- Kontrolny skript
 if [[ -f "${INIT_DIR}/edudisplej-checker.sh" ]]; then
     source "${INIT_DIR}/edudisplej-checker.sh"
@@ -104,9 +92,17 @@ fi
 echo ""
 
 # =============================================================================
+# Boot Screen Display
+# =============================================================================
+
+show_boot_screen
+countdown_with_f2
+
+# =============================================================================
 # Banner megjelenitese -- Zobrazenie bannera
 # =============================================================================
 
+echo ""
 show_banner
 print_info "Verzio -- Verzia: $(date +%Y%m%d)"
 
@@ -317,31 +313,131 @@ if [[ "$KIOSK_MODE" = "epiphany" ]]; then
 set -euo pipefail
 
 URL="${1:-https://www.time.is}"
-COUNT_FROM=5
 
-# Terminal kinezetl -- Vzhad terminalu
+# Terminal kinezet -- Vzhad terminalu
 tput civis || true
 clear
 
-# ASCII banner -- ASCII banner
-if command -v figlet >/dev/null 2>&1; then
-  figlet -w 120 "EDUDISPLEJ"
-else
-  echo "===================================="
-  echo "      E D U D I S P L E J"
-  echo "===================================="
-fi
-echo
-echo "Betoltes... / Nacitava sa..."
-echo
+# =============================================================================
+# Boot Screen Display
+# =============================================================================
 
-# Visszaszamlalas -- Odpocitavanie
-for ((i=COUNT_FROM; i>=1; i--)); do
-  printf "\rInditas %2d masodperc mulva... / Spustenie o %2d sekund..." "$i" "$i"
-  sleep 1
-done
-echo -e "\rInditas most! / Spusta sa teraz!     "
-sleep 0.3
+# ASCII Art for EDUDISPLEJ
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+echo "║                                                                           ║"
+echo "║   ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗ ██╗     ███████╗   ║"
+echo "║   ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗██║     ██╔════╝   ║"
+echo "║   █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝██║     █████╗     ║"
+echo "║   ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝ ██║     ██╔══╝     ║"
+echo "║   ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗   ║"
+echo "║   ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ║"
+echo "║                                                                           ║"
+echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
+echo "╠═══════════════════════════════════════════════════════════════════════════╣"
+
+# Get system info
+get_current_ssid() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null | awk -F: '$1=="yes" {print $2; exit}'
+    elif command -v iwgetid &> /dev/null; then
+        iwgetid -r 2>/dev/null
+    else
+        echo "unknown"
+    fi
+}
+
+get_current_signal() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1=="*" {print $2"%"; exit}'
+    else
+        local quality total
+        read quality total <<<$(iwconfig 2>/dev/null | awk -F'[ =/]+' '/Link Quality/ {print $4" " $5; exit}')
+        if [[ -n "$quality" && -n "$total" ]]; then
+            echo "$quality/$total"
+        else
+            echo "unknown"
+        fi
+    fi
+}
+
+get_screen_resolution() {
+    if command -v xrandr &> /dev/null && [[ -n "${DISPLAY:-}" ]]; then
+        xrandr 2>/dev/null | grep -oP '\d+x\d+' | head -1
+    elif [[ -f /sys/class/graphics/fb0/virtual_size ]]; then
+        cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | tr ',' 'x'
+    else
+        echo "unknown"
+    fi
+}
+
+# Display system status
+internet_status="✗ Nedostupny / Not available"
+wifi_info=""
+if ping -c 1 -W 2 google.com &> /dev/null; then
+    internet_status="✓ Dostupny / Available"
+    ssid=$(get_current_ssid)
+    signal=$(get_current_signal)
+    if [[ -n "$ssid" && "$ssid" != "unknown" ]]; then
+        wifi_info="  WiFi SSID: $ssid | Signal: $signal"
+    fi
+fi
+
+printf "║ %-73s ║\n" "Internet: $internet_status"
+if [[ -n "$wifi_info" ]]; then
+    printf "║ %-73s ║\n" "$wifi_info"
+fi
+
+resolution=$(get_screen_resolution)
+printf "║ %-73s ║\n" "Rozlisenie / Resolution: $resolution"
+
+echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+echo "║  Stlacte F2 pre nastavenia (raspi-config) / Press F2 for settings        ║"
+echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Countdown with F2 detection
+if [[ -t 0 ]]; then
+    old_tty_settings=$(stty -g 2>/dev/null || true)
+    stty -echo -icanon time 0 min 0 2>/dev/null || true
+    
+    key=""
+    for ((i=5; i>=1; i--)); do
+        printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
+        read -t 1 -n 3 key 2>/dev/null || true
+        if [[ "$key" == $'\x1b'* ]]; then
+            [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
+            echo ""
+            echo ""
+            echo "F2 stlacene! Spustam raspi-config... / F2 pressed! Launching raspi-config..."
+            sleep 1
+            sudo raspi-config
+            echo ""
+            echo "Navrat z nastaveni... / Returning from settings..."
+            sleep 2
+            clear
+            echo "Spustam prehliadac... / Starting browser..."
+            sleep 1
+        fi
+    done
+    
+    [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
+else
+    for ((i=5; i>=1; i--)); do
+        printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
+        sleep 1
+    done
+fi
+
+echo ""
+echo ""
+echo "Spustam kiosk rezim... / Starting kiosk mode..."
+sleep 1
 
 # Kepernyovedo kikapcsolasa -- Vypnutie setraca obrazovky
 if command -v xset >/dev/null 2>&1; then
@@ -384,31 +480,131 @@ else
 set -euo pipefail
 
 URL="${1:-https://www.time.is}"
-COUNT_FROM=5
 
 # Terminal kinezet -- Vzhad terminalu
 tput civis || true
 clear
 
-# ASCII banner -- ASCII banner
-if command -v figlet >/dev/null 2>&1; then
-  figlet -w 120 "EDUDISPLEJ"
-else
-  echo "===================================="
-  echo "      E D U D I S P L E J"
-  echo "===================================="
-fi
-echo
-echo "Betoltes... / Nacitava sa..."
-echo
+# =============================================================================
+# Boot Screen Display
+# =============================================================================
 
-# Visszaszamlalas -- Odpocitavanie
-for ((i=COUNT_FROM; i>=1; i--)); do
-  printf "\rInditas %2d masodperc mulva... / Spustenie o %2d sekund..." "$i" "$i"
-  sleep 1
-done
-echo -e "\rInditas most! / Spusta sa teraz!     "
-sleep 0.3
+# ASCII Art for EDUDISPLEJ
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+echo "║                                                                           ║"
+echo "║   ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗ ██╗     ███████╗   ║"
+echo "║   ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗██║     ██╔════╝   ║"
+echo "║   █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝██║     █████╗     ║"
+echo "║   ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝ ██║     ██╔══╝     ║"
+echo "║   ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗   ║"
+echo "║   ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ║"
+echo "║                                                                           ║"
+echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
+echo "╠═══════════════════════════════════════════════════════════════════════════╣"
+
+# Get system info
+get_current_ssid() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null | awk -F: '$1=="yes" {print $2; exit}'
+    elif command -v iwgetid &> /dev/null; then
+        iwgetid -r 2>/dev/null
+    else
+        echo "unknown"
+    fi
+}
+
+get_current_signal() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1=="*" {print $2"%"; exit}'
+    else
+        local quality total
+        read quality total <<<$(iwconfig 2>/dev/null | awk -F'[ =/]+' '/Link Quality/ {print $4" " $5; exit}')
+        if [[ -n "$quality" && -n "$total" ]]; then
+            echo "$quality/$total"
+        else
+            echo "unknown"
+        fi
+    fi
+}
+
+get_screen_resolution() {
+    if command -v xrandr &> /dev/null && [[ -n "${DISPLAY:-}" ]]; then
+        xrandr 2>/dev/null | grep -oP '\d+x\d+' | head -1
+    elif [[ -f /sys/class/graphics/fb0/virtual_size ]]; then
+        cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | tr ',' 'x'
+    else
+        echo "unknown"
+    fi
+}
+
+# Display system status
+internet_status="✗ Nedostupny / Not available"
+wifi_info=""
+if ping -c 1 -W 2 google.com &> /dev/null; then
+    internet_status="✓ Dostupny / Available"
+    ssid=$(get_current_ssid)
+    signal=$(get_current_signal)
+    if [[ -n "$ssid" && "$ssid" != "unknown" ]]; then
+        wifi_info="  WiFi SSID: $ssid | Signal: $signal"
+    fi
+fi
+
+printf "║ %-73s ║\n" "Internet: $internet_status"
+if [[ -n "$wifi_info" ]]; then
+    printf "║ %-73s ║\n" "$wifi_info"
+fi
+
+resolution=$(get_screen_resolution)
+printf "║ %-73s ║\n" "Rozlisenie / Resolution: $resolution"
+
+echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+echo "║  Stlacte F2 pre nastavenia (raspi-config) / Press F2 for settings        ║"
+echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Countdown with F2 detection
+if [[ -t 0 ]]; then
+    old_tty_settings=$(stty -g 2>/dev/null || true)
+    stty -echo -icanon time 0 min 0 2>/dev/null || true
+    
+    key=""
+    for ((i=5; i>=1; i--)); do
+        printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
+        read -t 1 -n 3 key 2>/dev/null || true
+        if [[ "$key" == $'\x1b'* ]]; then
+            [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
+            echo ""
+            echo ""
+            echo "F2 stlacene! Spustam raspi-config... / F2 pressed! Launching raspi-config..."
+            sleep 1
+            sudo raspi-config
+            echo ""
+            echo "Navrat z nastaveni... / Returning from settings..."
+            sleep 2
+            clear
+            echo "Spustam prehliadac... / Starting browser..."
+            sleep 1
+        fi
+    done
+    
+    [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
+else
+    for ((i=5; i>=1; i--)); do
+        printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
+        sleep 1
+    done
+fi
+
+echo ""
+echo ""
+echo "Spustam kiosk rezim... / Starting kiosk mode..."
+sleep 1
 
 # Kepernyovedo kikapcsolasa -- Vypnutie setraca obrazovky
 if command -v xset >/dev/null 2>&1; then
