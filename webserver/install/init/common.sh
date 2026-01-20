@@ -299,7 +299,7 @@ show_banner() {
     echo ""
 }
 
-# Telepítő banner megjelenítése ASCII művészettel -- Zobrazenie inštalačného bannera ASCII artom
+# Telepito banner megjelenitese ASCII muveszettel -- Zobrazenie instalacneho bannera ASCII artom
 show_installer_banner() {
     clear_screen
     echo ""
@@ -312,7 +312,7 @@ show_installer_banner() {
     echo "║  ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗     ║"
     echo "║  ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝     ║"
     echo "║                                                                  ║"
-    echo "║                T E L E P Í T Ő   /   I N Š T A L Á T O R       ║"
+    echo "║                T E L E P I T O   /   I N S T A L A T O R       ║"
     echo "║                         v e r z i a   19.01.2026                ║"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
