@@ -1,13 +1,13 @@
 #!/bin/bash
-# edudisplej-init.sh - EgyszerÅ±sített inicializálás -- Zjednodušená inicializácia
+# edudisplej-init.sh - Egyszerusitett inicializalas -- Zjednodusena inicializacia
 # =============================================================================
-# Ez a szkript ellenőrzi a rendszert és szükség esetén telepíti a hiányzó komponenseket
-# Tento skript kontroluje systém a v prípade potreby nainštaluje chýbajúce komponenty
+# Ez a szkript ellenorzi a rendszert es szukseg eseten telepiti a hianyzó komponenseket
+# Tento skript kontroluje system a v pripade potreby nainstaluje chybajuce komponenty
 # =============================================================================
 
 set -euo pipefail
 
-# Alapbeállítások -- Základné nastavenia
+# Alapbeallitasok -- Zakladne nastavenia
 EDUDISPLEJ_HOME="/opt/edudisplej"
 INIT_DIR="${EDUDISPLEJ_HOME}/init"
 CONFIG_FILE="${EDUDISPLEJ_HOME}/edudisplej.conf"
@@ -15,108 +15,108 @@ MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 SESSION_LOG="${EDUDISPLEJ_HOME}/session.log"
 APT_LOG="${EDUDISPLEJ_HOME}/apt.log"
 
-# Export környezeti változók -- Export premenných prostredia
+# Export kornyezeti valtozok -- Export premennych prostredia
 export DISPLAY=:0
 export HOME="${EDUDISPLEJ_HOME}"
 export USER="edudisplej"
 
-# Log fájl tisztítás -- Čistenie log súboru
+# Log fajl tisztitas -- Cistenie log suboru
 if [[ -f "$SESSION_LOG" ]]; then
     mv "$SESSION_LOG" "${SESSION_LOG}.old" 2>/dev/null || true
 fi
 
-# Kimenet átirányítás log fájlba -- Presmerovanie výstupu do log súboru
+# Kimenet atiranyitas log fajlba -- Presmerovanie vystupu do log suboru
 exec > >(tee -a "$SESSION_LOG") 2>&1
 
 # =============================================================================
-# Modulok betöltése -- Načítanie modulov
+# Modulok betoltese -- Nacitanie modulov
 # =============================================================================
 
 echo "==========================================="
 echo "      E D U D I S P L E J"
 echo "==========================================="
 echo ""
-echo "Modulok betöltése... / Načítavam moduly..."
+echo "Modulok betoltese... / Nacitavam moduly..."
 echo ""
 
-# Közös függvények -- Spoločné funkcie
+# Kozos fuggvenyek -- Spolocne funkcie
 if [[ -f "${INIT_DIR}/common.sh" ]]; then
     # Try to source the file - the source command itself will detect syntax errors
     # We rely on file size verification during download to catch truncation
     if source "${INIT_DIR}/common.sh" 2>/dev/null; then
-        print_success "✓ common.sh betöltve -- načítaný"
+        print_success "✓ common.sh betoltve -- nacitany"
     else
         echo "==========================================="
-        echo "[KRITICKÁ HIBA / CRITICAL ERROR]"
+        echo "[KRITICKA HIBA / CRITICAL ERROR]"
         echo "==========================================="
         echo ""
-        echo "Nepodarilo sa načítať common.sh!"
+        echo "Nepodarilo sa nacitat common.sh!"
         echo "Failed to load common.sh!"
         echo ""
-        echo "Súbor môže obsahovať syntax chyby,"
-        echo "môže byť poškodený alebo neúplne stiahnutý."
+        echo "Subor moze obsahovat syntax chyby,"
+        echo "moze byt poskodeny alebo neuplne stiahnuty."
         echo ""
         echo "File may contain syntax errors,"
         echo "may be corrupted or incompletely downloaded."
         echo ""
-        echo "RIEŠENIE / SOLUTION:"
-        echo "Znova spustite inštaláciu:"
+        echo "RIESENIE / SOLUTION:"
+        echo "Znova spustite instalaciu:"
         echo "curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash"
         echo ""
-        echo "Viac informácií: /opt/edudisplej/filestreamerror.md"
+        echo "Viac informacii: /opt/edudisplej/filestreamerror.md"
         echo "==========================================="
         sleep 10
         exit 1
     fi
 else
-    echo "[HIBA/CHYBA] common.sh nem található!"
+    echo "[HIBA/CHYBA] common.sh nem talalhato!"
     exit 1
 fi
 
-# Hálózati függvények -- Sieťové funkcie
+# Halozati fuggvenyek -- Sietove funkcie
 if [[ -f "${INIT_DIR}/network.sh" ]]; then
     source "${INIT_DIR}/network.sh"
-    print_success "✓ network.sh betöltve -- načítaný"
+    print_success "✓ network.sh betoltve -- nacitany"
 fi
 
-# Nyelvbeállítások -- Jazykové nastavenia
+# Nyelvbeallitasok -- Jazykove nastavenia
 if [[ -f "${INIT_DIR}/language.sh" ]]; then
     source "${INIT_DIR}/language.sh"
-    print_success "✓ language.sh betöltve -- načítaný"
+    print_success "✓ language.sh betoltve -- nacitany"
 fi
 
-# Ellenőrző szkript -- Kontrolný skript
+# Ellenorzo szkript -- Kontrolny skript
 if [[ -f "${INIT_DIR}/edudisplej-checker.sh" ]]; then
     source "${INIT_DIR}/edudisplej-checker.sh"
-    print_success "✓ edudisplej-checker.sh betöltve -- načítaný"
+    print_success "✓ edudisplej-checker.sh betoltve -- nacitany"
 else
-    print_warning "! edudisplej-checker.sh nem található -- nenájdený"
+    print_warning "! edudisplej-checker.sh nem talalhato -- nenajdeny"
 fi
 
-# Telepítő szkript -- Inštalačný skript
+# Telepito szkript -- Instalacny skript
 if [[ -f "${INIT_DIR}/edudisplej-installer.sh" ]]; then
     source "${INIT_DIR}/edudisplej-installer.sh"
-    print_success "✓ edudisplej-installer.sh betöltve -- načítaný"
+    print_success "✓ edudisplej-installer.sh betoltve -- nacitany"
 else
-    print_warning "! edudisplej-installer.sh nem található -- nenájdený"
+    print_warning "! edudisplej-installer.sh nem talalhato -- nenajdeny"
 fi
 
 echo ""
 
 # =============================================================================
-# Banner megjelenítése -- Zobrazenie bannera
+# Banner megjelenitese -- Zobrazenie bannera
 # =============================================================================
 
 show_banner
-print_info "Verzió -- Verzia: $(date +%Y%m%d)"
+print_info "Verzio -- Verzia: $(date +%Y%m%d)"
 
 # =============================================================================
-# Alapkönyvtár biztosítása -- Zabezpečenie základného adresára
+# Alapkonyvtar biztositasa -- Zabezpecenie zakladneho adresara
 # =============================================================================
 
 if [[ ! -d "$EDUDISPLEJ_HOME" ]]; then
     mkdir -p "$EDUDISPLEJ_HOME" || {
-        print_error "Nem sikerült létrehozni -- Nepodarilo sa vytvoriť: $EDUDISPLEJ_HOME"
+        print_error "Nem sikerult letrehozni -- Nepodarilo sa vytvorit: $EDUDISPLEJ_HOME"
         exit 1
     }
 fi
@@ -125,29 +125,29 @@ mkdir -p "$INIT_DIR" "${EDUDISPLEJ_HOME}/localweb" 2>/dev/null || true
 touch "$APT_LOG" 2>/dev/null || true
 
 # =============================================================================
-# Konfiguráció betöltése -- Načítanie konfigurácie
+# Konfiguracio betoltese -- Nacitanie konfiguracie
 # =============================================================================
 
-# Konfiguráció betöltése, ha létezik -- Načítanie konfigurácie, ak existuje
+# Konfiguracio betoltese, ha letezik -- Nacitanie konfiguracie, ak existuje
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE" || true
 fi
 
-# Alapértelmezett értékek -- Predvolené hodnoty
+# Alapertelmezett ertekek -- Predvolene hodnoty
 KIOSK_URL="${KIOSK_URL:-https://www.time.is}"
 DEFAULT_KIOSK_URL="https://www.time.is"
 
 # =============================================================================
-# Kiosk mód beállítások beolvasása -- Načítanie nastavení kiosk módu
+# Kiosk mod beallitasok beolvasasa -- Nacitanie nastaveni kiosk modu
 # =============================================================================
 
-# Kiosk mód olvasása telepítésből -- Načítanie kiosk módu z inštalácie
+# Kiosk mod olvasasa telepitesbol -- Nacitanie kiosk modu z instalacie
 read_kiosk_preferences() {
     local kiosk_mode_file="${EDUDISPLEJ_HOME}/.kiosk_mode"
     local console_user_file="${EDUDISPLEJ_HOME}/.console_user"
     local user_home_file="${EDUDISPLEJ_HOME}/.user_home"
     
-    # Kiosk mód -- Kiosk mód
+    # Kiosk mod -- Kiosk mod
     if [[ -f "$kiosk_mode_file" ]]; then
         KIOSK_MODE=$(cat "$kiosk_mode_file" | tr -d '\r\n')
     else
@@ -159,18 +159,18 @@ read_kiosk_preferences() {
             KIOSK_MODE="chromium"
         fi
     fi
-    print_info "Kiosk mód -- Kiosk mód: $KIOSK_MODE"
+    print_info "Kiosk mod -- Kiosk mod: $KIOSK_MODE"
     
-    # Konzol felhasználó -- Konzolový používateľ
+    # Konzol felhasznalo -- Konzolovy pouzivatel
     if [[ -f "$console_user_file" ]]; then
         CONSOLE_USER=$(cat "$console_user_file" | tr -d '\r\n')
     else
         CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
         [[ -z "$CONSOLE_USER" ]] && CONSOLE_USER="pi"
     fi
-    print_info "Felhasználó -- Používateľ: $CONSOLE_USER"
+    print_info "Felhasznalo -- Pouzivatel: $CONSOLE_USER"
     
-    # Felhasználó home könyvtár -- Domovský adresár používateľa
+    # Felhasznalo home konyvtar -- Domovsky adresar pouzivatela
     if [[ -f "$user_home_file" ]]; then
         USER_HOME=$(cat "$user_home_file" | tr -d '\r\n')
     else
@@ -180,7 +180,7 @@ read_kiosk_preferences() {
     if [[ -z "$USER_HOME" ]]; then
         USER_HOME="/home/$CONSOLE_USER"
     fi
-    print_info "Home könyvtár -- Domovský adresár: $USER_HOME"
+    print_info "Home konyvtar -- Domovsky adresar: $USER_HOME"
     
     export KIOSK_MODE CONSOLE_USER USER_HOME
 }
@@ -190,61 +190,61 @@ read_kiosk_preferences
 echo ""
 
 # =============================================================================
-# Internet kapcsolat ellenőrzése -- Kontrola internetového pripojenia
+# Internet kapcsolat ellenorzese -- Kontrola internetoveho pripojenia
 # =============================================================================
 
-print_info "Internet ellenőrzése -- Kontrola internetu..."
+print_info "Internet ellenorzese -- Kontrola internetu..."
 wait_for_internet
 INTERNET_AVAILABLE=$?
 
 if [[ $INTERNET_AVAILABLE -eq 0 ]]; then
-    print_success "✓ Internet elérhető -- Internet je dostupný"
+    print_success "✓ Internet elerheto -- Internet je dostupny"
 else
-    print_warning "✗ Nincs internet -- Žiadny internet"
+    print_warning "✗ Nincs internet -- Ziadny internet"
 fi
 echo ""
 
 # =============================================================================
-# Rendszer ellenőrzése -- Kontrola systému
+# Rendszer ellenorzese -- Kontrola systemu
 # =============================================================================
 
-# Rendszer állapot ellenőrzése -- Kontrola stavu systému
+# Rendszer allapot ellenorzese -- Kontrola stavu systemu
 if check_system_ready "$KIOSK_MODE" "$CONSOLE_USER" "$USER_HOME"; then
     print_success "=========================================="
-    print_success "Rendszer kész! -- Systém je pripravený!"
+    print_success "Rendszer kesz! -- System je pripraveny!"
     print_success "=========================================="
     echo ""
-    print_info "X környezet indítása történik... -- Spúšťa sa X prostredie..."
+    print_info "X kornyezet inditasa tortenik... -- Spusta sa X prostredie..."
     exit 0
 fi
 
 echo ""
 print_info "=========================================="
-print_info "Telepítés szükséges -- Je potrebná inštalácia"
+print_info "Telepites szukseges -- Je potrebna instalacia"
 print_info "=========================================="
 echo ""
 
 # =============================================================================
-# Hiányzó komponensek telepítése -- Inštalácia chýbajúcich komponentov
+# Hianyzo komponensek telepitese -- Instalacia chybajucich komponentov
 # =============================================================================
 
-# Alapcsomagok telepítése -- Inštalácia základných balíčkov
+# Alapcsomagok telepitese -- Instalacia zakladnych balickov
 REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
-print_info "1. Alapcsomagok telepítése -- Inštalácia základných balíčkov..."
+print_info "1. Alapcsomagok telepitese -- Instalacia zakladnych balickov..."
 if ! install_required_packages "${REQUIRED_PACKAGES[@]}"; then
-    print_warning "Néhány alapcsomag telepítése sikertelen -- Niektoré základné balíčky sa nepodarilo nainštalovať"
+    print_warning "Nehany alapcsomag telepitese sikertelen -- Niektore zakladne balicky sa nepodarilo nainštalovat"
 fi
 echo ""
 
-# Kiosk csomagok telepítése -- Inštalácia kiosk balíčkov
-print_info "2. Kiosk csomagok telepítése -- Inštalácia kiosk balíčkov..."
+# Kiosk csomagok telepitese -- Instalacia kiosk balickov
+print_info "2. Kiosk csomagok telepitese -- Instalacia kiosk balickov..."
 if ! install_kiosk_packages "$KIOSK_MODE"; then
-    print_warning "Néhány kiosk csomag telepítése sikertelen -- Niektoré kiosk balíčky sa nepodarilo nainštalovať"
+    print_warning "Nehany kiosk csomag telepitese sikertelen -- Niektore kiosk balicky sa nepodarilo nainštalovat"
 fi
 echo ""
 
-# Böngésző telepítése -- Inštalácia prehliadača
-print_info "3. Böngésző telepítése -- Inštalácia prehliadača..."
+# Bongeszo telepitese -- Instalacia prehliadaca
+print_info "3. Bongeszo telepitese -- Instalacia prehliadaca..."
 if [[ "$KIOSK_MODE" = "epiphany" ]]; then
     BROWSER_NAME="epiphany-browser"
 else
@@ -252,26 +252,26 @@ else
 fi
 
 if ! install_browser "$BROWSER_NAME"; then
-    print_warning "Böngésző telepítése sikertelen -- Inštalácia prehliadača zlyhala"
+    print_warning "Bongeszo telepitese sikertelen -- Instalacia prehliadaca zlyhala"
 fi
 echo ""
 
 # =============================================================================
-# Kiosk rendszer konfigurálása -- Konfigurácia kiosk systému
+# Kiosk rendszer konfiguralasa -- Konfiguracia kiosk systemu
 # =============================================================================
 
-print_info "4. Kiosk rendszer konfigurálása -- Konfigurácia kiosk systému..."
+print_info "4. Kiosk rendszer konfiguralasa -- Konfiguracia kiosk systemu..."
 
 KIOSK_CONFIGURED_FILE="${EDUDISPLEJ_HOME}/.kiosk_system_configured"
 
-# Ha már konfigurálva, kilépés -- Ak už je nakonfigurované, ukončenie
+# Ha mar konfiguralva, kilepes -- Ak uz je nakonfigurovane, ukoncenie
 if [[ -f "$KIOSK_CONFIGURED_FILE" ]]; then
-    print_info "Kiosk rendszer már konfigurálva van -- Kiosk systém je už nakonfigurovaný"
+    print_info "Kiosk rendszer mar konfiguralva van -- Kiosk system je uz nakonfigurovany"
     exit 0
 fi
 
-# Display managerek letiltása -- Vypnutie display managerov
-print_info "Display managerek letiltása -- Vypínanie display managerov..."
+# Display managerek letiltasa -- Vypnutie display managerov
+print_info "Display managerek letiltasa -- Vypinanie display managerov..."
 DISPLAY_MANAGERS=("lightdm" "lxdm" "sddm" "gdm3" "gdm" "xdm" "plymouth")
 for dm in "${DISPLAY_MANAGERS[@]}"; do
     if systemctl list-unit-files | grep -q "^${dm}.service"; then
@@ -280,46 +280,46 @@ for dm in "${DISPLAY_MANAGERS[@]}"; do
     fi
 done
 
-# .xinitrc létrehozása -- Vytvorenie .xinitrc
-print_info "Létrehozás -- Vytvorenie: .xinitrc"
+# .xinitrc letrehozasa -- Vytvorenie .xinitrc
+print_info "Letrehozas -- Vytvorenie: .xinitrc"
 cat > "$USER_HOME/.xinitrc" <<'XINITRC_EOF'
 #!/bin/bash
-# X inicializáció -- X inicializácia
+# X inicializacio -- X inicializacia
 exec openbox-session
 XINITRC_EOF
 chmod +x "$USER_HOME/.xinitrc"
 chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.xinitrc" 2>/dev/null || true
 
-# Openbox autostart konfigurálása -- Konfigurácia Openbox autostart
-print_info "Létrehozás -- Vytvorenie: Openbox autostart"
+# Openbox autostart konfiguralasa -- Konfiguracia Openbox autostart
+print_info "Letrehozas -- Vytvorenie: Openbox autostart"
 mkdir -p "$USER_HOME/.config/openbox"
 cat > "$USER_HOME/.config/openbox/autostart" <<AUTOSTART_EOF
-# Képernyővédő kikapcsolása -- Vypnutie šetriča obrazovky
+# Kepernyovedo kikapcsolasa -- Vypnutie setraca obrazovky
 xset -dpms
 xset s off
 xset s noblank
 
-# Egérkurzor elrejtése -- Skrytie kurzora myši
+# Egerkurzor elrejtese -- Skrytie kurzora mysi
 unclutter -idle 1 &
 
-# ASCII logo megjelenítése terminálban -- Zobrazenie ASCII loga v terminále
+# ASCII logo megjelenitese terminalban -- Zobrazenie ASCII loga v terminale
 xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "\$HOME/kiosk-launcher.sh" &
 AUTOSTART_EOF
 chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 
-# kiosk-launcher.sh létrehozása kiosk mód alapján -- Vytvorenie kiosk-launcher.sh podľa kiosk módu
-print_info "Létrehozás -- Vytvorenie: kiosk-launcher.sh"
+# kiosk-launcher.sh letrehozasa kiosk mod alapjan -- Vytvorenie kiosk-launcher.sh podla kiosk modu
+print_info "Letrehozas -- Vytvorenie: kiosk-launcher.sh"
 
 if [[ "$KIOSK_MODE" = "epiphany" ]]; then
     cat > "$USER_HOME/kiosk-launcher.sh" <<'KIOSK_LAUNCHER_EOF'
 #!/bin/bash
-# Terminal indító Epiphany böngészőhöz -- Terminálový spúšťač pre Epiphany
+# Terminal indito Epiphany bongeszohoz -- Terminalovy spustac pre Epiphany
 set -euo pipefail
 
 URL="${1:-https://www.time.is}"
 COUNT_FROM=5
 
-# Terminál kinézet -- Vzhľad terminálu
+# Terminal kinezetl -- Vzhad terminalu
 tput civis || true
 clear
 
@@ -332,32 +332,32 @@ else
   echo "===================================="
 fi
 echo
-echo "Betöltés... / Načítava sa..."
+echo "Betoltes... / Nacitava sa..."
 echo
 
-# Visszaszámlálás -- Odpočítavanie
+# Visszaszamlalas -- Odpocitavanie
 for ((i=COUNT_FROM; i>=1; i--)); do
-  printf "\rIndítás %2d másodperc múlva... / Spustenie o %2d sekúnd..." "$i" "$i"
+  printf "\rInditas %2d masodperc mulva... / Spustenie o %2d sekund..." "$i" "$i"
   sleep 1
 done
-echo -e "\rIndítás most! / Spúšťa sa teraz!     "
+echo -e "\rInditas most! / Spusta sa teraz!     "
 sleep 0.3
 
-# Képernyővédő kikapcsolása -- Vypnutie šetriča obrazovky
+# Kepernyovedo kikapcsolasa -- Vypnutie setraca obrazovky
 if command -v xset >/dev/null 2>&1; then
   xset -dpms
   xset s off
   xset s noblank
 fi
 
-# Egérkurzor elrejtése -- Skrytie kurzora myši
+# Egerkurzor elrejtese -- Skrytie kurzora mysi
 if command -v unclutter >/dev/null 2>&1; then
   unclutter -idle 1 -root >/dev/null 2>&1 &
 fi
 
 trap 'tput cnorm || true' EXIT
 
-# Böngésző indítása -- Spustenie prehliadača
+# Bongeszo inditasa -- Spustenie prehliadaca
 epiphany-browser --fullscreen "${URL}" &
 
 sleep 3
@@ -365,7 +365,7 @@ if command -v xdotool >/dev/null 2>&1; then
   xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
 fi
 
-# Watchdog: böngésző újraindítása ha bezáródik -- Watchdog: reštart prehliadača ak sa zatvorí
+# Watchdog: bongeszo ujrainditasa ha bezarodik -- Watchdog: restart prehliadaca ak sa zatvori
 while true; do
   sleep 2
   if ! pgrep -x "epiphany-browser" >/dev/null; then
@@ -380,13 +380,13 @@ KIOSK_LAUNCHER_EOF
 else
     cat > "$USER_HOME/kiosk-launcher.sh" <<'KIOSK_LAUNCHER_EOF'
 #!/bin/bash
-# Terminal indító Chromium böngészőhöz -- Terminálový spúšťač pre Chromium
+# Terminal indito Chromium bongeszohoz -- Terminalovy spustac pre Chromium
 set -euo pipefail
 
 URL="${1:-https://www.time.is}"
 COUNT_FROM=5
 
-# Terminál kinézet -- Vzhľad terminálu
+# Terminal kinezet -- Vzhad terminalu
 tput civis || true
 clear
 
@@ -399,32 +399,32 @@ else
   echo "===================================="
 fi
 echo
-echo "Betöltés... / Načítava sa..."
+echo "Betoltes... / Nacitava sa..."
 echo
 
-# Visszaszámlálás -- Odpočítavanie
+# Visszaszamlalas -- Odpocitavanie
 for ((i=COUNT_FROM; i>=1; i--)); do
-  printf "\rIndítás %2d másodperc múlva... / Spustenie o %2d sekúnd..." "$i" "$i"
+  printf "\rInditas %2d masodperc mulva... / Spustenie o %2d sekund..." "$i" "$i"
   sleep 1
 done
-echo -e "\rIndítás most! / Spúšťa sa teraz!     "
+echo -e "\rInditas most! / Spusta sa teraz!     "
 sleep 0.3
 
-# Képernyővédő kikapcsolása -- Vypnutie šetriča obrazovky
+# Kepernyovedo kikapcsolasa -- Vypnutie setraca obrazovky
 if command -v xset >/dev/null 2>&1; then
   xset -dpms
   xset s off
   xset s noblank
 fi
 
-# Egérkurzor elrejtése -- Skrytie kurzora myši
+# Egerkurzor elrejtese -- Skrytie kurzora mysi
 if command -v unclutter >/dev/null 2>&1; then
   unclutter -idle 1 -root >/dev/null 2>&1 &
 fi
 
 trap 'tput cnorm || true' EXIT
 
-# Böngésző indítása -- Spustenie prehliadača
+# Bongeszo inditasa -- Spustenie prehliadaca
 chromium-browser --kiosk --no-sandbox --disable-gpu --disable-infobars \
   --no-first-run --incognito --noerrdialogs --disable-translate \
   --disable-features=TranslateUI --disable-session-crashed-bubble \
@@ -435,7 +435,7 @@ if command -v xdotool >/dev/null 2>&1; then
   xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
 fi
 
-# Watchdog: böngésző újraindítása ha bezáródik -- Watchdog: reštart prehliadača ak sa zatvorí
+# Watchdog: bongeszo ujrainditasa ha bezarodik -- Watchdog: restart prehliadaca ak sa zatvori
 while true; do
   sleep 2
   if ! pgrep -x "chromium-browser" >/dev/null; then
@@ -455,15 +455,15 @@ fi
 chmod +x "$USER_HOME/kiosk-launcher.sh"
 chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/kiosk-launcher.sh" 2>/dev/null || true
 
-# Konfigurált flag létrehozása -- Vytvorenie flagu nakonfigurovaný
+# Konfigurait flag letrehozasa -- Vytvorenie flagu nakonfigurovany
 touch "$KIOSK_CONFIGURED_FILE"
 
-# Systemd újratöltése -- Reload systemd
+# Systemd ujratoltese -- Reload systemd
 systemctl daemon-reload 2>/dev/null || true
 
 print_success "=========================================="
-print_success "Kiosk konfiguráció kész! -- Konfigurácia kiosk hotová!"
+print_success "Kiosk konfiguracio kesz! -- Konfiguracia kiosk hotova!"
 print_success "=========================================="
 echo ""
-print_info "Rendszer újraindítása szükséges -- Je potrebný reštart systému"
+print_info "Rendszer ujrainditasa szukseges -- Je potrebny restart systemu"
 exit 0
