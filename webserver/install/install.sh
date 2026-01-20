@@ -31,7 +31,6 @@ trap cleanup_on_error EXIT
 # Heartbeat function to show the script is still running
 HEARTBEAT_PID=""
 start_heartbeat() {
-    local message="${1:-Processing...}"
     stop_heartbeat  # Stop any existing heartbeat
     (
         while true; do
@@ -102,11 +101,19 @@ mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR"
 echo "[*] Nacitavame zoznam suborov : ${INIT_BASE}/download.php?getfiles"
 
 # Add timeout to prevent freezing
-FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles" 2>&1 | tr -d '\r')"
+# Separate stderr from file list to avoid mixing error messages with data
+FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles" 2>/dev/null | tr -d '\r')"
+CURL_EXIT_CODE=$?
+
+if [ $CURL_EXIT_CODE -ne 0 ]; then
+  echo "[!] Chyba: Nepodarilo sa pripojit k serveru (curl exit code: $CURL_EXIT_CODE)."
+  echo "[!] Skontrolujte internetove pripojenie a skuste znova."
+  exit 1
+fi
 
 if [ -z "$FILES_LIST" ]; then
-  echo "[!] Chyba: Nepodarilo sa nacitat zoznam suborov."
-  echo "[!] Skontrolujte internetove pripojenie a skuste znova."
+  echo "[!] Chyba: Server vratil prazdny zoznam suborov."
+  echo "[!] Skontrolujte dostupnost servera alebo skuste znova."
   exit 1
 fi
 
@@ -114,7 +121,19 @@ echo "[DEBUG] Zoznam suborov:"
 echo "$FILES_LIST"
 
 # Count total files for progress tracking
-TOTAL_FILES=$(echo "$FILES_LIST" | grep -c "^[^;]*;")
+# More robust counting: count non-empty lines with at least one semicolon
+TOTAL_FILES=0
+while IFS= read -r line; do
+    if [[ -n "$line" && "$line" == *";"* ]]; then
+        TOTAL_FILES=$((TOTAL_FILES + 1))
+    fi
+done <<< "$FILES_LIST"
+
+if [ $TOTAL_FILES -eq 0 ]; then
+    echo "[!] Chyba: Ziadne subory na stiahnutie."
+    exit 1
+fi
+
 CURRENT_FILE=0
 
 echo ""
@@ -281,7 +300,23 @@ echo "=========================================="
 echo ""
 
 # Offer manual restart option
-read -t 30 -p "Restartovať teraz? [Y/n] (automaticky za 30s): " response || response="y"
+# Use explicit timeout check to handle different failure modes
+if read -t 30 -p "Restartovať teraz? [Y/n] (automaticky za 30s): " response; then
+    # User provided input before timeout
+    :
+else
+    # Timeout or other read failure - check exit code
+    READ_EXIT=$?
+    if [ $READ_EXIT -gt 128 ]; then
+        # Timeout (exit code > 128 typically indicates timeout)
+        response="y"
+        echo "(timeout - automaticky restartujem)"
+    else
+        # Other failure (interrupted, EOF, etc.) - default to yes for safety
+        response="y"
+        echo "(interrupted - automaticky restartujem)"
+    fi
+fi
 echo ""
 
 case "$response" in
