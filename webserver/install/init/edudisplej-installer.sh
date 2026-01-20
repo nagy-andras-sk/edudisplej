@@ -372,7 +372,7 @@ install_kiosk_packages() {
     fi
 }
 
-# Export függvények -- Export funkcií
+# Export fuggvenyek -- Export funkcii
 export -f install_required_packages
 export -f install_browser
 export -f install_kiosk_packages
