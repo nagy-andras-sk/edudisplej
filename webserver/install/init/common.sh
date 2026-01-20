@@ -458,7 +458,7 @@ check_url() {
     
     # Try to fetch headers with timeout
     if command -v curl >/dev/null 2>&1; then
-        if curl -fsSL --max-time 10 --head "$url" >/dev/null 2>&1; then
+        if curl -fsSL --max-time 10 --connect-timeout 5 --head "$url" >/dev/null 2>&1; then
             return 0
         fi
     fi
