@@ -96,12 +96,24 @@ EOF
            '.packages[$group] = {installed: true, date: $date, versions: $versions} | .last_update = $date' \
            "$PACKAGES_JSON" > "$temp_file" && mv "$temp_file" "$PACKAGES_JSON"
     else
-        # Fallback: simple JSON construction (less robust but works)
-        # This is a simplified version - just mark as installed
+        # Fallback: Read existing data and merge
         local temp_file="${PACKAGES_JSON}.tmp"
+        local existing_packages=""
+        
+        # Read existing packages if file exists and has data
+        if [[ -f "$PACKAGES_JSON" ]] && [[ -s "$PACKAGES_JSON" ]]; then
+            # Extract existing packages (simple parsing)
+            existing_packages=$(sed -n '/"packages":/,/}/p' "$PACKAGES_JSON" | grep -v "\"$package_group\"" | grep "\".*\":" || true)
+        fi
+        
+        # Build new JSON with merged data
         {
             echo "{"
             echo "  \"packages\": {"
+            if [[ -n "$existing_packages" ]]; then
+                echo "$existing_packages"
+                echo "    ,"
+            fi
             echo "    \"$package_group\": {"
             echo "      \"installed\": true,"
             echo "      \"date\": \"$timestamp\","
@@ -334,6 +346,17 @@ install_kiosk_packages() {
     local packages=()
     local configured_file="${EDUDISPLEJ_HOME}/.kiosk_configured"
     
+    # Altalanos csomagok -- Vseobecne balicky
+    packages+=("xterm" "xdotool" "figlet" "dbus-x11")
+    
+    # Bongeszo mod alapjan -- Podla modu prehliadaca
+    if [[ "$kiosk_mode" = "epiphany" ]]; then
+        packages+=("epiphany-browser")
+        print_info "Epiphany bongeszo ARMv6-hoz -- Prehliadac Epiphany pre ARMv6..."
+    else
+        print_info "Chromium bongeszo kulon telepitve lesz -- Prehliadac Chromium bude nainstalovany samostatne..."
+    fi
+    
     # Check if already installed and recorded
     if check_packages_installed "kiosk_${kiosk_mode}"; then
         print_info "Kiosk csomagok mar telepitve -- Kiosk balicky uz nainstalovane"
@@ -348,17 +371,6 @@ install_kiosk_packages() {
     fi
     
     print_info "Kiosk csomagok telepitese -- Instalacia kiosk balickov: $kiosk_mode"
-    
-    # Altalanos csomagok -- Vseobecne balicky
-    packages+=("xterm" "xdotool" "figlet" "dbus-x11")
-    
-    # Bongeszo mod alapjan -- Podla modu prehliadaca
-    if [[ "$kiosk_mode" = "epiphany" ]]; then
-        packages+=("epiphany-browser")
-        print_info "Epiphany bongeszo ARMv6-hoz -- Prehliadac Epiphany pre ARMv6..."
-    else
-        print_info "Chromium bongeszo kulon telepitve lesz -- Prehliadac Chromium bude nainstalovany samostatne..."
-    fi
     
     # Csomagok telepitese -- Instalacia balickov
     if install_required_packages "${packages[@]}"; then
