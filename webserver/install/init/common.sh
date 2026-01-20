@@ -24,7 +24,8 @@ FALLBACK_URLS=(
 # =============================================================================
 
 # Translations array - Slovak without diacritics
-declare -A TRANS_SK=(
+declare -Ag TRANS_SK
+TRANS_SK=(
     # Boot messages
     ["boot_starting"]="Spustanie EduDisplej systemu..."
     ["boot_loading_modules"]="Nacitavam moduly..."
@@ -102,7 +103,8 @@ declare -A TRANS_SK=(
 )
 
 # Translations array - English
-declare -A TRANS_EN=(
+declare -Ag TRANS_EN
+TRANS_EN=(
     # Boot messages
     ["boot_starting"]="Starting EduDisplej system..."
     ["boot_loading_modules"]="Loading modules..."
@@ -205,7 +207,8 @@ load_config() {
         CURRENT_LANG="${LANG:-$DEFAULT_LANG}"
         return 0
     fi
-    return 1
+    CURRENT_LANG="$DEFAULT_LANG"
+    return 0
 }
 
 # Save configuration to file
@@ -299,23 +302,14 @@ show_banner() {
     echo ""
 }
 
-# Telepítő banner megjelenítése ASCII művészettel -- Zobrazenie inštalačného bannera ASCII artom
+# Installer banner display with ASCII art
 show_installer_banner() {
     clear_screen
     echo ""
-    echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║                                                                  ║"
-    echo "║  ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗ ██╗     ███████╗     ║"
-    echo "║  ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗██║     ██╔════╝     ║"
-    echo "║  █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝██║     █████╗       ║"
-    echo "║  ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝ ██║     ██╔══╝       ║"
-    echo "║  ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗     ║"
-    echo "║  ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝     ║"
-    echo "║                                                                  ║"
-    echo "║                T E L E P Í T Ő   /   I N Š T A L Á T O R       ║"
-    echo "║                         v e r z i a   19.01.2026                ║"
-    echo "║                                                                  ║"
-    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo "=========================================="
+    echo "       E D U D I S P L E J"
+    echo "         I N S T A L L E R"
+    echo "=========================================="
     echo ""
 }
 
