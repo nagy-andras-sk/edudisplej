@@ -219,7 +219,6 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
             sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
         fi
         
-
     elif [[ "${NAME}" == *.html ]]; then
       # HTML subory presun do localweb priecinka
       cp -f "${INIT_DIR}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"

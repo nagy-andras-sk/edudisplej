@@ -31,6 +31,11 @@ if (isset($_GET['streamfile'])) {
     set_time_limit(0);
     
     $fileSize = filesize($filePath);
+    if ($fileSize === false) {
+        http_response_code(500);
+        echo "Error getting file size: " . $file;
+        exit;
+    }
     
     header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="' . $file . '"');
@@ -49,6 +54,12 @@ if (isset($_GET['streamfile'])) {
     $chunkSize = 8192; // 8KB chunks
     while (!feof($handle)) {
         $buffer = fread($handle, $chunkSize);
+        if ($buffer === false) {
+            fclose($handle);
+            http_response_code(500);
+            echo "Error reading file: " . $file;
+            exit;
+        }
         echo $buffer;
         flush(); // Force output to be sent immediately
     }
