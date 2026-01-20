@@ -42,7 +42,7 @@ if (isset($_GET['streamfile'])) {
     $handle = fopen($filePath, 'rb');
     if ($handle === false) {
         http_response_code(500);
-        echo "Error opening file.";
+        echo "Error opening file: " . $file;
         exit;
     }
     

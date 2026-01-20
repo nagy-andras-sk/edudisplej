@@ -219,23 +219,7 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
             sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
         fi
         
-        # Verify critical bash files have proper ending
-        # Check if last line is complete (not truncated)
-        LAST_LINE="$(tail -n1 "${INIT_DIR}/${NAME}" 2>/dev/null || true)"
-        if [[ -n "$LAST_LINE" ]] && [[ ! "$LAST_LINE" =~ ^[[:space:]]*$ ]]; then
-            # Last line has content, verify it's complete
-            # A truncated line often won't end with expected bash syntax
-            LAST_CHAR="${LAST_LINE: -1}"
-            if [[ "$LAST_CHAR" != "}" ]] && [[ "$LAST_CHAR" != ";" ]] && \
-               [[ "$LAST_CHAR" != ")" ]] && [[ "$LAST_CHAR" != '"' ]] && \
-               [[ "$LAST_CHAR" != "'" ]] && [[ ! "$LAST_LINE" =~ ^[[:space:]]*#.*$ ]]; then
-                # Last character is suspicious - might be truncated
-                # However, many valid lines end with other characters, so we only warn
-                echo "    [!] UPOZORNENIE: Posledny riadok suboru vyzerá podozrivo:"
-                echo "        '${LAST_LINE}'"
-                echo "        Skontrolujte ci subor nie je poskodeny!"
-            fi
-        fi
+
     elif [[ "${NAME}" == *.html ]]; then
       # HTML subory presun do localweb priecinka
       cp -f "${INIT_DIR}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"
