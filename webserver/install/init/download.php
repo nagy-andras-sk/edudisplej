@@ -22,10 +22,38 @@ if (isset($_GET['streamfile'])) {
         exit;
     }
 
+    // Disable output buffering to prevent truncation
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    // Disable time limit for large files
+    set_time_limit(0);
+    
+    $fileSize = filesize($filePath);
+    
     header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="' . $file . '"');
-    header('Content-Length: ' . filesize($filePath));
-    readfile($filePath);
+    header('Content-Length: ' . $fileSize);
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    
+    // Stream file in chunks to prevent memory issues and ensure complete transfer
+    $handle = fopen($filePath, 'rb');
+    if ($handle === false) {
+        http_response_code(500);
+        echo "Error opening file.";
+        exit;
+    }
+    
+    $chunkSize = 8192; // 8KB chunks
+    while (!feof($handle)) {
+        $buffer = fread($handle, $chunkSize);
+        echo $buffer;
+        flush(); // Force output to be sent immediately
+    }
+    
+    fclose($handle);
     exit;
 }
 

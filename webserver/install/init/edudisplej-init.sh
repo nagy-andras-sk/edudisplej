@@ -41,8 +41,60 @@ echo ""
 
 # Közös függvények -- Spoločné funkcie
 if [[ -f "${INIT_DIR}/common.sh" ]]; then
-    source "${INIT_DIR}/common.sh"
-    print_success "✓ common.sh betöltve -- načítaný"
+    # Verify file is not truncated before sourcing
+    if ! grep -q "^load_config" "${INIT_DIR}/common.sh"; then
+        echo "==========================================="
+        echo "[KRITICKÁ HIBA / CRITICAL ERROR]"
+        echo "==========================================="
+        echo ""
+        echo "common.sh je poškodený alebo neúplný!"
+        echo "common.sh is corrupted or incomplete!"
+        echo ""
+        echo "Chýba funkcia 'load_config' alebo je"
+        echo "súbor neúplne stiahnutý (truncated)."
+        echo ""
+        echo "Missing 'load_config' function or file"
+        echo "is incompletely downloaded (truncated)."
+        echo ""
+        echo "RIEŠENIE / SOLUTION:"
+        echo "1. Znova spustite inštaláciu:"
+        echo "   curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash"
+        echo ""
+        echo "2. Alebo manuálne opravte súbor:"
+        echo "   sudo nano ${INIT_DIR}/common.sh"
+        echo ""
+        echo "Viac informácií: /opt/edudisplej/filestreamerror.md"
+        echo "==========================================="
+        sleep 10
+        exit 1
+    fi
+    
+    # Try to source the file
+    if source "${INIT_DIR}/common.sh" 2>/dev/null; then
+        print_success "✓ common.sh betöltve -- načítaný"
+    else
+        echo "==========================================="
+        echo "[KRITICKÁ HIBA / CRITICAL ERROR]"
+        echo "==========================================="
+        echo ""
+        echo "Nepodarilo sa načítať common.sh!"
+        echo "Failed to load common.sh!"
+        echo ""
+        echo "Súbor môže obsahovať syntax chyby"
+        echo "alebo môže byť poškodený."
+        echo ""
+        echo "File may contain syntax errors"
+        echo "or may be corrupted."
+        echo ""
+        echo "RIEŠENIE / SOLUTION:"
+        echo "Znova spustite inštaláciu:"
+        echo "curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash"
+        echo ""
+        echo "Viac informácií: /opt/edudisplej/filestreamerror.md"
+        echo "==========================================="
+        sleep 10
+        exit 1
+    fi
 else
     echo "[HIBA/CHYBA] common.sh nem található!"
     exit 1
