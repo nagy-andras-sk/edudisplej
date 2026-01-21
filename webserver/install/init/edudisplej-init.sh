@@ -225,7 +225,7 @@ echo ""
 # =============================================================================
 
 # Alapcsomagok telepitese -- Instalacia zakladnych balickov
-REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
+REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg x11-xserver-utils python3-xdg)
 print_info "1. Alapcsomagok telepitese -- Instalacia zakladnych balickov..."
 if ! install_required_packages "${REQUIRED_PACKAGES[@]}"; then
     print_warning "Nehany alapcsomag telepitese sikertelen -- Niektore zakladne balicky sa nepodarilo nainštalovat"
@@ -296,23 +296,77 @@ AUTOSTART_LOG="/tmp/openbox-autostart.log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart BEGIN ===" >> "$AUTOSTART_LOG"
 
-# Screen saver settings
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting xset options..." >> "$AUTOSTART_LOG"
-xset -dpms >> "$AUTOSTART_LOG" 2>&1
-xset s off >> "$AUTOSTART_LOG" 2>&1
-xset s noblank >> "$AUTOSTART_LOG" 2>&1
-
-# Hide cursor
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting unclutter..." >> "$AUTOSTART_LOG"
-unclutter -idle 1 >> "$AUTOSTART_LOG" 2>&1 &
-
-# Launch xterm with kiosk-launcher
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching xterm with kiosk-launcher.sh..." >> "$AUTOSTART_LOG"
-if [ -f "$HOME/kiosk-launcher.sh" ]; then
-    xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "bash -c '$HOME/kiosk-launcher.sh; exec bash'" >> "$AUTOSTART_LOG" 2>&1 &
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm started (PID: $!)" >> "$AUTOSTART_LOG"
+# Screen saver settings (only if xset is available)
+if command -v xset >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting xset options..." >> "$AUTOSTART_LOG"
+    xset -dpms >> "$AUTOSTART_LOG" 2>&1
+    xset s off >> "$AUTOSTART_LOG" 2>&1
+    xset s noblank >> "$AUTOSTART_LOG" 2>&1
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] xset configured" >> "$AUTOSTART_LOG"
 else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: kiosk-launcher.sh not found!" >> "$AUTOSTART_LOG"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: xset not found, skipping screen saver config" >> "$AUTOSTART_LOG"
+fi
+
+# Hide cursor (only if unclutter is available)
+if command -v unclutter >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting unclutter..." >> "$AUTOSTART_LOG"
+    unclutter -idle 1 >> "$AUTOSTART_LOG" 2>&1 &
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] unclutter started" >> "$AUTOSTART_LOG"
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: unclutter not found" >> "$AUTOSTART_LOG"
+fi
+
+# Wait for X to be fully ready
+sleep 2
+
+# Launch xterm with test display
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching xterm..." >> "$AUTOSTART_LOG"
+if command -v xterm >/dev/null 2>&1; then
+    # Launch xterm in foreground-like mode with explicit display settings
+    xterm -display :0 \
+          -fa "Monospace" -fs 14 \
+          -geometry 120x36+50+50 \
+          -bg black -fg green \
+          -title "EduDisplej Terminal" \
+          -e bash -c '
+              echo "==================================="
+              echo "   EduDisplej Terminal Test"
+              echo "==================================="
+              echo ""
+              echo "X Display: $DISPLAY"
+              echo "User: $USER"
+              echo "Home: $HOME"
+              echo ""
+              echo "This terminal should be VISIBLE on screen!"
+              echo ""
+              echo "Logs:"
+              echo "  - Openbox: /tmp/openbox-autostart.log"
+              echo "  - Watchdog: /tmp/edudisplej-watchdog.log"
+              echo ""
+              echo "Press Ctrl+C to exit, or this will stay open."
+              echo ""
+              # Keep terminal open
+              exec bash
+          ' >> "$AUTOSTART_LOG" 2>&1 &
+    
+    XTERM_PID=$!
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm launched (PID: $XTERM_PID)" >> "$AUTOSTART_LOG"
+    
+    # Verify xterm window appeared
+    sleep 1
+    if ps -p $XTERM_PID > /dev/null 2>&1; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ xterm process is running" >> "$AUTOSTART_LOG"
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ ERROR: xterm process died!" >> "$AUTOSTART_LOG"
+    fi
+    
+    # List all windows
+    if command -v xdotool >/dev/null 2>&1; then
+        WINDOWS=$(xdotool search --class xterm 2>&1)
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm windows: $WINDOWS" >> "$AUTOSTART_LOG"
+    fi
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: xterm not found!" >> "$AUTOSTART_LOG"
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart END ===" >> "$AUTOSTART_LOG"
@@ -324,17 +378,13 @@ chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 # kiosk-launcher.sh letrehozasa kiosk mod alapjan -- Vytvorenie kiosk-launcher.sh podla kiosk modu
 print_info "Letrehozas -- Vytvorenie: kiosk-launcher.sh"
 
-# Create shared header for both browser types - defined outside conditional
-create_kiosk_launcher_header() {
-    cat <<'KIOSK_HEADER_EOF'
+# Simplified kiosk launcher - TERMINAL ONLY (no browser)
+cat > "$USER_HOME/kiosk-launcher.sh" <<'LAUNCHER_EOF'
 #!/bin/bash
-# Terminal launcher for kiosk mode -- Terminalovy spustac pre kiosk mod
-set -euo pipefail
-
-# Kiosk launcher with detailed logging
+# Simplified kiosk launcher - TERMINAL ONLY (no browser)
 LAUNCHER_LOG="/tmp/kiosk-launcher.log"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER START ===" | tee -a "$LAUNCHER_LOG"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER START (TERMINAL TEST MODE) ===" | tee -a "$LAUNCHER_LOG"
 
 # Display environment
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] DISPLAY=$DISPLAY" | tee -a "$LAUNCHER_LOG"
@@ -343,176 +393,54 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] USER=$USER" | tee -a "$LAUNCHER_LOG"
 
 # Test X connection
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Testing X connection..." | tee -a "$LAUNCHER_LOG"
-if ! xdpyinfo >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Cannot connect to X display!" | tee -a "$LAUNCHER_LOG"
-    sleep 5
-    exit 1
-fi
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] X connection OK" | tee -a "$LAUNCHER_LOG"
-
-URL="${1:-https://www.time.is}"
-
-# Terminal appearance -- Vzhad terminalu
-tput civis || true
-clear
-
-# =============================================================================
-# Source common functions if available
-# =============================================================================
-if [[ -f /opt/edudisplej/init/common.sh ]]; then
-    source /opt/edudisplej/init/common.sh 2>/dev/null || true
-    # Use shared functions for display
-    show_edudisplej_logo
-    show_system_status
+if command -v xdpyinfo >/dev/null 2>&1; then
+    if xdpyinfo >/dev/null 2>&1; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ X connection OK" | tee -a "$LAUNCHER_LOG"
+        
+        # Get screen resolution
+        SCREEN_INFO=$(xdpyinfo | grep dimensions | awk '{print $2}')
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Screen resolution: $SCREEN_INFO" | tee -a "$LAUNCHER_LOG"
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ ERROR: Cannot connect to X display!" | tee -a "$LAUNCHER_LOG"
+        exit 1
+    fi
 else
-    # Fallback if common.sh not available
-    echo "EDUDISPLEJ"
-    echo "=========================================="
-    echo ""
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: xdpyinfo not available" | tee -a "$LAUNCHER_LOG"
 fi
 
-echo "╔═══════════════════════════════════════════════════════════════════════════╗"
-echo "║  Stlacte F2 pre nastavenia (raspi-config) / Press F2 for settings        ║"
-echo "╚═══════════════════════════════════════════════════════════════════════════╝"
-echo ""
-KIOSK_HEADER_EOF
-}
-
-# Shared countdown and browser launch logic - defined outside conditional
-create_countdown_and_launch() {
-    cat <<'COUNTDOWN_EOF'
-
-# Countdown with F2 detection
-if [[ -t 0 ]]; then
-    old_tty_settings=$(stty -g 2>/dev/null || true)
-    stty -echo -icanon time 0 min 0 2>/dev/null || true
-    
-    key=""
-    for ((i=5; i>=1; i--)); do
-        printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
-        read -t 1 -n 3 key 2>/dev/null || true
-        if [[ "$key" == $'\x1b'* ]]; then
-            [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
-            echo ""
-            echo ""
-            echo "F2 stlacene! Spustam raspi-config... / F2 pressed! Launching raspi-config..."
-            sleep 1
-            sudo raspi-config
-            echo ""
-            echo "Navrat z nastaveni... / Returning from settings..."
-            sleep 2
-            clear
-            echo "Spustam prehliadac... / Starting browser..."
-            sleep 1
-        fi
-    done
-    
-    [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
-else
-    for ((i=5; i>=1; i--)); do
-        printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
-        sleep 1
-    done
+# Show ASCII logo (if figlet available)
+if command -v figlet >/dev/null 2>&1; then
+    echo "" | tee -a "$LAUNCHER_LOG"
+    figlet -f standard "EduDisplej" | tee -a "$LAUNCHER_LOG"
+    echo "" | tee -a "$LAUNCHER_LOG"
 fi
 
-echo ""
-echo ""
-echo "Spustam kiosk rezim... / Starting kiosk mode..."
-sleep 1
-
-# Screen saver and cursor settings
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring screen settings..." | tee -a "$LAUNCHER_LOG"
-if command -v xset >/dev/null 2>&1; then
-  xset -dpms
-  xset s off
-  xset s noblank
-fi
-
-if command -v unclutter >/dev/null 2>&1; then
-  unclutter -idle 1 -root >/dev/null 2>&1 &
-fi
-
-trap 'tput cnorm || true' EXIT
-COUNTDOWN_EOF
-}
-
-if [[ "$KIOSK_MODE" = "epiphany" ]]; then
-    {
-        create_kiosk_launcher_header
-        create_countdown_and_launch
-        cat <<'EPIPHANY_EOF'
-
-# Launch Epiphany browser
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching Epiphany browser..." | tee -a "$LAUNCHER_LOG"
-epiphany-browser --fullscreen "${URL}" >> "$LAUNCHER_LOG" 2>&1 &
-BROWSER_PID=$!
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Epiphany started (PID: $BROWSER_PID)" | tee -a "$LAUNCHER_LOG"
-
-sleep 3
-if command -v xdotool >/dev/null 2>&1; then
-  xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
-fi
-
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Terminal test mode - no browser launch" | tee -a "$LAUNCHER_LOG"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] This terminal should remain visible" | tee -a "$LAUNCHER_LOG"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER END ===" | tee -a "$LAUNCHER_LOG"
 
-# Watchdog: restart browser if it crashes
-while true; do
-  sleep 2
-  if ! pgrep -x "epiphany-browser" >/dev/null; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Epiphany crashed, restarting..." | tee -a "$LAUNCHER_LOG"
-    epiphany-browser --fullscreen "${URL}" >> "$LAUNCHER_LOG" 2>&1 &
-    BROWSER_PID=$!
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Epiphany restarted (PID: $BROWSER_PID)" | tee -a "$LAUNCHER_LOG"
-    sleep 3
-    if command -v xdotool >/dev/null 2>&1; then
-      xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
-    fi
-  fi
-done
-EPIPHANY_EOF
-    } > "$USER_HOME/kiosk-launcher.sh"
-else
-    {
-        create_kiosk_launcher_header
-        create_countdown_and_launch
-        cat <<'CHROMIUM_EOF'
+# Keep this script running so xterm doesn't close
+echo ""
+echo "==================================="
+echo "Terminal is working!"
+echo "==================================="
+echo ""
+echo "You should see this message on screen."
+echo ""
+echo "To add browser later, edit:"
+echo "  /home/$USER/kiosk-launcher.sh"
+echo ""
+echo "Logs available at:"
+echo "  /tmp/openbox-autostart.log"
+echo "  /tmp/kiosk-launcher.log"
+echo "  /tmp/edudisplej-watchdog.log"
+echo ""
+echo "Press Ctrl+C to close this terminal"
+echo ""
 
-# Launch Chromium browser
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching Chromium browser..." | tee -a "$LAUNCHER_LOG"
-chromium-browser --kiosk --no-sandbox --disable-gpu --disable-infobars \
-  --no-first-run --incognito --noerrdialogs --disable-translate \
-  --disable-features=TranslateUI --disable-session-crashed-bubble \
-  --check-for-update-interval=31536000 "${URL}" >> "$LAUNCHER_LOG" 2>&1 &
-BROWSER_PID=$!
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Chromium started (PID: $BROWSER_PID)" | tee -a "$LAUNCHER_LOG"
-
-sleep 3
-if command -v xdotool >/dev/null 2>&1; then
-  xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
-fi
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER END ===" | tee -a "$LAUNCHER_LOG"
-
-# Watchdog: restart browser if it crashes
-while true; do
-  sleep 2
-  if ! pgrep -x "chromium-browser" >/dev/null; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Chromium crashed, restarting..." | tee -a "$LAUNCHER_LOG"
-    chromium-browser --kiosk --no-sandbox --disable-gpu --disable-infobars \
-      --no-first-run --incognito --noerrdialogs --disable-translate \
-      --disable-features=TranslateUI --disable-session-crashed-bubble \
-      --check-for-update-interval=31536000 "${URL}" >> "$LAUNCHER_LOG" 2>&1 &
-    BROWSER_PID=$!
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Chromium restarted (PID: $BROWSER_PID)" | tee -a "$LAUNCHER_LOG"
-    sleep 3
-    if command -v xdotool >/dev/null 2>&1; then
-      xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
-    fi
-  fi
-done
-CHROMIUM_EOF
-    } > "$USER_HOME/kiosk-launcher.sh"
-fi
+# Keep terminal open
+exec bash
+LAUNCHER_EOF
 
 chmod +x "$USER_HOME/kiosk-launcher.sh"
 chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/kiosk-launcher.sh" 2>/dev/null || true

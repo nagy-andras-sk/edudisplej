@@ -33,10 +33,10 @@ check_xterm() {
 }
 
 check_browser() {
-    if pgrep -x chromium-browser >/dev/null || pgrep -x epiphany-browser >/dev/null; then
-        return 0
-    fi
-    return 1
+    # DISABLED - browser check not needed in terminal test mode
+    # This allows the watchdog to report that browser checking is disabled
+    # rather than reporting it as an error
+    return 2  # Return "not applicable" status
 }
 
 log "=== EduDisplej Watchdog Started ==="
@@ -64,6 +64,8 @@ while true; do
     
     if check_browser; then
         log "✓ Browser running"
+    elif [ $? -eq 2 ]; then
+        log "⊘ Browser check disabled (terminal test mode)"
     else
         log "✗ Browser NOT running"
     fi
