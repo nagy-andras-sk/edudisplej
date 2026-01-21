@@ -308,6 +308,26 @@ else
     echo "[!] System will not auto-start on boot"
 fi
 
+# Install watchdog service
+echo "[*] Installing watchdog service..."
+if [ -f "${INIT_DIR}/edudisplej-watchdog.service" ]; then
+    cp "${INIT_DIR}/edudisplej-watchdog.service" /etc/systemd/system/
+    chmod 644 /etc/systemd/system/edudisplej-watchdog.service
+    
+    # Ensure watchdog script is executable
+    if [ -f "${INIT_DIR}/edudisplej-watchdog.sh" ]; then
+        chmod +x "${INIT_DIR}/edudisplej-watchdog.sh"
+        echo "[*] Watchdog script configured"
+    fi
+    
+    systemctl daemon-reload
+    systemctl enable edudisplej-watchdog.service 2>/dev/null || true
+    echo "[*] Watchdog service installed and enabled"
+else
+    echo "[!] WARNING: Watchdog service file not found"
+fi
+
+
 echo ""
 echo "=========================================="
 echo "Telepítés kész! / Installation Complete!"
