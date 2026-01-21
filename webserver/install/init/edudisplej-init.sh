@@ -291,10 +291,31 @@ print_info "Letrehozas -- Vytvorenie: Openbox autostart"
 mkdir -p "$USER_HOME/.config/openbox"
 cat > "$USER_HOME/.config/openbox/autostart" <<'AUTOSTART_EOF'
 #!/bin/bash
-# Openbox autostart with detailed logging
+# Openbox autostart with HDMI display activation
 AUTOSTART_LOG="/tmp/openbox-autostart.log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart BEGIN ===" >> "$AUTOSTART_LOG"
+
+# === CRITICAL: Force HDMI output activation ===
+if command -v xrandr >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Activating HDMI output..." >> "$AUTOSTART_LOG"
+    
+    # Turn on HDMI-1 explicitly
+    xrandr --output HDMI-1 --mode 1920x1080 --primary >> "$AUTOSTART_LOG" 2>&1
+    
+    # Force display update
+    xrandr --output HDMI-1 --off >> "$AUTOSTART_LOG" 2>&1
+    sleep 1
+    xrandr --output HDMI-1 --auto --primary >> "$AUTOSTART_LOG" 2>&1
+    
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] HDMI-1 activated" >> "$AUTOSTART_LOG"
+fi
+
+# Set white background (visible test)
+if command -v xsetroot >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting white background..." >> "$AUTOSTART_LOG"
+    xsetroot -solid white >> "$AUTOSTART_LOG" 2>&1
+fi
 
 # Screen saver settings (only if xset is available)
 if command -v xset >/dev/null 2>&1; then
@@ -303,8 +324,6 @@ if command -v xset >/dev/null 2>&1; then
     xset s off >> "$AUTOSTART_LOG" 2>&1
     xset s noblank >> "$AUTOSTART_LOG" 2>&1
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] xset configured" >> "$AUTOSTART_LOG"
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: xset not found, skipping screen saver config" >> "$AUTOSTART_LOG"
 fi
 
 # Hide cursor (only if unclutter is available)
@@ -312,62 +331,65 @@ if command -v unclutter >/dev/null 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting unclutter..." >> "$AUTOSTART_LOG"
     unclutter -idle 1 >> "$AUTOSTART_LOG" 2>&1 &
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] unclutter started" >> "$AUTOSTART_LOG"
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: unclutter not found" >> "$AUTOSTART_LOG"
 fi
 
-# Wait for X to be fully ready
+# Wait for display to be ready
 sleep 2
 
-# Launch xterm with test display
+# Launch xterm with VISIBLE colors (white background, black text)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching xterm..." >> "$AUTOSTART_LOG"
 if command -v xterm >/dev/null 2>&1; then
-    # Launch xterm in foreground-like mode with explicit display settings
     xterm -display :0 \
-          -fa "Monospace" -fs 14 \
-          -geometry 120x36+50+50 \
-          -bg black -fg green \
-          -title "EduDisplej Terminal" \
+          -fa "Monospace" -fs 16 \
+          -geometry 100x30+100+100 \
+          -bg white -fg black \
+          -title "EduDisplej Terminal - VISIBLE TEST" \
+          +sb \
           -e bash -c '
-              echo "==================================="
-              echo "   EduDisplej Terminal Test"
-              echo "==================================="
+              clear
+              echo "========================================="
+              echo "   EduDisplej Terminal - WORKING!"
+              echo "========================================="
+              echo ""
+              echo "If you can read this, the display works!"
               echo ""
               echo "X Display: $DISPLAY"
               echo "User: $USER"
-              echo "Home: $HOME"
+              echo "Date: $(date)"
               echo ""
-              echo "This terminal should be VISIBLE on screen!"
+              echo "Screen resolution:"
+              xrandr | grep "*" || echo "xrandr not available"
               echo ""
-              echo "Logs:"
-              echo "  - Openbox: /tmp/openbox-autostart.log"
-              echo "  - Watchdog: /tmp/edudisplej-watchdog.log"
+              echo "This terminal should be VISIBLE on HDMI monitor!"
               echo ""
-              echo "Press Ctrl+C to exit, or this will stay open."
+              echo "Press Ctrl+C to exit"
               echo ""
-              # Keep terminal open
-              exec bash
+              # Keep terminal open with live clock
+              while true; do
+                  echo -ne "\r$(date +%T) - Terminal is running..."
+                  sleep 1
+              done
           ' >> "$AUTOSTART_LOG" 2>&1 &
     
     XTERM_PID=$!
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm launched (PID: $XTERM_PID)" >> "$AUTOSTART_LOG"
     
-    # Verify xterm window appeared
-    sleep 1
+    # Verify xterm started
+    sleep 2
     if ps -p $XTERM_PID > /dev/null 2>&1; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ xterm process is running" >> "$AUTOSTART_LOG"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ xterm process confirmed running" >> "$AUTOSTART_LOG"
+        
+        # Raise window to front
+        if command -v xdotool >/dev/null 2>&1; then
+            XTERM_WID=$(xdotool search --pid $XTERM_PID 2>/dev/null | head -1)
+            if [ -n "$XTERM_WID" ]; then
+                xdotool windowactivate $XTERM_WID 2>/dev/null
+                xdotool windowraise $XTERM_WID 2>/dev/null
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ xterm window raised (WID: $XTERM_WID)" >> "$AUTOSTART_LOG"
+            fi
+        fi
     else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ ERROR: xterm process died!" >> "$AUTOSTART_LOG"
-    fi
-    
-    # List all windows
-    if command -v xdotool >/dev/null 2>&1; then
-        WINDOWS=$(xdotool search --class xterm 2>&1 || echo "no windows found")
-        if [ "$WINDOWS" = "no windows found" ] || [ -z "$WINDOWS" ]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm windows: none found yet" >> "$AUTOSTART_LOG"
-        else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm windows: $WINDOWS" >> "$AUTOSTART_LOG"
-        fi
     fi
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: xterm not found!" >> "$AUTOSTART_LOG"

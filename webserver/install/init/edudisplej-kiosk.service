@@ -13,8 +13,8 @@ Environment=HOME=/home/edudisplej
 Environment=USER=edudisplej
 Environment=DISPLAY=:0
 StandardInput=tty
-StandardOutput=tty
-StandardError=tty
+StandardOutput=journal
+StandardError=journal
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes

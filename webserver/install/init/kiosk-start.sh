@@ -71,10 +71,37 @@ fi
 # Terminate any existing X server
 terminate_xorg
 
+# === CRITICAL: Ensure we're on the right VT ===
+CURRENT_VT=$(fgconsole 2>/dev/null || echo "1")
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Current VT: $CURRENT_VT"
+
+# Ensure framebuffer is accessible
+if [ ! -c /dev/fb0 ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: /dev/fb0 not found!"
+    exit 1
+fi
+
+# Get framebuffer info
+FB_INFO=$(cat /sys/class/graphics/fb0/name 2>/dev/null || echo "unknown")
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Framebuffer: /dev/fb0 ($FB_INFO)"
+
+# Ensure HDMI output is active (force mode)
+if [ -f /sys/class/drm/card0-HDMI-A-1/status ]; then
+    HDMI_STATUS=$(cat /sys/class/drm/card0-HDMI-A-1/status)
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] HDMI Status: $HDMI_STATUS"
+fi
+
+# Clear framebuffer (test visibility)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Clearing framebuffer..."
+dd if=/dev/zero of=/dev/fb0 bs=1M count=10 2>/dev/null || true
+
+# Start X server on CURRENT VT (don't switch!)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server on VT${CURRENT_VT}..."
+
 # Start X server
 if command -v startx >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server..."
-    exec startx -- :0 vt1 2>&1 | tee /tmp/xorg-startup.log
+    # Keep current TTY (recommended for systemd services)
+    exec startx -- :0 -keeptty 2>&1 | tee /tmp/xorg-startup.log
 else
     echo "ERROR: startx not found. Init script may have failed."
     echo "Check logs: sudo journalctl -u edudisplej-kiosk.service"
