@@ -71,45 +71,10 @@ fi
 # Terminate any existing X server
 terminate_xorg
 
-# === CRITICAL: Ensure we're on the right VT ===
-CURRENT_VT=$(fgconsole 2>/dev/null || echo "1")
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Current VT: $CURRENT_VT"
-
-# Ensure we use tty1 for X server (matching systemd service TTYPath=/dev/tty1)
-TARGET_VT="1"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Target VT for X server: vt${TARGET_VT}"
-
-# Ensure framebuffer is accessible
-if [ ! -c /dev/fb0 ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: /dev/fb0 not found!"
-    exit 1
-fi
-
-# Get framebuffer info
-FB_INFO=$(cat /sys/class/graphics/fb0/name 2>/dev/null || echo "unknown")
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Framebuffer: /dev/fb0 ($FB_INFO)"
-
-# Ensure HDMI output is active (force mode)
-if [ -f /sys/class/drm/card0-HDMI-A-1/status ]; then
-    HDMI_STATUS=$(cat /sys/class/drm/card0-HDMI-A-1/status)
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] HDMI Status: $HDMI_STATUS"
-fi
-
-# Clear framebuffer (test visibility) - only if safe size detected
-if [ -f /sys/class/graphics/fb0/virtual_size ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Clearing framebuffer (safe mode)..."
-    dd if=/dev/zero of=/dev/fb0 bs=1M count=10 2>/dev/null || true
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Skipping framebuffer clear (size unknown)"
-fi
-
-# Start X server on explicit VT (vt1 = tty1)
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server on vt${TARGET_VT}..."
-
-# Start X server with explicit VT allocation
+# Start X server
 if command -v startx >/dev/null 2>&1; then
-    # Use explicit VT to ensure X renders to the correct terminal
-    exec startx -- :0 vt${TARGET_VT} 2>&1 | tee /tmp/xorg-startup.log
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server..."
+    exec startx -- :0 vt7 > /tmp/xorg-startup.log 2>&1
 else
     echo "ERROR: startx not found. Init script may have failed."
     echo "Check logs: sudo journalctl -u edudisplej-kiosk.service"
