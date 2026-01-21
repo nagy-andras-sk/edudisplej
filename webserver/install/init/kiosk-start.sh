@@ -73,6 +73,7 @@ terminate_xorg
 
 # Start X server on vt1 (the main console)
 # This ensures display appears on the primary screen, not vt7
+# Note: Using 'exec' to replace this process with X server (no cleanup needed after X starts)
 if command -v startx >/dev/null 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server on vt1..."
     exec startx -- :0 vt1 > /tmp/xorg-startup.log 2>&1

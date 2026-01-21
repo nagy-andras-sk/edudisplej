@@ -34,7 +34,7 @@ echo "  Display:     ${DISPLAY:-not set}"
 # Show screen resolution if available
 if command -v xrandr >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
     RESOLUTION=$(xrandr 2>/dev/null | grep '\*' | awk '{print $1}' | head -1)
-    if [ -n "$RESOLUTION" ]; then
+    if [ -n "$RESOLUTION" ] && [[ "$RESOLUTION" =~ ^[0-9]+x[0-9]+$ ]]; then
         echo "  Resolution:  $RESOLUTION"
     fi
 fi

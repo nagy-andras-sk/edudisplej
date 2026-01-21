@@ -225,7 +225,19 @@ echo ""
 # =============================================================================
 
 # Alapcsomagok telepitese -- Instalacia zakladnych balickov
-REQUIRED_PACKAGES=(openbox xinit xterm unclutter curl x11-utils xserver-xorg x11-xserver-utils python3-xdg)
+# Core packages needed for X11 and terminal display
+REQUIRED_PACKAGES=(
+    openbox
+    xinit
+    xterm
+    unclutter
+    curl
+    x11-utils
+    xserver-xorg
+    x11-xserver-utils
+    python3-xdg
+)
+
 print_info "1. Alapcsomagok telepitese -- Instalacia zakladnych balickov..."
 if ! install_required_packages "${REQUIRED_PACKAGES[@]}"; then
     print_warning "Nehany alapcsomag telepitese sikertelen -- Niektore zakladne balicky sa nepodarilo nainštalovat"
