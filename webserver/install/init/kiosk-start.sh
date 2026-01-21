@@ -74,7 +74,8 @@ terminate_xorg
 # Start X server
 if command -v startx >/dev/null 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server..."
-    exec startx -- :0 vt7 > /tmp/xorg-startup.log 2>&1
+    exec startx -- :0 vt7 > /tmp/xorg-startup.log 2>&1 && \
+    openbox-session & xterm
 else
     echo "ERROR: startx not found. Init script may have failed."
     echo "Check logs: sudo journalctl -u edudisplej-kiosk.service"
