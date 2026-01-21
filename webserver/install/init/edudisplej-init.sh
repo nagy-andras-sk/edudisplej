@@ -321,7 +321,7 @@ if command -v xrandr >/dev/null 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detecting HDMI outputs..." >> "$AUTOSTART_LOG"
     
     # Log all detected outputs
-    xrandr 2>&1 >> "$AUTOSTART_LOG"
+    xrandr >> "$AUTOSTART_LOG" 2>&1
     
     # Try multiple HDMI output names (different drivers use different names)
     HDMI_OUTPUT=""
