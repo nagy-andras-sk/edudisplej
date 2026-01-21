@@ -562,11 +562,8 @@ get_screen_resolution() {
 # Boot Screen Functions
 # =============================================================================
 
-# Display boot screen with system status
-show_boot_screen() {
-    clear_screen
-    
-    # ASCII Art for EDUDISPLEJ
+# Display ASCII art EDUDISPLEJ logo
+show_edudisplej_logo() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════════════════╗"
     echo "║                                                                           ║"
@@ -579,6 +576,10 @@ show_boot_screen() {
     echo "║                                                                           ║"
     echo "╚═══════════════════════════════════════════════════════════════════════════╝"
     echo ""
+}
+
+# Display system status information
+show_system_status() {
     echo "╔═══════════════════════════════════════════════════════════════════════════╗"
     echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
     echo "╠═══════════════════════════════════════════════════════════════════════════╣"
@@ -606,6 +607,13 @@ show_boot_screen() {
     
     echo "╚═══════════════════════════════════════════════════════════════════════════╝"
     echo ""
+}
+
+# Display boot screen with system status
+show_boot_screen() {
+    clear_screen
+    show_edudisplej_logo
+    show_system_status
 }
 
 # Countdown with F2 detection
