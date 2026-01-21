@@ -75,6 +75,10 @@ terminate_xorg
 CURRENT_VT=$(fgconsole 2>/dev/null || echo "1")
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Current VT: $CURRENT_VT"
 
+# Ensure we use tty1 for X server (matching systemd service TTYPath=/dev/tty1)
+TARGET_VT="1"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Target VT for X server: vt${TARGET_VT}"
+
 # Ensure framebuffer is accessible
 if [ ! -c /dev/fb0 ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: /dev/fb0 not found!"
@@ -99,13 +103,13 @@ else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Skipping framebuffer clear (size unknown)"
 fi
 
-# Start X server on CURRENT VT (don't switch!)
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server on VT${CURRENT_VT}..."
+# Start X server on explicit VT (vt1 = tty1)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server on vt${TARGET_VT}..."
 
-# Start X server
+# Start X server with explicit VT allocation
 if command -v startx >/dev/null 2>&1; then
-    # Keep current TTY (recommended for systemd services)
-    exec startx -- :0 -keeptty 2>&1 | tee /tmp/xorg-startup.log
+    # Use explicit VT to ensure X renders to the correct terminal
+    exec startx -- :0 vt${TARGET_VT} 2>&1 | tee /tmp/xorg-startup.log
 else
     echo "ERROR: startx not found. Init script may have failed."
     echo "Check logs: sudo journalctl -u edudisplej-kiosk.service"

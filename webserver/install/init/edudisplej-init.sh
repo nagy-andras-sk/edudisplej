@@ -276,6 +276,22 @@ for dm in "${DISPLAY_MANAGERS[@]}"; do
     fi
 done
 
+# X server jogosultsagok konfigurálása -- Konfiguracia X server opravneni
+print_info "X server jogosultsagok beallitasa -- Nastavenie X server opravneni..."
+mkdir -p /etc/X11 2>/dev/null || true
+cat > /etc/X11/Xwrapper.config <<'XWRAPPER_EOF'
+# X server wrapper configuration for EduDisplej
+# Allow non-console users to start X server
+allowed_users=anybody
+needs_root_rights=yes
+XWRAPPER_EOF
+print_success "✓ Xwrapper.config letrehozva -- vytvoreny"
+
+# Felhasznalo csoportok hozzaadasa -- Pridanie pouzivatelskych skupin
+print_info "Felhasznalo csoportok beallitasa -- Nastavenie pouzivatelskych skupin..."
+usermod -a -G tty,video,input "$CONSOLE_USER" 2>/dev/null || true
+print_success "✓ Felhasznalo hozzaadva: tty,video,input csoportokhoz -- Pouzivatel pridany do skupin"
+
 # .xinitrc letrehozasa -- Vytvorenie .xinitrc
 print_info "Letrehozas -- Vytvorenie: .xinitrc"
 cat > "$USER_HOME/.xinitrc" <<'XINITRC_EOF'
@@ -296,14 +312,51 @@ AUTOSTART_LOG="/tmp/openbox-autostart.log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart BEGIN ===" >> "$AUTOSTART_LOG"
 
+# === CRITICAL: Wait for X server to fully initialize ===
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for X server initialization..." >> "$AUTOSTART_LOG"
+sleep 5
+
 # === CRITICAL: Force HDMI output activation ===
 if command -v xrandr >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Activating HDMI output..." >> "$AUTOSTART_LOG"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detecting HDMI outputs..." >> "$AUTOSTART_LOG"
     
-    # Turn on HDMI-1 explicitly (no flicker - direct activation)
-    xrandr --output HDMI-1 --auto --primary >> "$AUTOSTART_LOG" 2>&1
+    # Log all detected outputs
+    xrandr 2>&1 >> "$AUTOSTART_LOG"
     
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] HDMI-1 activated" >> "$AUTOSTART_LOG"
+    # Try multiple HDMI output names (different drivers use different names)
+    HDMI_OUTPUT=""
+    for output in HDMI-1 HDMI-0 HDMI-A-1 HDMI-A-0; do
+        if xrandr | grep -q "^$output connected"; then
+            HDMI_OUTPUT="$output"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Found active HDMI output: $output" >> "$AUTOSTART_LOG"
+            break
+        fi
+    done
+    
+    if [ -n "$HDMI_OUTPUT" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Activating $HDMI_OUTPUT..." >> "$AUTOSTART_LOG"
+        
+        # Set explicit mode and make primary
+        xrandr --output "$HDMI_OUTPUT" --mode 1920x1080 --primary >> "$AUTOSTART_LOG" 2>&1 || \
+        xrandr --output "$HDMI_OUTPUT" --auto --primary >> "$AUTOSTART_LOG" 2>&1
+        
+        # Try to set broadcast RGB to full (improves color on some monitors)
+        xrandr --output "$HDMI_OUTPUT" --set "Broadcast RGB" "Full" 2>/dev/null || true
+        
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $HDMI_OUTPUT activated successfully" >> "$AUTOSTART_LOG"
+        
+        # Verify activation
+        if xrandr | grep -q "^$HDMI_OUTPUT.*\*"; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ $HDMI_OUTPUT is active and primary" >> "$AUTOSTART_LOG"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ WARNING: $HDMI_OUTPUT may not be active!" >> "$AUTOSTART_LOG"
+        fi
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ ERROR: No HDMI output detected!" >> "$AUTOSTART_LOG"
+        # Log all available outputs for debugging
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Available outputs:" >> "$AUTOSTART_LOG"
+        xrandr | grep " connected" >> "$AUTOSTART_LOG" 2>&1
+    fi
 fi
 
 # Set white background (visible test)
