@@ -18,8 +18,13 @@ check_required_packages() {
     local packages=("$@")
     local missing=()
 
+    # Get all installed packages in one call for efficiency
+    # This reduces the number of dpkg calls from N to 1
+    local installed_packages
+    installed_packages=$(dpkg-query -W -f='${Package}\n' 2>/dev/null)
+
     for pkg in "${packages[@]}"; do
-        if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+        if ! echo "$installed_packages" | grep -q "^${pkg}$"; then
             missing+=("$pkg")
         fi
     done

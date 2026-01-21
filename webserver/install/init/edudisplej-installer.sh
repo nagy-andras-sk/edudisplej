@@ -126,9 +126,13 @@ install_required_packages() {
     local still_missing=()
 
     # Csomagok ellenorzese -- Kontrola balickov
+    # Optimized: get all installed packages in one call
     print_info "Ellenorizzuk a csomagokat -- Kontrolujeme balicky..."
+    local installed_packages
+    installed_packages=$(dpkg-query -W -f='${Package}\n' 2>/dev/null)
+    
     for pkg in "${packages[@]}"; do
-        if dpkg -s "$pkg" >/dev/null 2>&1; then
+        if echo "$installed_packages" | grep -q "^${pkg}$"; then
             print_success "${pkg} ✓"
         else
             missing+=("$pkg")

@@ -306,15 +306,16 @@ chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 # kiosk-launcher.sh letrehozasa kiosk mod alapjan -- Vytvorenie kiosk-launcher.sh podla kiosk modu
 print_info "Letrehozas -- Vytvorenie: kiosk-launcher.sh"
 
-if [[ "$KIOSK_MODE" = "epiphany" ]]; then
-    cat > "$USER_HOME/kiosk-launcher.sh" <<'KIOSK_LAUNCHER_EOF'
+# Create shared header for both browser types
+create_kiosk_launcher_header() {
+    cat <<'KIOSK_HEADER_EOF'
 #!/bin/bash
-# Terminal indito Epiphany bongeszohoz -- Terminalovy spustac pre Epiphany
+# Terminal launcher for kiosk mode -- Terminalovy spustac pre kiosk mod
 set -euo pipefail
 
 URL="${1:-https://www.time.is}"
 
-# Terminal kinezet -- Vzhad terminalu
+# Terminal appearance -- Vzhad terminalu
 tput civis || true
 clear
 
@@ -323,55 +324,30 @@ clear
 # =============================================================================
 if [[ -f /opt/edudisplej/init/common.sh ]]; then
     source /opt/edudisplej/init/common.sh 2>/dev/null || true
+    # Use shared functions for display
+    show_edudisplej_logo
+    show_system_status
+else
+    # Fallback if common.sh not available
+    echo "EDUDISPLEJ"
+    echo "=========================================="
+    echo ""
 fi
 
-# =============================================================================
-# Boot Screen Display
-# =============================================================================
-
-# ASCII Art for EDUDISPLEJ
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════════════╗"
-echo "║                                                                           ║"
-echo "║   ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗ ██╗     ███████╗   ║"
-echo "║   ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗██║     ██╔════╝   ║"
-echo "║   █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝██║     █████╗     ║"
-echo "║   ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝ ██║     ██╔══╝     ║"
-echo "║   ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗   ║"
-echo "║   ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ║"
-echo "║                                                                           ║"
-echo "╚═══════════════════════════════════════════════════════════════════════════╝"
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════════════╗"
-echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
-echo "╠═══════════════════════════════════════════════════════════════════════════╣"
-
-# Display system status
-internet_status="✗ Nedostupny / Not available"
-wifi_info=""
-if check_internet 2>/dev/null || ping -c 1 -W 2 google.com &> /dev/null; then
-    internet_status="✓ Dostupny / Available"
-    ssid=$(get_current_ssid 2>/dev/null || echo "unknown")
-    signal=$(get_current_signal 2>/dev/null || echo "unknown")
-    if [[ -n "$ssid" && "$ssid" != "unknown" ]]; then
-        wifi_info="  WiFi SSID: $ssid | Signal: $signal"
-    fi
-fi
-
-printf "║ %-73s ║\n" "Internet: $internet_status"
-if [[ -n "$wifi_info" ]]; then
-    printf "║ %-73s ║\n" "$wifi_info"
-fi
-
-resolution=$(get_screen_resolution 2>/dev/null || echo "unknown")
-printf "║ %-73s ║\n" "Rozlisenie / Resolution: $resolution"
-
-echo "╚═══════════════════════════════════════════════════════════════════════════╝"
-echo ""
 echo "╔═══════════════════════════════════════════════════════════════════════════╗"
 echo "║  Stlacte F2 pre nastavenia (raspi-config) / Press F2 for settings        ║"
 echo "╚═══════════════════════════════════════════════════════════════════════════╝"
 echo ""
+KIOSK_HEADER_EOF
+}
+
+if [[ "$KIOSK_MODE" = "epiphany" ]]; then
+    {
+        create_kiosk_launcher_header
+
+# Shared countdown and browser launch logic
+create_countdown_and_launch() {
+    cat <<'COUNTDOWN_EOF'
 
 # Countdown with F2 detection
 if [[ -t 0 ]]; then
@@ -411,21 +387,28 @@ echo ""
 echo "Spustam kiosk rezim... / Starting kiosk mode..."
 sleep 1
 
-# Kepernyovedo kikapcsolasa -- Vypnutie setraca obrazovky
+# Screen saver and cursor settings
 if command -v xset >/dev/null 2>&1; then
   xset -dpms
   xset s off
   xset s noblank
 fi
 
-# Egerkurzor elrejtese -- Skrytie kurzora mysi
 if command -v unclutter >/dev/null 2>&1; then
   unclutter -idle 1 -root >/dev/null 2>&1 &
 fi
 
 trap 'tput cnorm || true' EXIT
+COUNTDOWN_EOF
+}
 
-# Bongeszo inditasa -- Spustenie prehliadaca
+if [[ "$KIOSK_MODE" = "epiphany" ]]; then
+    {
+        create_kiosk_launcher_header
+        create_countdown_and_launch
+        cat <<'EPIPHANY_EOF'
+
+# Launch Epiphany browser
 epiphany-browser --fullscreen "${URL}" &
 
 sleep 3
@@ -433,7 +416,7 @@ if command -v xdotool >/dev/null 2>&1; then
   xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
 fi
 
-# Watchdog: bongeszo ujrainditasa ha bezarodik -- Watchdog: restart prehliadaca ak sa zatvori
+# Watchdog: restart browser if it crashes
 while true; do
   sleep 2
   if ! pgrep -x "epiphany-browser" >/dev/null; then
@@ -444,127 +427,15 @@ while true; do
     fi
   fi
 done
-KIOSK_LAUNCHER_EOF
+EPIPHANY_EOF
+    } > "$USER_HOME/kiosk-launcher.sh"
 else
-    cat > "$USER_HOME/kiosk-launcher.sh" <<'KIOSK_LAUNCHER_EOF'
-#!/bin/bash
-# Terminal indito Chromium bongeszohoz -- Terminalovy spustac pre Chromium
-set -euo pipefail
+    {
+        create_kiosk_launcher_header
+        create_countdown_and_launch
+        cat <<'CHROMIUM_EOF'
 
-URL="${1:-https://www.time.is}"
-
-# Terminal kinezet -- Vzhad terminalu
-tput civis || true
-clear
-
-# =============================================================================
-# Source common functions if available
-# =============================================================================
-if [[ -f /opt/edudisplej/init/common.sh ]]; then
-    source /opt/edudisplej/init/common.sh 2>/dev/null || true
-fi
-
-# =============================================================================
-# Boot Screen Display
-# =============================================================================
-
-# ASCII Art for EDUDISPLEJ
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════════════╗"
-echo "║                                                                           ║"
-echo "║   ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗ ██╗     ███████╗   ║"
-echo "║   ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗██║     ██╔════╝   ║"
-echo "║   █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝██║     █████╗     ║"
-echo "║   ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝ ██║     ██╔══╝     ║"
-echo "║   ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗   ║"
-echo "║   ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ║"
-echo "║                                                                           ║"
-echo "╚═══════════════════════════════════════════════════════════════════════════╝"
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════════════╗"
-echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
-echo "╠═══════════════════════════════════════════════════════════════════════════╣"
-
-# Display system status
-internet_status="✗ Nedostupny / Not available"
-wifi_info=""
-if check_internet 2>/dev/null || ping -c 1 -W 2 google.com &> /dev/null; then
-    internet_status="✓ Dostupny / Available"
-    ssid=$(get_current_ssid 2>/dev/null || echo "unknown")
-    signal=$(get_current_signal 2>/dev/null || echo "unknown")
-    if [[ -n "$ssid" && "$ssid" != "unknown" ]]; then
-        wifi_info="  WiFi SSID: $ssid | Signal: $signal"
-    fi
-fi
-
-printf "║ %-73s ║\n" "Internet: $internet_status"
-if [[ -n "$wifi_info" ]]; then
-    printf "║ %-73s ║\n" "$wifi_info"
-fi
-
-resolution=$(get_screen_resolution 2>/dev/null || echo "unknown")
-printf "║ %-73s ║\n" "Rozlisenie / Resolution: $resolution"
-
-echo "╚═══════════════════════════════════════════════════════════════════════════╝"
-echo ""
-echo "╔═══════════════════════════════════════════════════════════════════════════╗"
-echo "║  Stlacte F2 pre nastavenia (raspi-config) / Press F2 for settings        ║"
-echo "╚═══════════════════════════════════════════════════════════════════════════╝"
-echo ""
-
-# Countdown with F2 detection
-if [[ -t 0 ]]; then
-    old_tty_settings=$(stty -g 2>/dev/null || true)
-    stty -echo -icanon time 0 min 0 2>/dev/null || true
-    
-    key=""
-    for ((i=5; i>=1; i--)); do
-        printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
-        read -t 1 -n 3 key 2>/dev/null || true
-        if [[ "$key" == $'\x1b'* ]]; then
-            [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
-            echo ""
-            echo ""
-            echo "F2 stlacene! Spustam raspi-config... / F2 pressed! Launching raspi-config..."
-            sleep 1
-            sudo raspi-config
-            echo ""
-            echo "Navrat z nastaveni... / Returning from settings..."
-            sleep 2
-            clear
-            echo "Spustam prehliadac... / Starting browser..."
-            sleep 1
-        fi
-    done
-    
-    [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
-else
-    for ((i=5; i>=1; i--)); do
-        printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
-        sleep 1
-    done
-fi
-
-echo ""
-echo ""
-echo "Spustam kiosk rezim... / Starting kiosk mode..."
-sleep 1
-
-# Kepernyovedo kikapcsolasa -- Vypnutie setraca obrazovky
-if command -v xset >/dev/null 2>&1; then
-  xset -dpms
-  xset s off
-  xset s noblank
-fi
-
-# Egerkurzor elrejtese -- Skrytie kurzora mysi
-if command -v unclutter >/dev/null 2>&1; then
-  unclutter -idle 1 -root >/dev/null 2>&1 &
-fi
-
-trap 'tput cnorm || true' EXIT
-
-# Bongeszo inditasa -- Spustenie prehliadaca
+# Launch Chromium browser
 chromium-browser --kiosk --no-sandbox --disable-gpu --disable-infobars \
   --no-first-run --incognito --noerrdialogs --disable-translate \
   --disable-features=TranslateUI --disable-session-crashed-bubble \
@@ -575,7 +446,7 @@ if command -v xdotool >/dev/null 2>&1; then
   xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
 fi
 
-# Watchdog: bongeszo ujrainditasa ha bezarodik -- Watchdog: restart prehliadaca ak sa zatvori
+# Watchdog: restart browser if it crashes
 while true; do
   sleep 2
   if ! pgrep -x "chromium-browser" >/dev/null; then
@@ -589,7 +460,8 @@ while true; do
     fi
   fi
 done
-KIOSK_LAUNCHER_EOF
+CHROMIUM_EOF
+    } > "$USER_HOME/kiosk-launcher.sh"
 fi
 
 chmod +x "$USER_HOME/kiosk-launcher.sh"
