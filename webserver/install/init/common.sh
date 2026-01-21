@@ -241,6 +241,11 @@ set_mode() {
 # Display Functions
 # =============================================================================
 
+# Timestamp for logs
+log_timestamp() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]"
+}
+
 # Print colored text
 print_color() {
     local color="$1"
@@ -262,7 +267,7 @@ print_info() {
         local line="${BASH_LINENO[0]}"
         caller_info=" [${file}:${line}]"
     fi
-    print_color "blue" "[INFO]${caller_info} $1"
+    echo -e "$(log_timestamp) \033[0;36m[INFO]\033[0m${caller_info} $1"
 }
 
 # Print success message
@@ -273,21 +278,21 @@ print_success() {
         local line="${BASH_LINENO[0]}"
         caller_info=" [${file}:${line}]"
     fi
-    print_color "green" "[OK]${caller_info} $1"
+    echo -e "$(log_timestamp) \033[0;32m[SUCCESS]\033[0m${caller_info} $1"
 }
 
 # Print warning message
 print_warning() {
     local file=$(basename "${BASH_SOURCE[1]:-unknown}")
     local line="${BASH_LINENO[0]:-?}"
-    print_color "yellow" "[$(t warning)] [${file}:${line}] $1"
+    echo -e "$(log_timestamp) \033[0;33m[WARNING]\033[0m [${file}:${line}] $1"
 }
 
 # Print error message
 print_error() {
     local file=$(basename "${BASH_SOURCE[1]:-unknown}")
     local line="${BASH_LINENO[0]:-?}"
-    print_color "red" "[$(t error)] [${file}:${line}] $1"
+    echo -e "$(log_timestamp) \033[0;31m[ERROR]\033[0m [${file}:${line}] $1"
 }
 
 # Show banner using figlet if available

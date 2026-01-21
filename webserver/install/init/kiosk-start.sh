@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+# Redirect all output to systemd journal
+exec 1> >(logger -t edudisplej-kiosk -p user.info)
+exec 2> >(logger -t edudisplej-kiosk -p user.err)
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] kiosk-start.sh BEGIN"
+
 KIOSK_CONFIGURED_FLAG="/opt/edudisplej/.kiosk_system_configured"
 INIT_SCRIPT="/opt/edudisplej/init/edudisplej-init.sh"
 
@@ -67,7 +73,8 @@ terminate_xorg
 
 # Start X server
 if command -v startx >/dev/null 2>&1; then
-    exec startx -- :0 vt1
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server..."
+    exec startx -- :0 vt1 2>&1 | tee /tmp/xorg-startup.log
 else
     echo "ERROR: startx not found. Init script may have failed."
     echo "Check logs: sudo journalctl -u edudisplej-kiosk.service"

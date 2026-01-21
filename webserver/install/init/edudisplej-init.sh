@@ -289,18 +289,36 @@ chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.xinitrc" 2>/dev/null || true
 # Openbox autostart konfiguralasa -- Konfiguracia Openbox autostart
 print_info "Letrehozas -- Vytvorenie: Openbox autostart"
 mkdir -p "$USER_HOME/.config/openbox"
-cat > "$USER_HOME/.config/openbox/autostart" <<AUTOSTART_EOF
-# Kepernyovedo kikapcsolasa -- Vypnutie setraca obrazovky
-xset -dpms
-xset s off
-xset s noblank
+cat > "$USER_HOME/.config/openbox/autostart" <<'AUTOSTART_EOF'
+#!/bin/bash
+# Openbox autostart with detailed logging
+AUTOSTART_LOG="/tmp/openbox-autostart.log"
 
-# Egerkurzor elrejtese -- Skrytie kurzora mysi
-unclutter -idle 1 &
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart BEGIN ===" >> "$AUTOSTART_LOG"
 
-# ASCII logo megjelenitese terminalban -- Zobrazenie ASCII loga v terminale
-xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "\$HOME/kiosk-launcher.sh" &
+# Screen saver settings
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting xset options..." >> "$AUTOSTART_LOG"
+xset -dpms >> "$AUTOSTART_LOG" 2>&1
+xset s off >> "$AUTOSTART_LOG" 2>&1
+xset s noblank >> "$AUTOSTART_LOG" 2>&1
+
+# Hide cursor
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting unclutter..." >> "$AUTOSTART_LOG"
+unclutter -idle 1 >> "$AUTOSTART_LOG" 2>&1 &
+
+# Launch xterm with kiosk-launcher
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching xterm with kiosk-launcher.sh..." >> "$AUTOSTART_LOG"
+if [ -f "$HOME/kiosk-launcher.sh" ]; then
+    xterm -fa Monospace -fs 14 -geometry 120x36+20+20 -e "bash -c '$HOME/kiosk-launcher.sh; exec bash'" >> "$AUTOSTART_LOG" 2>&1 &
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm started (PID: $!)" >> "$AUTOSTART_LOG"
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: kiosk-launcher.sh not found!" >> "$AUTOSTART_LOG"
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart END ===" >> "$AUTOSTART_LOG"
 AUTOSTART_EOF
+
+chmod +x "$USER_HOME/.config/openbox/autostart"
 chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 
 # kiosk-launcher.sh letrehozasa kiosk mod alapjan -- Vytvorenie kiosk-launcher.sh podla kiosk modu
@@ -312,6 +330,25 @@ create_kiosk_launcher_header() {
 #!/bin/bash
 # Terminal launcher for kiosk mode -- Terminalovy spustac pre kiosk mod
 set -euo pipefail
+
+# Kiosk launcher with detailed logging
+LAUNCHER_LOG="/tmp/kiosk-launcher.log"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER START ===" | tee -a "$LAUNCHER_LOG"
+
+# Display environment
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] DISPLAY=$DISPLAY" | tee -a "$LAUNCHER_LOG"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] HOME=$HOME" | tee -a "$LAUNCHER_LOG"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] USER=$USER" | tee -a "$LAUNCHER_LOG"
+
+# Test X connection
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Testing X connection..." | tee -a "$LAUNCHER_LOG"
+if ! xdpyinfo >/dev/null 2>&1; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Cannot connect to X display!" | tee -a "$LAUNCHER_LOG"
+    sleep 5
+    exit 1
+fi
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] X connection OK" | tee -a "$LAUNCHER_LOG"
 
 URL="${1:-https://www.time.is}"
 
@@ -384,6 +421,7 @@ echo "Spustam kiosk rezim... / Starting kiosk mode..."
 sleep 1
 
 # Screen saver and cursor settings
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring screen settings..." | tee -a "$LAUNCHER_LOG"
 if command -v xset >/dev/null 2>&1; then
   xset -dpms
   xset s off
@@ -405,18 +443,26 @@ if [[ "$KIOSK_MODE" = "epiphany" ]]; then
         cat <<'EPIPHANY_EOF'
 
 # Launch Epiphany browser
-epiphany-browser --fullscreen "${URL}" &
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching Epiphany browser..." | tee -a "$LAUNCHER_LOG"
+epiphany-browser --fullscreen "${URL}" >> "$LAUNCHER_LOG" 2>&1 &
+BROWSER_PID=$!
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Epiphany started (PID: $BROWSER_PID)" | tee -a "$LAUNCHER_LOG"
 
 sleep 3
 if command -v xdotool >/dev/null 2>&1; then
   xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
 fi
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER END ===" | tee -a "$LAUNCHER_LOG"
+
 # Watchdog: restart browser if it crashes
 while true; do
   sleep 2
   if ! pgrep -x "epiphany-browser" >/dev/null; then
-    epiphany-browser --fullscreen "${URL}" &
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Epiphany crashed, restarting..." | tee -a "$LAUNCHER_LOG"
+    epiphany-browser --fullscreen "${URL}" >> "$LAUNCHER_LOG" 2>&1 &
+    BROWSER_PID=$!
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Epiphany restarted (PID: $BROWSER_PID)" | tee -a "$LAUNCHER_LOG"
     sleep 3
     if command -v xdotool >/dev/null 2>&1; then
       xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
@@ -432,24 +478,32 @@ else
         cat <<'CHROMIUM_EOF'
 
 # Launch Chromium browser
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching Chromium browser..." | tee -a "$LAUNCHER_LOG"
 chromium-browser --kiosk --no-sandbox --disable-gpu --disable-infobars \
   --no-first-run --incognito --noerrdialogs --disable-translate \
   --disable-features=TranslateUI --disable-session-crashed-bubble \
-  --check-for-update-interval=31536000 "${URL}" &
+  --check-for-update-interval=31536000 "${URL}" >> "$LAUNCHER_LOG" 2>&1 &
+BROWSER_PID=$!
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Chromium started (PID: $BROWSER_PID)" | tee -a "$LAUNCHER_LOG"
 
 sleep 3
 if command -v xdotool >/dev/null 2>&1; then
   xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
 fi
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER END ===" | tee -a "$LAUNCHER_LOG"
+
 # Watchdog: restart browser if it crashes
 while true; do
   sleep 2
   if ! pgrep -x "chromium-browser" >/dev/null; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Chromium crashed, restarting..." | tee -a "$LAUNCHER_LOG"
     chromium-browser --kiosk --no-sandbox --disable-gpu --disable-infobars \
       --no-first-run --incognito --noerrdialogs --disable-translate \
       --disable-features=TranslateUI --disable-session-crashed-bubble \
-      --check-for-update-interval=31536000 "${URL}" &
+      --check-for-update-interval=31536000 "${URL}" >> "$LAUNCHER_LOG" 2>&1 &
+    BROWSER_PID=$!
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Chromium restarted (PID: $BROWSER_PID)" | tee -a "$LAUNCHER_LOG"
     sleep 3
     if command -v xdotool >/dev/null 2>&1; then
       xdotool key --window "$(xdotool getactivewindow 2>/dev/null || true)" F11 || true
