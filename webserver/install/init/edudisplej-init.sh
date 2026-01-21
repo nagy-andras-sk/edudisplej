@@ -313,7 +313,7 @@ print_success "✓ Felhasznalo hozzaadva: tty,video,input csoportokhoz -- Pouziv
 print_info "Letrehozas -- Vytvorenie: .xinitrc"
 cat > "$USER_HOME/.xinitrc" <<'XINITRC_EOF'
 #!/bin/bash
-# X inicializacio -- X inicializacia
+# Start Openbox window manager
 exec openbox-session
 XINITRC_EOF
 chmod +x "$USER_HOME/.xinitrc"
@@ -324,114 +324,68 @@ print_info "Letrehozas -- Vytvorenie: Openbox autostart"
 mkdir -p "$USER_HOME/.config/openbox"
 cat > "$USER_HOME/.config/openbox/autostart" <<'AUTOSTART_EOF'
 #!/bin/bash
-# Openbox autostart - simplified for cross-platform compatibility
-# Goal: Display terminal with edudisplej_terminal_script.sh on main screen
-AUTOSTART_LOG="/tmp/openbox-autostart.log"
+# Openbox autostart - Launch terminal on main display
+# Simple and reliable
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart BEGIN ===" >> "$AUTOSTART_LOG"
+LOG="/tmp/openbox-autostart.log"
+exec >> "$LOG" 2>&1
 
-# Wait for X server to fully initialize
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for X server initialization..." >> "$AUTOSTART_LOG"
-sleep 3
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart starting"
 
-# Configure display output (works on multiple platforms)
-if command -v xrandr >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detecting display outputs..." >> "$AUTOSTART_LOG"
-    xrandr >> "$AUTOSTART_LOG" 2>&1
-    
-    # Find first connected output and set it as primary
-    DISPLAY_OUTPUT=$(xrandr | grep " connected" | head -1 | awk '{print $1}')
-    if [ -n "$DISPLAY_OUTPUT" ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting $DISPLAY_OUTPUT as primary..." >> "$AUTOSTART_LOG"
-        xrandr --output "$DISPLAY_OUTPUT" --auto --primary >> "$AUTOSTART_LOG" 2>&1 || true
-    fi
-fi
-
-# Disable screen saver and power management
-if command -v xset >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Disabling screen saver..." >> "$AUTOSTART_LOG"
-    xset -dpms >> "$AUTOSTART_LOG" 2>&1 || true
-    xset s off >> "$AUTOSTART_LOG" 2>&1 || true
-    xset s noblank >> "$AUTOSTART_LOG" 2>&1 || true
-fi
-
-# Hide cursor after 1 second of inactivity
-if command -v unclutter >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting unclutter..." >> "$AUTOSTART_LOG"
-    unclutter -idle 1 >> "$AUTOSTART_LOG" 2>&1 &
-fi
-
-# Set black background (professional look)
-if command -v xsetroot >/dev/null 2>&1; then
-    xsetroot -solid black >> "$AUTOSTART_LOG" 2>&1 || true
-fi
-
-# Wait for display to be ready
+# Wait for X to be ready
 sleep 2
 
-# Launch xterm with edudisplej_terminal_script.sh
-# This is the GOAL: show terminal with script content on main screen
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching EduDisplej terminal..." >> "$AUTOSTART_LOG"
-
-TERMINAL_SCRIPT="/opt/edudisplej/init/edudisplej_terminal_script.sh"
-
-if command -v xterm >/dev/null 2>&1; then
-    if [ -x "$TERMINAL_SCRIPT" ]; then
-        # Launch fullscreen terminal with the edudisplej script
-        xterm -display :0 \
-              -fullscreen \
-              -fa "Monospace" -fs 14 \
-              -bg black -fg green \
-              -title "EduDisplej" \
-              +sb \
-              -e "$TERMINAL_SCRIPT" >> "$AUTOSTART_LOG" 2>&1 &
-        
-        XTERM_PID=$!
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] EduDisplej terminal launched (PID: $XTERM_PID)" >> "$AUTOSTART_LOG"
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Terminal script not found or not executable: $TERMINAL_SCRIPT" >> "$AUTOSTART_LOG"
-        # Fallback: launch simple terminal
-        xterm -display :0 -fullscreen -fa "Monospace" -fs 14 -bg black -fg green \
-              -title "EduDisplej" +sb >> "$AUTOSTART_LOG" 2>&1 &
+# Configure display - find first connected output
+if command -v xrandr >/dev/null 2>&1; then
+    OUTPUT=$(xrandr | grep " connected" | head -1 | awk '{print $1}')
+    if [ -n "$OUTPUT" ]; then
+        xrandr --output "$OUTPUT" --auto --primary 2>/dev/null || true
+        echo "Display output set: $OUTPUT"
     fi
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: xterm not found!" >> "$AUTOSTART_LOG"
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart END ===" >> "$AUTOSTART_LOG"
+# Disable screen blanking
+command -v xset >/dev/null 2>&1 && {
+    xset -dpms s off s noblank 2>/dev/null || true
+}
+
+# Hide cursor
+command -v unclutter >/dev/null 2>&1 && {
+    unclutter -idle 1 &
+}
+
+# Black background
+command -v xsetroot >/dev/null 2>&1 && {
+    xsetroot -solid black 2>/dev/null || true
+}
+
+# Launch terminal with script - THIS IS THE GOAL
+SCRIPT="/opt/edudisplej/init/edudisplej_terminal_script.sh"
+if [ -x "$SCRIPT" ]; then
+    echo "Launching terminal with $SCRIPT"
+    xterm -display :0 -fullscreen -fa Monospace -fs 14 \
+          -bg black -fg green -title "EduDisplej" +sb \
+          -e "$SCRIPT" &
+    echo "Terminal launched (PID: $!)"
+else
+    echo "ERROR: Script not found: $SCRIPT"
+    # Fallback: simple terminal
+    xterm -display :0 -fullscreen -bg black -fg green +sb &
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart complete"
 AUTOSTART_EOF
 
 chmod +x "$USER_HOME/.config/openbox/autostart"
 chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 
-# kiosk-launcher.sh - Not used in simplified setup, kept for compatibility
-print_info "Letrehozas -- Vytvorenie: kiosk-launcher.sh (compatibility)"
-
-cat > "$USER_HOME/kiosk-launcher.sh" <<'LAUNCHER_EOF'
-#!/bin/bash
-# kiosk-launcher.sh - Kept for compatibility but not used
-# Terminal is launched directly from Openbox autostart
-LAUNCHER_LOG="/tmp/kiosk-launcher.log"
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] kiosk-launcher.sh (not used)" | tee -a "$LAUNCHER_LOG"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Terminal is launched from Openbox autostart" | tee -a "$LAUNCHER_LOG"
-
-# Keep script running if called
-exec bash
-LAUNCHER_EOF
-
-chmod +x "$USER_HOME/kiosk-launcher.sh"
-chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/kiosk-launcher.sh" 2>/dev/null || true
-
-# Konfigurait flag letrehozasa -- Vytvorenie flagu nakonfigurovany
+# Mark system as configured
 touch "$KIOSK_CONFIGURED_FILE"
 
-# Systemd ujratoltese -- Reload systemd
+# Reload systemd
 systemctl daemon-reload 2>/dev/null || true
 
 print_success "=========================================="
-print_success "Kiosk konfiguracio kesz! -- Konfiguracia kiosk hotova!"
+print_success "Setup complete! Reboot to start terminal"
 print_success "=========================================="
-echo ""
-print_info "Rendszer ujrainditasa szukseges -- Je potrebny restart systemu"
 exit 0
