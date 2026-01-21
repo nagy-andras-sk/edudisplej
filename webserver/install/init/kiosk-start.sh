@@ -91,9 +91,13 @@ if [ -f /sys/class/drm/card0-HDMI-A-1/status ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] HDMI Status: $HDMI_STATUS"
 fi
 
-# Clear framebuffer (test visibility)
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Clearing framebuffer..."
-dd if=/dev/zero of=/dev/fb0 bs=1M count=10 2>/dev/null || true
+# Clear framebuffer (test visibility) - only if safe size detected
+if [ -f /sys/class/graphics/fb0/virtual_size ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Clearing framebuffer (safe mode)..."
+    dd if=/dev/zero of=/dev/fb0 bs=1M count=10 2>/dev/null || true
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Skipping framebuffer clear (size unknown)"
+fi
 
 # Start X server on CURRENT VT (don't switch!)
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server on VT${CURRENT_VT}..."

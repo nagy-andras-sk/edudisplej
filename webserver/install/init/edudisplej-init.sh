@@ -300,12 +300,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart BEGIN ===" >> "$AUTOS
 if command -v xrandr >/dev/null 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Activating HDMI output..." >> "$AUTOSTART_LOG"
     
-    # Turn on HDMI-1 explicitly
-    xrandr --output HDMI-1 --mode 1920x1080 --primary >> "$AUTOSTART_LOG" 2>&1
-    
-    # Force display update
-    xrandr --output HDMI-1 --off >> "$AUTOSTART_LOG" 2>&1
-    sleep 1
+    # Turn on HDMI-1 explicitly (no flicker - direct activation)
     xrandr --output HDMI-1 --auto --primary >> "$AUTOSTART_LOG" 2>&1
     
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] HDMI-1 activated" >> "$AUTOSTART_LOG"
@@ -364,10 +359,10 @@ if command -v xterm >/dev/null 2>&1; then
               echo ""
               echo "Press Ctrl+C to exit"
               echo ""
-              # Keep terminal open with live clock
+              # Keep terminal open with live clock (5sec interval for CPU efficiency)
               while true; do
-                  echo -ne "\r$(date +%T) - Terminal is running..."
-                  sleep 1
+                  echo "$(date +%T) - Terminal is running..."
+                  sleep 5
               done
           ' >> "$AUTOSTART_LOG" 2>&1 &
     
