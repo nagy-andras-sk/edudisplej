@@ -516,5 +516,169 @@ wait_for_internet() {
     return 1
 }
 
+# =============================================================================
+# Network Information Functions (extracted from network.sh)
+# =============================================================================
+
+# Get current Wi-Fi SSID
+get_current_ssid() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null | awk -F: '$1=="yes" {print $2; exit}'
+    elif command -v iwgetid &> /dev/null; then
+        iwgetid -r 2>/dev/null
+    else
+        echo "unknown"
+    fi
+}
+
+# Get current Wi-Fi signal (0-100 if available)
+get_current_signal() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1=="*" {print $2"%"; exit}'
+    else
+        # Fallback via iwconfig
+        local quality total
+        read quality total <<<$(iwconfig 2>/dev/null | awk -F'[ =/]+' '/Link Quality/ {print $4" " $5; exit}')
+        if [[ -n "$quality" && -n "$total" ]]; then
+            echo "$quality/$total"
+        else
+            echo "unknown"
+        fi
+    fi
+}
+
+# Get screen resolution
+get_screen_resolution() {
+    if command -v xrandr &> /dev/null && [[ -n "${DISPLAY:-}" ]]; then
+        xrandr 2>/dev/null | grep -o '[0-9][0-9]*x[0-9][0-9]*' | head -1
+    elif [[ -f /sys/class/graphics/fb0/virtual_size ]]; then
+        cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | tr ',' 'x'
+    else
+        echo "unknown"
+    fi
+}
+
+# =============================================================================
+# Boot Screen Functions
+# =============================================================================
+
+# Display boot screen with system status
+show_boot_screen() {
+    clear_screen
+    
+    # ASCII Art for EDUDISPLEJ
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                           ║"
+    echo "║   ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗ ██╗     ███████╗   ║"
+    echo "║   ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗██║     ██╔════╝   ║"
+    echo "║   █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝██║     █████╗     ║"
+    echo "║   ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝ ██║     ██╔══╝     ║"
+    echo "║   ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗   ║"
+    echo "║   ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ║"
+    echo "║                                                                           ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
+    echo "╠═══════════════════════════════════════════════════════════════════════════╣"
+    
+    # Internet status
+    local internet_status="✗ Nedostupny / Not available"
+    local wifi_info=""
+    if check_internet; then
+        internet_status="✓ Dostupny / Available"
+        local ssid=$(get_current_ssid)
+        local signal=$(get_current_signal)
+        if [[ -n "$ssid" && "$ssid" != "unknown" ]]; then
+            wifi_info="WiFi SSID: $ssid | Signal: $signal"
+        fi
+    fi
+    
+    printf "║ %-73s ║\n" "Internet: $internet_status"
+    if [[ -n "$wifi_info" ]]; then
+        printf "║ %-73s ║\n" "  $wifi_info"
+    fi
+    
+    # Screen resolution
+    local resolution=$(get_screen_resolution)
+    printf "║ %-73s ║\n" "Rozlisenie / Resolution: $resolution"
+    
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo ""
+}
+
+# Countdown with F2 detection
+countdown_with_f2() {
+    local countdown_seconds=5
+    
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║  Stlacte F2 pre nastavenia (raspi-config) / Press F2 for settings        ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo ""
+    
+    # Enable non-blocking read
+    if [[ -t 0 ]]; then
+        # Save terminal settings
+        local old_tty_settings=$(stty -g 2>/dev/null || true)
+        stty -echo -icanon time 0 min 0 2>/dev/null || true
+        
+        local key=""
+        local escape_sequence=""
+        for ((i=countdown_seconds; i>=1; i--)); do
+            printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
+            
+            # Read input with timeout, accumulate escape sequences
+            # F2 can be ESC[OQ, ESC[[B, or ESC[12~ depending on terminal
+            key=""
+            for ((j=0; j<10; j++)); do
+                if read -t 0.1 -n 1 char 2>/dev/null; then
+                    key+="$char"
+                    # Check if we got an escape character
+                    if [[ "$char" == $'\x1b' ]]; then
+                        escape_sequence="$char"
+                        # Read more characters to complete escape sequence
+                        for ((k=0; k<10; k++)); do
+                            if read -t 0.05 -n 1 char 2>/dev/null; then
+                                escape_sequence+="$char"
+                            else
+                                break
+                            fi
+                        done
+                        # Check if this is F2 (various possibilities)
+                        if [[ "$escape_sequence" == $'\x1b'* ]]; then
+                            # Restore terminal settings
+                            [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
+                            echo ""
+                            echo ""
+                            print_info "F2 stlacene! Spustam raspi-config... / F2 pressed! Launching raspi-config..."
+                            sleep 1
+                            sudo raspi-config
+                            # After raspi-config exits, continue with normal boot
+                            echo ""
+                            print_info "Navrat z nastaveni... / Returning from settings..."
+                            sleep 2
+                            return 0
+                        fi
+                    fi
+                fi
+            done
+        done
+        
+        # Restore terminal settings
+        [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
+    else
+        # If not in interactive terminal, just do simple countdown
+        for ((i=countdown_seconds; i>=1; i--)); do
+            printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
+            sleep 1
+        done
+    fi
+    
+    echo ""
+    echo ""
+    return 0
+}
+
 # Load configuration on source
 load_config
