@@ -1,86 +1,96 @@
-# EduDisplej Boot Order a Závislostný Diagram / Boot Order and Dependency Diagram
+# EduDisplej Boot Order - Simplified & Optimized
 
-## Spúšťací proces / Boot Sequence
+## Goal
+After boot, display a fullscreen terminal on the main screen (tty1) running `edudisplej_terminal_script.sh`.
+
+## Simple Boot Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│ 1. SYSTEM BOOT                                                      │
-│    └─ Raspberry Pi bootloader → kernel → systemd                   │
-└────────────────────────────┬────────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 2. SYSTEMD TARGET: multi-user.target                               │
-│    └─ network-online.target                                        │
-└────────────────────────────┬────────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 3. SYSTEMD SERVICE: edudisplej-kiosk.service                       │
-│    Súbor / File: /etc/systemd/system/edudisplej-kiosk.service     │
-│    User: edudisplej (alebo / or CONSOLE_USER)                     │
-│    ExecStart: /opt/edudisplej/init/kiosk-start.sh                 │
-└────────────────────────────┬────────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 4. WRAPPER SCRIPT: kiosk-start.sh                                  │
-│    Súbor / File: /opt/edudisplej/init/kiosk-start.sh              │
-│    ┌───────────────────────────────────────────────────────────┐  │
-│    │ 4a. Check flag: .kiosk_system_configured                  │  │
-│    │     ├─ AK NIE / IF NOT → sudo edudisplej-init.sh         │  │
-│    │     └─ AK ÁNO / IF YES → skip init                       │  │
-│    ├───────────────────────────────────────────────────────────┤  │
-│    │ 4b. terminate_xorg() - Kill existing X servers            │  │
-│    ├───────────────────────────────────────────────────────────┤  │
-│    │ 4c. exec startx -- :0 vt1 2>&1 | tee /tmp/xorg-startup.log│  │
-│    └───────────────────────────────────────────────────────────┘  │
-└────────────────────────────┬────────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 5. X SERVER STARTUP: startx                                        │
-│    ├─ Reads: ~/.xinitrc                                           │
-│    └─ Starts: /usr/lib/xorg/Xorg :0 vt1                          │
-└────────────────────────────┬────────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 6. XINITRC: ~/.xinitrc                                             │
-│    Súbor / File: /home/edudisplej/.xinitrc                        │
-│    Obsah / Content: exec openbox-session                           │
-└────────────────────────────┬────────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 7. WINDOW MANAGER: openbox-session                                │
-│    ├─ Starts: /usr/bin/openbox                                    │
-│    └─ Reads: ~/.config/openbox/autostart                         │
-└────────────────────────────┬────────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 8. OPENBOX AUTOSTART: ~/.config/openbox/autostart                 │
-│    Súbor / File: /home/edudisplej/.config/openbox/autostart      │
-│    ┌───────────────────────────────────────────────────────────┐  │
-│    │ 8a. xset -dpms / xset s off / xset s noblank              │  │
-│    ├───────────────────────────────────────────────────────────┤  │
-│    │ 8b. unclutter -idle 1 &                                    │  │
-│    ├───────────────────────────────────────────────────────────┤  │
-│    │ 8c. xterm -e "$HOME/kiosk-launcher.sh" &                  │  │
-│    └───────────────────────────────────────────────────────────┘  │
-│    Log: /tmp/openbox-autostart.log                                │
-└────────────────────────────┬────────────────────────────────────────┘
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 9. KIOSK LAUNCHER: ~/kiosk-launcher.sh                            │
-│    Súbor / File: /home/edudisplej/kiosk-launcher.sh               │
-│    ┌───────────────────────────────────────────────────────────┐  │
-│    │ 9a. X connection test (xdpyinfo)                          │  │
-│    ├───────────────────────────────────────────────────────────┤  │
-│    │ 9b. Show ASCII logo (figlet)                              │  │
-│    ├───────────────────────────────────────────────────────────┤  │
-│    │ 9c. F2 countdown (raspi-config option)                    │  │
-│    ├───────────────────────────────────────────────────────────┤  │
-│    │ 9d. Launch browser (chromium/epiphany)                    │  │
-│    │     └─ chromium-browser --kiosk $URL                      │  │
-│    └───────────────────────────────────────────────────────────┘  │
-│    Log: /tmp/kiosk-launcher.log                                   │
-└─────────────────────────────────────────────────────────────────────┘
+System Boot
+    ↓
+systemd starts edudisplej-kiosk.service on tty1
+    ↓
+kiosk-start.sh (26 lines)
+    ├─ First boot? Run edudisplej-init.sh
+    ├─ Kill any old X servers
+    └─ Start: startx -- :0 vt1
+         ↓
+    ~/.xinitrc (3 lines)
+         └─ exec openbox-session
+              ↓
+         ~/.config/openbox/autostart (40 lines)
+              ├─ Configure display (auto-detect)
+              ├─ Disable screensaver
+              └─ Launch: xterm -fullscreen -e edudisplej_terminal_script.sh
+                   ↓
+              Terminal with banner + system info visible ✅
 ```
+
+## Key Points
+
+✅ **Simple**: Only 3 key scripts (kiosk-start.sh, .xinitrc, autostart)  
+✅ **Reliable**: Direct path, no complex logic  
+✅ **Cross-platform**: Works on any Linux with systemd + X11  
+✅ **VT1**: Display on main console, not vt7  
+✅ **Maintainable**: Easy to understand and modify  
+
+## Files
+
+```
+/opt/edudisplej/init/
+├── kiosk-start.sh           # 26 lines - Start X on vt1
+├── edudisplej-init.sh       # First boot setup
+├── edudisplej_terminal_script.sh  # 52 lines - Terminal display
+└── edudisplej-kiosk.service # Systemd service
+
+/home/<user>/
+├── .xinitrc                 # 3 lines - Start Openbox
+└── .config/openbox/
+    └── autostart            # 40 lines - Launch terminal
+```
+
+## Verification
+
+```bash
+# Verify X is on vt1
+ps aux | grep Xorg | grep -o 'vt[0-9]*'  # Should show: vt1
+
+# Check terminal running
+ps aux | grep edudisplej_terminal_script
+
+# View logs
+cat /tmp/openbox-autostart.log
+```
+
+## Troubleshooting
+
+**Terminal not visible?**
+```bash
+# Check X is running
+ps aux | grep Xorg
+
+# Check Openbox started
+ps aux | grep openbox
+
+# Check xterm launched
+ps aux | grep xterm
+
+# View log
+cat /tmp/openbox-autostart.log
+```
+
+**Wrong VT?**
+```bash
+ps aux | grep Xorg | grep -o 'vt[0-9]*'
+# If not vt1, edit /opt/edudisplej/init/kiosk-start.sh
+```
+
+## Summary
+
+- **Total**: ~150 lines of core code (simplified from 400+)
+- **Boot time**: Fast - no unnecessary waits or checks
+- **Reliability**: Simple = fewer failure points
+- **Goal**: Terminal on main screen EVERY TIME ✅
 
 ## Watchdog Service (Paralelne / Parallel)
 
