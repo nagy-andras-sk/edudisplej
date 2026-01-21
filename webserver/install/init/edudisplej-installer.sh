@@ -129,16 +129,29 @@ install_required_packages() {
     # Optimized: get all installed packages in one call
     print_info "Ellenorizzuk a csomagokat -- Kontrolujeme balicky..."
     local installed_packages
-    installed_packages=$(dpkg-query -W -f='${Package}\n' 2>/dev/null)
-    
-    for pkg in "${packages[@]}"; do
-        if echo "$installed_packages" | grep -q "^${pkg}$"; then
-            print_success "${pkg} ✓"
-        else
-            missing+=("$pkg")
-            print_warning "${pkg} hianzik -- chyba"
-        fi
-    done
+    # Use dpkg-query with error handling
+    if ! installed_packages=$(dpkg-query -W -f='${Package}\n' 2>/dev/null); then
+        # Fallback to dpkg if dpkg-query fails
+        print_warning "dpkg-query zlyhal, pouzivam dpkg fallback -- dpkg-query failed, using dpkg fallback"
+        for pkg in "${packages[@]}"; do
+            if dpkg -s "$pkg" >/dev/null 2>&1; then
+                print_success "${pkg} ✓"
+            else
+                missing+=("$pkg")
+                print_warning "${pkg} hianzik -- chyba"
+            fi
+        done
+    else
+        # dpkg-query succeeded, use optimized approach
+        for pkg in "${packages[@]}"; do
+            if echo "$installed_packages" | grep -q "^${pkg}$"; then
+                print_success "${pkg} ✓"
+            else
+                missing+=("$pkg")
+                print_warning "${pkg} hianzik -- chyba"
+            fi
+        done
+    fi
 
     if [[ ${#missing[@]} -eq 0 ]]; then
         print_success "Minden csomag telepitve van -- Vsetky balicky su nainstalovane"

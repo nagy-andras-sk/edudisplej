@@ -21,13 +21,21 @@ check_required_packages() {
     # Get all installed packages in one call for efficiency
     # This reduces the number of dpkg calls from N to 1
     local installed_packages
-    installed_packages=$(dpkg-query -W -f='${Package}\n' 2>/dev/null)
-
-    for pkg in "${packages[@]}"; do
-        if ! echo "$installed_packages" | grep -q "^${pkg}$"; then
-            missing+=("$pkg")
-        fi
-    done
+    if ! installed_packages=$(dpkg-query -W -f='${Package}\n' 2>/dev/null); then
+        # Fallback to individual dpkg calls if dpkg-query fails
+        for pkg in "${packages[@]}"; do
+            if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+                missing+=("$pkg")
+            fi
+        done
+    else
+        # Use optimized approach
+        for pkg in "${packages[@]}"; do
+            if ! echo "$installed_packages" | grep -q "^${pkg}$"; then
+                missing+=("$pkg")
+            fi
+        done
+    fi
 
     if [[ ${#missing[@]} -eq 0 ]]; then
         return 0  # Minden csomag megvan -- Všetky balíčky sú nainštalované

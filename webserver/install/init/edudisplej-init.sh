@@ -306,7 +306,7 @@ chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 # kiosk-launcher.sh letrehozasa kiosk mod alapjan -- Vytvorenie kiosk-launcher.sh podla kiosk modu
 print_info "Letrehozas -- Vytvorenie: kiosk-launcher.sh"
 
-# Create shared header for both browser types
+# Create shared header for both browser types - defined outside conditional
 create_kiosk_launcher_header() {
     cat <<'KIOSK_HEADER_EOF'
 #!/bin/bash
@@ -341,11 +341,7 @@ echo ""
 KIOSK_HEADER_EOF
 }
 
-if [[ "$KIOSK_MODE" = "epiphany" ]]; then
-    {
-        create_kiosk_launcher_header
-
-# Shared countdown and browser launch logic
+# Shared countdown and browser launch logic - defined outside conditional
 create_countdown_and_launch() {
     cat <<'COUNTDOWN_EOF'
 
