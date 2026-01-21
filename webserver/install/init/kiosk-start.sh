@@ -1,6 +1,6 @@
 #!/bin/bash
-# kiosk-start.sh - Wrapper script for systemd service
-# Handles first-time initialization and X server startup
+# kiosk-start.sh - Simplified wrapper script for systemd service
+# Handles first-time initialization and X server startup on tty1
 
 set -euo pipefail
 
@@ -71,11 +71,11 @@ fi
 # Terminate any existing X server
 terminate_xorg
 
-# Start X server
+# Start X server on vt1 (the main console)
+# This ensures display appears on the primary screen, not vt7
 if command -v startx >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server..."
-    exec startx -- :0 vt7 > /tmp/xorg-startup.log 2>&1 && \
-    openbox-session & xterm
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting X server on vt1..."
+    exec startx -- :0 vt1 > /tmp/xorg-startup.log 2>&1
 else
     echo "ERROR: startx not found. Init script may have failed."
     echo "Check logs: sudo journalctl -u edudisplej-kiosk.service"

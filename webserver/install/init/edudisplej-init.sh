@@ -307,137 +307,75 @@ print_info "Letrehozas -- Vytvorenie: Openbox autostart"
 mkdir -p "$USER_HOME/.config/openbox"
 cat > "$USER_HOME/.config/openbox/autostart" <<'AUTOSTART_EOF'
 #!/bin/bash
-# Openbox autostart with HDMI display activation
+# Openbox autostart - simplified for cross-platform compatibility
+# Goal: Display terminal with edudisplej_terminal_script.sh on main screen
 AUTOSTART_LOG="/tmp/openbox-autostart.log"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Openbox autostart BEGIN ===" >> "$AUTOSTART_LOG"
 
-# === CRITICAL: Wait for X server to fully initialize ===
+# Wait for X server to fully initialize
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for X server initialization..." >> "$AUTOSTART_LOG"
-sleep 5
+sleep 3
 
-# === CRITICAL: Force HDMI output activation ===
+# Configure display output (works on multiple platforms)
 if command -v xrandr >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detecting HDMI outputs..." >> "$AUTOSTART_LOG"
-    
-    # Log all detected outputs
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Detecting display outputs..." >> "$AUTOSTART_LOG"
     xrandr >> "$AUTOSTART_LOG" 2>&1
     
-    # Try multiple HDMI output names (different drivers use different names)
-    HDMI_OUTPUT=""
-    for output in HDMI-1 HDMI-0 HDMI-A-1 HDMI-A-0; do
-        if xrandr | grep -q "^$output connected"; then
-            HDMI_OUTPUT="$output"
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Found active HDMI output: $output" >> "$AUTOSTART_LOG"
-            break
-        fi
-    done
-    
-    if [ -n "$HDMI_OUTPUT" ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Activating $HDMI_OUTPUT..." >> "$AUTOSTART_LOG"
-        
-        # Set explicit mode and make primary
-        xrandr --output "$HDMI_OUTPUT" --mode 1920x1080 --primary >> "$AUTOSTART_LOG" 2>&1 || \
-        xrandr --output "$HDMI_OUTPUT" --auto --primary >> "$AUTOSTART_LOG" 2>&1
-        
-        # Try to set broadcast RGB to full (improves color on some monitors)
-        xrandr --output "$HDMI_OUTPUT" --set "Broadcast RGB" "Full" 2>/dev/null || true
-        
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $HDMI_OUTPUT activated successfully" >> "$AUTOSTART_LOG"
-        
-        # Verify activation
-        if xrandr | grep -q "^$HDMI_OUTPUT.*\*"; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ $HDMI_OUTPUT is active and primary" >> "$AUTOSTART_LOG"
-        else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ WARNING: $HDMI_OUTPUT may not be active!" >> "$AUTOSTART_LOG"
-        fi
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ ERROR: No HDMI output detected!" >> "$AUTOSTART_LOG"
-        # Log all available outputs for debugging
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Available outputs:" >> "$AUTOSTART_LOG"
-        xrandr | grep " connected" >> "$AUTOSTART_LOG" 2>&1
+    # Find first connected output and set it as primary
+    DISPLAY_OUTPUT=$(xrandr | grep " connected" | head -1 | awk '{print $1}')
+    if [ -n "$DISPLAY_OUTPUT" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting $DISPLAY_OUTPUT as primary..." >> "$AUTOSTART_LOG"
+        xrandr --output "$DISPLAY_OUTPUT" --auto --primary >> "$AUTOSTART_LOG" 2>&1 || true
     fi
 fi
 
-# Set white background (visible test)
-if command -v xsetroot >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting white background..." >> "$AUTOSTART_LOG"
-    xsetroot -solid white >> "$AUTOSTART_LOG" 2>&1
-fi
-
-# Screen saver settings (only if xset is available)
+# Disable screen saver and power management
 if command -v xset >/dev/null 2>&1; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting xset options..." >> "$AUTOSTART_LOG"
-    xset -dpms >> "$AUTOSTART_LOG" 2>&1
-    xset s off >> "$AUTOSTART_LOG" 2>&1
-    xset s noblank >> "$AUTOSTART_LOG" 2>&1
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] xset configured" >> "$AUTOSTART_LOG"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Disabling screen saver..." >> "$AUTOSTART_LOG"
+    xset -dpms >> "$AUTOSTART_LOG" 2>&1 || true
+    xset s off >> "$AUTOSTART_LOG" 2>&1 || true
+    xset s noblank >> "$AUTOSTART_LOG" 2>&1 || true
 fi
 
-# Hide cursor (only if unclutter is available)
+# Hide cursor after 1 second of inactivity
 if command -v unclutter >/dev/null 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting unclutter..." >> "$AUTOSTART_LOG"
     unclutter -idle 1 >> "$AUTOSTART_LOG" 2>&1 &
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] unclutter started" >> "$AUTOSTART_LOG"
+fi
+
+# Set black background (professional look)
+if command -v xsetroot >/dev/null 2>&1; then
+    xsetroot -solid black >> "$AUTOSTART_LOG" 2>&1 || true
 fi
 
 # Wait for display to be ready
 sleep 2
 
-# Launch xterm with VISIBLE colors (white background, black text)
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching xterm..." >> "$AUTOSTART_LOG"
+# Launch xterm with edudisplej_terminal_script.sh
+# This is the GOAL: show terminal with script content on main screen
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching EduDisplej terminal..." >> "$AUTOSTART_LOG"
+
+TERMINAL_SCRIPT="/opt/edudisplej/init/edudisplej_terminal_script.sh"
+
 if command -v xterm >/dev/null 2>&1; then
-    xterm -display :0 \
-          -fa "Monospace" -fs 16 \
-          -geometry 100x30+100+100 \
-          -bg white -fg black \
-          -title "EduDisplej Terminal - VISIBLE TEST" \
-          +sb \
-          -e bash -c '
-              clear
-              echo "========================================="
-              echo "   EduDisplej Terminal - WORKING!"
-              echo "========================================="
-              echo ""
-              echo "If you can read this, the display works!"
-              echo ""
-              echo "X Display: $DISPLAY"
-              echo "User: $USER"
-              echo "Date: $(date)"
-              echo ""
-              echo "Screen resolution:"
-              xrandr | grep "*" || echo "xrandr not available"
-              echo ""
-              echo "This terminal should be VISIBLE on HDMI monitor!"
-              echo ""
-              echo "Press Ctrl+C to exit"
-              echo ""
-              # Keep terminal open with live clock (5sec interval for CPU efficiency)
-              while true; do
-                  echo "$(date +%T) - Terminal is running..."
-                  sleep 5
-              done
-          ' >> "$AUTOSTART_LOG" 2>&1 &
-    
-    XTERM_PID=$!
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm launched (PID: $XTERM_PID)" >> "$AUTOSTART_LOG"
-    
-    # Verify xterm started
-    sleep 2
-    if ps -p $XTERM_PID > /dev/null 2>&1; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ xterm process confirmed running" >> "$AUTOSTART_LOG"
+    if [ -x "$TERMINAL_SCRIPT" ]; then
+        # Launch fullscreen terminal with the edudisplej script
+        xterm -display :0 \
+              -fullscreen \
+              -fa "Monospace" -fs 14 \
+              -bg black -fg green \
+              -title "EduDisplej" \
+              +sb \
+              -e "$TERMINAL_SCRIPT" >> "$AUTOSTART_LOG" 2>&1 &
         
-        # Raise window to front
-        if command -v xdotool >/dev/null 2>&1; then
-            XTERM_WID=$(xdotool search --pid $XTERM_PID 2>/dev/null | head -1)
-            if [ -n "$XTERM_WID" ]; then
-                xdotool windowactivate $XTERM_WID 2>/dev/null
-                xdotool windowraise $XTERM_WID 2>/dev/null
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ xterm window raised (WID: $XTERM_WID)" >> "$AUTOSTART_LOG"
-            fi
-        fi
+        XTERM_PID=$!
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] EduDisplej terminal launched (PID: $XTERM_PID)" >> "$AUTOSTART_LOG"
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ ERROR: xterm process died!" >> "$AUTOSTART_LOG"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Terminal script not found or not executable: $TERMINAL_SCRIPT" >> "$AUTOSTART_LOG"
+        # Fallback: launch simple terminal
+        xterm -display :0 -fullscreen -fa "Monospace" -fs 14 -bg black -fg green \
+              -title "EduDisplej" +sb >> "$AUTOSTART_LOG" 2>&1 &
     fi
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: xterm not found!" >> "$AUTOSTART_LOG"
@@ -449,77 +387,19 @@ AUTOSTART_EOF
 chmod +x "$USER_HOME/.config/openbox/autostart"
 chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 
-# kiosk-launcher.sh letrehozasa kiosk mod alapjan -- Vytvorenie kiosk-launcher.sh podla kiosk modu
-print_info "Letrehozas -- Vytvorenie: kiosk-launcher.sh"
+# kiosk-launcher.sh - Not used in simplified setup, kept for compatibility
+print_info "Letrehozas -- Vytvorenie: kiosk-launcher.sh (compatibility)"
 
-# NOTE: Simplified kiosk launcher for terminal test mode
-# This removes browser launch code to focus on getting xterm visible first
-# KIOSK_MODE variable is still set but not used here - browser can be added back later
-# Simplified kiosk launcher - TERMINAL ONLY (no browser)
 cat > "$USER_HOME/kiosk-launcher.sh" <<'LAUNCHER_EOF'
 #!/bin/bash
-# Simplified kiosk launcher - TERMINAL ONLY (no browser)
+# kiosk-launcher.sh - Kept for compatibility but not used
+# Terminal is launched directly from Openbox autostart
 LAUNCHER_LOG="/tmp/kiosk-launcher.log"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER START (TERMINAL TEST MODE) ===" | tee -a "$LAUNCHER_LOG"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] kiosk-launcher.sh (not used)" | tee -a "$LAUNCHER_LOG"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Terminal is launched from Openbox autostart" | tee -a "$LAUNCHER_LOG"
 
-# Display environment
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] DISPLAY=$DISPLAY" | tee -a "$LAUNCHER_LOG"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] HOME=$HOME" | tee -a "$LAUNCHER_LOG"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] USER=$USER" | tee -a "$LAUNCHER_LOG"
-
-# Test X connection
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Testing X connection..." | tee -a "$LAUNCHER_LOG"
-if command -v xdpyinfo >/dev/null 2>&1; then
-    if xdpyinfo >/dev/null 2>&1; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ X connection OK" | tee -a "$LAUNCHER_LOG"
-        
-        # Get screen resolution (with error handling)
-        SCREEN_INFO=$(xdpyinfo 2>/dev/null | grep dimensions | awk '{print $2}')
-        if [ -n "$SCREEN_INFO" ]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Screen resolution: $SCREEN_INFO" | tee -a "$LAUNCHER_LOG"
-        else
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Could not determine screen resolution" | tee -a "$LAUNCHER_LOG"
-        fi
-    else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ ERROR: Cannot connect to X display!" | tee -a "$LAUNCHER_LOG"
-        exit 1
-    fi
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: xdpyinfo not available" | tee -a "$LAUNCHER_LOG"
-fi
-
-# Show ASCII logo (if figlet available)
-if command -v figlet >/dev/null 2>&1; then
-    echo "" | tee -a "$LAUNCHER_LOG"
-    figlet -f standard "EduDisplej" | tee -a "$LAUNCHER_LOG"
-    echo "" | tee -a "$LAUNCHER_LOG"
-fi
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Terminal test mode - no browser launch" | tee -a "$LAUNCHER_LOG"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] This terminal should remain visible" | tee -a "$LAUNCHER_LOG"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] === KIOSK LAUNCHER END ===" | tee -a "$LAUNCHER_LOG"
-
-# Keep this script running so xterm doesn't close
-echo ""
-echo "==================================="
-echo "Terminal is working!"
-echo "==================================="
-echo ""
-echo "You should see this message on screen."
-echo ""
-echo "To add browser later, edit:"
-echo "  /home/$USER/kiosk-launcher.sh"
-echo ""
-echo "Logs available at:"
-echo "  /tmp/openbox-autostart.log"
-echo "  /tmp/kiosk-launcher.log"
-echo "  /tmp/edudisplej-watchdog.log"
-echo ""
-echo "Press Ctrl+C to close this terminal"
-echo ""
-
-# Keep terminal open
+# Keep script running if called
 exec bash
 LAUNCHER_EOF
 
