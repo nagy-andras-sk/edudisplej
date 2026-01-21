@@ -1,112 +1,144 @@
-# Terminal Test Mode
+# Terminal Display Mode
 
-Az EduDisplej most **terminal teszt módban** fut.
+EduDisplej runs in **terminal display mode** - showing a fullscreen terminal on the main display (tty1).
 
-## Mit látsz a képernyőn?
+## What You Should See
 
-Egy **fekete hátterű, zöld szöveges xterm terminál** kellene megjelenjen:
+A **fullscreen terminal** with the EduDisplej banner and system information:
 
 ```
-===================================
-   EduDisplej Terminal Test
-===================================
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║   ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗ ██╗     ███████╗   ║
+║   ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗██║     ██╔════╝   ║
+║   █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝██║     █████╗     ║
+║   ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝ ██║     ██╔══╝     ║
+║   ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗   ║
+║   ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
 
-X Display: :0
-User: edudisplej
-Home: /home/edudisplej
-
-This terminal should be VISIBLE on screen!
-
-Logs:
-  - Openbox: /tmp/openbox-autostart.log
-  - Watchdog: /tmp/edudisplej-watchdog.log
-
-Press Ctrl+C to exit, or this will stay open.
+  System je pripraveny / System is ready
+  ═══════════════════════════════════════
 ```
 
-## Ellenőrzés SSH-ról
+## Key Features
+
+✅ **Runs on tty1** (main console, not vt7!)  
+✅ **Cross-platform** (Raspberry Pi, Debian, Ubuntu, etc.)  
+✅ **Fullscreen terminal** with system info  
+✅ **Interactive bash shell** for commands  
+✅ **Professional display** with ASCII banner  
+
+## Verification via SSH
 
 ```bash
-# 1. Watchdog státusz
-tail -20 /tmp/edudisplej-watchdog.log
+# 1. Check service status
+sudo systemctl status edudisplej-kiosk.service
 
-# Várt eredmény:
-# ✓ X Server running
-# ✓ Openbox running
-# ✓ xterm running
-# ⊘ Browser check disabled (terminal test mode)
+# 2. Verify X is running on vt1 (NOT vt7!)
+ps aux | grep Xorg | grep -o 'vt[0-9]*'
+# Expected output: vt1
 
-# 2. Openbox log
+# 3. Check terminal process
+ps aux | grep edudisplej_terminal_script.sh
+
+# 4. View logs
 cat /tmp/openbox-autostart.log
-
-# 3. xterm folyamat
-ps aux | grep xterm
+tail -20 /tmp/edudisplej-watchdog.log
 ```
 
-## Böngésző hozzáadása később
+## Architecture Changes
 
-Ha a terminál már látszik, szerkeszd:
+### What Changed:
+
+1. **Fixed VT allocation:**
+   - X server now runs on **vt1** (main console)
+   - Was incorrectly starting on vt7 before
+   - Display now appears on primary screen
+
+2. **Simplified boot flow:**
+   - systemd → kiosk-start.sh → startx on vt1 → openbox → xterm → terminal script
+   - Removed complex browser launch logic
+   - Direct path to goal: terminal display
+
+3. **Cross-platform compatibility:**
+   - No Raspberry Pi specific assumptions
+   - Auto-detects display outputs
+   - Works on Debian, Ubuntu, Raspberry Pi
+
+4. **Package installation:**
+   - Only essential packages installed
+   - Browser installation skipped (not needed for terminal mode)
+   - `xterm` added to required packages
+
+5. **Terminal script improved:**
+   - Professional ASCII banner
+   - Shows system information (hostname, IP, resolution)
+   - Interactive bash shell
+
+## Troubleshooting
+
+### Display on wrong VT (nothing visible on screen)
+
+**Check:**
 ```bash
-nano /home/edudisplej/kiosk-launcher.sh
+ps aux | grep Xorg | grep -o 'vt[0-9]*'
 ```
 
-Adj hozzá a végére:
+**Expected:** `vt1`  
+**If you see:** `vt7` → Edit `/opt/edudisplej/init/kiosk-start.sh` and change to `vt1`
+
+### Terminal not appearing
+
+**Check logs:**
 ```bash
-# Launch Chromium
+cat /tmp/openbox-autostart.log | grep -i terminal
+```
+
+**Verify script is executable:**
+```bash
+ls -la /opt/edudisplej/init/edudisplej_terminal_script.sh
+# Should show: -rwxr-xr-x (executable)
+```
+
+### Manual terminal test
+
+```bash
+# Run as the console user
+DISPLAY=:0 xterm -fullscreen -bg black -fg green &
+```
+
+If this works, the issue is in the autostart script.
+
+## Adding Browser Later (Optional)
+
+The system is designed for terminal display only. If you need to add browser functionality later:
+
+1. Install browser:
+```bash
+sudo apt-get install chromium-browser
+```
+
+2. Modify Openbox autostart:
+```bash
+sudo nano /home/<user>/.config/openbox/autostart
+```
+
+3. Add browser launch (after terminal):
+```bash
+# Launch browser
 chromium-browser --kiosk --no-sandbox "https://www.time.is" &
 ```
 
-## Hibaelhárítás
+## Success Criteria
 
-### Ha továbbra sem látszik a terminál:
+✅ **Terminal visible on main display (physical screen)**  
+✅ **X server running on vt1**  
+✅ **EduDisplej banner displayed**  
+✅ **Interactive bash shell working**  
+✅ **System info showing correct details**  
 
-1. **Ellenőrizd az X felbontást:**
-```bash
-DISPLAY=:0 xrandr
-```
+## Documentation
 
-2. **Próbáld manuálisan:**
-```bash
-DISPLAY=:0 xterm -bg red -fg white -geometry 80x24+100+100 &
-```
-
-3. **Ellenőrizd az ablakokat:**
-```bash
-DISPLAY=:0 xdotool search --class xterm
-```
-
-4. **OpenBox config:**
-```bash
-cat ~/.config/openbox/rc.xml
-```
-
-## Változtatások összefoglalása
-
-### Mi változott:
-
-1. **Új csomagok telepítve:**
-   - `x11-xserver-utils` - tartalmazza az `xset` parancsot
-   - `python3-xdg` - OpenBox XDG autostart-hoz szükséges
-
-2. **Openbox autostart frissítve:**
-   - Védőmechanizmus hozzáadva (ellenőrzi hogy xset létezik-e)
-   - xterm explicit `-display :0` paraméterrel indul
-   - `-geometry 120x36+50+50` - pozíció és méret megadva
-   - `-bg black -fg green` - látható színek
-   - Teszt üzenet megjelenítése a terminálon
-   - `exec bash` - terminál nyitva marad
-
-3. **kiosk-launcher.sh egyszerűsítve:**
-   - **Böngésző indítás ELTÁVOLÍTVA**
-   - Csak teszt üzenet megjelenítése
-   - Terminál nyitva marad
-
-4. **Watchdog frissítve:**
-   - Böngésző ellenőrzés kikapcsolva terminal test módban
-   - Nem jelentett hibát hiányzó böngésző miatt
-
-## Sikerkritérium
-
-**SIKER = A képernyőn látható egy zöld szöveges terminál fekete háttéren, üzenettel.**
-
-Ha ez működik, UTÁNA adjuk hozzá a böngészőt a `kiosk-launcher.sh` fájlhoz.
+See [BOOTORDER.md](BOOTORDER.md) for complete architecture documentation and boot sequence details.

@@ -225,7 +225,7 @@ echo ""
 # =============================================================================
 
 # Alapcsomagok telepitese -- Instalacia zakladnych balickov
-REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg x11-xserver-utils python3-xdg)
+REQUIRED_PACKAGES=(openbox xinit xterm unclutter curl x11-utils xserver-xorg x11-xserver-utils python3-xdg)
 print_info "1. Alapcsomagok telepitese -- Instalacia zakladnych balickov..."
 if ! install_required_packages "${REQUIRED_PACKAGES[@]}"; then
     print_warning "Nehany alapcsomag telepitese sikertelen -- Niektore zakladne balicky sa nepodarilo nainštalovat"
@@ -239,24 +239,29 @@ if ! install_kiosk_packages "$KIOSK_MODE"; then
 fi
 echo ""
 
-# Bongeszo telepitese -- Instalacia prehliadaca
-print_info "3. Bongeszo telepitese -- Instalacia prehliadaca..."
-if [[ "$KIOSK_MODE" = "epiphany" ]]; then
-    BROWSER_NAME="epiphany-browser"
-else
-    BROWSER_NAME="chromium-browser"
-fi
+# Browser installation is OPTIONAL - terminal mode doesn't need it
+# Uncomment below if browser functionality is needed later
+# print_info "3. Bongeszo telepitese -- Instalacia prehliadaca..."
+# if [[ "$KIOSK_MODE" = "epiphany" ]]; then
+#     BROWSER_NAME="epiphany-browser"
+# else
+#     BROWSER_NAME="chromium-browser"
+# fi
+# 
+# if ! install_browser "$BROWSER_NAME"; then
+#     print_warning "Bongeszo telepitese sikertelen -- Instalacia prehliadaca zlyhala"
+# fi
+# echo ""
 
-if ! install_browser "$BROWSER_NAME"; then
-    print_warning "Bongeszo telepitese sikertelen -- Instalacia prehliadaca zlyhala"
-fi
+print_info "Skipping browser installation (terminal-only mode)"
 echo ""
 
 # =============================================================================
 # Kiosk rendszer konfiguralasa -- Konfiguracia kiosk systemu
+# Terminal-only mode: Display terminal on main screen, no browser
 # =============================================================================
 
-print_info "4. Kiosk rendszer konfiguralasa -- Konfiguracia kiosk systemu..."
+print_info "3. Kiosk rendszer konfiguralasa -- Konfiguracia kiosk systemu..."
 
 KIOSK_CONFIGURED_FILE="${EDUDISPLEJ_HOME}/.kiosk_system_configured"
 
