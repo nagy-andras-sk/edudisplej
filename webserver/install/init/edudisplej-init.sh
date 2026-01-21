@@ -362,8 +362,12 @@ if command -v xterm >/dev/null 2>&1; then
     
     # List all windows
     if command -v xdotool >/dev/null 2>&1; then
-        WINDOWS=$(xdotool search --class xterm 2>&1)
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm windows: $WINDOWS" >> "$AUTOSTART_LOG"
+        WINDOWS=$(xdotool search --class xterm 2>&1 || echo "no windows found")
+        if [ "$WINDOWS" = "no windows found" ] || [ -z "$WINDOWS" ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm windows: none found yet" >> "$AUTOSTART_LOG"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] xterm windows: $WINDOWS" >> "$AUTOSTART_LOG"
+        fi
     fi
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: xterm not found!" >> "$AUTOSTART_LOG"
@@ -378,6 +382,9 @@ chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 # kiosk-launcher.sh letrehozasa kiosk mod alapjan -- Vytvorenie kiosk-launcher.sh podla kiosk modu
 print_info "Letrehozas -- Vytvorenie: kiosk-launcher.sh"
 
+# NOTE: Simplified kiosk launcher for terminal test mode
+# This removes browser launch code to focus on getting xterm visible first
+# KIOSK_MODE variable is still set but not used here - browser can be added back later
 # Simplified kiosk launcher - TERMINAL ONLY (no browser)
 cat > "$USER_HOME/kiosk-launcher.sh" <<'LAUNCHER_EOF'
 #!/bin/bash
@@ -397,9 +404,13 @@ if command -v xdpyinfo >/dev/null 2>&1; then
     if xdpyinfo >/dev/null 2>&1; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ X connection OK" | tee -a "$LAUNCHER_LOG"
         
-        # Get screen resolution
-        SCREEN_INFO=$(xdpyinfo | grep dimensions | awk '{print $2}')
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Screen resolution: $SCREEN_INFO" | tee -a "$LAUNCHER_LOG"
+        # Get screen resolution (with error handling)
+        SCREEN_INFO=$(xdpyinfo 2>/dev/null | grep dimensions | awk '{print $2}')
+        if [ -n "$SCREEN_INFO" ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Screen resolution: $SCREEN_INFO" | tee -a "$LAUNCHER_LOG"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Could not determine screen resolution" | tee -a "$LAUNCHER_LOG"
+        fi
     else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ ERROR: Cannot connect to X display!" | tee -a "$LAUNCHER_LOG"
         exit 1
