@@ -40,7 +40,7 @@ Po inštalácii reštartujte systém a EduDisplej sa automaticky spustí.
 ├── session.log                           # Log aktuálnej relácie
 ├── session.log.old                       # Predchádzajúca relácia
 ├── apt.log                               # Log APT operácií
-├── .kiosk_mode                           # Uložený kiosk mód (chromium/epiphany)
+├── .kiosk_mode                           # Uložený kiosk mód (chromium)
 ├── .console_user                         # Uložený používateľ
 ├── .user_home                            # Domovský adresár používateľa
 ├── .kiosk_configured                     # Flag: kiosk balíčky nainštalované
@@ -76,8 +76,8 @@ Po inštalácii reštartujte systém a EduDisplej sa automaticky spustí.
                              ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │  2. DETEKCIA ARCHITEKTÚRY                                            │
-│     ├─ ARMv6 → kiosk_mode = "epiphany"                              │
-│     └─ Iné   → kiosk_mode = "chromium"                              │
+│     └─ Všetky architektúry → kiosk_mode = "chromium"                │
+│        (Chromium pre lepšiu stabilitu, žiadny D-Bus požadovaný)      │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
                              ▼
@@ -263,7 +263,7 @@ Po inštalácii reštartujte systém a EduDisplej sa automaticky spustí.
 ┌──────────────────────────────────────────────────────────────────────┐
 │  4. SPUSTENIE PREHLIADAČA (kiosk mód)                               │
 │     ├─ Chromium: chromium-browser --kiosk --no-sandbox ...          │
-│     └─ Epiphany: epiphany-browser --fullscreen                      │
+│     │  (s optimalizovanými príznakmi pre nízke zdroje a bez D-Bus)  │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
                              ▼
@@ -313,8 +313,7 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 ┌──────────────────────────────────────────────────────────────────────┐
 │  3. NAČÍTANIE KONFIGURÁCIE                                           │
 │     ├─ Kiosk mód: čítanie z .kiosk_mode                             │
-│     │  ├─ "chromium" (štandardný)                                    │
-│     │  └─ "epiphany" (ARMv6)                                         │
+│     │  └─ "chromium" (pre všetky architektúry)                        │
 │     ├─ Konzolový používateľ: čítanie z .console_user                │
 │     └─ Domovský adresár: čítanie z .user_home                       │
 └────────────────────────────┬─────────────────────────────────────────┘
@@ -378,15 +377,13 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 │  ├─ xterm                                                            │
 │  ├─ xdotool                                                          │
 │  ├─ figlet                                                           │
-│  ├─ dbus-x11                                                         │
-│  └─ epiphany-browser (len ak kiosk_mode = "epiphany")              │
+│  └─ dbus-x11                                                         │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
                              ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │  [3/4] KONTROLA PREHLIADAČA                                         │
-│  ├─ chromium-browser (ak kiosk_mode = "chromium")                  │
-│  └─ epiphany-browser (ak kiosk_mode = "epiphany")                  │
+│  └─ chromium-browser alebo chromium                                 │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
                              ▼
@@ -433,7 +430,6 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 │  2. INŠTALÁCIA KIOSK BALÍČKOV                                       │
 │     └─ install_kiosk_packages($KIOSK_MODE)                           │
 │        ├─ xterm, xdotool, figlet, dbus-x11                          │
-│        ├─ epiphany-browser (ak ARMv6)                               │
 │        ├─ Kontrola flagu .kiosk_configured                          │
 │        ├─ Volá install_required_packages()                          │
 │        ├─ Vytvorí flag .kiosk_configured                            │
@@ -444,8 +440,7 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 ┌──────────────────────────────────────────────────────────────────────┐
 │  3. INŠTALÁCIA PREHLIADAČA                                          │
 │     └─ install_browser($BROWSER_NAME)                                │
-│        ├─ chromium-browser (štandardný)                             │
-│        └─ epiphany-browser (ARMv6)                                  │
+│        └─ chromium-browser (všetky architektúry)                     │
 │        ├─ Kontrola či už nainštalované (data/packages.json)         │
 │        ├─ apt-get update (ak ešte nebolo)                           │
 │        ├─ apt-get install s 2 pokusmi                               │
@@ -494,11 +489,9 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 │      ├─ Zobrazuje systémový status                                  │
 │      ├─ Odpočítava 5 sekúnd s možnosťou F2                          │
 │      ├─ Spúšťa prehliadač v kiosk móde                              │
+│      │  └─ chromium-browser --kiosk --no-sandbox (+ optimalizované  │
+│      │     príznaky pre nízke zdroje a bez D-Bus)                   │
 │      └─ Watchdog slučka (reštart pri zlyhaní)                       │
-│      ├─ Pre Chromium:                                               │
-│      │  └─ chromium-browser --kiosk --no-sandbox ...                │
-│      └─ Pre Epiphany:                                               │
-│         └─ epiphany-browser --fullscreen                            │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
                              ▼
@@ -572,7 +565,6 @@ Inštalácia balíčkov a sledovanie nainštalovaných komponentov.
   - Zaznamenáva do packages.json
 - `install_kiosk_packages(kiosk_mode)` - Inštalácia kiosk balíčkov
   - xterm, xdotool, figlet, dbus-x11
-  - epiphany-browser (ak ARMv6)
   - Používa flag .kiosk_configured
 
 ### kiosk-start.sh
@@ -590,7 +582,7 @@ Pomocné funkcie pre kiosk mód.
 **Funkcie:**
 - `start_kiosk_mode()` - Informačná funkcia (kiosk beží automaticky)
 - `stop_kiosk_mode()` - Zastavenie kiosk módu
-  - Ukončí chromium-browser, epiphany-browser, openbox, unclutter, Xorg, xinit
+  - Ukončí chromium-browser, chromium, openbox, unclutter, Xorg, xinit
   - Vyčistí X lock súbory
 
 ### display.sh
@@ -620,7 +612,7 @@ Jednoduchý skript pre zobrazenie ASCII bannera v terminále.
 
 | Súbor | Význam |
 |-------|--------|
-| `.kiosk_mode` | Obsahuje "chromium" alebo "epiphany" |
+| `.kiosk_mode` | Obsahuje "chromium" |
 | `.console_user` | Meno používateľa (napr. "pi") |
 | `.user_home` | Domovský adresár používateľa |
 | `.kiosk_configured` | Flag: kiosk balíčky nainštalované |
@@ -794,7 +786,7 @@ KIOSK_URL=https://vasaurl.sk
 **Metóda 2:** Upravte kiosk-launcher.sh
 ```bash
 nano ~/kiosk-launcher.sh
-# Zmeňte riadok (približne riadok 315 pre Epiphany, 454 pre Chromium):
+# Zmeňte riadok podľa potreby (Chromium s optimalizovanými príznakmi):
 URL="${1:-https://vasaurl.sk}"
 ```
 
@@ -810,11 +802,14 @@ Po zmene reštartujte službu:
 sudo systemctl restart edudisplej-kiosk.service
 ```
 
-### Zmena Kiosk Módu (Chromium ↔ Epiphany)
+### Zmena Kiosk Módu
+
+**Poznámka**: Systém teraz používa výhradne Chromium pre lepšiu stabilitu a bez potreby D-Bus session. Predchádzajúce nastavenie s Epiphany už nie je potrebné.
 
 ```bash
-# Zmena na Epiphany
-echo "epiphany" | sudo tee /opt/edudisplej/.kiosk_mode
+# Overenie nastavenia (mali by ste vidieť "chromium")
+cat /opt/edudisplej/.kiosk_mode
+```
 sudo rm /opt/edudisplej/.kiosk_system_configured
 
 # Zmena na Chromium
@@ -1011,7 +1006,7 @@ URL="${1:-file:///opt/edudisplej/localweb/mojastranka.html}"
 
 ### Ako zobrazím viac terminálových informácií pri štarte?
 
-Upravte `~/kiosk-launcher.sh` a pridajte požadované informácie do boot screen sekcie (riadky 332-369 pre Epiphany, 472-509 pre Chromium).
+Upravte `edudisplej_terminal_script.sh` a pridajte požadované informácie do boot screen sekcie.
 
 ---
 
@@ -1023,7 +1018,7 @@ EduDisplej poskytuje:
 - ✅ **Modulárnosť:** Jasne oddelené moduly
 - ✅ **Transparentnosť:** Reálny feedback pri inštalácii
 - ✅ **Spoľahlivosť:** Watchdog, automatické reštarty
-- ✅ **Flexibilitu:** Podpora Chromium aj Epiphany
+- ✅ **Flexibilitu:** Podpora Chromium s optimalizovanými príznakmi pre nízke zdroje
 - ✅ **Udržiavateľnosť:** Sledovanie balíčkov, jasná štruktúra
 
 Pre viac informácií, otázok alebo hlásenie problémov navštívte GitHub repozitár projektu.
