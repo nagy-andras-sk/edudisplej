@@ -295,14 +295,11 @@ install_kiosk_packages() {
     local packages=()
     local configured_file="${EDUDISPLEJ_HOME}/.kiosk_configured"
     
-    packages+=("xterm" "xdotool" "figlet" "dbus-x11" "cpulimit")
+    packages+=("xterm" "xdotool" "figlet" "dbus-x11")
     
-    if [[ "$kiosk_mode" = "epiphany" ]]; then
-        packages+=("epiphany-browser")
-        print_info "Epiphany prehliadac pre ARMv6..."
-    else
-        print_info "Chromium prehliadac bude nainstalovany samostatne..."
-    fi
+    # Always use Chromium for better stability and no D-Bus dependency
+    # Epiphany requires D-Bus session which causes crashes in minimal environments
+    print_info "Chromium prehliadac bude nainstalovany (zlepsena stabilita, ziaden D-Bus pozadovany)..."
     
     if check_packages_installed "kiosk_${kiosk_mode}"; then
         print_info "Kiosk balicky uz nainstalovane"
