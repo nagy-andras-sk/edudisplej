@@ -295,10 +295,10 @@ install_kiosk_packages() {
     local packages=()
     local configured_file="${EDUDISPLEJ_HOME}/.kiosk_configured"
     
-    packages+=("xterm" "xdotool" "figlet" "dbus-x11")
+    packages+=("xterm" "xdotool" "figlet")
     
     # Always use Chromium for better stability and no D-Bus dependency
-    # Epiphany requires D-Bus session which causes crashes in minimal environments
+    # Chromium with --no-sandbox does not require D-Bus session
     print_info "Chromium prehliadac bude nainstalovany (zlepsena stabilita, ziaden D-Bus pozadovany)..."
     
     if check_packages_installed "kiosk_${kiosk_mode}"; then

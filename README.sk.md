@@ -376,8 +376,7 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 │  [2/4] KONTROLA KIOSK BALÍČKOV                                      │
 │  ├─ xterm                                                            │
 │  ├─ xdotool                                                          │
-│  ├─ figlet                                                           │
-│  └─ dbus-x11                                                         │
+│  └─ figlet                                                           │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
                              ▼
@@ -429,7 +428,7 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 ┌──────────────────────────────────────────────────────────────────────┐
 │  2. INŠTALÁCIA KIOSK BALÍČKOV                                       │
 │     └─ install_kiosk_packages($KIOSK_MODE)                           │
-│        ├─ xterm, xdotool, figlet, dbus-x11                          │
+│        ├─ xterm, xdotool, figlet                                     │
 │        ├─ Kontrola flagu .kiosk_configured                          │
 │        ├─ Volá install_required_packages()                          │
 │        ├─ Vytvorí flag .kiosk_configured                            │
@@ -564,7 +563,7 @@ Inštalácia balíčkov a sledovanie nainštalovaných komponentov.
   - Inštaluje s 2 pokusmi
   - Zaznamenáva do packages.json
 - `install_kiosk_packages(kiosk_mode)` - Inštalácia kiosk balíčkov
-  - xterm, xdotool, figlet, dbus-x11
+  - xterm, xdotool, figlet
   - Používa flag .kiosk_configured
 
 ### kiosk-start.sh

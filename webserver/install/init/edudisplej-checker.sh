@@ -152,7 +152,7 @@ check_system_ready() {
     fi
     
     # 2. Kiosk csomagok ellenőrzése -- Kontrola kiosk balíčkov
-    local kiosk_packages=(xterm xdotool figlet dbus-x11)
+    local kiosk_packages=(xterm xdotool figlet)
     print_info "[2/4] Kiosk csomagok -- Kiosk balíčky..."
     if check_required_packages "${kiosk_packages[@]}" >/dev/null 2>&1; then
         print_success "  ✓ Kiosk csomagok rendben -- Kiosk balíčky sú v poriadku"

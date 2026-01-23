@@ -42,14 +42,14 @@ echo ""
 echo "  ═══════════════════════════════════════════════════════"
 echo ""
 
-# Countdown a böngésző indításáig
+# Countdown na spustenie prehliadača
 for i in {10..1}; do
-    echo "  Böngésző indítása: ${i} mp múlva..."
+    echo "  Spustenie prehliadača za: ${i} sekúnd..."
     sleep 1
 done
 
 echo ""
-echo "  Böngésző indítása: /opt/edudisplej/localweb/clock.html"
+echo "  Spustenie prehliadača: /opt/edudisplej/localweb/clock.html"
 
 # Determine which browser to use
 BROWSER_CMD=""
@@ -60,7 +60,7 @@ elif command -v chromium >/dev/null 2>&1; then
 fi
 
 if [ -n "$BROWSER_CMD" ]; then
-    echo "  Használt böngésző: $BROWSER_CMD"
+    echo "  Používaný prehliadač: $BROWSER_CMD"
     # Launch Chromium with optimized flags for low resources and no D-Bus dependency
     $BROWSER_CMD \
         --kiosk \
@@ -80,8 +80,8 @@ if [ -n "$BROWSER_CMD" ]; then
         --check-for-update-interval=31536000 \
         file:///opt/edudisplej/localweb/clock.html &
 else
-    echo "  HIBA: Chromium nem található!"
-    echo "  Telepítse: sudo apt-get install chromium-browser"
+    echo "  CHYBA: Chromium sa nenašiel!"
+    echo "  Nainštalujte: sudo apt-get install chromium-browser"
 fi
 
 # Interactive shell
