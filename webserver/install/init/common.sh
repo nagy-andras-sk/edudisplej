@@ -38,61 +38,6 @@ TRANS_SK=(
     ["boot_starting_kiosk"]="Spustam kiosk rezim..."
     ["boot_loading_mode"]="Nacitavam ulozeny rezim..."
 
-    # Menu
-    ["menu_title"]="EduDisplej - Konfiguracne Menu"
-    ["menu_select"]="Vyberte moznost:"
-    ["menu_eduserver"]="EduServer rezim"
-    ["menu_standalone"]="Samostatny rezim"
-    ["menu_language"]="Jazyk"
-    ["menu_display"]="Nastavenia displeja"
-    ["menu_network"]="Nastavenia siete"
-    ["menu_exit"]="Ukoncit"
-    ["menu_invalid"]="Neplatna volba. Skuste znova."
-
-    # Network
-    ["network_wifi_setup"]="Nastavenie Wi-Fi"
-    ["network_enter_ssid"]="Zadajte SSID siete:"
-    ["network_enter_password"]="Zadajte heslo:"
-    ["network_connecting"]="Pripajam sa k sieti..."
-    ["network_connected"]="Uspesne pripojene!"
-    ["network_failed"]="Pripojenie zlyhalo!"
-    ["network_current_ip"]="Aktualna IP adresa:"
-    ["network_static_ip"]="Nastavenie statickej IP"
-    ["network_enter_ip"]="Zadajte IP adresu:"
-    ["network_enter_gateway"]="Zadajte gateway:"
-    ["network_enter_dns"]="Zadajte DNS server:"
-
-    # Display
-    ["display_settings"]="Nastavenia displeja"
-    ["display_current_res"]="Aktualne rozlisenie:"
-    ["display_select_res"]="Vyberte rozlisenie:"
-    ["display_applied"]="Rozlisenie nastavene!"
-
-    # Language
-    ["language_select"]="Vyberte jazyk:"
-    ["language_english"]="Anglictina"
-    ["language_slovak"]="Slovencina"
-    ["language_changed"]="Jazyk zmeneny!"
-
-    # Kiosk
-    ["kiosk_starting_x"]="Spustam X server..."
-    ["kiosk_starting_browser"]="Spustam prehliadac chromium-browser..."
-    ["kiosk_retry"]="Pokus o znovuspustenie..."
-    ["kiosk_failed"]="Spustenie zlyhal po 3 pokusoch!"
-    ["boot_pkg_check"]="Kontrolujem potrebne balicky..."
-    ["boot_pkg_missing"]="Chybajuce balicky:"
-    ["boot_pkg_ok"]="Vsetky balicky nainstalovane"
-    ["boot_pkg_installing"]="Instalujem balicky:"
-    ["boot_pkg_install_failed"]="Instalacia balickov zlyhala"
-    ["boot_summary"]="Zhrnutie systemu pred startom"
-    ["boot_countdown"]="Stlacte M alebo F12 pre menu"
-    ["boot_version"]="Verzia:"
-    ["boot_update_check"]="Kontrolujem aktualizacie..."
-    ["boot_update_available"]="Nova verzia dostupna:"
-    ["boot_update_downloading"]="Stahujem aktualizovane skripty..."
-    ["boot_update_done"]="Aktualizacia dokoncena, restartujem skript..."
-    ["boot_update_failed"]="Aktualizacia zlyhala"
-
     # General
     ["press_enter"]="Stlacte ENTER pre pokracovanie..."
     ["yes"]="ano"
@@ -116,61 +61,6 @@ TRANS_EN=(
     ["boot_f12_prompt"]="Press F12 to enter configuration (5 seconds)..."
     ["boot_starting_kiosk"]="Starting kiosk mode..."
     ["boot_loading_mode"]="Loading saved mode..."
-
-    # Menu
-    ["menu_title"]="EduDisplej - Configuration Menu"
-    ["menu_select"]="Select an option:"
-    ["menu_eduserver"]="EduServer mode"
-    ["menu_standalone"]="Standalone mode"
-    ["menu_language"]="Language"
-    ["menu_display"]="Display settings"
-    ["menu_network"]="Network settings"
-    ["menu_exit"]="Exit"
-    ["menu_invalid"]="Invalid option. Try again."
-
-    # Network
-    ["network_wifi_setup"]="Wi-Fi Setup"
-    ["network_enter_ssid"]="Enter network SSID:"
-    ["network_enter_password"]="Enter password:"
-    ["network_connecting"]="Connecting to network..."
-    ["network_connected"]="Successfully connected!"
-    ["network_failed"]="Connection failed!"
-    ["network_current_ip"]="Current IP address:"
-    ["network_static_ip"]="Static IP configuration"
-    ["network_enter_ip"]="Enter IP address:"
-    ["network_enter_gateway"]="Enter gateway:"
-    ["network_enter_dns"]="Enter DNS server:"
-
-    # Display
-    ["display_settings"]="Display settings"
-    ["display_current_res"]="Current resolution:"
-    ["display_select_res"]="Select resolution:"
-    ["display_applied"]="Resolution applied!"
-
-    # Language
-    ["language_select"]="Select language:"
-    ["language_english"]="English"
-    ["language_slovak"]="Slovak"
-    ["language_changed"]="Language changed!"
-
-    # Kiosk
-    ["kiosk_starting_x"]="Starting X server..."
-    ["kiosk_starting_browser"]="Starting chromium-browser..."
-    ["kiosk_retry"]="Retrying..."
-    ["kiosk_failed"]="Failed after 3 attempts!"
-    ["boot_pkg_check"]="Checking required packages..."
-    ["boot_pkg_missing"]="Missing packages:"
-    ["boot_pkg_ok"]="All required packages installed"
-    ["boot_pkg_installing"]="Installing packages:"
-    ["boot_pkg_install_failed"]="Package installation failed"
-    ["boot_summary"]="System summary before start"
-    ["boot_countdown"]="Press M or F12 to enter menu"
-    ["boot_version"]="Version:"
-    ["boot_update_check"]="Checking for updates..."
-    ["boot_update_available"]="New version available:"
-    ["boot_update_downloading"]="Downloading updated scripts..."
-    ["boot_update_done"]="Update finished, restarting script..."
-    ["boot_update_failed"]="Update failed"
 
     # General
     ["press_enter"]="Press ENTER to continue..."
@@ -211,32 +101,6 @@ load_config() {
     return 0
 }
 
-# Save configuration to file
-save_config() {
-    cat > "$CONFIG_FILE" << EOF
-# EduDisplej Configuration File
-MODE=${MODE:-EDSERVER}
-KIOSK_URL=${KIOSK_URL:-$DEFAULT_KIOSK_URL}
-LANG=${CURRENT_LANG}
-PACKAGES_INSTALLED=${PACKAGES_INSTALLED:-0}
-EOF
-}
-
-# Get current mode
-get_mode() {
-    if [[ -f "$MODE_FILE" ]]; then
-        cat "$MODE_FILE"
-    else
-        echo ""
-    fi
-}
-
-# Set current mode
-set_mode() {
-    local mode="$1"
-    echo "$mode" > "$MODE_FILE"
-}
-
 # =============================================================================
 # Display Functions
 # =============================================================================
@@ -244,19 +108,6 @@ set_mode() {
 # Timestamp for logs
 log_timestamp() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')]"
-}
-
-# Print colored text
-print_color() {
-    local color="$1"
-    local text="$2"
-    case "$color" in
-        red)    echo -e "\033[0;31m${text}\033[0m" ;;
-        green)  echo -e "\033[0;32m${text}\033[0m" ;;
-        yellow) echo -e "\033[0;33m${text}\033[0m" ;;
-        blue)   echo -e "\033[0;94m${text}\033[0m" ;;
-        *)      echo "$text" ;;
-    esac
 }
 
 # Print info message
@@ -365,27 +216,6 @@ clear_screen() {
     clear 2>/dev/null || printf '\033[2J\033[H'
 }
 
-# =============================================================================
-# Menu Functions
-# =============================================================================
-
-# Show main menu
-show_main_menu() {
-    clear_screen
-    show_banner
-    echo "$(t menu_title)"
-    echo "================================"
-    echo ""
-    echo "  0. $(t menu_eduserver)"
-    echo "  1. $(t menu_standalone)"
-    echo "  2. $(t menu_language)"
-    echo "  3. $(t menu_display)"
-    echo "  4. $(t menu_network)"
-    echo "  5. $(t menu_exit)"
-    echo ""
-    echo "$(t menu_select)"
-}
-
 # Wait for user to press enter
 wait_for_enter() {
     echo ""
@@ -395,52 +225,6 @@ wait_for_enter() {
 # =============================================================================
 # Utility Functions
 # =============================================================================
-
-# Retry a command with exponential backoff
-# Usage: retry_command <max_attempts> <command> [args...]
-retry_command() {
-    local max_attempts="$1"
-    shift
-    local attempt=1
-    local delay=1
-    
-    while [[ $attempt -le $max_attempts ]]; do
-        if "$@"; then
-            return 0
-        fi
-        
-        if [[ $attempt -lt $max_attempts ]]; then
-            print_warning "Command failed (attempt $attempt/$max_attempts), retrying in ${delay}s..."
-            sleep "$delay"
-            delay=$((delay * 2))
-        fi
-        ((attempt++))
-    done
-    
-    print_error "Command failed after $max_attempts attempts"
-    return 1
-}
-
-# Check if running as root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        return 1
-    fi
-    return 0
-}
-
-# Get MAC address suffix for hostname generation
-get_mac_suffix() {
-    local mac
-    mac=$(ip link show | grep -A1 "eth0\|wlan0" | grep ether | head -1 | awk '{print $2}')
-    if [[ -n "$mac" ]]; then
-        local clean_mac
-        clean_mac=${mac//:/}
-        echo "${clean_mac: -6}"
-    else
-        echo "unknown"
-    fi
-}
 
 # Check internet connectivity
 check_internet() {
