@@ -801,13 +801,20 @@ Po zmene reštartujte službu:
 sudo systemctl restart edudisplej-kiosk.service
 ```
 
-### Zmena Kiosk Módu
+### Overenie Nastavenia Prehliadača
 
-**Poznámka**: Systém teraz používa výhradne Chromium pre lepšiu stabilitu a bez potreby D-Bus session. Predchádzajúce nastavenie s Epiphany už nie je potrebné.
+**Poznámka**: Systém teraz používa výhradne Chromium pre lepšiu stabilitu a bez potreby D-Bus session.
 
 ```bash
 # Overenie nastavenia (mali by ste vidieť "chromium")
 cat /opt/edudisplej/.kiosk_mode
+
+# Ak súbor neexistuje alebo obsahuje "epiphany", opravte ho:
+echo "chromium" | sudo tee /opt/edudisplej/.kiosk_mode
+sudo rm -f /opt/edudisplej/.kiosk_system_configured
+
+# Reštart služby pre aplikovanie zmeny
+sudo systemctl restart edudisplej-kiosk.service
 ```
 sudo rm /opt/edudisplej/.kiosk_system_configured
 

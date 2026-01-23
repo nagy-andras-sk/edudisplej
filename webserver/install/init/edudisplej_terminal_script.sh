@@ -77,7 +77,7 @@ if [ -n "$BROWSER_CMD" ]; then
         --noerrdialogs \
         --disable-session-crashed-bubble \
         --incognito \
-        --check-for-update-interval=31536000 \
+        --check-for-update-interval=31536000 \  # 1 year in seconds (disable updates)
         file:///opt/edudisplej/localweb/clock.html &
 else
     echo "  CHYBA: Chromium sa nenašiel!"
