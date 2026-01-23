@@ -156,7 +156,7 @@ echo ""
 echo "[*] Restartujem sluzby / Szolgaltatasok ujrainditasa..."
 
 # Najdenie vsetkych sluzieb edudisplej / Osszes edudisplej szolgaltatas megkeresese
-SERVICES=$(systemctl list-units --type=service --all | grep edudisplej | awk '{print $1}')
+SERVICES=$(systemctl list-units --type=service --all | grep '^[[:space:]]*edudisplej' | awk '{print $1}')
 
 if [ -n "$SERVICES" ]; then
     echo "[*] Zastavujem sluzby..."
