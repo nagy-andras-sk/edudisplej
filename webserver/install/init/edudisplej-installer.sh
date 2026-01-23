@@ -295,7 +295,7 @@ install_kiosk_packages() {
     local packages=()
     local configured_file="${EDUDISPLEJ_HOME}/.kiosk_configured"
     
-    packages+=("xterm" "xdotool" "figlet" "dbus-x11")
+    packages+=("xterm" "xdotool" "figlet" "dbus-x11" "cpulimit")
     
     if [[ "$kiosk_mode" = "epiphany" ]]; then
         packages+=("epiphany-browser")
