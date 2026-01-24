@@ -378,8 +378,7 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 │  ├─ xterm                                                            │
 │  ├─ xdotool                                                          │
 │  ├─ figlet                                                           │
-│  ├─ dbus-x11                                                         │
-│  └─ epiphany-browser (len ak kiosk_mode = "epiphany")              │
+│  └─ (dbus-x11 removed - not needed for terminal mode)              │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
                              ▼
@@ -432,8 +431,8 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 ┌──────────────────────────────────────────────────────────────────────┐
 │  2. INŠTALÁCIA KIOSK BALÍČKOV                                       │
 │     └─ install_kiosk_packages($KIOSK_MODE)                           │
-│        ├─ xterm, xdotool, figlet, dbus-x11                          │
-│        ├─ epiphany-browser (ak ARMv6)                               │
+│        ├─ xterm, xdotool, figlet                                    │
+│        ├─ (browser removed - terminal-only mode)                    │
 │        ├─ Kontrola flagu .kiosk_configured                          │
 │        ├─ Volá install_required_packages()                          │
 │        ├─ Vytvorí flag .kiosk_configured                            │
@@ -571,8 +570,8 @@ Inštalácia balíčkov a sledovanie nainštalovaných komponentov.
   - Inštaluje s 2 pokusmi
   - Zaznamenáva do packages.json
 - `install_kiosk_packages(kiosk_mode)` - Inštalácia kiosk balíčkov
-  - xterm, xdotool, figlet, dbus-x11
-  - epiphany-browser (ak ARMv6)
+  - xterm, xdotool, figlet (dbus-x11 removed)
+  - Browser removed (terminal-only mode)
   - Používa flag .kiosk_configured
 
 ### kiosk-start.sh
@@ -769,8 +768,8 @@ startx -- :0 vt1
    # Pre základné balíčky (riadok 228)
    REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg novybalik)
    
-   # Pre kiosk balíčky - upravte edudisplej-installer.sh (riadok 336)
-   packages+=("xterm" "xdotool" "figlet" "dbus-x11" "novybalik")
+   # Pre kiosk balíčky - upravte edudisplej-installer.sh
+   packages+=("xterm" "xdotool" "figlet" "novybalik")
    ```
 3. Vymažte flag súbory pre opätovnú inštaláciu:
    ```bash

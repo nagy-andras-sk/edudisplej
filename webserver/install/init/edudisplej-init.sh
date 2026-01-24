@@ -25,8 +25,9 @@ if [[ -f "$SESSION_LOG" ]]; then
     mv "$SESSION_LOG" "${SESSION_LOG}.old" 2>/dev/null || true
 fi
 
-# Kimenet atiranyitas log fajlba -- Presmerovanie vystupu do log suboru
-exec > >(tee -a "$SESSION_LOG") 2>&1
+# Kimenet atiranyitas log fajlba ES kepernyon -- Presmerovanie vystupu do log suboru A na obrazovku
+# Output to both log file AND screen (tty1) so user can see what's happening
+exec > >(tee -a "$SESSION_LOG" /dev/tty1) 2>&1
 
 # =============================================================================
 # Modulok betoltese -- Nacitanie modulov

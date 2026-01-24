@@ -16,9 +16,10 @@ Environment=DISPLAY=:0
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 
 # TTY configuration for tty1 (main console)
+# Output to tty so user can see what's happening on the display
 StandardInput=tty
-StandardOutput=journal
-StandardError=journal
+StandardOutput=tty
+StandardError=tty
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
