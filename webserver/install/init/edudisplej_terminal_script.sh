@@ -37,20 +37,10 @@ IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 
 echo "  ─────────────────────────────────────────────────────"
 echo ""
-echo " OK Logs: /tmp/openbox-autostart.log, /opt/edudisplej/session.log"
+echo "  Logs: /tmp/openbox-autostart.log, /opt/edudisplej/session.log"
 echo ""
 echo "  ═══════════════════════════════════════════════════════"
 echo ""
-
-# Countdown az Epiphany indításáig
-for i in {10..1}; do
-    echo "  Epiphany indítása: ${i} mp múlva..."
-    sleep 1
-done
-
-echo ""
-echo "  Epiphany indítása: /opt/edudisplej/localweb/clock.html"
-cpulimit -l 60 -- epiphany file:///opt/edudisplej/localweb/clock.html &
 
 # Interactive shell
 exec bash --login
