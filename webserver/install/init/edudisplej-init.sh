@@ -322,16 +322,44 @@ LOG="/tmp/openbox-autostart.log"
 exec >> "$LOG" 2>&1
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart starting"
+echo "DISPLAY=${DISPLAY:-not set}"
+echo "USER=$(whoami)"
+echo "HOME=$HOME"
 
 # Wait for X to be ready
-sleep 2
+sleep 3
 
-# Configure display - find first connected output
+# Configure display - find first connected output and set it properly
 if command -v xrandr >/dev/null 2>&1; then
-    OUTPUT=$(xrandr | grep " connected" | head -1 | awk '{print $1}')
+    echo "=== xrandr output ==="
+    xrandr 2>&1
+    echo "===================="
+    
+    # Get the first connected output
+    OUTPUT=$(xrandr 2>/dev/null | grep " connected" | head -1 | awk '{print $1}')
     if [ -n "$OUTPUT" ]; then
-        xrandr --output "$OUTPUT" --auto --primary 2>/dev/null || true
-        echo "Display output set: $OUTPUT"
+        echo "Found output: $OUTPUT"
+        # Set output as primary and auto-configure
+        xrandr --output "$OUTPUT" --auto --primary 2>&1 || echo "xrandr failed"
+        echo "Display output configured: $OUTPUT"
+        
+        # Also try to explicitly set a resolution if auto fails
+        RESOLUTION=$(xrandr 2>/dev/null | grep -A1 "^$OUTPUT" | tail -1 | awk '{print $1}')
+        if [ -n "$RESOLUTION" ]; then
+            echo "Detected resolution: $RESOLUTION"
+            xrandr --output "$OUTPUT" --mode "$RESOLUTION" 2>&1 || true
+        fi
+    else
+        echo "WARNING: No connected output found!"
+        echo "Trying fallback display configuration..."
+        # Try common output names as fallback
+        for OUT in HDMI-1 HDMI-2 HDMI1 HDMI2 VGA-1 VGA1 LVDS-1 LVDS1 DSI-1 DSI1; do
+            if xrandr 2>/dev/null | grep -q "^$OUT connected"; then
+                echo "Found fallback output: $OUT"
+                xrandr --output "$OUT" --auto --primary 2>&1 || true
+                break
+            fi
+        done
     fi
 fi
 
@@ -340,16 +368,19 @@ command -v xset >/dev/null 2>&1 && {
     xset -dpms 2>/dev/null || true
     xset s off 2>/dev/null || true
     xset s noblank 2>/dev/null || true
+    echo "Screen blanking disabled"
 }
 
 # Hide cursor
 command -v unclutter >/dev/null 2>&1 && {
     unclutter -idle 1 &
+    echo "Cursor hiding enabled"
 }
 
 # Black background
 command -v xsetroot >/dev/null 2>&1 && {
     xsetroot -solid black 2>/dev/null || true
+    echo "Background set to black"
 }
 
 # Launch terminal with script - THIS IS THE GOAL
@@ -359,11 +390,21 @@ if [ -x "$SCRIPT" ]; then
     xterm -display :0 -fullscreen -fa Monospace -fs 14 \
           -bg black -fg green -title "EduDisplej" +sb \
           -e "$SCRIPT" &
-    echo "Terminal launched (PID: $!)"
+    XTERM_PID=$!
+    echo "Terminal launched (PID: $XTERM_PID)"
+    
+    # Verify terminal is running
+    sleep 2
+    if kill -0 $XTERM_PID 2>/dev/null; then
+        echo "Terminal is running"
+    else
+        echo "ERROR: Terminal process died!"
+    fi
 else
-    echo "ERROR: Script not found: $SCRIPT"
+    echo "ERROR: Script not found or not executable: $SCRIPT"
     # Fallback: simple terminal
     xterm -display :0 -fullscreen -bg black -fg green +sb &
+    echo "Launched fallback terminal"
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart complete"
