@@ -32,15 +32,8 @@ check_xterm() {
     return 1
 }
 
-check_browser() {
-    # Midori böngésző ellenőrzése
-    if pgrep -x midori >/dev/null; then
-        return 0
-    fi
-    return 1
-}
-
 log "=== EduDisplej Watchdog Started ==="
+log "Monitoring terminal-only mode (no browser)"
 
 while true; do
     log "--- Status Check ---"
@@ -63,15 +56,9 @@ while true; do
         log "✗ xterm NOT running"
     fi
     
-    if check_browser; then
-        log "✓ Browser running (Midori)"
-    else
-        log "✗ Browser NOT running"
-    fi
-    
     # Log file sizes
     [ -f /tmp/openbox-autostart.log ] && log "Openbox log: $(wc -l /tmp/openbox-autostart.log | awk '{print $1}') lines"
-    [ -f /tmp/kiosk-launcher.log ] && log "Launcher log: $(wc -l /tmp/kiosk-launcher.log | awk '{print $1}') lines"
+    [ -f /tmp/kiosk-startup.log ] && log "Startup log: $(wc -l /tmp/kiosk-startup.log | awk '{print $1}') lines"
     
     sleep "$CHECK_INTERVAL"
 done
