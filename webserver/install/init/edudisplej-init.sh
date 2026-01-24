@@ -372,10 +372,6 @@ if command -v xrandr >/dev/null 2>&1; then
             xrandr --output "$OUTPUT" --auto --primary 2>&1 | tee -a "$LOG"
         fi
         
-        # Force display update
-        sleep 1
-        xrandr --output "$OUTPUT" --auto 2>&1 | tee -a "$LOG" || true
-        
         echo "Display configured: $OUTPUT"
     else
         echo "WARNING: No connected display output found!"
@@ -397,7 +393,7 @@ fi
 
 # Hide mouse cursor
 if command -v unclutter >/dev/null 2>&1; then
-    unclutter -idle 1 -root &
+    unclutter -idle 1 &
     echo "✓ Unclutter started (PID: $!)"
 fi
 

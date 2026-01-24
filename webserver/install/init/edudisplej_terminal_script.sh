@@ -51,7 +51,7 @@ done
 echo ""
 echo "  Midori indítása: /opt/edudisplej/localweb/clock.html"
 if command -v midori >/dev/null 2>&1; then
-    midori -e Fullscreen -a file:///opt/edudisplej/localweb/clock.html &
+    midori --app file:///opt/edudisplej/localweb/clock.html &
 else
     echo "  WARNING: Midori not found, trying fallback browsers..."
     if command -v epiphany-browser >/dev/null 2>&1; then
