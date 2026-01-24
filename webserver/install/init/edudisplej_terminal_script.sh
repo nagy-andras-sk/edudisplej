@@ -42,15 +42,26 @@ echo ""
 echo "  ═══════════════════════════════════════════════════════"
 echo ""
 
-# Countdown az Epiphany indításáig
+# Countdown az Midori indításáig
 for i in {10..1}; do
-    echo "  Epiphany indítása: ${i} mp múlva..."
+    echo "  Midori indítása: ${i} mp múlva..."
     sleep 1
 done
 
 echo ""
-echo "  Epiphany indítása: /opt/edudisplej/localweb/clock.html"
-cpulimit -l 60 -- epiphany file:///opt/edudisplej/localweb/clock.html &
+echo "  Midori indítása: /opt/edudisplej/localweb/clock.html"
+if command -v midori >/dev/null 2>&1; then
+    midori -e Fullscreen -a file:///opt/edudisplej/localweb/clock.html &
+else
+    echo "  WARNING: Midori not found, trying fallback browsers..."
+    if command -v epiphany-browser >/dev/null 2>&1; then
+        cpulimit -l 60 -- epiphany-browser file:///opt/edudisplej/localweb/clock.html &
+    elif command -v chromium-browser >/dev/null 2>&1; then
+        chromium-browser --kiosk file:///opt/edudisplej/localweb/clock.html &
+    else
+        echo "  ERROR: No browser found!"
+    fi
+fi
 
 # Interactive shell
 exec bash --login

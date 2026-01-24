@@ -13,16 +13,22 @@ WorkingDirectory=/home/edudisplej
 Environment=HOME=/home/edudisplej
 Environment=USER=edudisplej
 Environment=DISPLAY=:0
-Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+
+# PAM session for proper logind/seat/VT access
+PAMName=login
 
 # TTY configuration for tty1 (main console)
 StandardInput=tty
-StandardOutput=journal
-StandardError=journal
+StandardOutput=journal+console
+StandardError=journal+console
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
 TTYVTDisallocate=yes
+
+# Switch to VT1 before starting
+ExecStartPre=/usr/bin/chvt 1
 
 # Run wrapper script to handle initialization and X startup
 ExecStart=/opt/edudisplej/init/kiosk-start.sh

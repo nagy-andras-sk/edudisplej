@@ -150,7 +150,7 @@ read_kiosk_preferences() {
         local arch
         arch="$(uname -m)"
         if [[ "$arch" = "armv6l" ]]; then
-            KIOSK_MODE="epiphany"
+            KIOSK_MODE="midori"
         else
             KIOSK_MODE="chromium"
         fi
@@ -325,57 +325,122 @@ mkdir -p "$USER_HOME/.config/openbox"
 cat > "$USER_HOME/.config/openbox/autostart" <<'AUTOSTART_EOF'
 #!/bin/bash
 # Openbox autostart - Launch terminal on main display
-# Simple and reliable
+# Robust display configuration to ensure content always shows on physical screen
 
 LOG="/tmp/openbox-autostart.log"
 exec >> "$LOG" 2>&1
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart starting"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] ===== Openbox autostart starting ====="
+echo "DISPLAY: ${DISPLAY:-not set}"
+echo "USER: ${USER:-not set}"
+echo "HOME: ${HOME:-not set}"
 
-# Wait for X to be ready
+# Wait for X to be fully ready
+echo "Waiting for X server to be ready..."
+for i in {1..30}; do
+    if xdpyinfo >/dev/null 2>&1; then
+        echo "X server ready after ${i} seconds"
+        break
+    fi
+    sleep 1
+done
+
+# Configure display - find and activate first connected output
+if command -v xrandr >/dev/null 2>&1; then
+    echo "Configuring display with xrandr..."
+    
+    # Get all outputs and their status
+    xrandr 2>/dev/null | tee -a "$LOG"
+    
+    # Find first connected output
+    OUTPUT=$(xrandr 2>/dev/null | grep " connected" | head -1 | awk '{print $1}')
+    
+    if [ -n "$OUTPUT" ]; then
+        echo "Found connected output: $OUTPUT"
+        
+        # Try to get preferred/current mode
+        MODE=$(xrandr 2>/dev/null | grep -A1 "^${OUTPUT} connected" | tail -1 | awk '{print $1}')
+        
+        if [ -n "$MODE" ]; then
+            echo "Setting output $OUTPUT to mode $MODE as primary"
+            xrandr --output "$OUTPUT" --mode "$MODE" --primary 2>&1 | tee -a "$LOG" || {
+                echo "Failed to set mode, trying --auto"
+                xrandr --output "$OUTPUT" --auto --primary 2>&1 | tee -a "$LOG"
+            }
+        else
+            echo "Setting output $OUTPUT to auto mode as primary"
+            xrandr --output "$OUTPUT" --auto --primary 2>&1 | tee -a "$LOG"
+        fi
+        
+        # Force display update
+        sleep 1
+        xrandr --output "$OUTPUT" --auto 2>&1 | tee -a "$LOG" || true
+        
+        echo "Display configured: $OUTPUT"
+    else
+        echo "WARNING: No connected display output found!"
+        echo "Available outputs:"
+        xrandr 2>/dev/null | grep -E "^[^ ]+ (dis)?connected" | tee -a "$LOG"
+    fi
+else
+    echo "WARNING: xrandr not available"
+fi
+
+# Disable all power management and screen blanking
+echo "Disabling screen blanking and power management..."
+if command -v xset >/dev/null 2>&1; then
+    xset -dpms 2>/dev/null && echo "✓ DPMS disabled" || echo "✗ DPMS disable failed"
+    xset s off 2>/dev/null && echo "✓ Screen saver off" || echo "✗ Screen saver off failed"
+    xset s noblank 2>/dev/null && echo "✓ Screen blank disabled" || echo "✗ Screen blank disable failed"
+    xset s 0 0 2>/dev/null && echo "✓ Screen saver timeout set to 0" || true
+fi
+
+# Hide mouse cursor
+if command -v unclutter >/dev/null 2>&1; then
+    unclutter -idle 1 -root &
+    echo "✓ Unclutter started (PID: $!)"
+fi
+
+# Set black background
+if command -v xsetroot >/dev/null 2>&1; then
+    xsetroot -solid black 2>/dev/null && echo "✓ Background set to black" || echo "✗ Background set failed"
+fi
+
+# Additional wait to ensure everything is settled
 sleep 2
 
-# Configure display - find first connected output
-if command -v xrandr >/dev/null 2>&1; then
-    OUTPUT=$(xrandr | grep " connected" | head -1 | awk '{print $1}')
-    if [ -n "$OUTPUT" ]; then
-        xrandr --output "$OUTPUT" --auto --primary 2>/dev/null || true
-        echo "Display output set: $OUTPUT"
-    fi
-fi
-
-# Disable screen blanking
-command -v xset >/dev/null 2>&1 && {
-    xset -dpms 2>/dev/null || true
-    xset s off 2>/dev/null || true
-    xset s noblank 2>/dev/null || true
-}
-
-# Hide cursor
-command -v unclutter >/dev/null 2>&1 && {
-    unclutter -idle 1 &
-}
-
-# Black background
-command -v xsetroot >/dev/null 2>&1 && {
-    xsetroot -solid black 2>/dev/null || true
-}
-
-# Launch terminal with script - THIS IS THE GOAL
+# Launch terminal with script - THIS IS THE MAIN APPLICATION
 SCRIPT="/opt/edudisplej/init/edudisplej_terminal_script.sh"
 if [ -x "$SCRIPT" ]; then
-    echo "Launching terminal with $SCRIPT"
-    xterm -display :0 -fullscreen -fa Monospace -fs 14 \
+    echo "Launching terminal with $SCRIPT on DISPLAY=${DISPLAY}"
+    
+    # Use explicit DISPLAY variable
+    DISPLAY=${DISPLAY:-:0} xterm -display "${DISPLAY:-:0}" \
+          -fullscreen -fa Monospace -fs 14 \
           -bg black -fg green -title "EduDisplej" +sb \
           -e "$SCRIPT" &
-    echo "Terminal launched (PID: $!)"
+    
+    XTERM_PID=$!
+    echo "✓ Terminal launched (PID: $XTERM_PID)"
+    
+    # Verify xterm started successfully
+    sleep 2
+    if kill -0 $XTERM_PID 2>/dev/null; then
+        echo "✓ Terminal running successfully"
+    else
+        echo "✗ ERROR: Terminal failed to start or crashed immediately"
+        # Fallback: simple terminal
+        DISPLAY=${DISPLAY:-:0} xterm -display "${DISPLAY:-:0}" -fullscreen -bg black -fg green +sb &
+        echo "Fallback terminal started (PID: $!)"
+    fi
 else
-    echo "ERROR: Script not found: $SCRIPT"
+    echo "ERROR: Script not found or not executable: $SCRIPT"
     # Fallback: simple terminal
-    xterm -display :0 -fullscreen -bg black -fg green +sb &
+    DISPLAY=${DISPLAY:-:0} xterm -display "${DISPLAY:-:0}" -fullscreen -bg black -fg green +sb &
+    echo "Fallback terminal started (PID: $!)"
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart complete"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] ===== Openbox autostart complete ====="
 AUTOSTART_EOF
 
 chmod +x "$USER_HOME/.config/openbox/autostart"

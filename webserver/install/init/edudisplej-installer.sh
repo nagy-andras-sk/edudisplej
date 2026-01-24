@@ -297,7 +297,10 @@ install_kiosk_packages() {
     
     packages+=("xterm" "xdotool" "figlet" "dbus-x11" "cpulimit")
     
-    if [[ "$kiosk_mode" = "epiphany" ]]; then
+    if [[ "$kiosk_mode" = "midori" ]]; then
+        packages+=("midori")
+        print_info "Midori prehliadac..."
+    elif [[ "$kiosk_mode" = "epiphany" ]]; then
         packages+=("epiphany-browser")
         print_info "Epiphany prehliadac pre ARMv6..."
     else
