@@ -33,7 +33,7 @@ stop_kiosk_mode() {
         all_pids+=("${temp_pids[@]}")
     fi
     
-    pids=$(pgrep -x "chromium" 2>/dev/null || true)
+    pids=$(pgrep -x "epiphany-browser" 2>/dev/null || true)
     if [[ -n "$pids" ]]; then
         readarray -t temp_pids <<< "$pids"
         all_pids+=("${temp_pids[@]}")

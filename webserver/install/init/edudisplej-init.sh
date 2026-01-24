@@ -147,8 +147,13 @@ read_kiosk_preferences() {
     if [[ -f "$kiosk_mode_file" ]]; then
         KIOSK_MODE=$(cat "$kiosk_mode_file" | tr -d '\r\n')
     else
-        # Always use chromium for better stability and no D-Bus dependency
-        KIOSK_MODE="chromium"
+        local arch
+        arch="$(uname -m)"
+        if [[ "$arch" = "armv6l" ]]; then
+            KIOSK_MODE="epiphany"
+        else
+            KIOSK_MODE="chromium"
+        fi
     fi
     print_info "Kiosk mod -- Kiosk mod: $KIOSK_MODE"
     
@@ -246,19 +251,21 @@ if ! install_kiosk_packages "$KIOSK_MODE"; then
 fi
 echo ""
 
-# Browser installation - Always use Chromium for stability
-print_info "3. Bongeszo telepitese -- Instalacia prehliadaca..."
-# Use chromium-browser for all architectures (better stability, no D-Bus session required)
-BROWSER_NAME="chromium-browser"
+# Browser installation is OPTIONAL - terminal mode doesn't need it
+# Uncomment below if browser functionality is needed later
+# print_info "3. Bongeszo telepitese -- Instalacia prehliadaca..."
+# if [[ "$KIOSK_MODE" = "epiphany" ]]; then
+#     BROWSER_NAME="epiphany-browser"
+# else
+#     BROWSER_NAME="chromium-browser"
+# fi
+# 
+# if ! install_browser "$BROWSER_NAME"; then
+#     print_warning "Bongeszo telepitese sikertelen -- Instalacia prehliadaca zlyhala"
+# fi
+# echo ""
 
-if ! install_browser "$BROWSER_NAME"; then
-    print_warning "Bongeszo telepitese sikertelen -- Instalacia prehliadaca zlyhala"
-    print_info "Fallback: pokus o chromium..."
-    BROWSER_NAME="chromium"
-    if ! install_browser "$BROWSER_NAME"; then
-        print_warning "Ani chromium sa nepodarilo nainštalovat"
-    fi
-fi
+print_info "Skipping browser installation (terminal-only mode)"
 echo ""
 
 # =============================================================================
