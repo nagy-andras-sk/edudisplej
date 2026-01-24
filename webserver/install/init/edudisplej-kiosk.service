@@ -25,7 +25,7 @@ StandardError=journal+console
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
-TTYVTDisallocate=yes
+TTYVTDisallocate=no
 
 # Switch to VT1 before starting
 ExecStartPre=/usr/bin/chvt 1

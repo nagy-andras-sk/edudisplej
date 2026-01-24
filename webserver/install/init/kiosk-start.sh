@@ -23,5 +23,6 @@ fi
 pkill -9 Xorg 2>/dev/null || true
 sleep 1
 
-# Start X on vt1 (main console) - this is where display will appear
-exec startx -- :0 vt1 2>&1 | tee /tmp/xorg-startup.log
+# Start X on the current VT (systemd already allocated tty1)
+# Do NOT specify vt1 explicitly - let X use the VT systemd allocated
+exec startx -- :0 2>&1 | tee /tmp/xorg-startup.log
