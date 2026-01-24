@@ -327,7 +327,20 @@ echo "USER=$(whoami)"
 echo "HOME=$HOME"
 
 # Wait for X to be ready
-sleep 3
+MAX_WAIT=10
+WAITED=0
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if xset q >/dev/null 2>&1; then
+        echo "X server ready after ${WAITED} seconds"
+        break
+    fi
+    sleep 1
+    WAITED=$((WAITED + 1))
+done
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+    echo "WARNING: X server may not be fully ready after ${MAX_WAIT} seconds"
+fi
 
 # Configure display - find first connected output and set it properly
 if command -v xrandr >/dev/null 2>&1; then
@@ -345,15 +358,20 @@ if command -v xrandr >/dev/null 2>&1; then
         
         # Also try to explicitly set a resolution if auto fails
         RESOLUTION=$(xrandr 2>/dev/null | grep -A1 "^$OUTPUT" | tail -1 | awk '{print $1}')
-        if [ -n "$RESOLUTION" ]; then
+        # Validate resolution format (should contain 'x' like 1920x1080)
+        if [ -n "$RESOLUTION" ] && [[ "$RESOLUTION" =~ ^[0-9]+x[0-9]+$ ]]; then
             echo "Detected resolution: $RESOLUTION"
             xrandr --output "$OUTPUT" --mode "$RESOLUTION" 2>&1 || true
+        else
+            echo "No valid resolution detected, relying on auto configuration"
         fi
     else
         echo "WARNING: No connected output found!"
         echo "Trying fallback display configuration..."
         # Try common output names as fallback
-        for OUT in HDMI-1 HDMI-2 HDMI1 HDMI2 VGA-1 VGA1 LVDS-1 LVDS1 DSI-1 DSI1; do
+        # This list covers most common display outputs on Raspberry Pi and other systems
+        FALLBACK_OUTPUTS="HDMI-1 HDMI-2 HDMI-3 HDMI1 HDMI2 HDMI3 VGA-1 VGA1 LVDS-1 LVDS1 DSI-1 DSI1 eDP-1 eDP1 DP-1 DP1"
+        for OUT in $FALLBACK_OUTPUTS; do
             if xrandr 2>/dev/null | grep -q "^$OUT connected"; then
                 echo "Found fallback output: $OUT"
                 xrandr --output "$OUT" --auto --primary 2>&1 || true
