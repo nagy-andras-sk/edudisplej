@@ -152,10 +152,7 @@ check_system_ready() {
     fi
     
     # 2. Kiosk csomagok ellenőrzése -- Kontrola kiosk balíčkov
-    local kiosk_packages=(xterm xdotool figlet dbus-x11)
-    if [[ "$kiosk_mode" = "epiphany" ]]; then
-        kiosk_packages+=("epiphany-browser")
-    fi
+    local kiosk_packages=(xterm xdotool figlet)
     print_info "[2/4] Kiosk csomagok -- Kiosk balíčky..."
     if check_required_packages "${kiosk_packages[@]}" >/dev/null 2>&1; then
         print_success "  ✓ Kiosk csomagok rendben -- Kiosk balíčky sú v poriadku"
@@ -165,15 +162,13 @@ check_system_ready() {
     fi
     
     # 3. Böngésző ellenőrzése -- Kontrola prehliadača
-    local browser_name
-    if [[ "$kiosk_mode" = "epiphany" ]]; then
-        browser_name="epiphany-browser"
-    else
-        browser_name="chromium-browser"
-    fi
+    # Always check for Chromium (no longer using Epiphany due to D-Bus issues)
+    local browser_name="chromium-browser"
     print_info "[3/4] Böngésző -- Prehliadač..."
     if check_browser "$browser_name"; then
         print_success "  ✓ Böngésző megvan -- Prehliadač je nainštalovaný: $browser_name"
+    elif check_browser "chromium"; then
+        print_success "  ✓ Böngésző megvan -- Prehliadač je nainštalovaný: chromium"
     else
         print_warning "  ✗ Böngésző hiányzik -- Prehliadač chýba: $browser_name"
         all_ready=false

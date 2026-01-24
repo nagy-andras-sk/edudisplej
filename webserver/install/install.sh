@@ -52,11 +52,10 @@ fi
 # Detekcia architektury / Architektura felismerese
 ARCH="$(uname -m)"
 echo "[*] Architektura / Architektura: $ARCH"
-if [ "$ARCH" = "armv6l" ]; then
-  KIOSK_MODE="epiphany"
-else
-  KIOSK_MODE="chromium"
-fi
+# Always use Chromium for better stability and no D-Bus dependency
+# Epiphany causes crashes in minimal environments without D-Bus session
+KIOSK_MODE="chromium"
+echo "[*] Browser mode: $KIOSK_MODE (optimized for low resources, no D-Bus required)"
 
 # Instalacia curl ak chyba / Curl telepites ha hianyzik
 if ! command -v curl >/dev/null 2>&1; then
