@@ -42,14 +42,14 @@ echo ""
 echo "  ═══════════════════════════════════════════════════════"
 echo ""
 
-# Countdown az Midori indításáig
+# Countdown a Midori indításáig
 for i in {10..1}; do
-    echo "  Midori indítása: ${i} mp múlva..."
+    echo "  A Midori indítása: ${i} mp múlva..."
     sleep 1
 done
 
 echo ""
-echo "  Midori indítása: /opt/edudisplej/localweb/clock.html"
+echo "  A Midori indítása: /opt/edudisplej/localweb/clock.html"
 if command -v midori >/dev/null 2>&1; then
     midori --app file:///opt/edudisplej/localweb/clock.html &
 else

@@ -299,7 +299,7 @@ install_kiosk_packages() {
     
     if [[ "$kiosk_mode" = "midori" ]]; then
         packages+=("midori")
-        print_info "Midori prehliadac..."
+        print_info "Midori prehliadač..."
     elif [[ "$kiosk_mode" = "epiphany" ]]; then
         packages+=("epiphany-browser")
         print_info "Epiphany prehliadac pre ARMv6..."
