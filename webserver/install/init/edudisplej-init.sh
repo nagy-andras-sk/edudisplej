@@ -143,18 +143,8 @@ read_kiosk_preferences() {
     local console_user_file="${EDUDISPLEJ_HOME}/.console_user"
     local user_home_file="${EDUDISPLEJ_HOME}/.user_home"
     
-    # Kiosk mod -- Kiosk mod
-    if [[ -f "$kiosk_mode_file" ]]; then
-        KIOSK_MODE=$(cat "$kiosk_mode_file" | tr -d '\r\n')
-    else
-        local arch
-        arch="$(uname -m)"
-        if [[ "$arch" = "armv6l" ]]; then
-            KIOSK_MODE="epiphany"
-        else
-            KIOSK_MODE="chromium"
-        fi
-    fi
+    # Kiosk mod -- Kiosk mod (Midori - universal böngésző)
+    KIOSK_MODE="midori"
     print_info "Kiosk mod -- Kiosk mod: $KIOSK_MODE"
     
     # Konzol felhasznalo -- Konzolovy pouzivatel

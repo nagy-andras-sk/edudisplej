@@ -33,10 +33,11 @@ check_xterm() {
 }
 
 check_browser() {
-    # DISABLED - browser check not needed in terminal test mode
-    # This allows the watchdog to report that browser checking is disabled
-    # rather than reporting it as an error
-    return 2  # Return "not applicable" status
+    # Midori böngésző ellenőrzése
+    if pgrep -x midori >/dev/null; then
+        return 0
+    fi
+    return 1
 }
 
 log "=== EduDisplej Watchdog Started ==="
@@ -63,9 +64,7 @@ while true; do
     fi
     
     if check_browser; then
-        log "✓ Browser running"
-    elif [ $? -eq 2 ]; then
-        log "⊘ Browser check disabled (terminal test mode)"
+        log "✓ Browser running (Midori)"
     else
         log "✗ Browser NOT running"
     fi

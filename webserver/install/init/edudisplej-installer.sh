@@ -289,20 +289,17 @@ install_browser() {
     fi
 }
 
-# Instalacia kiosk balickov / Kiosk csomagok telepitese
+# Instalacia kiosk balickok / Kiosk csomagok telepitese
 install_kiosk_packages() {
-    local kiosk_mode="${1:-chromium}"
+    local kiosk_mode="${1:-midori}"
     local packages=()
     local configured_file="${EDUDISPLEJ_HOME}/.kiosk_configured"
     
     packages+=("xterm" "xdotool" "figlet" "dbus-x11")
     
-    if [[ "$kiosk_mode" = "epiphany" ]]; then
-        packages+=("epiphany-browser")
-        print_info "Epiphany prehliadac pre ARMv6..."
-    else
-        print_info "Chromium prehliadac bude nainstalovany samostatne..."
-    fi
+    # Midori böngésző - minden architektúrához
+    packages+=("midori")
+    print_info "Midori prehliadac - minden architekturara..."
     
     if check_packages_installed "kiosk_${kiosk_mode}"; then
         print_info "Kiosk balicky uz nainstalovane"

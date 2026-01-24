@@ -52,11 +52,8 @@ fi
 # Detekcia architektury / Architektura felismerese
 ARCH="$(uname -m)"
 echo "[*] Architektura / Architektura: $ARCH"
-if [ "$ARCH" = "armv6l" ]; then
-  KIOSK_MODE="epiphany"
-else
-  KIOSK_MODE="chromium"
-fi
+# Midori böngésző - összes architektúrához
+KIOSK_MODE="midori"
 
 # Instalacia curl ak chyba / Curl telepites ha hianyzik
 if ! command -v curl >/dev/null 2>&1; then
