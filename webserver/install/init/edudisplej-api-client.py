@@ -11,6 +11,12 @@ Commands supported:
 - get_status: Get device status
 
 This is a foundation for future development.
+
+Dependencies:
+- Python 3.x (standard library only for core functionality)
+- python3-requests (optional, for server registration)
+  Install with: apt-get install python3-requests
+  If not available, registration will be skipped but local commands still work
 """
 
 import os
@@ -33,9 +39,9 @@ LOG_FILE = API_DIR / "api-client.log"
 PID_FILE = API_DIR / "api-client.pid"
 CONFIG_FILE = EDUDISPLEJ_HOME / "edudisplej.conf"
 
-# Server configuration
-API_SERVER_URL = "https://server.edudisplej.sk/api"
-POLL_INTERVAL = 60  # seconds
+# Server configuration - can be overridden in config file
+API_SERVER_URL = os.environ.get("EDUDISPLEJ_API_SERVER", "https://server.edudisplej.sk/api")
+POLL_INTERVAL = int(os.environ.get("EDUDISPLEJ_POLL_INTERVAL", "60"))  # seconds
 
 # Setup logging
 API_DIR.mkdir(parents=True, exist_ok=True)
@@ -74,12 +80,16 @@ class APIClient:
             # Try eth0 first
             mac_file = Path("/sys/class/net/eth0/address")
             if mac_file.exists():
-                return mac_file.read_text().strip()
+                mac = mac_file.read_text().strip()
+                if mac and mac != "00:00:00:00:00:00":
+                    return mac
             
             # Try wlan0
             mac_file = Path("/sys/class/net/wlan0/address")
             if mac_file.exists():
-                return mac_file.read_text().strip()
+                mac = mac_file.read_text().strip()
+                if mac and mac != "00:00:00:00:00:00":
+                    return mac
             
             # Find first non-loopback interface
             net_dir = Path("/sys/class/net")
@@ -94,7 +104,15 @@ class APIClient:
         except Exception as e:
             logger.error(f"Error getting MAC address: {e}")
         
-        return "00:00:00:00:00:00"
+        # Generate pseudo-random fallback based on hostname
+        # This ensures different devices get different fallbacks
+        import hashlib
+        hostname = socket.gethostname()
+        hash_obj = hashlib.md5(hostname.encode())
+        hash_hex = hash_obj.hexdigest()[:12]
+        fallback_mac = ':'.join(hash_hex[i:i+2] for i in range(0, 12, 2))
+        logger.warning(f"Could not detect MAC address, using fallback: {fallback_mac}")
+        return fallback_mac
     
     def register_device(self) -> bool:
         """Register device with central server"""
@@ -162,15 +180,33 @@ class APIClient:
         logger.info("Restarting browser...")
         
         try:
-            # Kill browser processes
+            # Kill browser processes gracefully with SIGTERM first
             for browser in ["chromium-browser", "epiphany-browser", "surf"]:
-                subprocess.run(
-                    ["pkill", "-9", browser],
+                # Try SIGTERM first for graceful shutdown
+                result = subprocess.run(
+                    ["pkill", "-15", browser],
                     capture_output=True,
                     timeout=5
                 )
+                
+                if result.returncode == 0:
+                    # Wait a moment for graceful shutdown
+                    time.sleep(2)
+                    
+                    # Check if still running, force kill if needed
+                    check_result = subprocess.run(
+                        ["pgrep", browser],
+                        capture_output=True
+                    )
+                    if check_result.returncode == 0:
+                        # Still running, force kill
+                        subprocess.run(
+                            ["pkill", "-9", browser],
+                            capture_output=True,
+                            timeout=5
+                        )
             
-            time.sleep(2)
+            time.sleep(1)
             
             # Browser will be restarted automatically by the kiosk system
             logger.info("Browser restart initiated")

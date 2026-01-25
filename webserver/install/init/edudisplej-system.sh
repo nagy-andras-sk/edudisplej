@@ -153,17 +153,20 @@ install_packages() {
         
         echo ""
         echo "► Process: apt-get install $pkg"
-        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" 2>&1 | tee -a "$APT_LOG" | grep -E "(Reading|Building|Unpacking|Setting up|Processing)" || true; then
+        
+        # Install package and capture result
+        if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
             ((installed_count++))
             echo "✓ Success: $pkg"
         else
             echo "⟳ Retrying: $pkg"
             sleep 2
-            if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" 2>&1 | tee -a "$APT_LOG" | grep -E "(Reading|Building|Unpacking|Setting up|Processing)" || true; then
+            if DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$APT_LOG" 2>&1; then
                 ((installed_count++))
                 echo "✓ Success: $pkg"
             else
                 echo "✗ Failed: $pkg"
+                print_error "Installation failed for $pkg - check $APT_LOG for details"
             fi
         fi
         echo ""

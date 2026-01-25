@@ -118,9 +118,11 @@ configure_hostname() {
     print_info "Setting new hostname..."
     
     # Method 1: Use hostnamectl (systemd)
+    local hostname_set=false
     if command -v hostnamectl >/dev/null 2>&1; then
         if hostnamectl set-hostname "$new_hostname" 2>/dev/null; then
             print_success "Hostname set via hostnamectl"
+            hostname_set=true
         else
             print_warning "hostnamectl failed, trying alternative method"
         fi
@@ -128,7 +130,15 @@ configure_hostname() {
     
     # Method 2: Direct hostname command
     if ! hostname "$new_hostname" 2>/dev/null; then
-        print_error "Failed to set hostname via hostname command"
+        print_warning "Failed to set hostname via hostname command"
+    else
+        hostname_set=true
+    fi
+    
+    # Verify hostname was set
+    if [[ "$hostname_set" == false ]]; then
+        print_error "Failed to set hostname using available methods"
+        return 1
     fi
     
     # Update /etc/hostname
