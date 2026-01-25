@@ -2,6 +2,23 @@
 <?php
 $baseDir = __DIR__;
 
+// Support for folder parameter to allow downloading from init or kiosk_scripts
+$folder = isset($_GET['folder']) ? $_GET['folder'] : 'init';
+
+// Security: only allow 'init' or 'kiosk_scripts' folders
+if ($folder === 'kiosk_scripts') {
+    $baseDir = dirname(__DIR__) . '/kiosk_scripts';
+} else {
+    $baseDir = __DIR__; // default to init folder
+}
+
+// Verify the directory exists
+if (!is_dir($baseDir)) {
+    http_response_code(404);
+    echo "Directory not found.";
+    exit;
+}
+
 if (isset($_GET['getfiles'])) {
     foreach (scandir($baseDir) as $file) {
         if ($file === '.' || $file === '..') continue;
