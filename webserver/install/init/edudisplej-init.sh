@@ -25,8 +25,9 @@ if [[ -f "$SESSION_LOG" ]]; then
     mv "$SESSION_LOG" "${SESSION_LOG}.old" 2>/dev/null || true
 fi
 
-# Kimenet atiranyitas log fajlba -- Presmerovanie vystupu do log suboru
-exec > >(tee -a "$SESSION_LOG") 2>&1
+# Kimenet atiranyitas log fajlba ES kepernyon -- Presmerovanie vystupu do log suboru A na obrazovku
+# Output to both log file AND screen (tty1) so user can see what's happening
+exec > >(tee -a "$SESSION_LOG" /dev/tty1) 2>&1
 
 # =============================================================================
 # Modulok betoltese -- Nacitanie modulov
@@ -143,18 +144,8 @@ read_kiosk_preferences() {
     local console_user_file="${EDUDISPLEJ_HOME}/.console_user"
     local user_home_file="${EDUDISPLEJ_HOME}/.user_home"
     
-    # Kiosk mod -- Kiosk mod
-    if [[ -f "$kiosk_mode_file" ]]; then
-        KIOSK_MODE=$(cat "$kiosk_mode_file" | tr -d '\r\n')
-    else
-        local arch
-        arch="$(uname -m)"
-        if [[ "$arch" = "armv6l" ]]; then
-            KIOSK_MODE="epiphany"
-        else
-            KIOSK_MODE="chromium"
-        fi
-    fi
+    # Kiosk mod -- Kiosk mod (Midori - universal böngésző)
+    KIOSK_MODE="midori"
     print_info "Kiosk mod -- Kiosk mod: $KIOSK_MODE"
     
     # Konzol felhasznalo -- Konzolovy pouzivatel
@@ -331,16 +322,65 @@ LOG="/tmp/openbox-autostart.log"
 exec >> "$LOG" 2>&1
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart starting"
+echo "DISPLAY=${DISPLAY:-not set}"
+echo "USER=$(whoami)"
+echo "HOME=$HOME"
 
 # Wait for X to be ready
-sleep 2
+MAX_WAIT=10
+WAITED=0
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if xset q >/dev/null 2>&1; then
+        echo "X server ready after ${WAITED} seconds"
+        break
+    fi
+    sleep 1
+    WAITED=$((WAITED + 1))
+done
 
-# Configure display - find first connected output
+if [ $WAITED -ge $MAX_WAIT ]; then
+    echo "WARNING: X server may not be fully ready after ${MAX_WAIT} seconds"
+fi
+
+# Configure display - find first connected output and set it properly
 if command -v xrandr >/dev/null 2>&1; then
-    OUTPUT=$(xrandr | grep " connected" | head -1 | awk '{print $1}')
+    echo "=== xrandr output ==="
+    xrandr 2>&1
+    echo "===================="
+    
+    # Get the first connected output
+    OUTPUT=$(xrandr 2>/dev/null | grep " connected" | head -1 | awk '{print $1}')
     if [ -n "$OUTPUT" ]; then
-        xrandr --output "$OUTPUT" --auto --primary 2>/dev/null || true
-        echo "Display output set: $OUTPUT"
+        echo "Found output: $OUTPUT"
+        # Set output as primary and auto-configure
+        xrandr --output "$OUTPUT" --auto --primary 2>&1 || echo "xrandr failed"
+        echo "Display output configured: $OUTPUT"
+        
+        # Also try to explicitly set a resolution if auto fails
+        RESOLUTION=$(xrandr 2>/dev/null | grep -A1 "^$OUTPUT" | tail -1 | awk '{print $1}')
+        # Validate resolution format (should contain 'x' like 1920x1080)
+        case "$RESOLUTION" in
+            [0-9]*x[0-9]*)
+                echo "Detected resolution: $RESOLUTION"
+                xrandr --output "$OUTPUT" --mode "$RESOLUTION" 2>&1 || true
+                ;;
+            *)
+                echo "No valid resolution detected, relying on auto configuration"
+                ;;
+        esac
+    else
+        echo "WARNING: No connected output found!"
+        echo "Trying fallback display configuration..."
+        # Try common output names as fallback
+        # This list covers most common display outputs on Raspberry Pi and other systems
+        FALLBACK_OUTPUTS="HDMI-1 HDMI-2 HDMI-3 HDMI1 HDMI2 HDMI3 VGA-1 VGA1 LVDS-1 LVDS1 DSI-1 DSI1 eDP-1 eDP1 DP-1 DP1"
+        for OUT in $FALLBACK_OUTPUTS; do
+            if xrandr 2>/dev/null | grep -q "^$OUT connected"; then
+                echo "Found fallback output: $OUT"
+                xrandr --output "$OUT" --auto --primary 2>&1 || true
+                break
+            fi
+        done
     fi
 fi
 
@@ -349,16 +389,19 @@ command -v xset >/dev/null 2>&1 && {
     xset -dpms 2>/dev/null || true
     xset s off 2>/dev/null || true
     xset s noblank 2>/dev/null || true
+    echo "Screen blanking disabled"
 }
 
 # Hide cursor
 command -v unclutter >/dev/null 2>&1 && {
     unclutter -idle 1 &
+    echo "Cursor hiding enabled"
 }
 
 # Black background
 command -v xsetroot >/dev/null 2>&1 && {
     xsetroot -solid black 2>/dev/null || true
+    echo "Background set to black"
 }
 
 # Launch terminal with script - THIS IS THE GOAL
@@ -368,11 +411,21 @@ if [ -x "$SCRIPT" ]; then
     xterm -display :0 -fullscreen -fa Monospace -fs 14 \
           -bg black -fg green -title "EduDisplej" +sb \
           -e "$SCRIPT" &
-    echo "Terminal launched (PID: $!)"
+    XTERM_PID=$!
+    echo "Terminal launched (PID: $XTERM_PID)"
+    
+    # Verify terminal is running
+    sleep 2
+    if kill -0 $XTERM_PID 2>/dev/null; then
+        echo "Terminal is running"
+    else
+        echo "ERROR: Terminal process died!"
+    fi
 else
-    echo "ERROR: Script not found: $SCRIPT"
+    echo "ERROR: Script not found or not executable: $SCRIPT"
     # Fallback: simple terminal
     xterm -display :0 -fullscreen -bg black -fg green +sb &
+    echo "Launched fallback terminal"
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart complete"

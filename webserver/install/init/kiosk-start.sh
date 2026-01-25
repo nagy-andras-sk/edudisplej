@@ -6,22 +6,81 @@ set -euo pipefail
 
 INIT_SCRIPT="/opt/edudisplej/init/edudisplej-init.sh"
 FLAG="/opt/edudisplej/.kiosk_system_configured"
+STARTUP_LOG="/tmp/kiosk-startup.log"
+
+# Log function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$STARTUP_LOG"
+}
+
+log "=== EduDisplej Kiosk Start ==="
+log "User: $(whoami)"
+log "TTY: $(tty)"
 
 # First-time setup
 if [ ! -f "$FLAG" ]; then
-    echo "=== EduDisplej First Boot Setup ==="
+    log "First boot - running setup"
     if [ -x "$INIT_SCRIPT" ]; then
-        sudo "$INIT_SCRIPT" || exit 1
+        sudo "$INIT_SCRIPT" 2>&1 | tee -a "$STARTUP_LOG" || {
+            log "ERROR: Setup failed"
+            exit 1
+        }
     else
-        echo "ERROR: Init script not executable"
+        log "ERROR: Init script not executable: $INIT_SCRIPT"
         exit 1
     fi
-    echo "=== Setup Complete ==="
+    log "Setup complete"
 fi
 
 # Kill any existing X servers
-pkill -9 Xorg 2>/dev/null || true
-sleep 1
+log "Checking for existing X servers..."
+if pgrep Xorg >/dev/null 2>&1; then
+    log "Killing existing X server"
+    pkill -9 Xorg 2>/dev/null || true
+    sleep 2
+fi
+
+# Clean up stale lock files
+if [ -f /tmp/.X0-lock ]; then
+    log "Removing stale X lock file"
+    rm -f /tmp/.X0-lock
+fi
+
+# Clean up stale X socket
+if [ -S /tmp/.X11-unix/X0 ]; then
+    log "Removing stale X socket"
+    rm -f /tmp/.X11-unix/X0
+fi
+
+# Setup XDG_RUNTIME_DIR and permissions
+log "Setting up XDG_RUNTIME_DIR..."
+XDG_RUNTIME_DIR="/run/user/1000"
+if [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || {
+        log "WARNING: Could not create $XDG_RUNTIME_DIR, using /tmp instead"
+        XDG_RUNTIME_DIR="/tmp"
+    }
+fi
+
+# Fix permissions on XDG_RUNTIME_DIR
+chmod 0700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+chown edudisplej:edudisplej "$XDG_RUNTIME_DIR" 2>/dev/null || true
+
+# Remove dconf directory if it exists (to prevent permission errors)
+rm -rf "$XDG_RUNTIME_DIR/dconf" 2>/dev/null || true
+
+export XDG_RUNTIME_DIR
+
+# Verify we're on the correct TTY
+CURRENT_TTY=$(tty)
+log "Current TTY: $CURRENT_TTY"
+if [ "$CURRENT_TTY" != "/dev/tty1" ]; then
+    log "WARNING: Not running on tty1! This may cause display issues."
+fi
 
 # Start X on vt1 (main console) - this is where display will appear
-exec startx -- :0 vt1 2>&1 | tee /tmp/xorg-startup.log
+log "Starting X server on vt1 (display :0)..."
+log "X server will be visible on the main physical display"
+
+# Start X with proper logging
+exec startx -- :0 vt1 -keeptty -nolisten tcp 2>&1 | tee -a "$STARTUP_LOG"
