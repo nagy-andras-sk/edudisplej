@@ -62,7 +62,10 @@ fix_armv6_boot_config() {
     
     # Create backup
     BACKUP_FILE="${CONFIG_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
-    cp "$CONFIG_FILE" "$BACKUP_FILE"
+    if ! cp "$CONFIG_FILE" "$BACKUP_FILE"; then
+        echo "[!] CHYBA - ERROR: Failed to create backup - Nepodarilo sa vytvorit zalohu"
+        return 1
+    fi
     echo "[*] Zaloha vytvorena - Backup created: $BACKUP_FILE"
     
     # Check if fix is already applied (idempotent)
@@ -73,12 +76,12 @@ fix_armv6_boot_config() {
     
     # Disable full KMS if present
     if grep -q "^dtoverlay=vc4-kms-v3d" "$CONFIG_FILE"; then
-        sed -i 's/^dtoverlay=vc4-kms-v3d/#dtoverlay=vc4-kms-v3d  # Disabled for ARMv6 - Issue #47/' "$CONFIG_FILE"
+        sed -i 's/^dtoverlay=vc4-kms-v3d/#dtoverlay=vc4-kms-v3d # Disabled for ARMv6 - Issue #47/' "$CONFIG_FILE"
         echo "[*] Deaktivovany full KMS - Disabled full KMS (vc4-kms-v3d)"
     fi
     
     # Add fake KMS if not present
-    if ! grep -q "dtoverlay=vc4-fkms-v3d" "$CONFIG_FILE"; then
+    if ! grep -q "^[[:space:]]*dtoverlay=vc4-fkms-v3d" "$CONFIG_FILE"; then
         cat >> "$CONFIG_FILE" <<'EOF'
 
 # ARMv6 fix - Issue #47
