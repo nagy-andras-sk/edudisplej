@@ -59,9 +59,9 @@ echo "  ════════════════════════
 echo ""
 
 # 5 másodperc várakozás
-echo "  5 másodperc múlva elindítva: ../main/main.sh"
+echo "  5 másodperc múlva elindítva: kiosk_scripts/main.sh"
 sleep 5
 
 # main.sh elindítása
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec bash "$SCRIPT_DIR/main/main.sh"
+exec bash "kiosk_scripts/main.sh"
