@@ -295,11 +295,11 @@ install_kiosk_packages() {
     local packages=()
     local configured_file="${EDUDISPLEJ_HOME}/.kiosk_configured"
     
-    packages+=("xterm" "xdotool" "figlet" "dbus-x11")
+    # Basic packages for terminal display - removed dbus-x11 (not needed for terminal-only mode)
+    packages+=("xterm" "xdotool" "figlet")
     
-    # Midori böngésző - minden architektúrához
-    packages+=("midori")
-    print_info "Midori prehliadac - minden architekturara..."
+    # Note: Midori browser removed - terminal-only mode doesn't need browser
+    print_info "Terminal-only mode - no browser installation needed"
     
     if check_packages_installed "kiosk_${kiosk_mode}"; then
         print_info "Kiosk balicky uz nainstalovane"

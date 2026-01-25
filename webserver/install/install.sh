@@ -52,7 +52,7 @@ fi
 # Detekcia architektury / Architektura felismerese
 ARCH="$(uname -m)"
 echo "[*] Architektura / Architektura: $ARCH"
-# Midori böngésző - összes architektúrához
+# Terminal-only mode - no browser needed
 KIOSK_MODE="midori"
 
 # Instalacia curl ak chyba / Curl telepites ha hianyzik
