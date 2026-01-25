@@ -1,25 +1,25 @@
 #!/bin/bash
-# common.sh - Shared functions, translations, and configuration
-# All text is in Slovak (without diacritics) or English
+# common.sh - Spolocne funkcie / Kozos funkciok
 
-# Directory paths
+# Adresare / Konyvtarak
 EDUDISPLEJ_HOME="/opt/edudisplej"
 INIT_DIR="${EDUDISPLEJ_HOME}/init"
 CONFIG_FILE="${EDUDISPLEJ_HOME}/edudisplej.conf"
 MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 
-# Default values
+# Predvolene hodnoty / Alapertelmezett ertekek
 DEFAULT_LANG="sk"
 CURRENT_LANG="${DEFAULT_LANG}"
-DEFAULT_KIOSK_URL="file:///opt/edudisplej/localweb/clock.html"
+DEFAULT_KIOSK_URL="https://www.time.is"
+FALLBACK_URLS=(
+    "https://www.time.is"
+    "file:///opt/edudisplej/localweb/clock.html"
+    "about:blank"
+)
 
-# =============================================================================
-# Translation System
-# =============================================================================
-
-# Translations array - Slovak without diacritics
-declare -A TRANS_SK=(
-    # Boot messages
+# Preklady - slovencina bez diakritiky / Forditas - szlovak diakritika nelkul
+declare -Ag TRANS_SK
+TRANS_SK=(
     ["boot_starting"]="Spustanie EduDisplej systemu..."
     ["boot_loading_modules"]="Nacitavam moduly..."
     ["boot_hostname_check"]="Kontrolujem hostname..."
@@ -30,63 +30,6 @@ declare -A TRANS_SK=(
     ["boot_f12_prompt"]="Stlacte F12 pre vstup do konfiguracie (5 sekund)..."
     ["boot_starting_kiosk"]="Spustam kiosk rezim..."
     ["boot_loading_mode"]="Nacitavam ulozeny rezim..."
-
-    # Menu
-    ["menu_title"]="EduDisplej - Konfiguracne Menu"
-    ["menu_select"]="Vyberte moznost:"
-    ["menu_eduserver"]="EduServer rezim"
-    ["menu_standalone"]="Samostatny rezim"
-    ["menu_language"]="Jazyk"
-    ["menu_display"]="Nastavenia displeja"
-    ["menu_network"]="Nastavenia siete"
-    ["menu_exit"]="Ukoncit"
-    ["menu_invalid"]="Neplatna volba. Skuste znova."
-
-    # Network
-    ["network_wifi_setup"]="Nastavenie Wi-Fi"
-    ["network_enter_ssid"]="Zadajte SSID siete:"
-    ["network_enter_password"]="Zadajte heslo:"
-    ["network_connecting"]="Pripajam sa k sieti..."
-    ["network_connected"]="Uspesne pripojene!"
-    ["network_failed"]="Pripojenie zlyhalo!"
-    ["network_current_ip"]="Aktualna IP adresa:"
-    ["network_static_ip"]="Nastavenie statickej IP"
-    ["network_enter_ip"]="Zadajte IP adresu:"
-    ["network_enter_gateway"]="Zadajte gateway:"
-    ["network_enter_dns"]="Zadajte DNS server:"
-
-    # Display
-    ["display_settings"]="Nastavenia displeja"
-    ["display_current_res"]="Aktualne rozlisenie:"
-    ["display_select_res"]="Vyberte rozlisenie:"
-    ["display_applied"]="Rozlisenie nastavene!"
-
-    # Language
-    ["language_select"]="Vyberte jazyk:"
-    ["language_english"]="Anglictina"
-    ["language_slovak"]="Slovencina"
-    ["language_changed"]="Jazyk zmeneny!"
-
-    # Kiosk
-    ["kiosk_starting_x"]="Spustam X server..."
-    ["kiosk_starting_browser"]="Spustam prehliadac Chromium..."
-    ["kiosk_retry"]="Pokus o znovuspustenie..."
-    ["kiosk_failed"]="Spustenie zlyhal po 3 pokusoch!"
-    ["boot_pkg_check"]="Kontrolujem potrebne balicky..."
-    ["boot_pkg_missing"]="Chybajuce balicky:"
-    ["boot_pkg_ok"]="Vsetky balicky nainstalovane"
-    ["boot_pkg_installing"]="Instalujem balicky:"
-    ["boot_pkg_install_failed"]="Instalacia balickov zlyhala"
-    ["boot_summary"]="Zhrnutie systemu pred startom"
-    ["boot_countdown"]="Stlacte M alebo F12 pre menu"
-    ["boot_version"]="Verzia:"
-    ["boot_update_check"]="Kontrolujem aktualizacie..."
-    ["boot_update_available"]="Nova verzia dostupna:"
-    ["boot_update_downloading"]="Stahujem aktualizovane skripty..."
-    ["boot_update_done"]="Aktualizacia dokoncena, restartujem skript..."
-    ["boot_update_failed"]="Aktualizacia zlyhala"
-
-    # General
     ["press_enter"]="Stlacte ENTER pre pokracovanie..."
     ["yes"]="ano"
     ["no"]="nie"
@@ -95,9 +38,8 @@ declare -A TRANS_SK=(
     ["warning"]="Upozornenie"
 )
 
-# Translations array - English
-declare -A TRANS_EN=(
-    # Boot messages
+declare -Ag TRANS_EN
+TRANS_EN=(
     ["boot_starting"]="Starting EduDisplej system..."
     ["boot_loading_modules"]="Loading modules..."
     ["boot_hostname_check"]="Checking hostname..."
@@ -108,63 +50,6 @@ declare -A TRANS_EN=(
     ["boot_f12_prompt"]="Press F12 to enter configuration (5 seconds)..."
     ["boot_starting_kiosk"]="Starting kiosk mode..."
     ["boot_loading_mode"]="Loading saved mode..."
-
-    # Menu
-    ["menu_title"]="EduDisplej - Configuration Menu"
-    ["menu_select"]="Select an option:"
-    ["menu_eduserver"]="EduServer mode"
-    ["menu_standalone"]="Standalone mode"
-    ["menu_language"]="Language"
-    ["menu_display"]="Display settings"
-    ["menu_network"]="Network settings"
-    ["menu_exit"]="Exit"
-    ["menu_invalid"]="Invalid option. Try again."
-
-    # Network
-    ["network_wifi_setup"]="Wi-Fi Setup"
-    ["network_enter_ssid"]="Enter network SSID:"
-    ["network_enter_password"]="Enter password:"
-    ["network_connecting"]="Connecting to network..."
-    ["network_connected"]="Successfully connected!"
-    ["network_failed"]="Connection failed!"
-    ["network_current_ip"]="Current IP address:"
-    ["network_static_ip"]="Static IP configuration"
-    ["network_enter_ip"]="Enter IP address:"
-    ["network_enter_gateway"]="Enter gateway:"
-    ["network_enter_dns"]="Enter DNS server:"
-
-    # Display
-    ["display_settings"]="Display settings"
-    ["display_current_res"]="Current resolution:"
-    ["display_select_res"]="Select resolution:"
-    ["display_applied"]="Resolution applied!"
-
-    # Language
-    ["language_select"]="Select language:"
-    ["language_english"]="English"
-    ["language_slovak"]="Slovak"
-    ["language_changed"]="Language changed!"
-
-    # Kiosk
-    ["kiosk_starting_x"]="Starting X server..."
-    ["kiosk_starting_browser"]="Starting Chromium browser..."
-    ["kiosk_retry"]="Retrying..."
-    ["kiosk_failed"]="Failed after 3 attempts!"
-    ["boot_pkg_check"]="Checking required packages..."
-    ["boot_pkg_missing"]="Missing packages:"
-    ["boot_pkg_ok"]="All required packages installed"
-    ["boot_pkg_installing"]="Installing packages:"
-    ["boot_pkg_install_failed"]="Package installation failed"
-    ["boot_summary"]="System summary before start"
-    ["boot_countdown"]="Press M or F12 to enter menu"
-    ["boot_version"]="Version:"
-    ["boot_update_check"]="Checking for updates..."
-    ["boot_update_available"]="New version available:"
-    ["boot_update_downloading"]="Downloading updated scripts..."
-    ["boot_update_done"]="Update finished, restarting script..."
-    ["boot_update_failed"]="Update failed"
-
-    # General
     ["press_enter"]="Press ENTER to continue..."
     ["yes"]="yes"
     ["no"]="no"
@@ -173,12 +58,7 @@ declare -A TRANS_EN=(
     ["warning"]="Warning"
 )
 
-# =============================================================================
-# Translation Function
-# =============================================================================
-
-# Get translated string
-# Usage: t "key"
+# Preklad / Forditas
 t() {
     local key="$1"
     if [[ "$CURRENT_LANG" == "sk" ]]; then
@@ -188,84 +68,54 @@ t() {
     fi
 }
 
-# =============================================================================
-# Configuration Functions
-# =============================================================================
-
-# Load configuration from file
+# Konfiguracne funkcie / Konfiguracios funkciok
 load_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
         source "$CONFIG_FILE"
         CURRENT_LANG="${LANG:-$DEFAULT_LANG}"
         return 0
     fi
-    return 1
+    CURRENT_LANG="$DEFAULT_LANG"
+    return 0
 }
 
-# Save configuration to file
-save_config() {
-    cat > "$CONFIG_FILE" << EOF
-# EduDisplej Configuration File
-MODE=${MODE:-EDSERVER}
-KIOSK_URL=${KIOSK_URL:-$DEFAULT_KIOSK_URL}
-LANG=${CURRENT_LANG}
-PACKAGES_INSTALLED=${PACKAGES_INSTALLED:-0}
-EOF
+# Zobrazenie funkcii / Megjelenites funkciok
+log_timestamp() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')]"
 }
 
-# Get current mode
-get_mode() {
-    if [[ -f "$MODE_FILE" ]]; then
-        cat "$MODE_FILE"
-    else
-        echo ""
-    fi
-}
-
-# Set current mode
-set_mode() {
-    local mode="$1"
-    echo "$mode" > "$MODE_FILE"
-}
-
-# =============================================================================
-# Display Functions
-# =============================================================================
-
-# Print colored text
-print_color() {
-    local color="$1"
-    local text="$2"
-    case "$color" in
-        red)    echo -e "\033[0;31m${text}\033[0m" ;;
-        green)  echo -e "\033[0;32m${text}\033[0m" ;;
-        yellow) echo -e "\033[0;33m${text}\033[0m" ;;
-        blue)   echo -e "\033[0;94m${text}\033[0m" ;;
-        *)      echo "$text" ;;
-    esac
-}
-
-# Print info message
 print_info() {
-    print_color "blue" "[INFO] $1"
+    local caller_info=""
+    if [[ "${SHOW_CALLER_INFO:-false}" == true && -n "${BASH_SOURCE[1]:-}" ]]; then
+        local file=$(basename "${BASH_SOURCE[1]}")
+        local line="${BASH_LINENO[0]}"
+        caller_info=" [${file}:${line}]"
+    fi
+    echo -e "$(log_timestamp) \033[0;36m[INFO]\033[0m${caller_info} $1"
 }
 
-# Print success message
 print_success() {
-    print_color "green" "[OK] $1"
+    local caller_info=""
+    if [[ "${SHOW_CALLER_INFO:-false}" == true && -n "${BASH_SOURCE[1]:-}" ]]; then
+        local file=$(basename "${BASH_SOURCE[1]}")
+        local line="${BASH_LINENO[0]}"
+        caller_info=" [${file}:${line}]"
+    fi
+    echo -e "$(log_timestamp) \033[0;32m[SUCCESS]\033[0m${caller_info} $1"
 }
 
-# Print warning message
 print_warning() {
-    print_color "yellow" "[$(t warning)] $1"
+    local file=$(basename "${BASH_SOURCE[1]:-unknown}")
+    local line="${BASH_LINENO[0]:-?}"
+    echo -e "$(log_timestamp) \033[0;33m[WARNING]\033[0m [${file}:${line}] $1"
 }
 
-# Print error message
 print_error() {
-    print_color "red" "[$(t error)] $1"
+    local file=$(basename "${BASH_SOURCE[1]:-unknown}")
+    local line="${BASH_LINENO[0]:-?}"
+    echo -e "$(log_timestamp) \033[0;31m[ERROR]\033[0m [${file}:${line}] $1"
 }
 
-# Show banner using figlet if available
 show_banner() {
     if command -v figlet &> /dev/null; then
         figlet -c "EduDisplej"
@@ -277,72 +127,104 @@ show_banner() {
     echo ""
 }
 
-# Clear screen
+show_installer_banner() {
+    clear_screen
+    echo ""
+    echo ",------.,------.  ,--. ,--.,------.  ,--. ,---.  ,------. ,--.   ,------.     ,--. "
+    echo "|  .---'|  .-.  \ |  | |  ||  .-.  \ |  |'   .-' |  .--. '|  |   |  .---'     |  | "
+    echo "|  \`--, |  |  \  :|  | |  ||  |  \  :|  |'.  \`-. |  '--' ||  |   |  \`--, ,--. |  | "
+    echo "|  \`---.|  '--'  /'  '-'  '|  '--'  /|  |.-'    ||  | --' |  '--.|  \`---.|  '-'  / "
+    echo "\`------'\`-------'  \`-----' \`-------' \`--'\`-----' \`--'     \`-----'\`------' \`-----' "
+    echo "║                T E L E P I T O   /   I N S T A L A T O R       ║"
+    echo ""
+}
+
+show_progress_bar() {
+    local current="$1"
+    local total="$2"
+    local description="$3"
+    local start_time="${4:-$(date +%s)}"
+    
+    local percent=$((current * 100 / total))
+    local bar_width=50
+    local filled=$((percent * bar_width / 100))
+    local empty=$((bar_width - filled))
+    
+    local elapsed=$(($(date +%s) - start_time))
+    local eta="--:--"
+    if [[ $current -gt 0 ]] && [[ $elapsed -gt 0 ]]; then
+        local avg_time=$((elapsed / current))
+        local remaining=$((total - current))
+        local eta_seconds=$((avg_time * remaining))
+        local eta_min=$((eta_seconds / 60))
+        local eta_sec=$((eta_seconds % 60))
+        eta=$(printf "%02d:%02d" $eta_min $eta_sec)
+    fi
+    
+    local bar="["
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=0; i<empty; i++)); do bar+="░"; done
+    bar+="]"
+    
+    printf "\r\033[K%s %3d%% %s  ETA: %s" "$bar" "$percent" "$description" "$eta"
+    
+    if [[ $current -eq $total ]]; then
+        echo ""
+    fi
+}
+
 clear_screen() {
     clear 2>/dev/null || printf '\033[2J\033[H'
 }
 
-# =============================================================================
-# Menu Functions
-# =============================================================================
-
-# Show main menu
-show_main_menu() {
-    clear_screen
-    show_banner
-    echo "$(t menu_title)"
-    echo "================================"
-    echo ""
-    echo "  0. $(t menu_eduserver)"
-    echo "  1. $(t menu_standalone)"
-    echo "  2. $(t menu_language)"
-    echo "  3. $(t menu_display)"
-    echo "  4. $(t menu_network)"
-    echo "  5. $(t menu_exit)"
-    echo ""
-    echo "$(t menu_select)"
-}
-
-# Wait for user to press enter
 wait_for_enter() {
     echo ""
     read -rp "$(t press_enter)" _
 }
 
-# =============================================================================
-# Utility Functions
-# =============================================================================
-
-# Check if running as root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        return 1
-    fi
-    return 0
-}
-
-# Get MAC address suffix for hostname generation
-get_mac_suffix() {
-    local mac
-    mac=$(ip link show | grep -A1 "eth0\|wlan0" | grep ether | head -1 | awk '{print $2}')
-    if [[ -n "$mac" ]]; then
-        local clean_mac
-        clean_mac=${mac//:/}
-        echo "${clean_mac: -6}"
-    else
-        echo "unknown"
-    fi
-}
-
-# Check internet connectivity
+# Pomocne funkcie / Segito funkciok
 check_internet() {
     ping -c 1 -W 5 google.com &> /dev/null
     return $?
 }
 
-# Wait for internet with retries
+check_url() {
+    local url="$1"
+    if [[ "$url" == file://* ]] || [[ "$url" == about:* ]]; then
+        return 0
+    fi
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsSL --max-time 10 --connect-timeout 5 --head "$url" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+get_working_url() {
+    local primary_url="$1"
+    if check_url "$primary_url"; then
+        echo "$primary_url"
+        return 0
+    fi
+    print_warning "Primary URL not accessible: $primary_url"
+    for fallback in "${FALLBACK_URLS[@]}"; do
+        if [[ "$fallback" == "$primary_url" ]]; then
+            continue
+        fi
+        print_info "Trying fallback URL: $fallback"
+        if check_url "$fallback"; then
+            echo "$fallback"
+            return 0
+        fi
+    done
+    print_warning "No URL verified, using first fallback: ${FALLBACK_URLS[0]}"
+    echo "${FALLBACK_URLS[0]}"
+    return 0
+}
+
 wait_for_internet() {
-    local max_attempts=30
+    local max_attempts=10
     local attempt=1
     print_info "$(t boot_waiting_network)"
     while [[ $attempt -le $max_attempts ]]; do
@@ -359,5 +241,149 @@ wait_for_internet() {
     return 1
 }
 
-# Load configuration on source
+# Sietove informacie / Halozati informaciok
+get_current_ssid() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null | awk -F: '$1=="yes" {print $2; exit}'
+    elif command -v iwgetid &> /dev/null; then
+        iwgetid -r 2>/dev/null
+    else
+        echo "unknown"
+    fi
+}
+
+get_current_signal() {
+    if command -v nmcli &> /dev/null; then
+        nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1=="*" {print $2"%"; exit}'
+    else
+        local quality total
+        read quality total <<<$(iwconfig 2>/dev/null | awk -F'[ =/]+' '/Link Quality/ {print $4" " $5; exit}')
+        if [[ -n "$quality" && -n "$total" ]]; then
+            echo "$quality/$total"
+        else
+            echo "unknown"
+        fi
+    fi
+}
+
+get_screen_resolution() {
+    if command -v xrandr &> /dev/null && [[ -n "${DISPLAY:-}" ]]; then
+        xrandr 2>/dev/null | grep -o '[0-9][0-9]*x[0-9][0-9]*' | head -1
+    elif [[ -f /sys/class/graphics/fb0/virtual_size ]]; then
+        cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | tr ',' 'x'
+    else
+        echo "unknown"
+    fi
+}
+
+# Zobrazenie loga / Logo megjelenites
+show_edudisplej_logo() {
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                           ║"
+    echo "║   ███████╗██████╗ ██╗   ██╗██████╗ ██╗███████╗██████╗ ██╗     ███████╗   ║"
+    echo "║   ██╔════╝██╔══██╗██║   ██║██╔══██╗██║██╔════╝██╔══██╗██║     ██╔════╝   ║"
+    echo "║   █████╗  ██║  ██║██║   ██║██║  ██║██║███████╗██████╔╝██║     █████╗     ║"
+    echo "║   ██╔══╝  ██║  ██║██║   ██║██║  ██║██║╚════██║██╔═══╝ ██║     ██╔══╝     ║"
+    echo "║   ███████╗██████╔╝╚██████╔╝██████╔╝██║███████║██║     ███████╗███████╗   ║"
+    echo "║   ╚══════╝╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝     ╚══════╝╚══════╝   ║"
+    echo "║                                                                           ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo ""
+}
+
+show_system_status() {
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║                         SYSTEM STATUS / STAV SYSTEMU                      ║"
+    echo "╠═══════════════════════════════════════════════════════════════════════════╣"
+    
+    local internet_status="✗ Nedostupny / Not available"
+    local wifi_info=""
+    if check_internet; then
+        internet_status="✓ Dostupny / Available"
+        local ssid=$(get_current_ssid)
+        local signal=$(get_current_signal)
+        if [[ -n "$ssid" && "$ssid" != "unknown" ]]; then
+            wifi_info="WiFi SSID: $ssid | Signal: $signal"
+        fi
+    fi
+    
+    printf "║ %-73s ║\n" "Internet: $internet_status"
+    if [[ -n "$wifi_info" ]]; then
+        printf "║ %-73s ║\n" "  $wifi_info"
+    fi
+    
+    local resolution=$(get_screen_resolution)
+    printf "║ %-73s ║\n" "Rozlisenie / Resolution: $resolution"
+    
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo ""
+}
+
+show_boot_screen() {
+    clear_screen
+    show_edudisplej_logo
+    show_system_status
+}
+
+countdown_with_f2() {
+    local countdown_seconds=5
+    
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║  Stlacte F2 pre nastavenia (raspi-config) / Press F2 for settings        ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo ""
+    
+    if [[ -t 0 ]]; then
+        local old_tty_settings=$(stty -g 2>/dev/null || true)
+        stty -echo -icanon time 0 min 0 2>/dev/null || true
+        
+        local key=""
+        local escape_sequence=""
+        for ((i=countdown_seconds; i>=1; i--)); do
+            printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
+            
+            key=""
+            for ((j=0; j<10; j++)); do
+                if read -t 0.1 -n 1 char 2>/dev/null; then
+                    key+="$char"
+                    if [[ "$char" == $'\x1b' ]]; then
+                        escape_sequence="$char"
+                        for ((k=0; k<10; k++)); do
+                            if read -t 0.05 -n 1 char 2>/dev/null; then
+                                escape_sequence+="$char"
+                            else
+                                break
+                            fi
+                        done
+                        if [[ "$escape_sequence" == $'\x1b'* ]]; then
+                            [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
+                            echo ""
+                            echo ""
+                            print_info "F2 stlacene! Spustam raspi-config..."
+                            sleep 1
+                            sudo raspi-config
+                            echo ""
+                            print_info "Navrat z nastaveni..."
+                            sleep 2
+                            return 0
+                        fi
+                    fi
+                fi
+            done
+        done
+        
+        [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
+    else
+        for ((i=countdown_seconds; i>=1; i--)); do
+            printf "\rSpustenie o / Starting in: %d sekund / seconds...  " "$i"
+            sleep 1
+        done
+    fi
+    
+    echo ""
+    echo ""
+    return 0
+}
+
 load_config

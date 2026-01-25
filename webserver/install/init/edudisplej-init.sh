@@ -1,577 +1,393 @@
-
 #!/bin/bash
-# edudisplej-init.sh - EduDisplej initialization script
+# edudisplej-init.sh - Egyszerusitett inicializalas -- Zjednodusena inicializacia
 # =============================================================================
-# Initialization
+# Ez a szkript ellenorzi a rendszert es szukseg eseten telepiti a hianyzó komponenseket
+# Tento skript kontroluje system a v pripade potreby nainstaluje chybajuce komponenty
 # =============================================================================
 
-# Set script directory
+set -euo pipefail
+
+# Alapbeallitasok -- Zakladne nastavenia
 EDUDISPLEJ_HOME="/opt/edudisplej"
 INIT_DIR="${EDUDISPLEJ_HOME}/init"
 CONFIG_FILE="${EDUDISPLEJ_HOME}/edudisplej.conf"
 MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
-LAST_ONLINE_FILE="${EDUDISPLEJ_HOME}/.last_online"
-LOCAL_WEB_DIR="${EDUDISPLEJ_HOME}/localweb"
 SESSION_LOG="${EDUDISPLEJ_HOME}/session.log"
-
-# Clean old session log on startup (keep only current session)
-if [[ -f "$SESSION_LOG" ]]; then
-    mv "$SESSION_LOG" "${SESSION_LOG}.old" 2>/dev/null || true
-fi
-
-# Redirect all output to session log
-exec > >(tee -a "$SESSION_LOG") 2>&1
-
-# Versioning and update source
-CURRENT_VERSION="20260107-1"
-INIT_BASE="https://install.edudisplej.sk/init"
-VERSION_URL="${INIT_BASE}/version.txt"
-FILES_LIST_URL="${INIT_BASE}/download.php?getfiles"
-DOWNLOAD_URL="${INIT_BASE}/download.php?streamfile="
-MAX_LOG_SIZE=2097152  # 2MB max log size
 APT_LOG="${EDUDISPLEJ_HOME}/apt.log"
-UPDATE_LOG="${EDUDISPLEJ_HOME}/update.log"
 
-# Clean old apt log on startup (keep only current session)
-if [[ -f "$APT_LOG" ]]; then
-    log_size=$(stat -f%z "$APT_LOG" 2>/dev/null || stat -c%s "$APT_LOG" 2>/dev/null || echo 0)
-    if [[ $log_size -gt $MAX_LOG_SIZE ]]; then
-        mv "$APT_LOG" "${APT_LOG}.old" 2>/dev/null || true
-    fi
-fi
-
-# Ensure home/init directories and permissions exist
-ensure_edudisplej_home() {
-    if [[ ! -d "$EDUDISPLEJ_HOME" ]]; then
-        if ! mkdir -p "$EDUDISPLEJ_HOME"; then
-            print_error "Unable to create $EDUDISPLEJ_HOME"
-            exit 1
-        fi
-    fi
-
-    mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" || true
-    touch "$APT_LOG" "$UPDATE_LOG" 2>/dev/null || true
-
-    if check_root && id -u edudisplej >/dev/null 2>&1; then
-        chown -R edudisplej:edudisplej "$EDUDISPLEJ_HOME" 2>/dev/null || print_warning "Could not change owner of $EDUDISPLEJ_HOME"
-    fi
-}
-
-# Export display for X operations
+# Export kornyezeti valtozok -- Export premennych prostredia
 export DISPLAY=:0
 export HOME="${EDUDISPLEJ_HOME}"
 export USER="edudisplej"
 
-# Countdown seconds before auto-start
-COUNTDOWN_SECONDS=10
+# Log fajl tisztitas -- Cistenie log suboru
+if [[ -f "$SESSION_LOG" ]]; then
+    mv "$SESSION_LOG" "${SESSION_LOG}.old" 2>/dev/null || true
+fi
+
+# Kimenet atiranyitas log fajlba -- Presmerovanie vystupu do log suboru
+exec > >(tee -a "$SESSION_LOG") 2>&1
 
 # =============================================================================
-# Load Modules
+# Modulok betoltese -- Nacitanie modulov
 # =============================================================================
 
 echo "==========================================="
 echo "      E D U D I S P L E J"
 echo "==========================================="
 echo ""
-echo "Nacitavam moduly... / Loading modules..."
+echo "Modulok betoltese... / Nacitavam moduly..."
+echo ""
 
-# Source all modules
+# Kozos fuggvenyek -- Spolocne funkcie
 if [[ -f "${INIT_DIR}/common.sh" ]]; then
-    source "${INIT_DIR}/common.sh"
-    print_success "common.sh loaded"
+    # Try to source the file - the source command itself will detect syntax errors
+    # We rely on file size verification during download to catch truncation
+    if source "${INIT_DIR}/common.sh" 2>/dev/null; then
+        print_success "✓ common.sh betoltve -- nacitany"
+    else
+        echo "==========================================="
+        echo "[KRITICKA HIBA / CRITICAL ERROR]"
+        echo "==========================================="
+        echo ""
+        echo "Nepodarilo sa nacitat common.sh!"
+        echo "Failed to load common.sh!"
+        echo ""
+        echo "Subor moze obsahovat syntax chyby,"
+        echo "moze byt poskodeny alebo neuplne stiahnuty."
+        echo ""
+        echo "File may contain syntax errors,"
+        echo "may be corrupted or incompletely downloaded."
+        echo ""
+        echo "RIESENIE / SOLUTION:"
+        echo "Znova spustite instalaciu:"
+        echo "curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash"
+        echo ""
+        echo "Viac informacii: /opt/edudisplej/filestreamerror.md"
+        echo "==========================================="
+        sleep 10
+        exit 1
+    fi
 else
-    echo "[ERROR] common.sh not found!"
+    echo "[HIBA/CHYBA] common.sh nem talalhato!"
     exit 1
 fi
 
-if [[ -f "${INIT_DIR}/kiosk.sh" ]]; then
-    source "${INIT_DIR}/kiosk.sh"
-    print_success "kiosk.sh loaded"
+# Ellenorzo szkript -- Kontrolny skript
+if [[ -f "${INIT_DIR}/edudisplej-checker.sh" ]]; then
+    source "${INIT_DIR}/edudisplej-checker.sh"
+    print_success "✓ edudisplej-checker.sh betoltve -- nacitany"
 else
-    print_error "kiosk.sh not found!"
+    print_warning "! edudisplej-checker.sh nem talalhato -- nenajdeny"
 fi
 
-if [[ -f "${INIT_DIR}/network.sh" ]]; then
-    source "${INIT_DIR}/network.sh"
-    print_success "network.sh loaded"
+# Telepito szkript -- Instalacny skript
+if [[ -f "${INIT_DIR}/edudisplej-installer.sh" ]]; then
+    source "${INIT_DIR}/edudisplej-installer.sh"
+    print_success "✓ edudisplej-installer.sh betoltve -- nacitany"
 else
-    print_error "network.sh not found!"
-fi
-
-if [[ -f "${INIT_DIR}/display.sh" ]]; then
-    source "${INIT_DIR}/display.sh"
-    print_success "display.sh loaded"
-else
-    print_error "display.sh not found!"
-fi
-
-if [[ -f "${INIT_DIR}/language.sh" ]]; then
-    source "${INIT_DIR}/language.sh"
-    print_success "language.sh loaded"
-else
-    print_error "language.sh not found!"
-fi
-
-if [[ -f "${INIT_DIR}/registration.sh" ]]; then
-    source "${INIT_DIR}/registration.sh"
-    print_success "registration.sh loaded"
-else
-    print_warning "registration.sh not found! Device registration will be skipped."
+    print_warning "! edudisplej-installer.sh nem talalhato -- nenajdeny"
 fi
 
 echo ""
 
 # =============================================================================
-# Show Banner
+# Boot Screen Display
 # =============================================================================
 
+show_boot_screen
+countdown_with_f2
+
+# =============================================================================
+# Banner megjelenitese -- Zobrazenie bannera
+# =============================================================================
+
+echo ""
 show_banner
+print_info "Verzio -- Verzia: $(date +%Y%m%d)"
 
-print_info "$(t boot_version) ${CURRENT_VERSION}"
+# =============================================================================
+# Alapkonyvtar biztositasa -- Zabezpecenie zakladneho adresara
+# =============================================================================
 
-# Ensure base directory exists and is writable
-ensure_edudisplej_home
-
-# Load configuration early so defaults are available
-if ! load_config; then
-    print_warning "Configuration not found, using defaults"
-    KIOSK_URL="${DEFAULT_KIOSK_URL}"
-    if save_config; then
-        print_success "Default configuration created at ${CONFIG_FILE}"
-    else
-        print_error "Failed to create default configuration at ${CONFIG_FILE}"
-    fi
+if [[ ! -d "$EDUDISPLEJ_HOME" ]]; then
+    mkdir -p "$EDUDISPLEJ_HOME" || {
+        print_error "Nem sikerult letrehozni -- Nepodarilo sa vytvorit: $EDUDISPLEJ_HOME"
+        exit 1
+    }
 fi
 
+mkdir -p "$INIT_DIR" "${EDUDISPLEJ_HOME}/localweb" 2>/dev/null || true
+touch "$APT_LOG" 2>/dev/null || true
+
 # =============================================================================
-# Helper Functions
+# Konfiguracio betoltese -- Nacitanie konfiguracie
 # =============================================================================
 
-# Browser candidates - epiphany-browser works on older ARM without NEON support
-BROWSER_CANDIDATES=(epiphany-browser chromium-browser chromium)
-BROWSER_BIN=""
-# Core packages needed for kiosk mode (browser installed separately via ensure_browser)
-REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg)
-APT_UPDATED=false
+# Konfiguracio betoltese, ha letezik -- Nacitanie konfiguracie, ak existuje
+if [[ -f "$CONFIG_FILE" ]]; then
+    source "$CONFIG_FILE" || true
+fi
 
-# Check and install required packages
-ensure_required_packages() {
-    local missing=()
-    local still_missing=()
+# Alapertelmezett ertekek -- Predvolene hodnoty
+KIOSK_URL="${KIOSK_URL:-https://www.time.is}"
+DEFAULT_KIOSK_URL="https://www.time.is"
 
-    print_info "$(t boot_pkg_check)"
-    for pkg in "${REQUIRED_PACKAGES[@]}"; do
-        if dpkg -s "$pkg" >/dev/null 2>&1; then
-            print_success "${pkg}"
-        else
-            missing+=("$pkg")
-        fi
-    done
+# =============================================================================
+# Kiosk mod beallitasok beolvasasa -- Nacitanie nastaveni kiosk modu
+# =============================================================================
 
-    if [[ ${#missing[@]} -eq 0 ]]; then
-        print_success "$(t boot_pkg_ok)"
-        return 0
-    fi
-
-    if [[ "${INTERNET_AVAILABLE:-1}" -ne 0 ]]; then
-        print_warning "$(t boot_pkg_missing) ${missing[*]}"
-        print_warning "Internet nie je dostupny, preskakuje sa instalacia."
-        return 1
-    fi
-
-    print_info "$(t boot_pkg_installing) ${missing[*]}"
-
-    # Update package lists
-    if [[ "$APT_UPDATED" == false ]]; then
-        print_info "Updating package lists..."
-        if ! apt-get update -y 2>&1 | tee "$APT_LOG"; then
-            print_error "apt-get update failed"
-            return 1
-        fi
-        APT_UPDATED=true
-    fi
-
-    # Try to install missing packages
-    print_info "Installing packages: ${missing[*]}"
-    apt-get install -y "${missing[@]}" 2>&1 | tee -a "$APT_LOG"
-
-    # Verify each package was actually installed
-    for pkg in "${missing[@]}"; do
-        if ! dpkg -s "$pkg" >/dev/null 2>&1; then
-            still_missing+=("$pkg")
-            print_error "Failed to install: ${pkg}"
-        else
-            print_success "Installed: ${pkg}"
-        fi
-    done
-
-    if [[ ${#still_missing[@]} -eq 0 ]]; then
-        print_success "$(t boot_pkg_ok)"
-        return 0
-    else
-        print_error "$(t boot_pkg_install_failed)"
-        print_error "Still missing: ${still_missing[*]}"
-        local tail_msg
-        tail_msg=$(tail -n 10 "$APT_LOG" 2>/dev/null)
-        echo "Last 10 lines of apt.log:"
-        echo "$tail_msg"
-        return 1
-    fi
-}
-
-# Ensure a supported browser is installed and pick one
-ensure_browser() {
-    for candidate in "${BROWSER_CANDIDATES[@]}"; do
-        if command -v "$candidate" >/dev/null 2>&1; then
-            BROWSER_BIN="$candidate"
-            export BROWSER_BIN
-            print_success "Using browser: ${candidate}"
-            return 0
-        fi
-    done
-
-    if [[ "${INTERNET_AVAILABLE:-1}" -ne 0 ]]; then
-        print_error "No supported browser installed and internet unavailable to install."
-        return 1
-    fi
-
-    if [[ "$APT_UPDATED" == false ]]; then
-        print_info "Updating package lists..."
-        if ! apt-get update -y 2>&1 | tee -a "$APT_LOG"; then
-            print_error "apt-get update failed"
-            return 1
-        fi
-        APT_UPDATED=true
-    fi
-
-    for candidate in "${BROWSER_CANDIDATES[@]}"; do
-        print_info "Installing browser: ${candidate}"
-        if apt-get install -y "$candidate" 2>&1 | tee -a "$APT_LOG"; then
-            if command -v "$candidate" >/dev/null 2>&1; then
-                BROWSER_BIN="$candidate"
-                export BROWSER_BIN
-                print_success "Installed browser: ${candidate}"
-                return 0
-            fi
-        else
-            print_warning "Installation failed for ${candidate}, trying next option."
-        fi
-    done
-
-    print_error "Unable to install supported browser (tried: ${BROWSER_CANDIDATES[*]})"
-    return 1
-}
-
-# Fetch latest version string from server
-fetch_remote_version() {
-    local out
-    if ! out=$(curl -fsSL "$VERSION_URL" 2>&1); then
-        print_error "$(t boot_update_failed) ${out}"
-        return 1
-    fi
-    echo "$out" | tr -d '\r' | head -n 1
-}
-
-# Download init files from server (same logic as install.sh)
-download_init_files() {
-    local tmpdir
-    tmpdir=$(mktemp -d) || return 1
-
-    local files_list
-    if ! files_list=$(curl -fsSL "$FILES_LIST_URL" 2>>"$UPDATE_LOG" | tr -d '\r'); then
-        print_error "$(t boot_update_failed) $(tail -n 5 "$UPDATE_LOG" 2>/dev/null)"
-        return 1
-    fi
-    if [[ -z "$files_list" ]]; then
-        return 1
-    fi
-
-    while IFS=";" read -r NAME SIZE MODIFIED; do
-        [[ -z "${NAME:-}" ]] && continue
-        if ! curl -fsSL "${DOWNLOAD_URL}${NAME}" -o "${tmpdir}/${NAME}" 2>>"$UPDATE_LOG"; then
-            print_error "$(t boot_update_failed) $(tail -n 5 "$UPDATE_LOG" 2>/dev/null)"
-            return 1
-        fi
-        sed -i 's/\r$//' "${tmpdir}/${NAME}"
-        if [[ "${NAME}" == *.sh ]]; then
-            chmod +x "${tmpdir}/${NAME}"
-            local first_line
-            first_line=$(head -n1 "${tmpdir}/${NAME}" || true)
-            if [[ "${first_line}" != "#!"* ]]; then
-                sed -i '1i #!/bin/bash' "${tmpdir}/${NAME}"
-            fi
-        fi
-    done <<< "$files_list"
-
-    cp -f "${tmpdir}"/* "$INIT_DIR"/
-    if [[ -f "${tmpdir}/clock.html" ]]; then
-        mkdir -p "$LOCAL_WEB_DIR"
-        cp -f "${tmpdir}/clock.html" "$LOCAL_WEB_DIR/clock.html"
-    fi
-    chmod -R 755 "$INIT_DIR"
-    rm -rf "$tmpdir"
-    return 0
-}
-
-# Self-update when a newer version exists
-self_update_if_needed() {
-    print_info "$(t boot_update_check)"
-
-    local remote_version
-    remote_version=$(fetch_remote_version) || return 0
-
-    if [[ -z "$remote_version" ]]; then
-        print_warning "$(t boot_update_failed)"
-        return 0
-    fi
-
-    if [[ "$remote_version" == "$CURRENT_VERSION" ]]; then
-        print_success "$(t boot_version) $CURRENT_VERSION"
-        return 0
-    fi
-
-    print_info "$(t boot_update_available) $remote_version"
-    print_info "$(t boot_update_downloading)"
-
-    if download_init_files; then
-        print_success "$(t boot_update_done)"
-        exec "$0" "$@"
-    else
-        print_error "$(t boot_update_failed)"
-    fi
-}
-
-# Gather current system information for boot summary
-show_system_summary() {
-    local current_mode
-    current_mode=$(get_mode)
-    [[ -z "$current_mode" ]] && current_mode="${MODE:-EDSERVER}"
-
-    # Get device info
-    local device_model
-    device_model=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0' || echo "Unknown")
+# Kiosk mod olvasasa telepitesbol -- Nacitanie kiosk modu z instalacie
+read_kiosk_preferences() {
+    local kiosk_mode_file="${EDUDISPLEJ_HOME}/.kiosk_mode"
+    local console_user_file="${EDUDISPLEJ_HOME}/.console_user"
+    local user_home_file="${EDUDISPLEJ_HOME}/.user_home"
     
-    # Get MAC address (try eth0, wlan0, or first available)
-    local mac_addr
-    mac_addr=$(cat /sys/class/net/eth0/address 2>/dev/null || \
-               cat /sys/class/net/wlan0/address 2>/dev/null || \
-               ip link show | grep -A1 "state UP" | grep "link/ether" | awk '{print $2}' | head -n1 || \
-               echo "N/A")
-    
-    # Get CPU info
-    local cpu_temp
-    cpu_temp=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2 || echo "N/A")
-    
-    # Get memory info
-    local mem_info
-    mem_info=$(free -h | awk '/^Mem:/ {print $2 " total, " $3 " used, " $4 " free"}')
-
-    echo ""
-    print_info "$(t boot_summary)"
-    echo "==========================================="
-    echo "Device: ${device_model}"
-    echo "MAC Address: ${mac_addr}"
-    echo "Hostname: $(hostname)"
-    echo "IP Address: $(get_current_ip)"
-    echo "Gateway: $(get_gateway)"
-    echo "-------------------------------------------"
-    echo "Mode: ${current_mode}"
-    echo "Kiosk URL: ${KIOSK_URL:-$DEFAULT_KIOSK_URL}"
-    echo "Language: ${CURRENT_LANG}"
-    echo "-------------------------------------------"
-    echo "Wi-Fi SSID: $(get_current_ssid)"
-    echo "Wi-Fi Signal: $(get_current_signal)"
-    if [[ -f "$LAST_ONLINE_FILE" ]]; then
-        echo "Last Online: $(cat "$LAST_ONLINE_FILE")"
+    # Kiosk mod -- Kiosk mod
+    if [[ -f "$kiosk_mode_file" ]]; then
+        KIOSK_MODE=$(cat "$kiosk_mode_file" | tr -d '\r\n')
     else
-        echo "Last Online: unknown"
-    fi
-    echo "-------------------------------------------"
-    echo "Resolution: $(get_current_resolution)"
-    echo "CPU Temp: ${cpu_temp}"
-    echo "Memory: ${mem_info}"
-    echo "==========================================="
-    echo ""
-}
-
-# Countdown before auto-start, allow entering the menu
-countdown_or_menu() {
-    local seconds="${1:-$COUNTDOWN_SECONDS}"
-    if [[ "${ENTER_MENU:-false}" == true ]]; then
-        return
-    fi
-    ENTER_MENU=false
-
-    for ((i=seconds; i>=1; i--)); do
-        echo -ne "\r$(t boot_countdown) (${i}s)  "
-        if read -r -t 1 -n 1 key 2>/dev/null; then
-            ENTER_MENU=true
-            break
+        local arch
+        arch="$(uname -m)"
+        if [[ "$arch" = "armv6l" ]]; then
+            KIOSK_MODE="epiphany"
+        else
+            KIOSK_MODE="chromium"
         fi
-    done
-    echo ""
+    fi
+    print_info "Kiosk mod -- Kiosk mod: $KIOSK_MODE"
+    
+    # Konzol felhasznalo -- Konzolovy pouzivatel
+    if [[ -f "$console_user_file" ]]; then
+        CONSOLE_USER=$(cat "$console_user_file" | tr -d '\r\n')
+    else
+        CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
+        [[ -z "$CONSOLE_USER" ]] && CONSOLE_USER="pi"
+    fi
+    print_info "Felhasznalo -- Pouzivatel: $CONSOLE_USER"
+    
+    # Felhasznalo home konyvtar -- Domovsky adresar pouzivatela
+    if [[ -f "$user_home_file" ]]; then
+        USER_HOME=$(cat "$user_home_file" | tr -d '\r\n')
+    else
+        USER_HOME="$(getent passwd "$CONSOLE_USER" | cut -d: -f6)"
+    fi
+    
+    if [[ -z "$USER_HOME" ]]; then
+        USER_HOME="/home/$CONSOLE_USER"
+    fi
+    print_info "Home konyvtar -- Domovsky adresar: $USER_HOME"
+    
+    export KIOSK_MODE CONSOLE_USER USER_HOME
 }
 
+echo ""
+read_kiosk_preferences
+echo ""
+
 # =============================================================================
-# Wait for Internet Connection
+# Internet kapcsolat ellenorzese -- Kontrola internetoveho pripojenia
 # =============================================================================
 
+print_info "Internet ellenorzese -- Kontrola internetu..."
 wait_for_internet
 INTERNET_AVAILABLE=$?
 
 if [[ $INTERNET_AVAILABLE -eq 0 ]]; then
-    date -u +"%Y-%m-%dT%H:%M:%SZ" > "$LAST_ONLINE_FILE"
-    
-    # Try to register device to remote server (only if not already registered)
-    if command -v register_device >/dev/null 2>&1; then
-        register_device || print_warning "Device registration failed (will retry on next boot)"
-    fi
+    print_success "✓ Internet elerheto -- Internet je dostupny"
+else
+    print_warning "✗ Nincs internet -- Ziadny internet"
+fi
+echo ""
+
+# =============================================================================
+# Rendszer ellenorzese -- Kontrola systemu
+# =============================================================================
+
+# Rendszer allapot ellenorzese -- Kontrola stavu systemu
+if check_system_ready "$KIOSK_MODE" "$CONSOLE_USER" "$USER_HOME"; then
+    print_success "=========================================="
+    print_success "Rendszer kesz! -- System je pripraveny!"
+    print_success "=========================================="
+    echo ""
+    print_info "X kornyezet inditasa tortenik... -- Spusta sa X prostredie..."
+    exit 0
 fi
 
 echo ""
-
-# Try to install missing packages (when internet is up)
-if ! ensure_required_packages; then
-    # Stop boot early if dependencies are missing
-    print_error "Required packages missing or failed to install. Fix issues and reboot."
-    exit 1
-fi
-
-# Ensure browser exists (chromium-browser/chromium) - non-blocking, will try to install if needed
-if ! ensure_browser; then
-    print_warning "No supported browser available yet. Will try offline mode or clock display."
-    # Don't exit - allow the system to continue and show clock or attempt recovery
-fi
-
-# Check for newer init bundle and self-update
-if [[ "$INTERNET_AVAILABLE" -eq 0 ]]; then
-    self_update_if_needed "$@"
-else
-    print_warning "$(t boot_update_failed)"
-fi
+print_info "=========================================="
+print_info "Telepites szukseges -- Je potrebna instalacia"
+print_info "=========================================="
+echo ""
 
 # =============================================================================
-# Main Menu Function
+# Hianyzo komponensek telepitese -- Instalacia chybajucich komponentov
 # =============================================================================
 
-main_menu() {
-    local choice
+# Alapcsomagok telepitese -- Instalacia zakladnych balickov
+# Core packages needed for X11 and terminal display
+REQUIRED_PACKAGES=(
+    openbox
+    xinit
+    xterm
+    unclutter
+    curl
+    x11-utils
+    xserver-xorg
+    x11-xserver-utils
+    python3-xdg
+)
 
-    while true; do
-        show_main_menu
-        if ! read -rp "> " -t $COUNTDOWN_SECONDS choice; then
-            print_info "No selection detected, starting saved mode..."
-            local saved_mode
-            saved_mode=$(get_mode)
-            [[ -z "$saved_mode" ]] && saved_mode="EDSERVER"
-            set_mode "$saved_mode"
-            save_config
+print_info "1. Alapcsomagok telepitese -- Instalacia zakladnych balickov..."
+if ! install_required_packages "${REQUIRED_PACKAGES[@]}"; then
+    print_warning "Nehany alapcsomag telepitese sikertelen -- Niektore zakladne balicky sa nepodarilo nainštalovat"
+fi
+echo ""
 
-            start_kiosk_mode
-            break
-        fi
+# Kiosk csomagok telepitese -- Instalacia kiosk balickov
+print_info "2. Kiosk csomagok telepitese -- Instalacia kiosk balickov..."
+if ! install_kiosk_packages "$KIOSK_MODE"; then
+    print_warning "Nehany kiosk csomag telepitese sikertelen -- Niektore kiosk balicky sa nepodarilo nainštalovat"
+fi
+echo ""
 
-        case "$choice" in
-            0)
-                # EduServer mode
-                print_info "$(t menu_eduserver)"
-                set_mode "EDSERVER"
-                KIOSK_URL="https://server.edudisplej.sk/demo/client/"
-                save_config
-                start_kiosk_mode
-                break
-                ;;
-            1)
-                # Standalone mode
-                print_info "$(t menu_standalone)"
-                set_mode "STANDALONE"
-                echo ""
-                read -rp "Enter URL / Zadajte URL: " KIOSK_URL
-                if [[ -z "$KIOSK_URL" ]]; then
-                    KIOSK_URL="${DEFAULT_KIOSK_URL}"
-                fi
-                save_config
-                start_kiosk_mode
-                break
-                ;;
-            2)
-                # Language settings
-                show_language_menu
-                ;;
-            3)
-                # Display settings
-                show_display_menu
-                ;;
-            4)
-                # Network settings
-                show_network_menu
-                ;;
-            5)
-                # Exit (just start kiosk with defaults)
-                print_info "$(t menu_exit)"
-                start_kiosk_mode
-                break
-                ;;
-            *)
-                print_error "$(t menu_invalid)"
-                sleep 1
-                ;;
-        esac
-    done
+# Browser installation is OPTIONAL - terminal mode doesn't need it
+# Uncomment below if browser functionality is needed later
+# print_info "3. Bongeszo telepitese -- Instalacia prehliadaca..."
+# if [[ "$KIOSK_MODE" = "epiphany" ]]; then
+#     BROWSER_NAME="epiphany-browser"
+# else
+#     BROWSER_NAME="chromium-browser"
+# fi
+# 
+# if ! install_browser "$BROWSER_NAME"; then
+#     print_warning "Bongeszo telepitese sikertelen -- Instalacia prehliadaca zlyhala"
+# fi
+# echo ""
+
+print_info "Skipping browser installation (terminal-only mode)"
+echo ""
+
+# =============================================================================
+# Kiosk rendszer konfiguralasa -- Konfiguracia kiosk systemu
+# Terminal-only mode: Display terminal on main screen, no browser
+# =============================================================================
+
+print_info "3. Kiosk rendszer konfiguralasa -- Konfiguracia kiosk systemu..."
+
+KIOSK_CONFIGURED_FILE="${EDUDISPLEJ_HOME}/.kiosk_system_configured"
+
+# Ha mar konfiguralva, kilepes -- Ak uz je nakonfigurovane, ukoncenie
+if [[ -f "$KIOSK_CONFIGURED_FILE" ]]; then
+    print_info "Kiosk rendszer mar konfiguralva van -- Kiosk system je uz nakonfigurovany"
+    exit 0
+fi
+
+# Display managerek letiltasa -- Vypnutie display managerov
+print_info "Display managerek letiltasa -- Vypinanie display managerov..."
+DISPLAY_MANAGERS=("lightdm" "lxdm" "sddm" "gdm3" "gdm" "xdm" "plymouth")
+for dm in "${DISPLAY_MANAGERS[@]}"; do
+    if systemctl list-unit-files | grep -q "^${dm}.service"; then
+        systemctl disable --now "${dm}.service" 2>/dev/null || true
+        systemctl mask "${dm}.service" 2>/dev/null || true
+    fi
+done
+
+# X server jogosultsagok konfigurálása -- Konfiguracia X server opravneni
+print_info "X server jogosultsagok beallitasa -- Nastavenie X server opravneni..."
+mkdir -p /etc/X11 2>/dev/null || true
+cat > /etc/X11/Xwrapper.config <<'XWRAPPER_EOF'
+# X server wrapper configuration for EduDisplej
+# Allow non-console users to start X server
+allowed_users=anybody
+needs_root_rights=yes
+XWRAPPER_EOF
+print_success "✓ Xwrapper.config letrehozva -- vytvoreny"
+
+# Felhasznalo csoportok hozzaadasa -- Pridanie pouzivatelskych skupin
+print_info "Felhasznalo csoportok beallitasa -- Nastavenie pouzivatelskych skupin..."
+usermod -a -G tty,video,input "$CONSOLE_USER" 2>/dev/null || true
+print_success "✓ Felhasznalo hozzaadva: tty,video,input csoportokhoz -- Pouzivatel pridany do skupin"
+
+# .xinitrc letrehozasa -- Vytvorenie .xinitrc
+print_info "Letrehozas -- Vytvorenie: .xinitrc"
+cat > "$USER_HOME/.xinitrc" <<'XINITRC_EOF'
+#!/bin/bash
+# Start Openbox window manager
+exec openbox-session
+XINITRC_EOF
+chmod +x "$USER_HOME/.xinitrc"
+chown "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.xinitrc" 2>/dev/null || true
+
+# Openbox autostart konfiguralasa -- Konfiguracia Openbox autostart
+print_info "Letrehozas -- Vytvorenie: Openbox autostart"
+mkdir -p "$USER_HOME/.config/openbox"
+cat > "$USER_HOME/.config/openbox/autostart" <<'AUTOSTART_EOF'
+#!/bin/bash
+# Openbox autostart - Launch terminal on main display
+# Simple and reliable
+
+LOG="/tmp/openbox-autostart.log"
+exec >> "$LOG" 2>&1
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart starting"
+
+# Wait for X to be ready
+sleep 2
+
+# Configure display - find first connected output
+if command -v xrandr >/dev/null 2>&1; then
+    OUTPUT=$(xrandr | grep " connected" | head -1 | awk '{print $1}')
+    if [ -n "$OUTPUT" ]; then
+        xrandr --output "$OUTPUT" --auto --primary 2>/dev/null || true
+        echo "Display output set: $OUTPUT"
+    fi
+fi
+
+# Disable screen blanking
+command -v xset >/dev/null 2>&1 && {
+    xset -dpms 2>/dev/null || true
+    xset s off 2>/dev/null || true
+    xset s noblank 2>/dev/null || true
 }
 
-# =============================================================================
-# Boot Summary + Countdown
-# =============================================================================
+# Hide cursor
+command -v unclutter >/dev/null 2>&1 && {
+    unclutter -idle 1 &
+}
 
-show_system_summary
+# Black background
+command -v xsetroot >/dev/null 2>&1 && {
+    xsetroot -solid black 2>/dev/null || true
+}
 
-if [[ ! -f "$MODE_FILE" ]]; then
-    print_warning "No mode configured - opening menu by default"
-    ENTER_MENU=true
-fi
-
-countdown_or_menu "$COUNTDOWN_SECONDS"
-
-echo ""
-
-# =============================================================================
-# Main Logic - Menu or Kiosk
-# =============================================================================
-
-if [[ "$ENTER_MENU" == true ]]; then
-    # Enter interactive menu
-    main_menu
+# Launch terminal with script - THIS IS THE GOAL
+SCRIPT="/opt/edudisplej/init/edudisplej_terminal_script.sh"
+if [ -x "$SCRIPT" ]; then
+    echo "Launching terminal with $SCRIPT"
+    xterm -display :0 -fullscreen -fa Monospace -fs 14 \
+          -bg black -fg green -title "EduDisplej" +sb \
+          -e "$SCRIPT" &
+    echo "Terminal launched (PID: $!)"
 else
-    # Load existing mode and start kiosk
-    print_info "$(t boot_loading_mode)"
-
-    SAVED_MODE=$(get_mode)
-
-    if [[ -n "$SAVED_MODE" ]]; then
-        print_info "Mode: ${SAVED_MODE}"
-    else
-        SAVED_MODE="EDSERVER"
-        set_mode "$SAVED_MODE"
-    fi
-
-    start_kiosk_mode
+    echo "ERROR: Script not found: $SCRIPT"
+    # Fallback: simple terminal
+    xterm -display :0 -fullscreen -bg black -fg green +sb &
 fi
 
-# =============================================================================
-# Keep running - monitor kiosk processes
-# =============================================================================
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart complete"
+AUTOSTART_EOF
 
-echo ""
-print_info "EduDisplej kiosk is running. Press Ctrl+C to stop."
-print_info "Logs: session.log, xclient.log"
-echo ""
+chmod +x "$USER_HOME/.config/openbox/autostart"
+chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
 
-# Keep the script alive - monitor xinit/X processes
-while true; do
-    if ! pgrep -x xinit >/dev/null 2>&1 && ! pgrep -x Xorg >/dev/null 2>&1; then
-        print_warning "X server stopped. Restarting..."
-        start_kiosk_mode
-    fi
-    sleep 10
-done
+# Mark system as configured
+touch "$KIOSK_CONFIGURED_FILE"
+
+# Reload systemd
+systemctl daemon-reload 2>/dev/null || true
+
+print_success "=========================================="
+print_success "Setup complete! Reboot to start terminal"
+print_success "=========================================="
+exit 0

@@ -1,0 +1,39 @@
+[Unit]
+Description=EduDisplej Kiosk Mode - Display System
+Documentation=https://github.com/nagy-andras-sk/edudisplej
+After=network-online.target systemd-user-sessions.service
+Wants=network-online.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=edudisplej
+Group=edudisplej
+WorkingDirectory=/home/edudisplej
+Environment=HOME=/home/edudisplej
+Environment=USER=edudisplej
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+
+# TTY configuration for tty1 (main console)
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+
+# Run wrapper script to handle initialization and X startup
+ExecStart=/opt/edudisplej/init/kiosk-start.sh
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Security and resource limits
+# Allow access to graphics and input devices
+SupplementaryGroups=video input tty
+
+[Install]
+WantedBy=multi-user.target
