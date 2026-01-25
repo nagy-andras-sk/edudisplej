@@ -8,8 +8,13 @@ $folder = isset($_GET['folder']) ? $_GET['folder'] : 'init';
 // Security: only allow 'init' or 'kiosk_scripts' folders
 if ($folder === 'kiosk_scripts') {
     $baseDir = dirname(__DIR__) . '/kiosk_scripts';
+} elseif ($folder === 'init') {
+    $baseDir = __DIR__; // init folder
 } else {
-    $baseDir = __DIR__; // default to init folder
+    // Reject invalid folder parameters
+    http_response_code(400);
+    echo "Invalid folder parameter. Only 'init' or 'kiosk_scripts' are allowed.";
+    exit;
 }
 
 // Verify the directory exists
