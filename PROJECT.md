@@ -46,19 +46,20 @@ Shifted focus from browser-only to terminal display:
 - Network monitoring
 - Lightweight operation
 
-### Phase 4: Current Optimization (v2.0)
+### Phase 4: Simplification (v2.0)
 **Objectives:**
-1. **Consolidate redundant scripts** - Reduce complexity
-2. **Add surf browser** - Lightweight browsing option
+1. **Simplify to core functionality** - Focus on local clock display
+2. **Add surf browser** - Lightweight browsing option  
 3. **Automatic hostname configuration** - Based on MAC address
-4. **API infrastructure** - Remote management capability
+4. **Basic watchdog** - Simple monitoring loop for future expansion
 
 **Key changes:**
 - Created `edudisplej-system.sh` - Unified system management
 - Created `edudisplej-hostname.sh` - Automatic hostname configuration
-- Created `edudisplej-api-client.py` - API client for remote management
+- Created `edudisplej-api-client.py` - Simple watchdog service (no remote API)
 - Optimized installation process
 - Better documentation
+- Removed API server code - system now fully local
 
 ---
 
@@ -70,23 +71,22 @@ Shifted focus from browser-only to terminal display:
 /opt/edudisplej/                          # Main application directory
 ├── init/                                 # Initialization scripts
 │   ├── common.sh                         # Common functions library
-│   ├── edudisplej-system.sh             # Unified system management (NEW)
+│   ├── edudisplej-system.sh             # Unified system management
 │   ├── edudisplej-init.sh               # Main initialization script
-│   ├── edudisplej-hostname.sh           # Hostname configuration (NEW)
-│   ├── edudisplej-api-client.py         # API client service (NEW)
+│   ├── edudisplej-hostname.sh           # Hostname configuration
+│   ├── edudisplej-api-client.py         # Watchdog service (local monitoring)
 │   ├── kiosk-start.sh                    # X server startup wrapper
 │   ├── kiosk.sh                          # Kiosk mode functions
 │   ├── edudisplej_terminal_script.sh    # Terminal display script
 │   ├── edudisplej-kiosk.service         # Systemd service definition
 │   ├── edudisplej-watchdog.service      # Watchdog service
-│   ├── edudisplej-api-client.service    # API client service (NEW)
-│   └── clock.html                        # Fallback HTML page
+│   ├── edudisplej-api-client.service    # Watchdog service file
+│   └── clock.html                        # Local clock HTML page
 ├── localweb/                             # Local web files
 │   └── clock.html                        # Offline clock page
-├── api/                                  # API client data (NEW)
-│   ├── api-client.log                   # API client logs
-│   └── api-client.pid                   # API client PID file
-├── screenshots/                          # Screenshots directory (NEW)
+├── logs/                                 # Log files
+│   ├── watchdog.log                     # Watchdog logs
+│   └── watchdog.pid                     # Watchdog PID file
 ├── data/                                 # Data directory
 │   ├── packages.json                     # Package tracking
 │   └── installed_packages.txt            # Backup package tracking
@@ -99,7 +99,7 @@ Shifted focus from browser-only to terminal display:
 ├── .user_home                            # User home directory
 ├── .kiosk_configured                     # Flag: kiosk packages installed
 ├── .kiosk_system_configured              # Flag: kiosk system configured
-└── .hostname_configured                  # Flag: hostname configured (NEW)
+└── .hostname_configured                  # Flag: hostname configured
 
 /home/[user]/                             # User home directory
 ├── .xinitrc                              # X initialization file
@@ -108,7 +108,7 @@ Shifted focus from browser-only to terminal display:
 /etc/systemd/system/
 ├── edudisplej-kiosk.service              # Main kiosk service
 ├── edudisplej-watchdog.service           # Watchdog service
-└── edudisplej-api-client.service         # API client service (NEW)
+└── edudisplej-api-client.service         # Watchdog service (symlink)
 
 /etc/sudoers.d/
 └── edudisplej                            # Sudo permissions for init script
@@ -141,20 +141,17 @@ Shifted focus from browser-only to terminal display:
 - Runs once, before first boot
 - Updates `/etc/hostname` and `/etc/hosts`
 
-#### 5. API Client (`edudisplej-api-client.py`) - NEW
-- Python-based service for remote management
-- Registers device with central server
-- Executes commands from server:
-  - `restart_browser` - Restart web browser
-  - `screenshot` - Capture screenshot
-  - `launch_program` - Launch programs (e.g., VLC)
-  - `get_status` - Report device status
-- Foundation for future development
-
-#### 6. Watchdog Service (`edudisplej-watchdog.sh`)
-- Monitors system health
-- Restarts services if they fail
+#### 5. Watchdog Service (`edudisplej-api-client.py`)
+- Simple Python-based monitoring service
+- Checks system health periodically (every 60 seconds)
+- Monitors X server and browser status
 - Logs monitoring data
+- Foundation for future development
+- No remote API calls - fully local operation
+
+#### 6. Legacy Watchdog Service (`edudisplej-watchdog.sh`)
+- Shell-based watchdog (legacy)
+- Can be replaced by Python watchdog service
 
 ---
 
@@ -264,18 +261,13 @@ Shifted focus from browser-only to terminal display:
 
 
 ┌─────────────────────────────────────────────────────────────┐
-│          PARALLEL: API CLIENT SERVICE                        │
+│          PARALLEL: WATCHDOG SERVICE                          │
 │  1. Start on boot (edudisplej-api-client.service)          │
-│  2. Register device with central server                      │
-│     - Send hostname and MAC address                          │
-│     - Receive device ID                                      │
-│  3. Poll for commands periodically                           │
-│  4. Execute commands:                                        │
-│     - restart_browser                                        │
-│     - screenshot                                             │
-│     - launch_program                                         │
-│     - get_status                                             │
-│  5. Report results back to server                            │
+│  2. Monitor system health every 60 seconds                   │
+│     - Check if X server is running                           │
+│     - Check if browser is running                            │
+│  3. Log monitoring data                                      │
+│  4. Foundation for future expansion                          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -284,7 +276,7 @@ Shifted focus from browser-only to terminal display:
 1. **System Boot** → **Systemd Init**: ~5-10 seconds
 2. **Systemd Init** → **Services Start**: ~2-3 seconds
 3. **Services Start** → **X Server Ready**: ~3-5 seconds (first boot: +30-60s for package installation)
-4. **X Server Ready** → **Terminal Display**: ~1-2 seconds
+4. **X Server Ready** → **Browser Display**: ~1-2 seconds
 
 **Total Boot Time:**
 - Normal boot: ~10-20 seconds
@@ -292,111 +284,26 @@ Shifted focus from browser-only to terminal display:
 
 ---
 
-## API Infrastructure Design
+## Watchdog Service
 
 ### Overview
-The API infrastructure allows remote management of EduDisplej devices through a central server.
+The watchdog service is a simple Python-based monitoring loop that checks system health.
 
-### Architecture
+### Features
+- Monitors X server status
+- Monitors browser (surf/chromium/epiphany) status
+- Logs monitoring data to `/opt/edudisplej/logs/watchdog.log`
+- Runs continuously with 60-second check interval
+- Foundation for future expansion
 
-```
-┌─────────────────────┐
-│  Central Server     │
-│  server.edudisplej  │
-│  .sk                │
-│                     │
-│  - PHP API          │
-│  - MySQL Database   │
-│  - Device Registry  │
-└──────────┬──────────┘
-           │
-           │ HTTPS
-           │
-           ▼
-┌─────────────────────┐
-│  EduDisplej Device  │
-│                     │
-│  API Client         │
-│  (Python Service)   │
-│                     │
-│  - Poll for         │
-│    commands         │
-│  - Execute          │
-│  - Report results   │
-└─────────────────────┘
-```
-
-### API Endpoints
-
-#### Server Side (PHP)
-- **POST /api/register.php**
-  - Register device
-  - Parameters: `hostname`, `mac`
-  - Response: `device_id`
-
-*(Future endpoints to be implemented)*
-- **GET /api/commands.php?device_id={id}**
-  - Get pending commands for device
-  
-- **POST /api/report.php**
-  - Report command execution results
-
-#### Client Side (Python)
-
-**Commands supported:**
-
-1. **restart_browser**
-   - Kills browser processes
-   - Browser auto-restarts via kiosk system
-   
-2. **screenshot**
-   - Takes screenshot using scrot or imagemagick
-   - Saves to `/opt/edudisplej/screenshots/`
-   - Parameters: `filename` (optional)
-   
-3. **launch_program**
-   - Launches arbitrary program
-   - Parameters: `program`, `args` (optional)
-   - Example: Launch VLC player
-   
-4. **get_status**
-   - Returns device status
-   - Includes: hostname, MAC, uptime, load, X status, browser status
-
-### Security Considerations
-
-**Current Implementation:**
-- HTTPS communication with server
-- Basic request validation
-- No authentication yet (placeholder for future)
-
-**Future Improvements:**
-- Device authentication tokens
-- Encrypted command transmission
-- Command signing/verification
-- Rate limiting
-- Audit logging
-
-### Development Roadmap
-
-**Phase 1 (Current):**
-- ✅ Basic client-server registration
-- ✅ Command framework
-- ✅ Local command execution
-
-**Phase 2 (Next):**
-- [ ] Server-side command queue
-- [ ] Command polling mechanism
-- [ ] Result reporting
-- [ ] Basic authentication
-
-**Phase 3 (Future):**
-- [ ] Web dashboard for device management
-- [ ] Real-time command execution
-- [ ] Screenshot upload to server
-- [ ] Remote VNC/console access
-- [ ] Batch operations
-- [ ] Scheduled tasks
+### Future Development
+The watchdog service is designed to be extended with:
+- Automatic service restart on failure
+- Memory/CPU monitoring
+- Disk space checks
+- Network connectivity monitoring
+- Custom alerting
+- Remote API integration (optional)
 
 ---
 
@@ -468,15 +375,15 @@ curl -fsSL https://install.edudisplej.sk/init/update.sh | sudo bash
 # Check status
 systemctl status edudisplej-kiosk.service
 systemctl status edudisplej-watchdog.service
-systemctl status edudisplej-api-client.service
+systemctl status edudisplej-api-client.service  # Watchdog service
 
 # View logs
 journalctl -u edudisplej-kiosk.service -f
-journalctl -u edudisplej-api-client.service -f
+journalctl -u edudisplej-api-client.service -f  # Watchdog logs
 
 # Restart services
 systemctl restart edudisplej-kiosk.service
-systemctl restart edudisplej-api-client.service
+systemctl restart edudisplej-api-client.service  # Restart watchdog
 ```
 
 ### Manual Operations
@@ -487,9 +394,6 @@ sudo /opt/edudisplej/init/kiosk.sh stop_kiosk_mode
 # Configure hostname
 sudo /opt/edudisplej/init/edudisplej-hostname.sh
 
-# Take screenshot manually
-DISPLAY=:0 scrot /opt/edudisplej/screenshots/manual.png
-
 # Check system status
 sudo /opt/edudisplej/init/edudisplej-init.sh
 ```
@@ -498,7 +402,7 @@ sudo /opt/edudisplej/init/edudisplej-init.sh
 - `/opt/edudisplej/session.log` - Current session
 - `/opt/edudisplej/session.log.old` - Previous session
 - `/opt/edudisplej/apt.log` - Package installation
-- `/opt/edudisplej/api/api-client.log` - API client logs
+- `/opt/edudisplej/logs/watchdog.log` - Watchdog service logs
 - `/tmp/openbox-autostart.log` - Openbox startup
 - `/tmp/kiosk-startup.log` - Kiosk startup
 
@@ -516,9 +420,9 @@ sudo /opt/edudisplej/init/edudisplej-init.sh
 2. Check interface: `ip addr show`
 3. Review logs: `journalctl -u NetworkManager`
 
-### API Client Issues
+### Watchdog Service Issues
 1. Check service: `systemctl status edudisplej-api-client.service`
-2. View logs: `cat /opt/edudisplej/api/api-client.log`
+2. View logs: `cat /opt/edudisplej/logs/watchdog.log`
 3. Test manually: `python3 /opt/edudisplej/init/edudisplej-api-client.py`
 
 ### Package Installation Issues
@@ -531,16 +435,16 @@ sudo /opt/edudisplej/init/edudisplej-init.sh
 ## Future Development Plans
 
 ### Short Term (Next Release)
-1. Complete API server implementation
-2. Web dashboard for device management
-3. Screenshot upload functionality
-4. Device grouping and batch operations
-5. Configuration management via API
+1. Enhanced watchdog with automatic service restart
+2. Browser content rotation support
+3. Configuration improvements
+4. Better error handling
+5. Improved logging
 
 ### Medium Term
-1. VLC integration for video playback
-2. Scheduled content rotation
-3. Remote configuration updates
+1. Optional remote API integration
+2. VLC integration for video playback
+3. Scheduled content rotation
 4. System monitoring and alerts
 5. Automatic updates
 
@@ -548,8 +452,8 @@ sudo /opt/edudisplej/init/edudisplej-init.sh
 1. Multi-display support
 2. Content scheduling system
 3. Analytics and reporting
-4. Mobile app for management
-5. Cloud-based content delivery
+4. Web dashboard for management (optional)
+5. Cloud-based content delivery (optional)
 
 ---
 
