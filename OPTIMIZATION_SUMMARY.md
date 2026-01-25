@@ -283,9 +283,9 @@ API Client Listening for Commands (NEW)
    - Added v2.0 feature summary
    - Updated directory structure
 
-### Unchanged (Backward Compatible):
-- `edudisplej-checker.sh` - Still present as fallback
-- `edudisplej-installer.sh` - Still present as fallback
+### Legacy Scripts Removed:
+- `edudisplej-checker.sh` - Functionality moved to `edudisplej-system.sh`
+- `edudisplej-installer.sh` - Functionality moved to `edudisplej-system.sh`
 - All other existing scripts remain functional
 
 ---
