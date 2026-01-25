@@ -81,7 +81,7 @@ fix_armv6_boot_config() {
     fi
     
     # Add fake KMS if not present
-    if ! grep -q "^[[:space:]]*dtoverlay=vc4-fkms-v3d" "$CONFIG_FILE"; then
+    if ! grep -q "^dtoverlay=vc4-fkms-v3d" "$CONFIG_FILE"; then
         cat >> "$CONFIG_FILE" <<'EOF'
 
 # ARMv6 fix - Issue #47
