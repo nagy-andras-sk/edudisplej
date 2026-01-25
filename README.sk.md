@@ -314,8 +314,7 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
 ┌──────────────────────────────────────────────────────────────────────┐
 │  1. NAČÍTANIE MODULOV                                                │
 │     ├─ common.sh (spoločné funkcie, preklady)                       │
-│     ├─ edudisplej-checker.sh (kontrola systému)                     │
-│     └─ edudisplej-installer.sh (inštalácia balíčkov)                │
+│     └─ edudisplej-system.sh (zjednodušený systémový manažment)      │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
                              ▼
@@ -349,7 +348,7 @@ Tento skript sa spustí iba pri prvom štarte systému po inštalácii (keď nee
                              │
                              ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│  5. KONTROLA SYSTÉMU (edudisplej-checker.sh)                        │
+│  5. KONTROLA SYSTÉMU (edudisplej-system.sh)                          │
 │     └─ check_system_ready($KIOSK_MODE, $CONSOLE_USER, $USER_HOME)   │
 └────────────────────────────┬─────────────────────────────────────────┘
                              │
@@ -559,22 +558,19 @@ Spoločné funkcie a konfigurácia používaná všetkými skriptmi.
 - Prekladový systém (slovenčina/angličtina)
 - Konfiguračné funkcie
 
-### edudisplej-checker.sh
-Kontrola systému a overenie nainštalovaných komponentov.
+### edudisplej-system.sh
+Zjednodušený systémový manažment - kombinuje funkcionalitu kontroly systému a inštalácie balíčkov.
 
-**Funkcie:**
+**Funkcie pre kontrolu:**
 - `check_required_packages(packages...)` - Kontrola balíčkov (dpkg -s)
 - `check_browser(browser_name)` - Kontrola prehliadača
 - `check_x_environment()` - Kontrola X prostredia
 - `check_kiosk_configuration(user, home)` - Kontrola kiosk konfiguračných súborov
-- `check_system_ready(kiosk_mode, user, home)` - **Hlavná funkcia**
+- `check_system_ready(kiosk_mode, user, home)` - **Hlavná kontrolná funkcia**
   - Kontroluje všetky 4 oblasti (základné balíčky, kiosk balíčky, prehliadač, konfigurácia)
   - Vracia 0 ak všetko OK, 1 ak niečo chýba
 
-### edudisplej-installer.sh
-Inštalácia balíčkov a sledovanie nainštalovaných komponentov.
-
-**Funkcie:**
+**Funkcie pre inštaláciu:**
 - `ensure_data_directory()` - Zabezpečenie existencie /opt/edudisplej/data/
 - `check_packages_installed(group)` - Kontrola či je skupina balíčkov už nainštalovaná
 - `record_package_installation(group, packages...)` - Zaznamenanie inštalácie do packages.json
@@ -760,7 +756,7 @@ sudo /opt/edudisplej/init/edudisplej-init.sh
 
 # Kontrola systému bez inštalácie
 source /opt/edudisplej/init/common.sh
-source /opt/edudisplej/init/edudisplej-checker.sh
+source /opt/edudisplej/init/edudisplej-system.sh
 check_system_ready chromium pi /home/pi
 
 # Reštart služby
@@ -788,7 +784,7 @@ startx -- :0 vt1
    # Pre základné balíčky (riadok 228)
    REQUIRED_PACKAGES=(openbox xinit unclutter curl x11-utils xserver-xorg novybalik)
    
-   # Pre kiosk balíčky - upravte edudisplej-installer.sh (riadok 336)
+   # Pre kiosk balíčky - upravte edudisplej-system.sh (install_kiosk_packages funkcia)
    packages+=("xterm" "xdotool" "figlet" "dbus-x11" "novybalik")
    ```
 3. Vymažte flag súbory pre opätovnú inštaláciu:
