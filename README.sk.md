@@ -4,6 +4,18 @@
 
 EduDisplej je kiosk systém pre Raspberry Pi a iné Linux zariadenia, ktorý automaticky spúšťa webový prehliadač na celú obrazovku po štarte systému. Systém je navrhnutý tak, aby bol jednoduchý na inštaláciu, spoľahlivý a ľahko udržiavateľný.
 
+### Nové funkcie vo verzii 2.0
+
+- **Automatická konfigurácia hostname** - Systém sa automaticky premenúva na `edudisplej-XXXXXX` podľa MAC adresy
+- **Surf browser** - Pridaný ľahký webový prehliadač pre minimalistické zobrazenie
+- **API infraštruktúra** - Vzdialená správa zariadení cez centrálny server
+  - Reštart prehliadača
+  - Screenshot obrazovky
+  - Spúšťanie programov (napr. VLC)
+  - Sledovanie stavu zariadenia
+- **Optimalizované skripty** - Konsolidované a zjednodušené inštalačné skripty
+- **Podrobná dokumentácia** - Komplexný PROJECT.md s históriou a roadmapou
+
 ## Rýchla Inštalácia
 
 ```bash
@@ -22,17 +34,25 @@ Po inštalácii reštartujte systém a EduDisplej sa automaticky spustí.
 /opt/edudisplej/                          # Hlavný adresár aplikácie
 ├── init/                                 # Inicializačné skripty
 │   ├── edudisplej-init.sh               # Hlavný inicializačný skript
-│   ├── edudisplej-checker.sh            # Kontrola systému
-│   ├── edudisplej-installer.sh          # Inštalátor balíčkov
+│   ├── edudisplej-system.sh             # Zjednodušený systémový manažment (NOVÝ)
+│   ├── edudisplej-hostname.sh           # Automatická konfigurácia hostname (NOVÝ)
+│   ├── edudisplej-api-client.py         # API klient pre vzdialenú správu (NOVÝ)
+│   ├── edudisplej-checker.sh            # Kontrola systému (starší)
+│   ├── edudisplej-installer.sh          # Inštalátor balíčkov (starší)
 │   ├── common.sh                         # Spoločné funkcie
 │   ├── kiosk-start.sh                    # Wrapper pre systemd službu
 │   ├── kiosk.sh                          # Kiosk funkcie (zastavenie)
 │   ├── display.sh                        # Funkcie pre nastavenie rozlíšenia
 │   ├── edudisplej_terminal_script.sh    # ASCII banner skript
 │   ├── edudisplej-kiosk.service         # Systemd servisná definícia
+│   ├── edudisplej-api-client.service    # API klient service (NOVÝ)
 │   └── clock.html                        # Lokálna webová stránka (hodiny)
 ├── localweb/                             # Lokálne webové súbory
 │   └── clock.html                        # Offline záložná stránka
+├── api/                                  # API klient dáta (NOVÝ)
+│   ├── api-client.log                   # API klient logy
+│   └── api-client.pid                   # API klient PID súbor
+├── screenshots/                          # Adresár pre screenshoty (NOVÝ)
 ├── data/                                 # Dátový adresár
 │   ├── packages.json                     # Sledovanie nainštalovaných balíčkov
 │   └── installed_packages.txt            # Záložné sledovanie balíčkov
@@ -44,7 +64,8 @@ Po inštalácii reštartujte systém a EduDisplej sa automaticky spustí.
 ├── .console_user                         # Uložený používateľ
 ├── .user_home                            # Domovský adresár používateľa
 ├── .kiosk_configured                     # Flag: kiosk balíčky nainštalované
-└── .kiosk_system_configured              # Flag: kiosk systém nakonfigurovaný
+├── .kiosk_system_configured              # Flag: kiosk systém nakonfigurovaný
+└── .hostname_configured                  # Flag: hostname nakonfigurovaný (NOVÝ)
 
 /home/[používateľ]/                       # Domovský adresár používateľa (napr. /home/pi)
 ├── .xinitrc                              # X inicializačný súbor
