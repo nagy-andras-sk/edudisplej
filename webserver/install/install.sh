@@ -4,6 +4,7 @@ set -euo pipefail
 # Zakladne nastavenia - Base settings
 TARGET_DIR="/opt/edudisplej"
 INIT_DIR="${TARGET_DIR}/init"
+KIOSK_SCRIPTS_DIR="${TARGET_DIR}/kiosk_scripts"
 LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 INIT_BASE="https://install.edudisplej.sk/init"
 SERVICE_FILE="/etc/systemd/system/edudisplej-kiosk.service"
@@ -131,102 +132,120 @@ if [ -d "$TARGET_DIR" ]; then
 fi
 
 # Vytvorenie priecinkov - Create directories
-mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR"
+mkdir -p "$INIT_DIR" "$KIOSK_SCRIPTS_DIR" "$LOCAL_WEB_DIR"
 
-# Nacitanie zoznamu suborov - Loading file list
-echo "[*] Nacitavame zoznam suborov - Loading file list..."
-
-FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles" 2>/dev/null | tr -d '\r')"
-CURL_EXIT_CODE=$?
-
-if [ $CURL_EXIT_CODE -ne 0 ]; then
-  echo "[!] Chyba pripojenia k serveru - Server connection error (kod - code: $CURL_EXIT_CODE)"
-  exit 1
-fi
-
-if [ -z "$FILES_LIST" ]; then
-  echo "[!] Server vratil prazdny zoznam - Server returned empty list"
-  exit 1
-fi
-
-# Pocet suborov - File count
-TOTAL_FILES=0
-while IFS= read -r line; do
-    if [[ -n "$line" && "$line" == *";"* ]]; then
-        TOTAL_FILES=$((TOTAL_FILES + 1))
-    fi
-done <<< "$FILES_LIST"
-
-if [ $TOTAL_FILES -eq 0 ]; then
-    echo "[!] Ziadne subory na stiahnutie - No files to download"
-    exit 1
-fi
-
-CURRENT_FILE=0
-echo ""
-echo "=========================================="
-echo "Stahovanie - Downloading: ${TOTAL_FILES} suborov - files"
-echo "=========================================="
-echo ""
-
-# Stiahnutie suborov - Download files
-while IFS=";" read -r NAME SIZE MODIFIED; do
-    [ -z "${NAME:-}" ] && continue
-
-    CURRENT_FILE=$((CURRENT_FILE + 1))
-    PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
+# Funkcia na stiahnutie suborov z konkretneho priecinka - Function to download files from a specific folder
+download_folder_files() {
+    local FOLDER_NAME="$1"
+    local TARGET_PATH="$2"
+    local FOLDER_PARAM="$3"
     
-    echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) ${NAME} (${SIZE} bajtov)"
+    echo ""
+    echo "=========================================="
+    echo "Nacitavanie suborov z ${FOLDER_NAME} - Loading files from ${FOLDER_NAME}"
+    echo "=========================================="
     
-    MAX_DOWNLOAD_ATTEMPTS=3
-    DOWNLOAD_SUCCESS=false
+    # Nacitanie zoznamu suborov - Loading file list
+    echo "[*] Nacitavame zoznam suborov - Loading file list..."
     
-    for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
-        if curl -sL --max-time 60 --connect-timeout 10 \
-            "${INIT_BASE}/download.php?streamfile=${NAME}" \
-            -o "${INIT_DIR}/${NAME}" 2>&1; then
-            
-            ACTUAL_SIZE=$(stat -c%s "${INIT_DIR}/${NAME}" 2>/dev/null || echo "0")
-            
-            if [ "$ACTUAL_SIZE" -eq "$SIZE" ]; then
-                DOWNLOAD_SUCCESS=true
-                break
-            else
-                echo "    [!] Velkost nesedi - Size mismatch (ocakavane - expected: ${SIZE}, skutocne - actual: ${ACTUAL_SIZE})"
-                if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
-                    sleep 2
-                    rm -f "${INIT_DIR}/${NAME}"
-                fi
-            fi
-        else
-            if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
-                echo "    [!] Pokus ${attempt}/${MAX_DOWNLOAD_ATTEMPTS} zlyhal, skusam znova - Attempt failed, retrying..."
-                sleep 2
-            fi
-        fi
-    done
+    FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles&folder=${FOLDER_PARAM}" 2>/dev/null | tr -d '\r')"
+    CURL_EXIT_CODE=$?
     
-    if [ "$DOWNLOAD_SUCCESS" != "true" ]; then
-        echo ""
-        echo "[!] CHYBA - ERROR: Subor $NAME sa nepodarilo stiahnut - File failed to download po - after ${MAX_DOWNLOAD_ATTEMPTS} pokusoch - attempts"
-        echo ""
+    if [ $CURL_EXIT_CODE -ne 0 ]; then
+        echo "[!] Chyba pripojenia k serveru - Server connection error (kod - code: $CURL_EXIT_CODE)"
         exit 1
     fi
-
-    # Oprava konca riadkov - Fix line endings
-    sed -i 's/\r$//' "${INIT_DIR}/${NAME}"
-
-    # Kontrola a oprava shebang - Check and fix shebang
-    if [[ "${NAME}" == *.sh ]]; then
-        chmod +x "${INIT_DIR}/${NAME}"
-        FIRST_LINE="$(head -n1 "${INIT_DIR}/${NAME}" || true)"
-        if [[ "${FIRST_LINE}" != "#!"* ]]; then
-            sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
-        fi
-    elif [[ "${NAME}" == *.html ]]; then
-      cp -f "${INIT_DIR}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"
+    
+    if [ -z "$FILES_LIST" ]; then
+        echo "[*] Ziadne subory v ${FOLDER_NAME} - No files in ${FOLDER_NAME}"
+        return 0
     fi
-done <<< "$FILES_LIST"
+    
+    # Pocet suborov - File count
+    TOTAL_FILES=0
+    while IFS= read -r line; do
+        if [[ -n "$line" && "$line" == *";"* ]]; then
+            TOTAL_FILES=$((TOTAL_FILES + 1))
+        fi
+    done <<< "$FILES_LIST"
+    
+    if [ $TOTAL_FILES -eq 0 ]; then
+        echo "[*] Ziadne subory v ${FOLDER_NAME} - No files in ${FOLDER_NAME}"
+        return 0
+    fi
+    
+    CURRENT_FILE=0
+    echo ""
+    echo "=========================================="
+    echo "Stahovanie - Downloading: ${TOTAL_FILES} suborov - files z ${FOLDER_NAME}"
+    echo "=========================================="
+    echo ""
+    
+    # Stiahnutie suborov - Download files
+    while IFS=";" read -r NAME SIZE MODIFIED; do
+        [ -z "${NAME:-}" ] && continue
+    
+        CURRENT_FILE=$((CURRENT_FILE + 1))
+        PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
+        
+        echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) ${NAME} (${SIZE} bajtov)"
+        
+        MAX_DOWNLOAD_ATTEMPTS=3
+        DOWNLOAD_SUCCESS=false
+        
+        for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
+            if curl -sL --max-time 60 --connect-timeout 10 \
+                "${INIT_BASE}/download.php?streamfile=${NAME}&folder=${FOLDER_PARAM}" \
+                -o "${TARGET_PATH}/${NAME}" 2>&1; then
+                
+                ACTUAL_SIZE=$(stat -c%s "${TARGET_PATH}/${NAME}" 2>/dev/null || echo "0")
+                
+                if [ "$ACTUAL_SIZE" -eq "$SIZE" ]; then
+                    DOWNLOAD_SUCCESS=true
+                    break
+                else
+                    echo "    [!] Velkost nesedi - Size mismatch (ocakavane - expected: ${SIZE}, skutocne - actual: ${ACTUAL_SIZE})"
+                    if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
+                        sleep 2
+                        rm -f "${TARGET_PATH}/${NAME}"
+                    fi
+                fi
+            else
+                if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
+                    echo "    [!] Pokus ${attempt}/${MAX_DOWNLOAD_ATTEMPTS} zlyhal, skusam znova - Attempt failed, retrying..."
+                    sleep 2
+                fi
+            fi
+        done
+        
+        if [ "$DOWNLOAD_SUCCESS" != "true" ]; then
+            echo ""
+            echo "[!] CHYBA - ERROR: Subor $NAME sa nepodarilo stiahnut - File failed to download po - after ${MAX_DOWNLOAD_ATTEMPTS} pokusoch - attempts"
+            echo ""
+            exit 1
+        fi
+    
+        # Oprava konca riadkov - Fix line endings
+        sed -i 's/\r$//' "${TARGET_PATH}/${NAME}"
+    
+        # Kontrola a oprava shebang - Check and fix shebang
+        if [[ "${NAME}" == *.sh ]]; then
+            chmod +x "${TARGET_PATH}/${NAME}"
+            FIRST_LINE="$(head -n1 "${TARGET_PATH}/${NAME}" || true)"
+            if [[ "${FIRST_LINE}" != "#!"* ]]; then
+                sed -i '1i #!/bin/bash' "${TARGET_PATH}/${NAME}"
+            fi
+        elif [[ "${NAME}" == *.html ]]; then
+            cp -f "${TARGET_PATH}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"
+        fi
+    done <<< "$FILES_LIST"
+}
+
+# Stiahnutie suborov z init priecinka - Download files from init folder
+download_folder_files "init" "$INIT_DIR" "init"
+
+# Stiahnutie suborov z kiosk_scripts priecinka - Download files from kiosk_scripts folder
+download_folder_files "kiosk_scripts" "$KIOSK_SCRIPTS_DIR" "kiosk_scripts"
 
 # Kontrola edudisplej-init.sh - Check for init script
 if [ ! -f "${INIT_DIR}/edudisplej-init.sh" ]; then
