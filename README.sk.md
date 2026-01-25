@@ -37,8 +37,6 @@ Po inštalácii reštartujte systém a EduDisplej sa automaticky spustí.
 │   ├── edudisplej-system.sh             # Zjednodušený systémový manažment (NOVÝ)
 │   ├── edudisplej-hostname.sh           # Automatická konfigurácia hostname (NOVÝ)
 │   ├── edudisplej-api-client.py         # API klient pre vzdialenú správu (NOVÝ)
-│   ├── edudisplej-checker.sh            # Kontrola systému (starší)
-│   ├── edudisplej-installer.sh          # Inštalátor balíčkov (starší)
 │   ├── common.sh                         # Spoločné funkcie
 │   ├── kiosk-start.sh                    # Wrapper pre systemd službu
 │   ├── kiosk.sh                          # Kiosk funkcie (zastavenie)

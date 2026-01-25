@@ -74,8 +74,6 @@ Shifted focus from browser-only to terminal display:
 │   ├── edudisplej-init.sh               # Main initialization script
 │   ├── edudisplej-hostname.sh           # Hostname configuration (NEW)
 │   ├── edudisplej-api-client.py         # API client service (NEW)
-│   ├── edudisplej-checker.sh            # System checker (LEGACY)
-│   ├── edudisplej-installer.sh          # Package installer (LEGACY)
 │   ├── kiosk-start.sh                    # X server startup wrapper
 │   ├── kiosk.sh                          # Kiosk mode functions
 │   ├── edudisplej_terminal_script.sh    # Terminal display script

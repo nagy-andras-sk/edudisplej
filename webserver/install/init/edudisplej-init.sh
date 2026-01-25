@@ -79,20 +79,8 @@ if [[ -f "${INIT_DIR}/edudisplej-system.sh" ]]; then
     source "${INIT_DIR}/edudisplej-system.sh"
     print_success "✓ edudisplej-system.sh betoltve -- nacitany"
 else
-    # Fallback to old scripts if new unified script not available
-    if [[ -f "${INIT_DIR}/edudisplej-checker.sh" ]]; then
-        source "${INIT_DIR}/edudisplej-checker.sh"
-        print_success "✓ edudisplej-checker.sh betoltve -- nacitany"
-    else
-        print_warning "! edudisplej-checker.sh nem talalhato -- nenajdeny"
-    fi
-
-    if [[ -f "${INIT_DIR}/edudisplej-installer.sh" ]]; then
-        source "${INIT_DIR}/edudisplej-installer.sh"
-        print_success "✓ edudisplej-installer.sh betoltve -- nacitany"
-    else
-        print_warning "! edudisplej-installer.sh nem talalhato -- nenajdeny"
-    fi
+    print_error "! edudisplej-system.sh nem talalhato -- nenajdeny"
+    exit 1
 fi
 
 echo ""
