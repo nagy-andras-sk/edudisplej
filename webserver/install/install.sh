@@ -115,13 +115,21 @@ else
   KIOSK_MODE="chromium"
 fi
 
-# Instalacia curl ak chyba - Install curl if missing
+# Instalacia zakladnych nastroje - Install basic tools
+MISSING_TOOLS=()
 if ! command -v curl >/dev/null 2>&1; then
-  echo "[*] Instalacia curl - Installing curl..."
+  MISSING_TOOLS+=("curl")
+fi
+if ! command -v surf >/dev/null 2>&1; then
+  MISSING_TOOLS+=("surf")
+fi
+
+if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
+  echo "[*] Instalacia zakladnych nastroje - Installing basic tools: ${MISSING_TOOLS[*]}"
   start_heartbeat
-  apt-get update -qq && apt-get install -y curl >/dev/null 2>&1
+  apt-get update -qq && apt-get install -y "${MISSING_TOOLS[@]}" >/dev/null 2>&1
   stop_heartbeat
-  echo "[✓] curl nainstalovany - curl installed"
+  echo "[✓] Zakladne nastroje nainstalovane - Basic tools installed"
 fi
 
 # Vzdy prepisat cielovy priecinok - Always overwrite target directory
@@ -301,6 +309,20 @@ if [ -f "${INIT_DIR}/edudisplej-watchdog.service" ]; then
     
     systemctl daemon-reload
     systemctl enable edudisplej-watchdog.service 2>/dev/null || true
+fi
+
+# API Client sluzba - API Client service
+echo "[*] Instalacia API klienta - Installing API client..."
+if [ -f "${INIT_DIR}/edudisplej-api-client.service" ]; then
+    cp "${INIT_DIR}/edudisplej-api-client.service" /etc/systemd/system/
+    chmod 644 /etc/systemd/system/edudisplej-api-client.service
+    
+    if [ -f "${INIT_DIR}/edudisplej-api-client.py" ]; then
+        chmod +x "${INIT_DIR}/edudisplej-api-client.py"
+    fi
+    
+    systemctl daemon-reload
+    systemctl enable edudisplej-api-client.service 2>/dev/null || true
 fi
 
 echo ""

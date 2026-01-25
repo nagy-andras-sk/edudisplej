@@ -74,23 +74,41 @@ else
     exit 1
 fi
 
-# Ellenorzo szkript -- Kontrolny skript
-if [[ -f "${INIT_DIR}/edudisplej-checker.sh" ]]; then
-    source "${INIT_DIR}/edudisplej-checker.sh"
-    print_success "✓ edudisplej-checker.sh betoltve -- nacitany"
+# Unified system management script -- Zjednoduseny systemovy skript
+if [[ -f "${INIT_DIR}/edudisplej-system.sh" ]]; then
+    source "${INIT_DIR}/edudisplej-system.sh"
+    print_success "✓ edudisplej-system.sh betoltve -- nacitany"
 else
-    print_warning "! edudisplej-checker.sh nem talalhato -- nenajdeny"
-fi
+    # Fallback to old scripts if new unified script not available
+    if [[ -f "${INIT_DIR}/edudisplej-checker.sh" ]]; then
+        source "${INIT_DIR}/edudisplej-checker.sh"
+        print_success "✓ edudisplej-checker.sh betoltve -- nacitany"
+    else
+        print_warning "! edudisplej-checker.sh nem talalhato -- nenajdeny"
+    fi
 
-# Telepito szkript -- Instalacny skript
-if [[ -f "${INIT_DIR}/edudisplej-installer.sh" ]]; then
-    source "${INIT_DIR}/edudisplej-installer.sh"
-    print_success "✓ edudisplej-installer.sh betoltve -- nacitany"
-else
-    print_warning "! edudisplej-installer.sh nem talalhato -- nenajdeny"
+    if [[ -f "${INIT_DIR}/edudisplej-installer.sh" ]]; then
+        source "${INIT_DIR}/edudisplej-installer.sh"
+        print_success "✓ edudisplej-installer.sh betoltve -- nacitany"
+    else
+        print_warning "! edudisplej-installer.sh nem talalhato -- nenajdeny"
+    fi
 fi
 
 echo ""
+
+# =============================================================================
+# Hostname Configuration -- Konfiguracia hostname
+# =============================================================================
+
+# Configure hostname based on MAC address before first boot
+if [[ -f "${INIT_DIR}/edudisplej-hostname.sh" ]]; then
+    if bash "${INIT_DIR}/edudisplej-hostname.sh"; then
+        print_success "✓ Hostname configured"
+    else
+        print_warning "! Hostname configuration failed (non-critical)"
+    fi
+fi
 
 # =============================================================================
 # Boot Screen Display
@@ -230,31 +248,23 @@ REQUIRED_PACKAGES=(
 )
 
 print_info "1. Alapcsomagok telepitese -- Instalacia zakladnych balickov..."
-if ! install_required_packages "${REQUIRED_PACKAGES[@]}"; then
+if ! install_packages "${REQUIRED_PACKAGES[@]}"; then
     print_warning "Nehany alapcsomag telepitese sikertelen -- Niektore zakladne balicky sa nepodarilo nainštalovat"
 fi
 echo ""
 
 # Kiosk csomagok telepitese -- Instalacia kiosk balickov
+# Including surf browser for lightweight browsing
 print_info "2. Kiosk csomagok telepitese -- Instalacia kiosk balickov..."
-if ! install_kiosk_packages "$KIOSK_MODE"; then
+KIOSK_PACKAGES=(xterm xdotool figlet dbus-x11 surf)
+if [[ "$KIOSK_MODE" = "epiphany" ]]; then
+    KIOSK_PACKAGES+=("epiphany-browser")
+fi
+
+if ! install_packages "${KIOSK_PACKAGES[@]}"; then
     print_warning "Nehany kiosk csomag telepitese sikertelen -- Niektore kiosk balicky sa nepodarilo nainštalovat"
 fi
 echo ""
-
-# Browser installation is OPTIONAL - terminal mode doesn't need it
-# Uncomment below if browser functionality is needed later
-# print_info "3. Bongeszo telepitese -- Instalacia prehliadaca..."
-# if [[ "$KIOSK_MODE" = "epiphany" ]]; then
-#     BROWSER_NAME="epiphany-browser"
-# else
-#     BROWSER_NAME="chromium-browser"
-# fi
-# 
-# if ! install_browser "$BROWSER_NAME"; then
-#     print_warning "Bongeszo telepitese sikertelen -- Instalacia prehliadaca zlyhala"
-# fi
-# echo ""
 
 print_info "Skipping browser installation (terminal-only mode)"
 echo ""
