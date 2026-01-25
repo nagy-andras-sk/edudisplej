@@ -1,7 +1,7 @@
 [Unit]
 Description=EduDisplej Watchdog Service
 Documentation=https://github.com/nagy-andras-sk/edudisplej
-After=network.target
+After=basic.target
 
 [Service]
 Type=simple

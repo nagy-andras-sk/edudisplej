@@ -72,7 +72,7 @@ class Watchdog:
                     browser_running = True
                     break
             
-            logger.debug(f"Health check - X running: {x_running}, Browser running: {browser_running}")
+            logger.info(f"Health check - X running: {x_running}, Browser running: {browser_running}")
             
             # Future: Add more health checks here
             # - Check display connectivity
