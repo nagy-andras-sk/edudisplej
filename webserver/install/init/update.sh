@@ -180,6 +180,51 @@ else
     echo "[!] Mozno je potrebny manualy restart"
 fi
 
+# Restart display surface / Restart zobrazenej plochy
+echo ""
+echo "[*] Restartujem zobrazenu plochu / Restarting display surface..."
+
+# Stop kiosk processes - use multiple pgrep calls for reliability
+echo "[*] Zastavujem kiosk procesy..."
+declare -a KIOSK_PIDS=()
+
+for process in surf xterm openbox Xorg xinit; do
+    mapfile -t temp_pids < <(pgrep -x "$process" 2>/dev/null || true)
+    # Filter out empty values and add to main array
+    for pid in "${temp_pids[@]}"; do
+        [[ -n "$pid" ]] && KIOSK_PIDS+=("$pid")
+    done
+done
+
+if [ ${#KIOSK_PIDS[@]} -gt 0 ]; then
+    # TERM signal first
+    for pid in "${KIOSK_PIDS[@]}"; do
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    
+    sleep 2
+    
+    # Force kill if still running
+    for pid in "${KIOSK_PIDS[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
+    
+    echo "[✓] Kiosk procesy zastavene"
+else
+    echo "[*] Ziadne kiosk procesy nenajdene"
+fi
+
+# Restart kiosk service to reload display
+if systemctl is-enabled edudisplej-kiosk.service >/dev/null 2>&1; then
+    echo "[*] Restartujem edudisplej-kiosk.service..."
+    systemctl restart edudisplej-kiosk.service 2>/dev/null || true
+    echo "[✓] Displej restartovany"
+else
+    echo "[!] edudisplej-kiosk.service nie je aktivovana"
+fi
+
 echo ""
 echo "=========================================="
 echo "[✓] Hotovo / Kesz!"

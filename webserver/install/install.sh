@@ -108,11 +108,12 @@ fi
 # Detekcia architektury - Architecture detection
 ARCH="$(uname -m)"
 echo "[*] Architektura - Architecture: $ARCH"
+# Always use surf browser
+KIOSK_MODE="surf"
+
+# Apply ARMv6 boot config fix if needed
 if [ "$ARCH" = "armv6l" ]; then
-  KIOSK_MODE="epiphany"
   fix_armv6_boot_config
-else
-  KIOSK_MODE="chromium"
 fi
 
 # Instalacia zakladnych nastroje - Install basic tools
@@ -257,7 +258,7 @@ fi
 echo "[*] Pouzivatel - User: $CONSOLE_USER, Domov - Home: $USER_HOME"
 
 # Ulozenie nastaveni - Save settings
-echo "$KIOSK_MODE" > "${TARGET_DIR}/.kiosk_mode"
+echo "surf" > "${TARGET_DIR}/.kiosk_mode"
 echo "$CONSOLE_USER" > "${TARGET_DIR}/.console_user"
 echo "$USER_HOME" > "${TARGET_DIR}/.user_home"
 
@@ -311,27 +312,13 @@ if [ -f "${INIT_DIR}/edudisplej-watchdog.service" ]; then
     systemctl enable edudisplej-watchdog.service 2>/dev/null || true
 fi
 
-# API Client sluzba - API Client service
-echo "[*] Instalacia API klienta - Installing API client..."
-if [ -f "${INIT_DIR}/edudisplej-api-client.service" ]; then
-    cp "${INIT_DIR}/edudisplej-api-client.service" /etc/systemd/system/
-    chmod 644 /etc/systemd/system/edudisplej-api-client.service
-    
-    if [ -f "${INIT_DIR}/edudisplej-api-client.py" ]; then
-        chmod +x "${INIT_DIR}/edudisplej-api-client.py"
-    fi
-    
-    systemctl daemon-reload
-    systemctl enable edudisplej-api-client.service 2>/dev/null || true
-fi
-
 echo ""
 echo "=========================================="
 echo "Instalacia ukoncena - Installation completed!"
 echo "=========================================="
 echo ""
 echo "[✓] Konfiguracia - Configuration:"
-echo "  - Kiosk mod - Kiosk mode: $KIOSK_MODE"
+echo "  - Kiosk mod - Kiosk mode: surf"
 echo "  - Pouzivatel - User: $CONSOLE_USER"
 echo ""
 echo "Po restarte system automaticky spusti displej"

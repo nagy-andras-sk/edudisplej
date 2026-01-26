@@ -136,10 +136,6 @@ if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE" || true
 fi
 
-# Alapertelmezett ertekek -- Predvolene hodnoty
-KIOSK_URL="${KIOSK_URL:-https://www.time.is}"
-DEFAULT_KIOSK_URL="https://www.time.is"
-
 # =============================================================================
 # Kiosk mod beallitasok beolvasasa -- Nacitanie nastaveni kiosk modu
 # =============================================================================
@@ -150,13 +146,18 @@ read_kiosk_preferences() {
     local console_user_file="${EDUDISPLEJ_HOME}/.console_user"
     local user_home_file="${EDUDISPLEJ_HOME}/.user_home"
     
-    # Kiosk mod -- Kiosk mod (Midori - universal böngésző)
-    KIOSK_MODE="midori"
+    # Kiosk mod -- Kiosk mod (surf browser)
+    # Read from file if exists, otherwise use default
+    if [[ -f "$kiosk_mode_file" ]]; then
+        KIOSK_MODE=$(tr -d '\r\n' < "$kiosk_mode_file")
+    else
+        KIOSK_MODE="surf"
+    fi
     print_info "Kiosk mod -- Kiosk mod: $KIOSK_MODE"
     
     # Konzol felhasznalo -- Konzolovy pouzivatel
     if [[ -f "$console_user_file" ]]; then
-        CONSOLE_USER=$(cat "$console_user_file" | tr -d '\r\n')
+        CONSOLE_USER=$(tr -d '\r\n' < "$console_user_file")
     else
         CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
         [[ -z "$CONSOLE_USER" ]] && CONSOLE_USER="pi"
@@ -165,7 +166,7 @@ read_kiosk_preferences() {
     
     # Felhasznalo home konyvtar -- Domovsky adresar pouzivatela
     if [[ -f "$user_home_file" ]]; then
-        USER_HOME=$(cat "$user_home_file" | tr -d '\r\n')
+        USER_HOME=$(tr -d '\r\n' < "$user_home_file")
     else
         USER_HOME="$(getent passwd "$CONSOLE_USER" | cut -d: -f6)"
     fi
@@ -245,9 +246,6 @@ echo ""
 # Including surf browser for lightweight browsing
 print_info "2. Kiosk csomagok telepitese -- Instalacia kiosk balickov..."
 KIOSK_PACKAGES=(xterm xdotool figlet dbus-x11 surf)
-if [[ "$KIOSK_MODE" = "epiphany" ]]; then
-    KIOSK_PACKAGES+=("epiphany-browser")
-fi
 
 if ! install_packages "${KIOSK_PACKAGES[@]}"; then
     print_warning "Nehany kiosk csomag telepitese sikertelen -- Niektore kiosk balicky sa nepodarilo nainštalovat"

@@ -10,12 +10,6 @@ MODE_FILE="${EDUDISPLEJ_HOME}/.mode"
 # Predvolene hodnoty / Alapertelmezett ertekek
 DEFAULT_LANG="sk"
 CURRENT_LANG="${DEFAULT_LANG}"
-DEFAULT_KIOSK_URL="https://www.time.is"
-FALLBACK_URLS=(
-    "https://www.time.is"
-    "file:///opt/edudisplej/localweb/clock.html"
-    "about:blank"
-)
 
 # Preklady - slovencina bez diakritiky / Forditas - szlovak diakritika nelkul
 declare -Ag TRANS_SK
@@ -201,27 +195,7 @@ check_url() {
     return 1
 }
 
-get_working_url() {
-    local primary_url="$1"
-    if check_url "$primary_url"; then
-        echo "$primary_url"
-        return 0
-    fi
-    print_warning "Primary URL not accessible: $primary_url"
-    for fallback in "${FALLBACK_URLS[@]}"; do
-        if [[ "$fallback" == "$primary_url" ]]; then
-            continue
-        fi
-        print_info "Trying fallback URL: $fallback"
-        if check_url "$fallback"; then
-            echo "$fallback"
-            return 0
-        fi
-    done
-    print_warning "No URL verified, using first fallback: ${FALLBACK_URLS[0]}"
-    echo "${FALLBACK_URLS[0]}"
-    return 0
-}
+
 
 wait_for_internet() {
     local max_attempts=10
