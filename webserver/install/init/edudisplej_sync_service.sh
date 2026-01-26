@@ -100,12 +100,13 @@ sync_kiosk() {
 capture_screenshot() {
     local mac=$(get_mac_address)
     local screenshot_file="/tmp/edudisplej_screenshot_$(date +%s).png"
+    local display="${DISPLAY:-:0}"
     
     # Capture screenshot using scrot or import (ImageMagick)
     if command -v scrot >/dev/null 2>&1; then
-        DISPLAY=:0 scrot "$screenshot_file" 2>/dev/null
+        DISPLAY="$display" scrot "$screenshot_file" 2>/dev/null
     elif command -v import >/dev/null 2>&1; then
-        DISPLAY=:0 import -window root "$screenshot_file" 2>/dev/null
+        DISPLAY="$display" import -window root "$screenshot_file" 2>/dev/null
     else
         echo "Screenshot tool not available (scrot or imagemagick required)"
         return 1

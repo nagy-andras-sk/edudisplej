@@ -214,11 +214,16 @@ sudo /opt/edudisplej/edudisplej_sync_service.sh register
 
 ## Security Notes
 
-1. **Change Default Password:** Immediately change the default admin password
-2. **Database Credentials:** Update database password in `dbkonfiguracia.php`
-3. **HTTPS:** Use HTTPS in production environments
+1. **Change Default Password:** Immediately change the default admin password after installation
+2. **Database Credentials:** The database password is specified in the requirements but should be changed in production:
+   - Update `dbkonfiguracia.php` with a strong password
+   - Update the database user password: `ALTER USER 'edudisplej_sk'@'localhost' IDENTIFIED BY 'your-new-password';`
+3. **HTTPS:** Always use HTTPS in production environments to protect credentials and sensitive data
 4. **Firewall:** Restrict API access to known kiosk IPs if possible
-5. **Regular Updates:** Keep PHP and MySQL updated
+5. **File Permissions:** Ensure web files are not writable by the web server except the screenshots directory
+6. **Regular Updates:** Keep PHP, MySQL, and all system packages updated
+7. **API Security:** Consider implementing API key authentication for kiosk communication in production
+8. **Session Security:** Configure PHP session settings for production use (secure cookies, httponly, etc.)
 
 ## Troubleshooting
 
