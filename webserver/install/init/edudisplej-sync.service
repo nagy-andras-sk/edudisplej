@@ -1,0 +1,17 @@
+[Unit]
+Description=EduDisplej Sync Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/edudisplej/edudisplej_sync_service.sh start
+Restart=always
+RestartSec=10
+User=root
+Environment=EDUDISPLEJ_API_URL=http://localhost/control_edudisplej_sk/api.php
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
