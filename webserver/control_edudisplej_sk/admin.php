@@ -424,6 +424,7 @@ if ($is_logged_in) {
         <div class="navbar">
             <h1>🖥️ EduDisplej Control Panel</h1>
             <div class="user-info">
+                <a href="companies.php">🏢 Companies</a>
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
                 <a href="?logout=1">Logout</a>
             </div>
@@ -502,6 +503,7 @@ if ($is_logged_in) {
                                 <td><?php echo $kiosk['sync_interval']; ?>s</td>
                                 <td><?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?></td>
                                 <td>
+                                    <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" class="btn btn-sm">👁️ View</a>
                                     <a href="?screenshot=<?php echo $kiosk['id']; ?>" class="btn btn-sm btn-success" onclick="return confirm('Request screenshot?')">📸 Screenshot</a>
                                     <a href="?toggle_ping=<?php echo $kiosk['id']; ?>" class="btn btn-sm btn-warning">
                                         <?php echo ($kiosk['sync_interval'] == 20) ? '🐌 Slow' : '⚡ Fast'; ?> Ping
