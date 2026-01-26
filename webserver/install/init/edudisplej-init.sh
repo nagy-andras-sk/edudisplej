@@ -147,7 +147,12 @@ read_kiosk_preferences() {
     local user_home_file="${EDUDISPLEJ_HOME}/.user_home"
     
     # Kiosk mod -- Kiosk mod (surf browser)
-    KIOSK_MODE="surf"
+    # Read from file if exists, otherwise use default
+    if [[ -f "$kiosk_mode_file" ]]; then
+        KIOSK_MODE=$(cat "$kiosk_mode_file" | tr -d '\r\n')
+    else
+        KIOSK_MODE="surf"
+    fi
     print_info "Kiosk mod -- Kiosk mod: $KIOSK_MODE"
     
     # Konzol felhasznalo -- Konzolovy pouzivatel

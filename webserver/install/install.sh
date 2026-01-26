@@ -110,6 +110,8 @@ ARCH="$(uname -m)"
 echo "[*] Architektura - Architecture: $ARCH"
 # Always use surf browser
 KIOSK_MODE="surf"
+
+# Apply ARMv6 boot config fix if needed
 if [ "$ARCH" = "armv6l" ]; then
   fix_armv6_boot_config
 fi
