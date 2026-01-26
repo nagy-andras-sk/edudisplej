@@ -33,3 +33,10 @@ __pycache__/
 
 # Node modules (if any JS tooling is added)
 node_modules/
+
+# Screenshots uploaded by kiosks
+webserver/control_edudisplej_sk/screenshots/
+
+# Old backup files
+*_old.html
+*.old
