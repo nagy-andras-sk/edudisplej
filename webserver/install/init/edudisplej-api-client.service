@@ -1,8 +1,7 @@
 [Unit]
-Description=EduDisplej API Client
+Description=EduDisplej Watchdog Service
 Documentation=https://github.com/nagy-andras-sk/edudisplej
-After=network-online.target
-Wants=network-online.target
+After=basic.target
 
 [Service]
 Type=simple
