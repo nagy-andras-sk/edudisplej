@@ -225,7 +225,7 @@ check_kiosk_configuration() {
 }
 
 check_system_ready() {
-    local kiosk_mode="${1:-chromium}"
+    local kiosk_mode="${1:-surf}"
     local console_user="${2:-pi}"
     local user_home="${3:-/home/pi}"
     
@@ -244,11 +244,8 @@ check_system_ready() {
         all_ready=false
     fi
     
-    # 2. Check kiosk packages
+    # 2. Check kiosk packages (surf browser only)
     local kiosk_packages=(xterm xdotool figlet dbus-x11 surf)
-    if [[ "$kiosk_mode" = "epiphany" ]]; then
-        kiosk_packages+=("epiphany-browser")
-    fi
     print_info "[2/3] Kiosk packages..."
     if check_required_packages "${kiosk_packages[@]}" >/dev/null 2>&1; then
         print_success "  ✓ Kiosk packages OK"

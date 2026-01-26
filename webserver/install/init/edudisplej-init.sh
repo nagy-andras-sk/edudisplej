@@ -136,10 +136,6 @@ if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE" || true
 fi
 
-# Alapertelmezett ertekek -- Predvolene hodnoty
-KIOSK_URL="${KIOSK_URL:-https://www.time.is}"
-DEFAULT_KIOSK_URL="https://www.time.is"
-
 # =============================================================================
 # Kiosk mod beallitasok beolvasasa -- Nacitanie nastaveni kiosk modu
 # =============================================================================
@@ -150,8 +146,8 @@ read_kiosk_preferences() {
     local console_user_file="${EDUDISPLEJ_HOME}/.console_user"
     local user_home_file="${EDUDISPLEJ_HOME}/.user_home"
     
-    # Kiosk mod -- Kiosk mod (Midori - universal böngésző)
-    KIOSK_MODE="midori"
+    # Kiosk mod -- Kiosk mod (surf browser)
+    KIOSK_MODE="surf"
     print_info "Kiosk mod -- Kiosk mod: $KIOSK_MODE"
     
     # Konzol felhasznalo -- Konzolovy pouzivatel
@@ -245,9 +241,6 @@ echo ""
 # Including surf browser for lightweight browsing
 print_info "2. Kiosk csomagok telepitese -- Instalacia kiosk balickov..."
 KIOSK_PACKAGES=(xterm xdotool figlet dbus-x11 surf)
-if [[ "$KIOSK_MODE" = "epiphany" ]]; then
-    KIOSK_PACKAGES+=("epiphany-browser")
-fi
 
 if ! install_packages "${KIOSK_PACKAGES[@]}"; then
     print_warning "Nehany kiosk csomag telepitese sikertelen -- Niektore kiosk balicky sa nepodarilo nainštalovat"
