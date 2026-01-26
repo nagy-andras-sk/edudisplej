@@ -149,7 +149,7 @@ read_kiosk_preferences() {
     # Kiosk mod -- Kiosk mod (surf browser)
     # Read from file if exists, otherwise use default
     if [[ -f "$kiosk_mode_file" ]]; then
-        KIOSK_MODE=$(cat "$kiosk_mode_file" | tr -d '\r\n')
+        KIOSK_MODE=$(tr -d '\r\n' < "$kiosk_mode_file")
     else
         KIOSK_MODE="surf"
     fi
@@ -157,7 +157,7 @@ read_kiosk_preferences() {
     
     # Konzol felhasznalo -- Konzolovy pouzivatel
     if [[ -f "$console_user_file" ]]; then
-        CONSOLE_USER=$(cat "$console_user_file" | tr -d '\r\n')
+        CONSOLE_USER=$(tr -d '\r\n' < "$console_user_file")
     else
         CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
         [[ -z "$CONSOLE_USER" ]] && CONSOLE_USER="pi"
@@ -166,7 +166,7 @@ read_kiosk_preferences() {
     
     # Felhasznalo home konyvtar -- Domovsky adresar pouzivatela
     if [[ -f "$user_home_file" ]]; then
-        USER_HOME=$(cat "$user_home_file" | tr -d '\r\n')
+        USER_HOME=$(tr -d '\r\n' < "$user_home_file")
     else
         USER_HOME="$(getent passwd "$CONSOLE_USER" | cut -d: -f6)"
     fi

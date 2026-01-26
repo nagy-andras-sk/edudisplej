@@ -189,25 +189,24 @@ echo "[*] Zastavujem kiosk procesy..."
 declare -a KIOSK_PIDS=()
 
 for process in surf xterm openbox Xorg xinit; do
-    pids=$(pgrep -x "$process" 2>/dev/null || true)
-    if [ -n "$pids" ]; then
-        while IFS= read -r pid; do
-            KIOSK_PIDS+=("$pid")
-        done <<< "$pids"
-    fi
+    mapfile -t temp_pids < <(pgrep -x "$process" 2>/dev/null || true)
+    # Filter out empty values and add to main array
+    for pid in "${temp_pids[@]}"; do
+        [[ -n "$pid" ]] && KIOSK_PIDS+=("$pid")
+    done
 done
 
 if [ ${#KIOSK_PIDS[@]} -gt 0 ]; then
     # TERM signal first
     for pid in "${KIOSK_PIDS[@]}"; do
-        [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null || true
+        kill -TERM "$pid" 2>/dev/null || true
     done
     
     sleep 2
     
     # Force kill if still running
     for pid in "${KIOSK_PIDS[@]}"; do
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        if kill -0 "$pid" 2>/dev/null; then
             kill -KILL "$pid" 2>/dev/null || true
         fi
     done
