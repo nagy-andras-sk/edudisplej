@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `password` varchar(255) NOT NULL,
   `email` varchar(255) DEFAULT NULL,
   `isadmin` tinyint(1) NOT NULL DEFAULT 0,
+  `company_id` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `last_login` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -74,6 +75,9 @@ CREATE TABLE IF NOT EXISTS `sync_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
 -- Add foreign keys
+ALTER TABLE `users`
+  ADD CONSTRAINT `users_company_fk` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE SET NULL;
+
 ALTER TABLE `kiosks`
   ADD CONSTRAINT `kiosks_company_fk` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE SET NULL;
 

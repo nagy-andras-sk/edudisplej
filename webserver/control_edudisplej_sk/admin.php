@@ -424,6 +424,7 @@ if ($is_logged_in) {
         <div class="navbar">
             <h1>🖥️ EduDisplej Control Panel</h1>
             <div class="user-info">
+                <a href="users.php">👥 Users</a>
                 <a href="companies.php">🏢 Companies</a>
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
                 <a href="?logout=1">Logout</a>
@@ -467,6 +468,79 @@ if ($is_logged_in) {
             </div>
             
             <h2 style="margin-bottom: 20px;">Kiosk Management</h2>
+            
+            <?php if (!empty($companies)): ?>
+                <div style="margin-bottom: 30px;">
+                    <h3 style="margin-bottom: 15px; color: #667eea;">Kiosks by Company</h3>
+                    <?php foreach ($companies as $company): ?>
+                        <?php 
+                        $company_kiosks = array_filter($kiosks, fn($k) => $k['company_id'] == $company['id']);
+                        if (!empty($company_kiosks)):
+                        ?>
+                        <div style="background: white; padding: 20px; margin-bottom: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                            <h4 style="color: #667eea; margin-bottom: 10px;">
+                                🏢 <?php echo htmlspecialchars($company['name']); ?>
+                                <span style="color: #999; font-size: 14px; font-weight: normal;">
+                                    (<?php echo count($company_kiosks); ?> kiosk<?php echo count($company_kiosks) != 1 ? 's' : ''; ?>)
+                                </span>
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
+                                <?php foreach ($company_kiosks as $kiosk): ?>
+                                    <div style="border: 1px solid #eee; padding: 15px; border-radius: 5px; background: #f9f9f9;">
+                                        <div style="font-weight: 600; margin-bottom: 5px;">
+                                            <?php echo htmlspecialchars($kiosk['hostname'] ?? 'Kiosk #' . $kiosk['id']); ?>
+                                        </div>
+                                        <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                                            📍 <?php echo htmlspecialchars($kiosk['location'] ?? 'No location'); ?>
+                                        </div>
+                                        <span class="status-badge status-<?php echo $kiosk['status']; ?>">
+                                            <?php echo ucfirst($kiosk['status']); ?>
+                                        </span>
+                                        <div style="margin-top: 10px;">
+                                            <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" style="font-size: 11px; color: #667eea;">View details →</a>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    
+                    <?php 
+                    $unassigned_kiosks = array_filter($kiosks, fn($k) => empty($k['company_id']));
+                    if (!empty($unassigned_kiosks)):
+                    ?>
+                    <div style="background: white; padding: 20px; margin-bottom: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h4 style="color: #999; margin-bottom: 10px;">
+                            ⚠️ Unassigned Kiosks
+                            <span style="color: #999; font-size: 14px; font-weight: normal;">
+                                (<?php echo count($unassigned_kiosks); ?> kiosk<?php echo count($unassigned_kiosks) != 1 ? 's' : ''; ?>)
+                            </span>
+                        </h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
+                            <?php foreach ($unassigned_kiosks as $kiosk): ?>
+                                <div style="border: 1px solid #eee; padding: 15px; border-radius: 5px; background: #f9f9f9;">
+                                    <div style="font-weight: 600; margin-bottom: 5px;">
+                                        <?php echo htmlspecialchars($kiosk['hostname'] ?? 'Kiosk #' . $kiosk['id']); ?>
+                                    </div>
+                                    <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                                        📍 <?php echo htmlspecialchars($kiosk['location'] ?? 'No location'); ?>
+                                    </div>
+                                    <span class="status-badge status-<?php echo $kiosk['status']; ?>">
+                                        <?php echo ucfirst($kiosk['status']); ?>
+                                    </span>
+                                    <div style="margin-top: 10px;">
+                                        <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" style="font-size: 11px; color: #667eea;">View details →</a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            
+            <h2 style="margin-bottom: 20px;">All Kiosks - Detailed View</h2>
             
             <table>
                 <thead>

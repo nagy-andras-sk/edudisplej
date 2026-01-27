@@ -10,8 +10,11 @@ Web-based administration interface for managing kiosks.
 
 **Features:**
 - User authentication with role-based access
-- Multi-tenant support (company management)
+- **User Management** - Create, edit, delete users with company assignments
+- Multi-tenant support (company management with edit/delete capabilities)
+- **Database Auto-Fixer** - Automatic database structure validation and repair (dbjavito.php)
 - Kiosk status monitoring
+- **Visual Dashboard** - Kiosks grouped by company with status overview
 - Screenshot requests
 - Configurable sync intervals
 - Real-time status updates
@@ -116,6 +119,36 @@ sudo nano /etc/systemd/system/edudisplej-sync.service
 
 3. Register new users at: `http://your-server/control_edudisplej_sk/userregistration.php`
 
+### New Features
+
+**Database Auto-Fixer:**
+- Access: `http://your-server/control_edudisplej_sk/dbjavito.php`
+- Automatically checks and fixes database structure
+- Creates missing tables and columns
+- Sets up foreign key constraints
+- Run this after any database updates or if you encounter database errors
+
+**User Management:**
+- Access: Admin Panel → Users (👥 Users in navigation)
+- Create new users with admin privileges
+- Edit existing users (change username, email, password, admin status)
+- Assign users to companies
+- Delete users (cannot delete yourself)
+- View all users with their roles and company assignments
+
+**Enhanced Company Management:**
+- Access: Admin Panel → Companies (🏢 Companies in navigation)
+- Create new companies
+- Edit company names
+- Delete companies (protected if users or kiosks are assigned)
+- Assign kiosks to companies with location and comments
+
+**Visual Dashboard:**
+- Main dashboard now shows kiosks grouped by company
+- Quick status overview for each company
+- Unassigned kiosks shown separately
+- Card-based layout for better visualization
+
 ### Managing Kiosks
 
 **Viewing Kiosks:**
@@ -177,6 +210,7 @@ sudo /opt/edudisplej/edudisplej_sync_service.sh register
 - password (hashed)
 - email
 - isadmin (boolean)
+- company_id (foreign key) - NEW: Assign users to companies
 - created_at, last_login
 
 **kiosks** - Display devices
