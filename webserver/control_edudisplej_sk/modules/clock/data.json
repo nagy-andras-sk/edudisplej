@@ -1,0 +1,13 @@
+{
+  "module_name": "clock",
+  "version": "1.0.0",
+  "enabled": true,
+  "description": "Clock display module",
+  "settings": {
+    "format": "24h",
+    "timezone": "Europe/Bratislava",
+    "show_date": true,
+    "show_seconds": true
+  },
+  "last_updated": "2026-01-27T07:50:00Z"
+}

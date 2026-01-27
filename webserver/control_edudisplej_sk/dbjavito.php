@@ -96,6 +96,8 @@ try {
                 'hostname' => "text DEFAULT NULL",
                 'installed' => "datetime NOT NULL DEFAULT current_timestamp()",
                 'mac' => "text NOT NULL",
+                'device_id' => "varchar(20) DEFAULT NULL",
+                'public_ip' => "varchar(45) DEFAULT NULL",
                 'last_seen' => "timestamp NULL DEFAULT NULL",
                 'hw_info' => "text DEFAULT NULL",
                 'screenshot_url' => "text DEFAULT NULL",
@@ -419,7 +421,7 @@ try {
                 <?php endif; ?>
             </p>
             
-            <a href="admin.php" class="btn">← Back to Admin Panel</a>
+            <a href="admin/index.php" class="btn">← Back to Admin Panel</a>
             <a href="dbjavito.php" class="btn" style="background: #0e6027;">↻ Run Again</a>
         </div>
     </div>
