@@ -35,6 +35,24 @@ try {
     
     // Decode and save base64 image
     $image_data = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $screenshot_data));
+    
+    // Validate it's actually image data by checking the header
+    if ($image_data === false || strlen($image_data) < 100) {
+        $response['message'] = 'Invalid image data';
+        echo json_encode($response);
+        exit;
+    }
+    
+    // Check for PNG/JPEG magic bytes
+    $is_png = (substr($image_data, 0, 8) === "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A");
+    $is_jpeg = (substr($image_data, 0, 3) === "\xFF\xD8\xFF");
+    
+    if (!$is_png && !$is_jpeg) {
+        $response['message'] = 'Invalid image format. Only PNG and JPEG are supported.';
+        echo json_encode($response);
+        exit;
+    }
+    
     file_put_contents($filepath, $image_data);
     
     // Update kiosk

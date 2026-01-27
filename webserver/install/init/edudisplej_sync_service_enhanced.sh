@@ -107,8 +107,9 @@ sync_modules() {
     local device_id=""
     
     # Load device ID from config if exists
+    # NOTE: Only source trusted config files. In production, validate file ownership and permissions.
     if [ -f "$CONFIG_FILE" ]; then
-        source "$CONFIG_FILE"
+        source "$CONFIG_FILE" 2>/dev/null || true
     fi
     
     response=$(curl -s -X POST "$API_BASE_URL/api/modules_sync.php" \
@@ -120,12 +121,9 @@ sync_modules() {
         echo "Modules sync successful"
         
         # Extract modules array and process each module
-        # For now, create basic module directories
-        mkdir -p "$MODULES_DIR/default"
-        mkdir -p "$MODULES_DIR/clock"
-        
-        # Extract sync_interval from default module if available
-        # This is a simplified version - in production you'd use jq to parse JSON properly
+        # NOTE: Current implementation uses basic string parsing. For production,
+        # consider installing 'jq' or 'python' for proper JSON parsing.
+        # Example with jq: echo "$response" | jq -r '.modules[] | .name'
         
         # Save modules response for debugging
         echo "$response" > "$MODULES_DIR/.last_sync.json"

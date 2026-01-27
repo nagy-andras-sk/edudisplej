@@ -72,8 +72,13 @@ echo json_encode($response);
  * @return string Generated device ID
  */
 function generateDeviceId($mac) {
-    // Generate 4 random alphanumeric characters
-    $random_chars = substr(str_shuffle('ABCDEFGHJKLMNPQRSTUVWXYZ23456789'), 0, 4);
+    // Generate 4 cryptographically secure random alphanumeric characters
+    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    $random_chars = '';
+    $random_bytes = random_bytes(4);
+    for ($i = 0; $i < 4; $i++) {
+        $random_chars .= $chars[ord($random_bytes[$i]) % strlen($chars)];
+    }
     
     // Extract 6 characters from MAC address (remove colons and take first 6)
     $mac_clean = str_replace([':', '-'], '', strtoupper($mac));
