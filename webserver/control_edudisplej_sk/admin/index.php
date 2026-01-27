@@ -1,12 +1,11 @@
 <?php
 /**
- * Admin Panel - Redirect to new location
- * This file redirects to the new admin directory
+ * Admin Panel
+ * EduDisplej Control Panel
  */
 
-header('Location: admin/index.php');
-exit();
-?>
+session_start();
+require_once '../dbkonfiguracia.php';
 
 $error = '';
 $login_error = '';
@@ -14,7 +13,7 @@ $login_error = '';
 // Handle logout
 if (isset($_GET['logout'])) {
     session_destroy();
-    header('Location: admin.php');
+    header('Location: index.php');
     exit();
 }
 
@@ -48,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         $update_stmt->execute();
                         $update_stmt->close();
                         
-                        header('Location: admin.php');
+                        header('Location: index.php');
                         exit();
                     } else {
                         $login_error = 'Access denied. Admin privileges required.';
@@ -82,7 +81,7 @@ if ($is_logged_in && isset($_GET['screenshot']) && is_numeric($_GET['screenshot'
         $stmt->execute();
         $stmt->close();
         closeDbConnection($conn);
-        header('Location: admin.php?msg=screenshot_requested');
+        header('Location: index.php?msg=screenshot_requested');
         exit();
     } catch (Exception $e) {
         $error = 'Failed to request screenshot';
@@ -110,7 +109,7 @@ if ($is_logged_in && isset($_GET['toggle_ping']) && is_numeric($_GET['toggle_pin
         $stmt->execute();
         $stmt->close();
         closeDbConnection($conn);
-        header('Location: admin.php?msg=interval_updated');
+        header('Location: index.php?msg=interval_updated');
         exit();
     } catch (Exception $e) {
         $error = 'Failed to update ping interval';
@@ -154,243 +153,7 @@ if ($is_logged_in) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - EduDisplej Control</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-        }
-        
-        .login-container {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-        }
-        
-        .login-box {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            max-width: 400px;
-            width: 100%;
-        }
-        
-        .login-box h1 {
-            color: #333;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-        
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .navbar h1 {
-            font-size: 24px;
-        }
-        
-        .navbar .user-info {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-        
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            background: rgba(255,255,255,0.2);
-            transition: background 0.3s;
-        }
-        
-        .navbar a:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        
-        .container {
-            padding: 30px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-            font-weight: 500;
-        }
-        
-        input[type="text"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        button, .btn {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: opacity 0.3s;
-        }
-        
-        button:hover, .btn:hover {
-            opacity: 0.9;
-        }
-        
-        .btn-sm {
-            padding: 6px 12px;
-            font-size: 12px;
-        }
-        
-        .btn-success {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        }
-        
-        .btn-warning {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        
-        .error, .success {
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        
-        .error {
-            background: #fee;
-            color: #c33;
-            border: 1px solid #fcc;
-        }
-        
-        .success {
-            background: #efe;
-            color: #3c3;
-            border: 1px solid #cfc;
-        }
-        
-        table {
-            width: 100%;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        th, td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        
-        th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: 600;
-        }
-        
-        tr:last-child td {
-            border-bottom: none;
-        }
-        
-        tr:hover {
-            background: #f9f9f9;
-        }
-        
-        .status-badge {
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        .status-online {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .status-offline {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-        
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .stat-card h3 {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-        
-        .stat-card .number {
-            font-size: 36px;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .register-link {
-            text-align: center;
-            margin-top: 20px;
-            color: #666;
-        }
-        
-        .register-link a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 600;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <?php if (!$is_logged_in): ?>
@@ -417,7 +180,7 @@ if ($is_logged_in) {
                 </form>
                 
                 <div class="register-link">
-                    Don't have an account? <a href="userregistration.php">Register here</a>
+                    Don't have an account? <a href="../userregistration.php">Register here</a>
                 </div>
             </div>
         </div>
@@ -547,6 +310,7 @@ if ($is_logged_in) {
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>Device ID</th>
                         <th>Hostname</th>
                         <th>MAC Address</th>
                         <th>Company</th>
@@ -560,12 +324,13 @@ if ($is_logged_in) {
                 <tbody>
                     <?php if (empty($kiosks)): ?>
                         <tr>
-                            <td colspan="9" style="text-align: center; color: #999;">No kiosks registered yet</td>
+                            <td colspan="10" style="text-align: center; color: #999;">No kiosks registered yet</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($kiosks as $kiosk): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($kiosk['id']); ?></td>
+                                <td><code><?php echo htmlspecialchars($kiosk['device_id'] ?? 'N/A'); ?></code></td>
                                 <td><?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?></td>
                                 <td><code><?php echo htmlspecialchars(substr($kiosk['mac'], 0, 17)); ?></code></td>
                                 <td><?php echo htmlspecialchars($kiosk['company_name'] ?? 'Unassigned'); ?></td>
@@ -591,5 +356,6 @@ if ($is_logged_in) {
             </table>
         </div>
     <?php endif; ?>
+    <script src="script.js"></script>
 </body>
 </html>
