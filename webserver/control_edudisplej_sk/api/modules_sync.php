@@ -1,9 +1,4 @@
 <?php
-/**
- * Modules Sync API
- * EduDisplej Control Panel
- */
-
 header('Content-Type: application/json');
 require_once '../dbkonfiguracia.php';
 

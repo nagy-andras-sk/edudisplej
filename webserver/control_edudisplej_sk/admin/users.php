@@ -1,9 +1,4 @@
 <?php
-/**
- * User Management
- * EduDisplej Control Panel
- */
-
 session_start();
 require_once '../dbkonfiguracia.php';
 
