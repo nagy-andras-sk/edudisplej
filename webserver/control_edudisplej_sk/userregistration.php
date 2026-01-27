@@ -215,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
         
         <div class="login-link">
-            Already have an account? <a href="admin.php">Login here</a>
+            Already have an account? <a href="admin/index.php">Login here</a>
         </div>
     </div>
 </body>

@@ -1,11 +1,12 @@
 <?php
 /**
- * Admin Panel
- * EduDisplej Control Panel
+ * Admin Panel - Redirect to new location
+ * This file redirects to the new admin directory
  */
 
-session_start();
-require_once 'dbkonfiguracia.php';
+header('Location: admin/index.php');
+exit();
+?>
 
 $error = '';
 $login_error = '';

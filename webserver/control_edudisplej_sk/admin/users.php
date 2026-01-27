@@ -206,51 +206,8 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Management - EduDisplej</title>
+    <link rel="stylesheet" href="style.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-        }
-        
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .navbar h1 {
-            font-size: 24px;
-        }
-        
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            background: rgba(255,255,255,0.2);
-            transition: background 0.3s;
-        }
-        
-        .navbar a:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        
-        .container {
-            padding: 30px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
         .card {
             background: white;
             padding: 30px;
@@ -264,24 +221,12 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
             color: #333;
         }
         
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
         }
         
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-            font-weight: 500;
-        }
-        
-        input[type="text"],
         input[type="email"],
         input[type="password"],
         select {
@@ -296,73 +241,12 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
             margin-right: 8px;
         }
         
-        button, .btn {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: opacity 0.3s;
-        }
-        
-        button:hover, .btn:hover {
-            opacity: 0.9;
-        }
-        
-        .btn-sm {
-            padding: 6px 12px;
-            font-size: 12px;
-        }
-        
         .btn-danger {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
         
         .btn-warning {
             background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-        }
-        
-        .error {
-            background: #fee;
-            color: #c33;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border: 1px solid #fcc;
-        }
-        
-        .success {
-            background: #efe;
-            color: #3c3;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border: 1px solid #cfc;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        
-        th {
-            background: #f9f9f9;
-            font-weight: 600;
-        }
-        
-        tr:hover {
-            background: #f9f9f9;
         }
         
         .badge {
