@@ -20,6 +20,8 @@ $errors = [];
 function logResult($message, $type = 'info') {
     global $results;
     $results[] = ['type' => $type, 'message' => $message];
+    // Console log
+    echo "[" . strtoupper($type) . "] " . $message . "\n";
 }
 
 function logError($message) {
@@ -30,7 +32,34 @@ function logError($message) {
 
 try {
     $conn = getDbConnection();
+    
+    // Set charset explicitly
+    if (!$conn->set_charset("utf8mb4")) {
+        logError("Failed to set charset utf8mb4: " . $conn->error);
+        // Try fallback to utf8
+        if (!$conn->set_charset("utf8")) {
+            throw new Exception("Cannot set any UTF-8 charset");
+        }
+        logResult("Using utf8 charset (fallback)", 'warning');
+        $charset = 'utf8';
+        $collation = 'utf8_unicode_ci';
+    } else {
+        logResult("Charset set to utf8mb4", 'success');
+        $charset = 'utf8mb4';
+        $collation = 'utf8mb4_unicode_ci';
+    }
+    
     logResult("Connected to database successfully", 'success');
+    
+    // Log MySQL version
+    $version = $conn->query("SELECT VERSION() as version")->fetch_assoc();
+    logResult("MySQL/MariaDB version: " . $version['version'], 'info');
+    
+    // Log current charset settings
+    $charset_result = $conn->query("SHOW VARIABLES LIKE 'character_set%'");
+    while ($row = $charset_result->fetch_assoc()) {
+        logResult("DB Setting: " . $row['Variable_name'] . " = " . $row['Value'], 'info');
+    }
     
     // Define expected schema
     $expected_tables = [
@@ -128,6 +157,8 @@ try {
     foreach ($expected_tables as $table_name => $table_def) {
         $table_exists = false;
         
+        logResult("Processing table: $table_name", 'info');
+        
         // Check if table exists
         $result = $conn->query("SHOW TABLES LIKE '$table_name'");
         if ($result->num_rows > 0) {
@@ -145,6 +176,7 @@ try {
             foreach ($table_def['columns'] as $col_name => $col_def) {
                 if (!isset($existing_columns[$col_name])) {
                     $sql = "ALTER TABLE $table_name ADD COLUMN $col_name $col_def";
+                    logResult("Executing SQL: $sql", 'info');
                     if ($conn->query($sql)) {
                         logResult("Added column '$col_name' to table '$table_name'", 'success');
                     } else {
@@ -173,7 +205,9 @@ try {
                 $columns_sql[] = "UNIQUE KEY ($uk)";
             }
             
-            $sql = "CREATE TABLE $table_name (\n  " . implode(",\n  ", $columns_sql) . "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci";
+            $sql = "CREATE TABLE $table_name (\n  " . implode(",\n  ", $columns_sql) . "\n) ENGINE=InnoDB DEFAULT CHARSET=$charset COLLATE=$collation";
+            
+            logResult("Executing SQL: $sql", 'info');
             
             if ($conn->query($sql)) {
                 logResult("Created table '$table_name'", 'success');
@@ -200,6 +234,7 @@ try {
             foreach ($table_def['foreign_keys'] as $fk_name => $fk_def) {
                 if (!isset($existing_fks[$fk_name])) {
                     $sql = "ALTER TABLE $table_name ADD CONSTRAINT $fk_name $fk_def";
+                    logResult("Executing SQL: $sql", 'info');
                     if ($conn->query($sql)) {
                         logResult("Added foreign key '$fk_name' to table '$table_name'", 'success');
                     } else {
@@ -226,6 +261,8 @@ try {
             logError("Failed to create default admin user: " . $conn->error);
         }
         $stmt->close();
+    } else {
+        logResult("Default admin user already exists", 'info');
     }
     
     // Create default company if not exists
@@ -240,6 +277,8 @@ try {
             logError("Failed to create default company: " . $conn->error);
         }
         $stmt->close();
+    } else {
+        logResult("Default company already exists", 'info');
     }
     
     closeDbConnection($conn);
@@ -247,6 +286,7 @@ try {
     
 } catch (Exception $e) {
     logError("Fatal error: " . $e->getMessage());
+    echo "\nStack trace:\n" . $e->getTraceAsString() . "\n";
 }
 
 ?>
