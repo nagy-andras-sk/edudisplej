@@ -35,12 +35,24 @@ fi
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 [ -n "$IP" ] && echo "  IP Address:  $IP"
 
-echo "  ─────────────────────────────────────────────────────"
-echo ""
-echo "  Logs: /tmp/openbox-autostart.log, /opt/edudisplej/session.log"
-echo ""
-echo "  ═══════════════════════════════════════════════════════"
-echo ""
-
 # Interactive shell
 exec bash --login
+# Create named pipe for logging
+SYNC_LOG_PIPE="/tmp/edudisplej_sync.log"
+mkfifo "$SYNC_LOG_PIPE" 2>/dev/null || true
+
+# Tail logs in background
+tail -f "$SYNC_LOG_PIPE" 2>/dev/null &
+TAIL_PID=$!
+
+# Logging function
+log_sync_status() {
+    local status="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $status" >> "$SYNC_LOG_PIPE"
+}
+
+# Cleanup on exit
+trap "kill $TAIL_PID 2>/dev/null; rm -f '$SYNC_LOG_PIPE'" EXIT
+
+log_sync_status "🚀 EduDisplej Sync Service started"

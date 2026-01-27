@@ -4,7 +4,7 @@
 # =============================================================================
 
 # Configuration
-API_URL="${EDUDISPLEJ_API_URL:-http://localhost/control_edudisplej_sk/api.php}"
+API_URL="${EDUDISPLEJ_API_URL:-http://control.edudisplej.sk/api.php}"
 SYNC_INTERVAL=300  # Default 5 minutes
 CONFIG_DIR="/opt/edudisplej"
 CONFIG_FILE="$CONFIG_DIR/kiosk.conf"
@@ -187,4 +187,61 @@ case "${1:-}" in
         echo "  screenshot - Capture and upload screenshot"
         exit 1
         ;;
-esac
+
+# Create named pipe for logging
+SYNC_LOG_PIPE="/tmp/edudisplej_sync.log"
+mkfifo "$SYNC_LOG_PIPE" 2>/dev/null || true
+
+# Logging function
+log_sync_status() {
+    local status="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $status" | tee -a "$SYNC_LOG_PIPE"
+}
+
+# Override sync functions to use logging
+sync_kiosk() {
+    local mac=$(get_mac_address)
+    local hostname=$(get_hostname)
+    local hw_info=$(get_hw_info)
+    
+    log_sync_status "🔄 Syncing kiosk..."
+    
+    response=$(curl -s -X POST "$API_URL?action=sync" \
+        -H "Content-Type: application/json" \
+        -d "{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info}")
+    
+    if echo "$response" | grep -q '"success":true'; then
+        new_interval=$(echo "$response" | grep -o '"sync_interval":[0-9]*' | cut -d: -f2)
+        if [ -n "$new_interval" ]; then
+            SYNC_INTERVAL=$new_interval
+        fi
+        
+        screenshot_requested=$(echo "$response" | grep -o '"screenshot_requested":[a-z]*' | cut -d: -f2)
+        if [ "$screenshot_requested" = "true" ]; then
+            log_sync_status "📸 Screenshot requested"
+            capture_screenshot
+        fi
+        
+        log_sync_status "✅ Sync OK (${SYNC_INTERVAL}s)"
+        return 0
+    else
+        log_sync_status "❌ Sync failed"
+        return 1
+    fi
+}
+
+# Update main loop
+main() {
+    log_sync_status "🚀 EduDisplej Sync Service started"
+    
+    if [ ! -f "$CONFIG_FILE" ]; then
+        log_sync_status "📝 Registering kiosk..."
+        register_kiosk || log_sync_status "⚠️ Registration failed"
+    fi
+    
+    while true; do
+        sync_kiosk
+        sleep "$SYNC_INTERVAL"
+    done
+}
