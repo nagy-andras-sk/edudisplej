@@ -215,23 +215,31 @@ try {
     $result = $conn->query("SELECT id FROM users WHERE username = 'admin'");
     if ($result->num_rows == 0) {
         $default_password = password_hash('admin123', PASSWORD_DEFAULT);
-        $sql = "INSERT INTO users (username, password, email, isadmin) VALUES ('admin', '$default_password', 'admin@edudisplej.sk', 1)";
-        if ($conn->query($sql)) {
+        $username = 'admin';
+        $email = 'admin@edudisplej.sk';
+        $isadmin = 1;
+        $stmt = $conn->prepare("INSERT INTO users (username, password, email, isadmin) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("sssi", $username, $default_password, $email, $isadmin);
+        if ($stmt->execute()) {
             logResult("Created default admin user (username: admin, password: admin123)", 'success');
         } else {
             logError("Failed to create default admin user: " . $conn->error);
         }
+        $stmt->close();
     }
     
     // Create default company if not exists
     $result = $conn->query("SELECT id FROM companies WHERE name = 'Default Company'");
     if ($result->num_rows == 0) {
-        $sql = "INSERT INTO companies (name) VALUES ('Default Company')";
-        if ($conn->query($sql)) {
+        $company_name = 'Default Company';
+        $stmt = $conn->prepare("INSERT INTO companies (name) VALUES (?)");
+        $stmt->bind_param("s", $company_name);
+        if ($stmt->execute()) {
             logResult("Created default company", 'success');
         } else {
             logError("Failed to create default company: " . $conn->error);
         }
+        $stmt->close();
     }
     
     closeDbConnection($conn);
