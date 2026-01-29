@@ -22,23 +22,32 @@ try {
     $conn = getDbConnection();
     
     // Check if kiosk already exists
-    $stmt = $conn->prepare("SELECT id, device_id FROM kiosks WHERE mac = ?");
+    $stmt = $conn->prepare("SELECT id, device_id, is_configured, company_id FROM kiosks WHERE mac = ?");
     $stmt->bind_param("s", $mac);
     $stmt->execute();
     $result = $stmt->get_result();
     
     if ($result->num_rows > 0) {
         $kiosk = $result->fetch_assoc();
+        
+        // Update last_seen
+        $update_stmt = $conn->prepare("UPDATE kiosks SET last_seen = NOW(), public_ip = ?, hw_info = ?, status = 'online' WHERE id = ?");
+        $update_stmt->bind_param("ssi", $public_ip, $hw_info, $kiosk['id']);
+        $update_stmt->execute();
+        $update_stmt->close();
+        
         $response['success'] = true;
         $response['message'] = 'Kiosk already registered';
         $response['kiosk_id'] = $kiosk['id'];
         $response['device_id'] = $kiosk['device_id'];
+        $response['is_configured'] = (bool)$kiosk['is_configured'];
+        $response['company_assigned'] = !empty($kiosk['company_id']);
     } else {
         // Generate special device ID: 4 random chars + 6 from MAC (min 10 chars)
         $device_id = generateDeviceId($mac);
         
         // Register new kiosk
-        $stmt = $conn->prepare("INSERT INTO kiosks (mac, device_id, hostname, hw_info, public_ip, status, last_seen) VALUES (?, ?, ?, ?, ?, 'online', NOW())");
+        $stmt = $conn->prepare("INSERT INTO kiosks (mac, device_id, hostname, hw_info, public_ip, status, is_configured, last_seen) VALUES (?, ?, ?, ?, ?, 'unconfigured', 0, NOW())");
         $stmt->bind_param("sssss", $mac, $device_id, $hostname, $hw_info, $public_ip);
         
         if ($stmt->execute()) {
@@ -47,6 +56,8 @@ try {
             $response['message'] = 'Kiosk registered successfully';
             $response['kiosk_id'] = $kiosk_id;
             $response['device_id'] = $device_id;
+            $response['is_configured'] = false;
+            $response['company_assigned'] = false;
         } else {
             $response['message'] = 'Registration failed';
         }

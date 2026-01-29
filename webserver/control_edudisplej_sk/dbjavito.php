@@ -70,6 +70,8 @@ try {
                 'password' => "varchar(255) NOT NULL",
                 'email' => "varchar(255) DEFAULT NULL",
                 'isadmin' => "tinyint(1) NOT NULL DEFAULT 0",
+                'is_super_admin' => "tinyint(1) NOT NULL DEFAULT 0",
+                'role' => "enum('super_admin','admin','content_editor','viewer') DEFAULT 'viewer'",
                 'company_id' => "int(11) DEFAULT NULL",
                 'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()",
                 'last_login' => "timestamp NULL DEFAULT NULL"
@@ -94,6 +96,7 @@ try {
             'columns' => [
                 'id' => "int(11) NOT NULL AUTO_INCREMENT",
                 'hostname' => "text DEFAULT NULL",
+                'friendly_name' => "varchar(255) DEFAULT NULL",
                 'installed' => "datetime NOT NULL DEFAULT current_timestamp()",
                 'mac' => "text NOT NULL",
                 'device_id' => "varchar(20) DEFAULT NULL",
@@ -102,11 +105,13 @@ try {
                 'hw_info' => "text DEFAULT NULL",
                 'screenshot_url' => "text DEFAULT NULL",
                 'screenshot_requested' => "tinyint(1) DEFAULT 0",
-                'status' => "enum('online','offline','pending') DEFAULT 'pending'",
+                'screenshot_timestamp' => "timestamp NULL DEFAULT NULL",
+                'status' => "enum('online','offline','pending','unconfigured') DEFAULT 'unconfigured'",
                 'company_id' => "int(11) DEFAULT NULL",
                 'location' => "text DEFAULT NULL",
                 'comment' => "text DEFAULT NULL",
-                'sync_interval' => "int(11) DEFAULT 300"
+                'sync_interval' => "int(11) DEFAULT 300",
+                'is_configured' => "tinyint(1) DEFAULT 0"
             ],
             'primary_key' => 'id',
             'unique_keys' => [],
@@ -151,6 +156,52 @@ try {
             'unique_keys' => [],
             'foreign_keys' => [
                 'sync_logs_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE SET NULL"
+            ]
+        ],
+        'modules' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'module_key' => "varchar(100) NOT NULL",
+                'name' => "varchar(255) NOT NULL",
+                'description' => "text DEFAULT NULL",
+                'is_active' => "tinyint(1) DEFAULT 1",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => ['module_key'],
+            'foreign_keys' => []
+        ],
+        'module_licenses' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'company_id' => "int(11) NOT NULL",
+                'module_id' => "int(11) NOT NULL",
+                'quantity' => "int(11) DEFAULT 1",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'ml_company_fk' => "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE",
+                'ml_module_fk' => "FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE"
+            ]
+        ],
+        'kiosk_modules' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'kiosk_id' => "int(11) NOT NULL",
+                'module_id' => "int(11) NOT NULL",
+                'display_order' => "int(11) DEFAULT 0",
+                'duration_seconds' => "int(11) DEFAULT 10",
+                'settings' => "text DEFAULT NULL",
+                'is_active' => "tinyint(1) DEFAULT 1",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'km_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE",
+                'km_module_fk' => "FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE"
             ]
         ]
     ];
@@ -281,6 +332,30 @@ try {
         $stmt->close();
     } else {
         logResult("Default company already exists", 'info');
+    }
+    
+    // Create default modules if not exist
+    $default_modules = [
+        ['key' => 'clock', 'name' => 'Clock & Time', 'description' => 'Display date and time with customizable formats and colors'],
+        ['key' => 'namedays', 'name' => 'Name Days', 'description' => 'Display Hungarian and Slovak name days with customizable style'],
+        ['key' => 'split_clock_namedays', 'name' => 'Split: Clock + Name Days', 'description' => 'Combined module for 16:9 displays showing clock and name days together'],
+        ['key' => 'unconfigured', 'name' => 'Unconfigured Display', 'description' => 'Default screen for unconfigured kiosks']
+    ];
+    
+    foreach ($default_modules as $module) {
+        $result = $conn->query("SELECT id FROM modules WHERE module_key = '" . $conn->real_escape_string($module['key']) . "'");
+        if ($result->num_rows == 0) {
+            $stmt = $conn->prepare("INSERT INTO modules (module_key, name, description) VALUES (?, ?, ?)");
+            $stmt->bind_param("sss", $module['key'], $module['name'], $module['description']);
+            if ($stmt->execute()) {
+                logResult("Created module: " . $module['name'], 'success');
+            } else {
+                logError("Failed to create module '" . $module['name'] . "': " . $conn->error);
+            }
+            $stmt->close();
+        } else {
+            logResult("Module '" . $module['name'] . "' already exists", 'info');
+        }
     }
     
     closeDbConnection($conn);
