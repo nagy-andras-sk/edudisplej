@@ -20,6 +20,11 @@ try {
     
     // Find kiosk
     if ($kiosk_id) {
+        if ($kiosk_id <= 0) {
+            $response['message'] = 'Invalid kiosk ID';
+            echo json_encode($response);
+            exit;
+        }
         $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval FROM kiosks WHERE id = ?");
         $stmt->bind_param("i", $kiosk_id);
     } else {

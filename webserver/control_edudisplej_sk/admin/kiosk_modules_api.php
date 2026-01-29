@@ -76,6 +76,12 @@ try {
                 break;
             }
             
+            // Validate duration is within reasonable bounds (1 second to 1 hour)
+            if ($duration < 1 || $duration > 3600) {
+                $response['message'] = 'Duration must be between 1 and 3600 seconds';
+                break;
+            }
+            
             // Check if module already assigned
             $stmt = $conn->prepare("SELECT id FROM kiosk_modules WHERE kiosk_id = ? AND module_id = ?");
             $stmt->bind_param("ii", $kiosk_id, $module_id);
@@ -178,6 +184,12 @@ try {
                 break;
             }
             
+            // Validate duration is within reasonable bounds (1 second to 1 hour)
+            if ($duration < 1 || $duration > 3600) {
+                $response['message'] = 'Duration must be between 1 and 3600 seconds';
+                break;
+            }
+            
             $stmt = $conn->prepare("UPDATE kiosk_modules SET duration_seconds = ?, settings = ? WHERE id = ?");
             $stmt->bind_param("isi", $duration, $settings, $kiosk_module_id);
             
@@ -197,8 +209,8 @@ try {
     closeDbConnection($conn);
     
 } catch (Exception $e) {
-    $response['message'] = 'Server error: ' . $e->getMessage();
-    error_log($e->getMessage());
+    $response['message'] = 'Server error occurred';
+    error_log('Module Management API Error: ' . $e->getMessage());
 }
 
 echo json_encode($response);

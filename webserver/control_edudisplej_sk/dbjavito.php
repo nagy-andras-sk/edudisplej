@@ -343,8 +343,13 @@ try {
     ];
     
     foreach ($default_modules as $module) {
-        $result = $conn->query("SELECT id FROM modules WHERE module_key = '" . $conn->real_escape_string($module['key']) . "'");
+        $stmt = $conn->prepare("SELECT id FROM modules WHERE module_key = ?");
+        $stmt->bind_param("s", $module['key']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
         if ($result->num_rows == 0) {
+            $stmt->close();
             $stmt = $conn->prepare("INSERT INTO modules (module_key, name, description) VALUES (?, ?, ?)");
             $stmt->bind_param("sss", $module['key'], $module['name'], $module['description']);
             if ($stmt->execute()) {
@@ -355,6 +360,7 @@ try {
             $stmt->close();
         } else {
             logResult("Module '" . $module['name'] . "' already exists", 'info');
+            $stmt->close();
         }
     }
     
