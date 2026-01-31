@@ -88,6 +88,9 @@ sync_kiosk() {
             capture_screenshot
         fi
         
+        # Download and update modules
+        sync_modules
+        
         echo "Sync successful (interval: ${SYNC_INTERVAL}s)"
         return 0
     else
@@ -95,6 +98,156 @@ sync_kiosk() {
         return 1
     fi
 }
+
+# Sync modules from server
+sync_modules() {
+    local mac=$(get_mac_address)
+    local kiosk_id=$(grep "KIOSK_ID=" "$CONFIG_FILE" 2>/dev/null | cut -d= -f2)
+    
+    echo "Syncing modules..."
+    
+    response=$(curl -s -X POST "$API_URL?action=modules" \
+        -H "Content-Type: application/json" \
+        -d "{\"mac\":\"$mac\",\"kiosk_id\":$kiosk_id}")
+    
+    if echo "$response" | grep -q '"success":true'; then
+        # Save module configuration
+        echo "$response" > "$CONFIG_DIR/modules.json"
+        
+        # Check if configured
+        is_configured=$(echo "$response" | grep -o '"is_configured":[a-z]*' | cut -d: -f2)
+        
+        if [ "$is_configured" = "false" ]; then
+            echo "Kiosk not configured, showing unconfigured screen"
+            update_content_unconfigured
+        else
+            echo "Kiosk configured, updating content"
+            update_content_configured
+        fi
+        
+        return 0
+    else
+        echo "Failed to sync modules: $response"
+        return 1
+    fi
+}
+
+# Update content for unconfigured kiosk
+update_content_unconfigured() {
+    local content_dir="$CONFIG_DIR/content"
+    mkdir -p "$content_dir"
+    
+    # Download unconfigured.html from server
+    curl -s -o "$content_dir/index.html" \
+        "http://server.edudisplej.sk/unconfigured.html" || {
+        echo "Failed to download unconfigured.html"
+        return 1
+    }
+    
+    # Store device info in localStorage via JS
+    local mac=$(get_mac_address)
+    local device_id=$(grep "DEVICE_ID=" "$CONFIG_FILE" 2>/dev/null | cut -d= -f2 || echo "N/A")
+    
+    cat >> "$content_dir/index.html" << EOF
+<script>
+localStorage.setItem('edudisplej_device_id', '$device_id');
+localStorage.setItem('edudisplej_mac', '$mac');
+</script>
+EOF
+    
+    echo "Unconfigured content updated"
+}
+
+# Update content for configured kiosk
+update_content_configured() {
+    local content_dir="$CONFIG_DIR/content"
+    mkdir -p "$content_dir"
+    
+    # Parse modules from modules.json
+    local modules=$(cat "$CONFIG_DIR/modules.json" | grep -o '"modules":\[.*\]' | sed 's/"modules"://')
+    
+    if [ -z "$modules" ] || [ "$modules" = "[]" ]; then
+        echo "No modules configured"
+        update_content_unconfigured
+        return 1
+    fi
+    
+    # Download module HTML files
+    echo "Downloading module content..."
+    
+    # Create index.html with module rotation logic
+    create_module_loader "$content_dir"
+    
+    echo "Configured content updated"
+}
+
+# Create module loader HTML
+create_module_loader() {
+    local content_dir="$1"
+    local modules_json=$(cat "$CONFIG_DIR/modules.json")
+    
+    cat > "$content_dir/index.html" << 'EOF'
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDisplej</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        iframe {
+            width: 100vw;
+            height: 100vh;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <iframe id="contentFrame" src=""></iframe>
+    <script>
+        const modulesConfig = %MODULES_JSON%;
+        let currentIndex = 0;
+        const frame = document.getElementById('contentFrame');
+        
+        function loadNextModule() {
+            if (modulesConfig.modules.length === 0) {
+                window.location.href = '/unconfigured.html';
+                return;
+            }
+            
+            const module = modulesConfig.modules[currentIndex];
+            const moduleUrl = '/modules/' + module.module_key + '.html';
+            
+            console.log('Loading module:', module.module_key);
+            frame.src = moduleUrl;
+            
+            // Schedule next module
+            const duration = (module.duration_seconds || 10) * 1000;
+            setTimeout(() => {
+                currentIndex = (currentIndex + 1) % modulesConfig.modules.length;
+                loadNextModule();
+            }, duration);
+        }
+        
+        // Start rotation
+        loadNextModule();
+        
+        // Reload page every hour to get config updates
+        setTimeout(() => window.location.reload(), 60 * 60 * 1000);
+    </script>
+</body>
+</html>
+EOF
+    
+    # Replace %MODULES_JSON% with actual JSON
+    sed -i "s|%MODULES_JSON%|$modules_json|g" "$content_dir/index.html"
+}
+
 
 # Capture and upload screenshot
 capture_screenshot() {
