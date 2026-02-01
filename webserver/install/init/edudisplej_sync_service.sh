@@ -14,7 +14,7 @@ CONFIG_DIR="/opt/edudisplej"
 STATUS_FILE="${CONFIG_DIR}/sync_status.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/sync.log"
-DEBUG=true  # Enable detailed debug logs
+DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment variable
 
 # Create directories
 mkdir -p "$CONFIG_DIR" "$LOG_DIR"
@@ -189,6 +189,19 @@ write_success_status() {
     local device_id=$2
     local is_configured=$3
     
+    # Calculate next sync time with proper fallback for BSD date
+    local next_sync
+    if date -d "+${SYNC_INTERVAL} seconds" '+%Y-%m-%d %H:%M:%S' >/dev/null 2>&1; then
+        # GNU date
+        next_sync=$(date -d "+${SYNC_INTERVAL} seconds" '+%Y-%m-%d %H:%M:%S')
+    elif date -v +${SYNC_INTERVAL}S '+%Y-%m-%d %H:%M:%S' >/dev/null 2>&1; then
+        # BSD date
+        next_sync=$(date -v +${SYNC_INTERVAL}S '+%Y-%m-%d %H:%M:%S')
+    else
+        # Fallback: just use current time
+        next_sync=$(date '+%Y-%m-%d %H:%M:%S')
+    fi
+    
     cat > "$STATUS_FILE" <<EOF
 {
     "last_sync": "$(date '+%Y-%m-%d %H:%M:%S')",
@@ -196,7 +209,7 @@ write_success_status() {
     "kiosk_id": $kiosk_id,
     "device_id": "$device_id",
     "is_configured": $is_configured,
-    "next_sync": "$(date -d "+${SYNC_INTERVAL} seconds" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')",
+    "next_sync": "$next_sync",
     "error": null
 }
 EOF
@@ -208,18 +221,30 @@ write_error_status() {
     local error_msg=$1
     local response=$2
     
-    # Escape quotes in response for JSON
-    local escaped_response=$(echo "$response" | sed 's/"/\\"/g')
-    
-    cat > "$STATUS_FILE" <<EOF
+    # Try to use jq for proper JSON handling if available
+    if command -v jq >/dev/null 2>&1; then
+        jq -n \
+            --arg last_sync "$(date '+%Y-%m-%d %H:%M:%S')" \
+            --arg status "error" \
+            --arg error "$error_msg" \
+            --arg response "$response" \
+            --arg next_retry "$(date -d "+60 seconds" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -v +60S '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')" \
+            '{last_sync: $last_sync, status: $status, error: $error, response: $response, next_retry: $next_retry}' \
+            > "$STATUS_FILE"
+    else
+        # Fallback: escape JSON special characters manually
+        local escaped_response=$(echo "$response" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr -d '\n\r')
+        
+        cat > "$STATUS_FILE" <<EOF
 {
     "last_sync": "$(date '+%Y-%m-%d %H:%M:%S')",
     "status": "error",
     "error": "$error_msg",
     "response": "$escaped_response",
-    "next_retry": "$(date -d "+60 seconds" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')"
+    "next_retry": "$(date -d "+60 seconds" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -v +60S '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')"
 }
 EOF
+    fi
     log_debug "Error status written: $STATUS_FILE"
 }
 

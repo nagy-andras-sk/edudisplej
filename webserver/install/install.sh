@@ -291,19 +291,18 @@ install_services_from_structure() {
     fi
     
     # Extract services using Python
-    SERVICES_JSON=$(python3 <<EOF
+    SERVICES_JSON=$(echo "$STRUCTURE_JSON" | python3 -c "
 import json
 import sys
 try:
-    data = json.loads('''$STRUCTURE_JSON''')
+    data = json.load(sys.stdin)
     if 'services' in data:
         for svc in data['services']:
-            print(f"{svc['source']}|{svc['name']}|{svc.get('enabled', False)}|{svc.get('autostart', False)}|{svc.get('description', '')}")
+            print(f\"{svc['source']}|{svc['name']}|{svc.get('enabled', False)}|{svc.get('autostart', False)}|{svc.get('description', '')}\")
 except Exception as e:
-    print(f"ERROR: {e}", file=sys.stderr)
+    print(f'ERROR: {e}', file=sys.stderr)
     sys.exit(1)
-EOF
-)
+")
     
     if [ $? -ne 0 ]; then
         echo "[!] Chyba pri parsovani services z structure.json"

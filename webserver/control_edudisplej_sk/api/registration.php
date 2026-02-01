@@ -140,8 +140,7 @@ try {
     log_debug("Response: " . json_encode($response));
     
 } catch (Exception $e) {
-    $response['message'] = 'Server exception: ' . $e->getMessage();
-    $response['trace'] = $e->getTraceAsString();
+    $response['message'] = 'Server exception - check server logs for details';
     log_debug("Exception: " . $e->getMessage());
     log_debug("Trace: " . $e->getTraceAsString());
 }
