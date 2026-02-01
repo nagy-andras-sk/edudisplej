@@ -1,0 +1,17 @@
+[Unit]
+Description=EduDisplej Terminal Status Display
+After=edudisplej-sync.service
+Wants=edudisplej-sync.service
+
+[Service]
+Type=simple
+ExecStart=/opt/edudisplej/init/edudisplej_terminal_display.sh
+Restart=always
+RestartSec=10
+User=root
+StandardOutput=tty
+StandardError=journal
+TTYPath=/dev/tty2
+
+[Install]
+WantedBy=multi-user.target

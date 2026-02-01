@@ -312,6 +312,51 @@ if [ -f "${INIT_DIR}/edudisplej-watchdog.service" ]; then
     systemctl enable edudisplej-watchdog.service 2>/dev/null || true
 fi
 
+# Sync Service installation / Sync Szolgaltatas telepitese
+echo "[*] Telepítem Sync Service-t / Installing Sync Service..."
+
+# Remove old api-client service if exists / Regi api-client szolgaltatas eltavolitasa
+if [ -f "/etc/systemd/system/edudisplej-api-client.service" ]; then
+    echo "[*] Odstraňujem starú službu api-client / Removing old api-client service..."
+    systemctl stop edudisplej-api-client.service 2>/dev/null || true
+    systemctl disable edudisplej-api-client.service 2>/dev/null || true
+    rm -f /etc/systemd/system/edudisplej-api-client.service
+    systemctl daemon-reload
+fi
+
+if [ -f "${INIT_DIR}/edudisplej-sync.service" ]; then
+    cp "${INIT_DIR}/edudisplej-sync.service" /etc/systemd/system/
+    chmod 644 /etc/systemd/system/edudisplej-sync.service
+    
+    if [ -f "${TARGET_DIR}/edudisplej_sync_service.sh" ]; then
+        chmod +x "${TARGET_DIR}/edudisplej_sync_service.sh"
+    fi
+    
+    systemctl daemon-reload
+    systemctl enable edudisplej-sync.service 2>/dev/null || true
+    systemctl start edudisplej-sync.service 2>/dev/null || true
+    
+    echo "[✓] Sync Service aktivovaný / Sync Service enabled"
+else
+    echo "[!] VAROVANIE - WARNING: Sync service file not found"
+fi
+
+# Terminal display service installation / Terminal UI szolgaltatas telepitese
+echo "[*] Instalacia Terminal Display / Installing Terminal Display..."
+if [ -f "${INIT_DIR}/edudisplej-terminal.service" ]; then
+    cp "${INIT_DIR}/edudisplej-terminal.service" /etc/systemd/system/
+    chmod 644 /etc/systemd/system/edudisplej-terminal.service
+    
+    if [ -f "${INIT_DIR}/edudisplej_terminal_display.sh" ]; then
+        chmod +x "${INIT_DIR}/edudisplej_terminal_display.sh"
+    fi
+    
+    systemctl daemon-reload
+    systemctl enable edudisplej-terminal.service 2>/dev/null || true
+    
+    echo "[✓] Terminal Display aktivovaný / Terminal Display enabled"
+fi
+
 echo ""
 echo "=========================================="
 echo "Instalacia ukoncena - Installation completed!"

@@ -1,73 +1,70 @@
-# EduDisplej
+# EduDisplej - Digital Signage for Educational Institutions
 
-**EduDisplej** je systém digitálnych displejov pre vzdelávacie inštitúcie (školy, univerzity). Umožňuje centralizovanú správu a zobrazovanie rôzneho obsahu na informačných kioskoch v celej budove.
+Simple, powerful digital display system for schools and universities.
 
-## 🚀 Inštalácia
-
-Jednoduchá inštalácia jedným príkazom:
+## 🚀 Quick Install
 
 ```bash
 curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash
 ```
 
-Po inštalácii sa zariadenie automaticky zaregistruje a zobrazí sa nastavovacie okno až do priradenia k firme a nastavenia modulov cez administračný panel.
+After installation, reboot your device.
 
-## 🔄 Aktualizácia
-
-Pre aktualizáciu systému použite:
+## 🔄 Update
 
 ```bash
-sudo /opt/edudisplej/init/update.sh
+sudo /opt/edudisplej/update.sh
 ```
 
-## 📖 Ako to funguje?
+## 📺 How It Works
 
-1. **Automatická registrácia** - Zariadenie sa pri prvom spustení automaticky zaregistruje do systému
-2. **Webová správa** - Administrátor môže cez webové rozhraní priradiť zariadenie k organizácii a konfigurovať zobrazovaný obsah
-3. **Synchronizácia modulov** - Moduly sa automaticky synchronizujú zo servera a zobrazujú sa v nastavenej sekvencii
-4. **Loop systém** - Obsah sa automaticky rotuje podľa nakonfigurovaných intervalov
+1. **Automatic Registration**: Devices automatically register on first boot
+2. **Web Management**: Configure displays at https://control.edudisplej.sk/admin/
+3. **Module Sync**: Content syncs automatically every 5 minutes
+4. **Display Rotation**: Modules rotate based on your configuration
 
-## 🌐 Webové rozhraní
+## 🎯 Features
 
-Administračný panel je dostupný na: **https://control.edudisplej.sk**
+- ⏰ Clock module (digital/analog)
+- 📅 Name days (Slovak/Hungarian)
+- 🖥️ Split-screen layouts
+- ⏱️ Scheduled content (e.g., lunch menu only at noon)
+- 📊 Real-time monitoring
+- 🔄 Automatic updates
 
-## ✨ Funkcie
+## 🛠️ System Requirements
 
-- **Automatická registrácia zariadení** - Žiadna manuálna konfigurácia
-- **Multi-tenant podpora** - Podpora viacerých organizácií/škôl
-- **Modulárny systém** - Hodiny, meniny, kalendár a ďalšie moduly
-- **Centralizovaná správa** - Ovládanie všetkých displejov z jedného miesta
-- **Screenshot monitoring** - Sledovanie aktuálneho stavu displejov
-- **Používateľské role** - Super admin, admin, editor obsahu
-- **Real-time sync** - Okamžitá aktualizácia obsahu na zariadeniach
+- Raspberry Pi or x86 Linux
+- Internet connection
+- HDMI display
 
-## 📦 Dostupné moduly
+## 📖 Management
 
-- **📅 Hodiny** - Digitálne/analógové hodiny s dátumom
-- **🎂 Meniny** - Slovenské a maďarské meniny
-- **📋 Split modul** - Kombinované rozloženie pre 16:9 displeje (plánované)
-- **Vlastné moduly** - Jednoducho pridávajte vlastné HTML moduly
+Visit the control panel: **https://control.edudisplej.sk/admin/**
 
-## 🛠️ Technické požiadavky
+## 🆘 Support
 
-- Linux-based systém (Raspberry Pi, x86 Linux)
-- Internetové pripojenie
-- Displej (kiosk mode)
+For issues, check system status:
+```bash
+sudo systemctl status edudisplej-sync.service
+sudo systemctl status edudisplej-kiosk.service
+```
 
-## 📄 Licencia
+View logs:
+```bash
+tail -f /opt/edudisplej/logs/sync.log
+```
+
+## 📄 Licencia / License
 
 Tento projekt je proprietárny softvér. Všetky práva vyhradené.
+This project is proprietary software. All rights reserved.
 
-## 👥 Autor
+## 👥 Autor / Author
 
 **Nagy András** - [nagy-andras-sk](https://github.com/nagy-andras-sk)
 
-## 📞 Podpora
-
-- 📧 Email: info@edudisplej.sk
-- 🐛 Issues: [GitHub Issues](https://github.com/nagy-andras-sk/edudisplej/issues)
-
 ---
 
-**Vytvorené s ❤️ pre vzdelávacie inštitúcie**
+**Made with ❤️ for education**
 
