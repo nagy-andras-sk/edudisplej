@@ -30,6 +30,12 @@ if ! command -v curl >/dev/null 2>&1; then
   apt-get update -qq && apt-get install -y curl >/dev/null 2>&1
 fi
 
+# Kontrola jq / jq ellenorzes
+if ! command -v jq >/dev/null 2>&1; then
+  echo "[!] jq nie je nainstalovany. Instalujem..."
+  apt-get update -qq && apt-get install -y jq >/dev/null 2>&1
+fi
+
 echo ""
 echo "=========================================="
 echo "EduDisplej - Aktualizacia / Frissites"
@@ -439,6 +445,38 @@ except Exception as e:
 
 # After file installation, install services
 install_services
+
+# ============================================================================
+# REFRESH LOOP PLAYER / LOOP LEJATSZO FRISSITESE
+# ============================================================================
+
+echo ""
+echo "=========================================="
+echo "[*] Modulok frissitese es loop player ujrageneralasa"
+echo "=========================================="
+
+DOWNLOAD_SCRIPT="${INIT_DIR}/edudisplej-download-modules.sh"
+TERMINAL_SCRIPT="${INIT_DIR}/edudisplej_terminal_script.sh"
+
+if [ -f "$DOWNLOAD_SCRIPT" ]; then
+    chmod +x "$DOWNLOAD_SCRIPT" 2>/dev/null || true
+    echo "[*] Futtatom: $DOWNLOAD_SCRIPT"
+    if bash "$DOWNLOAD_SCRIPT"; then
+        echo "[✓] Modulok frissitve"
+    else
+        echo "[!] Hiba a modulok frissitese kozben"
+    fi
+else
+    echo "[!] Nem talalhato: $DOWNLOAD_SCRIPT"
+fi
+
+if [ -f "$TERMINAL_SCRIPT" ]; then
+    chmod +x "$TERMINAL_SCRIPT" 2>/dev/null || true
+    echo "[*] Kiosk terminal script inditasa (background)"
+    nohup "$TERMINAL_SCRIPT" >/opt/edudisplej/logs/update_terminal_script.log 2>&1 &
+else
+    echo "[!] Nem talalhato: $TERMINAL_SCRIPT"
+fi
 
 echo ""
 echo "=========================================="

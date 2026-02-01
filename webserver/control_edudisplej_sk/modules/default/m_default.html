@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDisplej</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .logo-container {
+            text-align: center;
+            animation: fadeIn 1s ease-in;
+            max-width: 100%;
+            padding: 20px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .logo-text {
+            font-weight: bold;
+            line-height: 1.2;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            word-wrap: break-word;
+            max-width: 100%;
+        }
+        
+        .version {
+            margin-top: 20px;
+            opacity: 0.7;
+            font-weight: 300;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <div class="logo-text" id="logoText">EDUDISPLEJ</div>
+        <div class="version" id="version">v1.0</div>
+    </div>
+    
+    <script>
+        // Get settings from URL parameters or use defaults
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        const settings = {
+            text: urlParams.get('text') || 'EDUDISPLEJ',
+            fontSize: parseInt(urlParams.get('fontSize')) || 120,
+            textColor: urlParams.get('textColor') || '#ffffff',
+            bgColor: urlParams.get('bgColor') || '#1e40af',
+            showVersion: urlParams.get('showVersion') !== 'false',
+            version: urlParams.get('version') || 'v1.0'
+        };
+        
+        // Apply settings
+        document.body.style.backgroundColor = settings.bgColor;
+        
+        // Auto-scale content to fit viewport
+        function scaleToFit() {
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Calculate scale based on viewport
+            const scaleX = viewportWidth / 1920;
+            const scaleY = viewportHeight / 1080;
+            const scale = Math.min(scaleX, scaleY, 1);
+            
+            // Adjust font size if it would overflow
+            if (scale < 1) {
+                settings.fontSize = Math.floor(settings.fontSize * scale);
+            }
+        }
+        
+        scaleToFit();
+        window.addEventListener('resize', scaleToFit);
+        
+        const logoText = document.getElementById('logoText');
+        logoText.textContent = settings.text;
+        logoText.style.fontSize = settings.fontSize + 'px';
+        logoText.style.color = settings.textColor;
+        
+        const version = document.getElementById('version');
+        if (settings.showVersion) {
+            version.textContent = settings.version;
+            version.style.fontSize = (settings.fontSize * 0.2) + 'px';
+            version.style.color = settings.textColor;
+        } else {
+            version.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

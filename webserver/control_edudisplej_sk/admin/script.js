@@ -80,8 +80,30 @@ async function assignCompany(kioskId, companyId) {
         const data = await response.json();
         
         if (data.success) {
-            // Reload the page to show updated assignments
-            window.location.reload();
+            // Get the kiosk row
+            const kioskRow = document.querySelector(`tr[data-kiosk-id="${kioskId}"]`);
+            if (kioskRow) {
+                // Update the company column in the table
+                const cells = kioskRow.querySelectorAll('td');
+                if (cells.length > 4) {
+                    const companySelect = document.querySelector(`.company-select[onchange*="${kioskId}"]`);
+                    let companyName = 'Unassigned';
+                    
+                    if (companyId !== '' && companyId) {
+                        // Find the selected company name from the dropdown
+                        const selectedOption = companySelect ? companySelect.options[companySelect.selectedIndex] : null;
+                        if (selectedOption) {
+                            companyName = selectedOption.text;
+                        }
+                    }
+                    
+                    cells[4].textContent = companyName;
+                    kioskRow.setAttribute('data-company', companyName);
+                }
+                
+                // Show success message
+                showSuccessMessage('Kiosk assigned successfully!');
+            }
         } else {
             alert('Failed to assign company: ' + data.message);
         }
@@ -89,6 +111,33 @@ async function assignCompany(kioskId, companyId) {
         console.error('Error assigning company:', error);
         alert('Error assigning company');
     }
+}
+
+// Show success message
+function showSuccessMessage(message) {
+    // Create a temporary success message element
+    const messageEl = document.createElement('div');
+    messageEl.className = 'success';
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: #28a745;
+        color: white;
+        border-radius: 5px;
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+    `;
+    
+    document.body.appendChild(messageEl);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        messageEl.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => messageEl.remove(), 300);
+    }, 3000);
 }
 
 // Search and filter table

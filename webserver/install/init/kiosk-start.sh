@@ -82,5 +82,15 @@ fi
 log "Starting X server on vt1 (display :0)..."
 log "X server will be visible on the main physical display"
 
-# Start X with proper logging
-exec startx -- :0 vt1 -keeptty -nolisten tcp 2>&1 | tee -a "$STARTUP_LOG"
+# Start X server and openbox (in background, not with exec)
+# If X or openbox crashes, the service will restart them
+startx -- :0 vt1 -keeptty -nolisten tcp 2>&1 | tee -a "$STARTUP_LOG" &
+STARTX_PID=$!
+
+log "X server started (PID: $STARTX_PID)"
+
+# Keep this script running so the service stays alive
+# If X crashes, systemd will restart the entire service
+while true; do
+    sleep 60
+done

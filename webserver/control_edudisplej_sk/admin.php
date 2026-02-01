@@ -171,7 +171,7 @@ if ($is_logged_in) {
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
             padding: 20px;
         }
         
@@ -191,7 +191,7 @@ if ($is_logged_in) {
         }
         
         .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
             color: white;
             padding: 15px 30px;
             display: flex;
@@ -251,12 +251,12 @@ if ($is_logged_in) {
         
         input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #1e40af;
         }
         
         button, .btn {
             padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
             color: white;
             border: none;
             border-radius: 5px;
@@ -278,11 +278,11 @@ if ($is_logged_in) {
         }
         
         .btn-success {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
         }
         
         .btn-warning {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
         
         .error, .success {
@@ -318,7 +318,7 @@ if ($is_logged_in) {
         }
         
         th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
             color: white;
             font-weight: 600;
         }
@@ -376,7 +376,7 @@ if ($is_logged_in) {
         .stat-card .number {
             font-size: 36px;
             font-weight: bold;
-            color: #667eea;
+            color: #1e40af;
         }
         
         .register-link {
@@ -386,7 +386,7 @@ if ($is_logged_in) {
         }
         
         .register-link a {
-            color: #667eea;
+            color: #1e40af;
             text-decoration: none;
             font-weight: 600;
         }
@@ -472,14 +472,14 @@ if ($is_logged_in) {
             
             <?php if (!empty($companies)): ?>
                 <div style="margin-bottom: 30px;">
-                    <h3 style="margin-bottom: 15px; color: #667eea;">Kiosks by Company</h3>
+                    <h3 style="margin-bottom: 15px; color: #1e40af;">Kiosks by Company</h3>
                     <?php foreach ($companies as $company): ?>
                         <?php 
                         $company_kiosks = array_filter($kiosks, fn($k) => $k['company_id'] == $company['id']);
                         if (!empty($company_kiosks)):
                         ?>
                         <div style="background: white; padding: 20px; margin-bottom: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                            <h4 style="color: #667eea; margin-bottom: 10px;">
+                            <h4 style="color: #1e40af; margin-bottom: 10px;">
                                 🏢 <?php echo htmlspecialchars($company['name']); ?>
                                 <span style="color: #999; font-size: 14px; font-weight: normal;">
                                     (<?php echo count($company_kiosks); ?> kiosk<?php echo count($company_kiosks) != 1 ? 's' : ''; ?>)
@@ -498,7 +498,7 @@ if ($is_logged_in) {
                                             <?php echo ucfirst($kiosk['status']); ?>
                                         </span>
                                         <div style="margin-top: 10px;">
-                                            <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" style="font-size: 11px; color: #667eea;">View details →</a>
+                                            <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" style="font-size: 11px; color: #1e40af;">View details →</a>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -531,7 +531,7 @@ if ($is_logged_in) {
                                         <?php echo ucfirst($kiosk['status']); ?>
                                     </span>
                                     <div style="margin-top: 10px;">
-                                        <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" style="font-size: 11px; color: #667eea;">View details →</a>
+                                        <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" style="font-size: 11px; color: #1e40af;">View details →</a>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -593,3 +593,4 @@ if ($is_logged_in) {
     <?php endif; ?>
 </body>
 </html>
+

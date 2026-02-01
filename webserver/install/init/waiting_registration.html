@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Čakanie na registráciu - EduDisplej</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            position: absolute;
+            top: 30px;
+            left: 40px;
+            font-size: 48px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .sad-face {
+            font-size: 180px;
+            margin-bottom: 40px;
+            animation: pulse 2s ease-in-out infinite;
+            filter: drop-shadow(0 0 20px rgba(0,0,0,0.2));
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .message-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 50px 60px;
+            max-width: 900px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .message {
+            margin-bottom: 30px;
+        }
+
+        .message h1 {
+            font-size: 42px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .message p {
+            font-size: 24px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .divider {
+            height: 2px;
+            background: rgba(255, 255, 255, 0.3);
+            margin: 35px 0;
+            border-radius: 2px;
+        }
+
+        .instructions {
+            font-size: 20px;
+            opacity: 0.85;
+            line-height: 1.8;
+            margin-top: 30px;
+        }
+
+        .instructions strong {
+            color: #FFD700;
+            font-weight: 600;
+        }
+
+        .spinner {
+            margin-top: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .spinner div {
+            width: 15px;
+            height: 15px;
+            background: white;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .spinner div:nth-child(1) { animation-delay: -0.32s; }
+        .spinner div:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .device-info {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            opacity: 0.7;
+            background: rgba(0,0,0,0.2);
+            padding: 15px 30px;
+            border-radius: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .logo { font-size: 32px; top: 20px; left: 20px; }
+            .sad-face { font-size: 120px; }
+            .message h1 { font-size: 32px; }
+            .message p { font-size: 18px; }
+            .instructions { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="logo">EDUDISPLEJ</div>
+    
+    <div class="container">
+        <div class="sad-face">😞</div>
+        
+        <div class="message-box">
+            <!-- Slovak -->
+            <div class="message">
+                <h1>Obrazovka ešte nie je zaregistrovaná</h1>
+                <p>Toto zariadenie čaká na priradenie k spoločnosti.</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Hungarian -->
+            <div class="message">
+                <h1>Ez a kijelző még nincs regisztrálva</h1>
+                <p>Ez az eszköz várja a céghez való hozzárendelést.</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- English -->
+            <div class="message">
+                <h1>This Display Is Not Registered Yet</h1>
+                <p>This device is waiting to be assigned to a company.</p>
+            </div>
+
+            <div class="instructions">
+                <strong>Návod / Útmutató / Instructions:</strong><br>
+                1. Prihláste sa do admin panelu na <strong>control.edudisplej.sk/admin</strong><br>
+                2. Nájdite toto zariadenie v zozname<br>
+                3. Priraďte zariadenie k spoločnosti<br><br>
+                
+                1. Jelentkezz be az admin panelre: <strong>control.edudisplej.sk/admin</strong><br>
+                2. Keresd meg ezt az eszközt a listában<br>
+                3. Rendeld hozzá az eszközt egy céghez<br><br>
+                
+                1. Login to admin panel at <strong>control.edudisplej.sk/admin</strong><br>
+                2. Find this device in the list<br>
+                3. Assign the device to a company
+            </div>
+
+            <div class="spinner">
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="device-info" id="deviceInfo">
+        Čakám na registráciu... / Regisztrációra várok... / Waiting for registration...
+    </div>
+
+    <script>
+        // Auto-reload every 30 seconds to check for registration
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+
+        // Update device info with hostname
+        const hostname = window.location.hostname || 'localhost';
+        const deviceInfo = document.getElementById('deviceInfo');
+        
+        // Animate the waiting text
+        let dots = 0;
+        setInterval(function() {
+            dots = (dots + 1) % 4;
+            const dotString = '.'.repeat(dots);
+            deviceInfo.textContent = `Čakám na registráciu${dotString} / Regisztrációra várok${dotString} / Waiting for registration${dotString}`;
+        }, 500);
+    </script>
+</body>
+</html>

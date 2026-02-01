@@ -186,11 +186,31 @@ try {
                 'ml_module_fk' => "FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE"
             ]
         ],
+        'kiosk_group_modules' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'group_id' => "int(11) NOT NULL",
+                'module_id' => "int(11) NOT NULL",
+                'module_key' => "varchar(100) DEFAULT NULL",
+                'display_order' => "int(11) DEFAULT 0",
+                'duration_seconds' => "int(11) DEFAULT 10",
+                'settings' => "text DEFAULT NULL",
+                'is_active' => "tinyint(1) DEFAULT 1",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'kgm_group_fk' => "FOREIGN KEY (group_id) REFERENCES kiosk_groups(id) ON DELETE CASCADE",
+                'kgm_module_fk' => "FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE"
+            ]
+        ],
         'kiosk_modules' => [
             'columns' => [
                 'id' => "int(11) NOT NULL AUTO_INCREMENT",
                 'kiosk_id' => "int(11) NOT NULL",
                 'module_id' => "int(11) NOT NULL",
+                'module_key' => "varchar(100) DEFAULT NULL",
                 'display_order' => "int(11) DEFAULT 0",
                 'duration_seconds' => "int(11) DEFAULT 10",
                 'settings' => "text DEFAULT NULL",
@@ -355,10 +375,11 @@ try {
     // Create default modules if not exist
     $default_modules = [
         ['key' => 'clock', 'name' => 'Clock & Time', 'description' => 'Display date and time with customizable formats and colors'],
+        ['key' => 'datetime', 'name' => 'Date & Time Module', 'description' => 'Advanced datetime module with digital/analog clock, 12h/24h formats, customizable colors and sizes'],
         ['key' => 'namedays', 'name' => 'Name Days', 'description' => 'Display Hungarian and Slovak name days with customizable style'],
         ['key' => 'split_clock_namedays', 'name' => 'Split: Clock + Name Days', 'description' => 'Combined module for 16:9 displays showing clock and name days together'],
         ['key' => 'unconfigured', 'name' => 'Unconfigured Display', 'description' => 'Default screen for unconfigured kiosks'],
-        ['key' => 'default-logo', 'name' => 'Default Logo', 'description' => 'Display EduDisplej logo with version number'],
+        ['key' => 'default-logo', 'name' => 'Default Logo', 'description' => 'Display EduDisplej logo with version number and customizable text'],
         ['key' => 'dateclock', 'name' => 'Date & Clock Module', 'description' => 'Enhanced date and clock module with full customization options (analog/digital, formats, languages, sizes)']
     ];
     
@@ -381,6 +402,58 @@ try {
         } else {
             logResult("Module '" . $module['name'] . "' already exists", 'info');
             $stmt->close();
+        }
+    }
+    
+    // Verify data integrity: check kiosk_modules for missing module_id values
+    logResult("Verifying data integrity...", 'info');
+    
+    // Check for orphaned kiosk_modules entries (where module_key exists but module_id is NULL)
+    $result = $conn->query("SELECT km.id, km.kiosk_id, km.module_key FROM kiosk_modules km WHERE km.module_id IS NULL OR km.module_id = 0");
+    if ($result && $result->num_rows > 0) {
+        logResult("Found " . $result->num_rows . " kiosk_modules entries with missing module_id", 'warning');
+        
+        // Fix them by finding the module_id from module_key
+        while ($row = $result->fetch_assoc()) {
+            if ($row['module_key']) {
+                $fix_stmt = $conn->prepare("
+                    UPDATE kiosk_modules km 
+                    SET km.module_id = (SELECT id FROM modules WHERE module_key = ? LIMIT 1)
+                    WHERE km.id = ?
+                ");
+                $fix_stmt->bind_param("si", $row['module_key'], $row['id']);
+                if ($fix_stmt->execute()) {
+                    logResult("Fixed kiosk_modules entry id=" . $row['id'] . " by module_key='" . $row['module_key'] . "'", 'success');
+                } else {
+                    logError("Failed to fix kiosk_modules entry id=" . $row['id'] . ": " . $conn->error);
+                }
+                $fix_stmt->close();
+            }
+        }
+    } else {
+        logResult("All kiosk_modules entries have valid module_id values", 'success');
+    }
+    
+    // Check for orphaned kiosk_group_modules entries
+    $result = $conn->query("SELECT kgm.id, kgm.module_key FROM kiosk_group_modules kgm WHERE kgm.module_id IS NULL OR kgm.module_id = 0");
+    if ($result && $result->num_rows > 0) {
+        logResult("Found " . $result->num_rows . " kiosk_group_modules entries with missing module_id", 'warning');
+        
+        while ($row = $result->fetch_assoc()) {
+            if ($row['module_key']) {
+                $fix_stmt = $conn->prepare("
+                    UPDATE kiosk_group_modules kgm 
+                    SET kgm.module_id = (SELECT id FROM modules WHERE module_key = ? LIMIT 1)
+                    WHERE kgm.id = ?
+                ");
+                $fix_stmt->bind_param("si", $row['module_key'], $row['id']);
+                if ($fix_stmt->execute()) {
+                    logResult("Fixed kiosk_group_modules entry id=" . $row['id'] . " by module_key='" . $row['module_key'] . "'", 'success');
+                } else {
+                    logError("Failed to fix kiosk_group_modules entry id=" . $row['id'] . ": " . $conn->error);
+                }
+                $fix_stmt->close();
+            }
         }
     }
     
@@ -528,3 +601,4 @@ try {
     </div>
 </body>
 </html>
+

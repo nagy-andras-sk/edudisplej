@@ -136,3 +136,4 @@ if ($health['status'] === 'error') {
 
 echo json_encode($health, JSON_PRETTY_PRINT);
 ?>
+

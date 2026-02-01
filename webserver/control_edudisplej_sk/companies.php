@@ -196,7 +196,7 @@ try {
         }
         
         .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
             color: white;
             padding: 15px 30px;
             display: flex;
@@ -269,7 +269,7 @@ try {
         
         button {
             padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
             color: white;
             border: none;
             border-radius: 5px;
@@ -385,9 +385,9 @@ try {
                                 <td><?php echo htmlspecialchars($company['name']); ?></td>
                                 <td><?php echo count(array_filter($kiosks, fn($k) => $k['company_id'] == $company['id'])); ?></td>
                                 <td>
-                                    <a href="?edit=<?php echo $company['id']; ?>" style="display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-size: 12px;">✏️ Edit</a>
+                                    <a href="?edit=<?php echo $company['id']; ?>" style="display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%); color: white; text-decoration: none; border-radius: 5px; font-size: 12px;">✏️ Edit</a>
                                     <a href="?delete=<?php echo $company['id']; ?>" 
-                                       style="display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-decoration: none; border-radius: 5px; font-size: 12px;" 
+                                       style="display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; border-radius: 5px; font-size: 12px;" 
                                        onclick="return confirm('Are you sure you want to delete this company?')">🗑️ Delete</a>
                                 </td>
                             </tr>
@@ -445,3 +445,4 @@ try {
     </div>
 </body>
 </html>
+

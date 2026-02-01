@@ -8,12 +8,33 @@ Simple, powerful digital display system for schools and universities.
 curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash
 ```
 
-After installation, reboot your device.
+After installation, **reboot your device**. The system will:
+1. **Automatically register** with the control panel
+2. **Wait for admin assignment** (assign device to company)
+3. **Download modules** and start displaying
+
+## 🔄 Complete Reinstall
+
+To completely remove and reinstall the system:
+
+```bash
+sudo systemctl stop edudisplej-kiosk.service edudisplej-watchdog.service edudisplej-sync.service edudisplej-terminal.service 2>/dev/null; \
+sudo systemctl disable edudisplej-kiosk.service edudisplej-watchdog.service edudisplej-sync.service edudisplej-terminal.service 2>/dev/null; \
+sudo rm -f /etc/systemd/system/edudisplej-*.service; \
+sudo rm -f /etc/sudoers.d/edudisplej; \
+sudo rm -rf /opt/edudisplej; \
+sudo systemctl daemon-reload; \
+curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
+```
 
 ## 🔄 Update
 
+System updates are installed **automatically every 24 hours**. No manual intervention needed.
+
+To update manually:
+
 ```bash
-sudo /opt/edudisplej/update.sh
+sudo /opt/edudisplej/init/update.sh
 ```
 
 ## 📺 How It Works
@@ -42,6 +63,10 @@ sudo /opt/edudisplej/update.sh
 - **License Management**: Control module access per company
 - **Configuration Interface**: Easy-to-use dashboard for module settings
 - **Module Rotation**: Automatic rotation between configured modules
+- **Group Loop Configuration**: Configure module loops per group with drag-drop
+- **Live Preview**: Real-time preview of module loop with progress tracking
+- **Module Download**: Automatic download of modules to kiosks at startup
+- **Local Caching**: Modules cached locally for offline operation
 
 See [MODULES.md](MODULES.md) for detailed documentation on the module system.
 
@@ -67,6 +92,17 @@ See [MODULES.md](MODULES.md) for detailed documentation on the module system.
 ## 📖 Management
 
 Visit the control panel: **https://control.edudisplej.sk/admin/**
+
+### Automatic System Updates
+
+The kiosk automatically checks for system updates **once per day** through the background sync service:
+
+- **What's updated**: System packages, scripts, and configuration files
+- **When**: Daily automatic check at first startup, then every 24 hours
+- **How**: System checks remote server (structure.json) and downloads changes if needed
+- **Zero downtime**: Updates happen while kiosk is running, no reboot required (unless critical)
+
+The update process is **fully automatic** - after the initial install, no manual update commands are needed.
 
 ### For Administrators
 - Manage companies and users
@@ -94,6 +130,46 @@ tail -f /opt/edudisplej/logs/sync.log
 ```
 
 ## 🔍 Troubleshooting
+
+### Module Download Issues
+
+If modules fail to download on kiosk startup:
+
+```bash
+# Manually run the download script
+sudo /opt/edudisplej/init/edudisplej-download-modules.sh
+
+# Check download logs
+cat /tmp/edudisplej_download.log
+
+# Verify device ID is configured
+cat /opt/edudisplej/kiosk.conf
+
+# Check API connectivity
+curl -X POST https://control.edudisplej.sk/api/kiosk_loop.php \
+  -d "device_id=YOUR_DEVICE_ID"
+```
+
+### Loop Player Not Starting
+
+If the surf browser doesn't start or shows errors:
+
+```bash
+# Check if surf is installed
+which surf
+
+# Check loop player file
+ls -l /opt/edudisplej/localweb/loop_player.html
+
+# Check loop configuration
+cat /opt/edudisplej/localweb/modules/loop.json
+
+# View openbox autostart log
+cat /tmp/openbox-autostart.log
+
+# Restart kiosk service
+sudo systemctl restart edudisplej-kiosk.service
+```
 
 ### Check API Health
 

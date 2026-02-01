@@ -25,14 +25,10 @@ if [[ -f "$SESSION_LOG" ]]; then
     mv "$SESSION_LOG" "${SESSION_LOG}.old" 2>/dev/null || true
 fi
 
-# Kimenet atiranyitas log fajlba ES kepernyon -- Presmerovanie vystupu do log suboru A na obrazovku
-# Output to both log file AND screen (tty1) so user can see what's happening
-exec > >(tee -a "$SESSION_LOG" /dev/tty1) 2>&1
-
-# =============================================================================
-# Modulok betoltese -- Nacitanie modulov
-# =============================================================================
-
+# Kimenet atiranyitas log fajlba -- Presmerovanie vystupu do log suboru
+# Log to file only (not exec to avoid looping)
+LOG_FILE="${SESSION_LOG}"
+{
 echo "==========================================="
 echo "      E D U D I S P L E J"
 echo "==========================================="
@@ -245,7 +241,7 @@ echo ""
 # Kiosk csomagok telepitese -- Instalacia kiosk balickov
 # Including surf browser for lightweight browsing
 print_info "2. Kiosk csomagok telepitese -- Instalacia kiosk balickov..."
-KIOSK_PACKAGES=(xterm xdotool figlet dbus-x11 surf)
+KIOSK_PACKAGES=(xterm xdotool figlet dbus-x11 surf jq)
 
 if ! install_packages "${KIOSK_PACKAGES[@]}"; then
     print_warning "Nehany kiosk csomag telepitese sikertelen -- Niektore kiosk balicky sa nepodarilo nainštalovat"
@@ -296,7 +292,35 @@ print_info "Felhasznalo csoportok beallitasa -- Nastavenie pouzivatelskych skupi
 usermod -a -G tty,video,input "$CONSOLE_USER" 2>/dev/null || true
 print_success "✓ Felhasznalo hozzaadva: tty,video,input csoportokhoz -- Pouzivatel pridany do skupin"
 
-# .xinitrc letrehozasa -- Vytvorenie .xinitrc
+# Sudoers beallitasa - passwordless sudo az edudisplej scriptekhez
+# Nastavenie sudoers - bez hesla pre edudisplej scripty
+print_info "Sudoers beallitasa -- Nastavenie sudoers..."
+SUDOERS_FILE="/etc/sudoers.d/edudisplej"
+
+# Biztonsan letrehozzuk a sudoers fajlt
+touch "$SUDOERS_FILE"
+chmod 0440 "$SUDOERS_FILE"
+
+# Az edudisplej felhasznalonak passwordless sudo jogokat adunk a szukseges scriptekhez
+cat > "$SUDOERS_FILE" <<SUDOERS_EOF
+# EduDisplej - Passwordless sudo for system services and terminal script
+# Allow console user to run update.sh and terminal script without password
+Defaults:$CONSOLE_USER !requiretty
+
+# Script permissions
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/update.sh
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej_terminal_script.sh
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-download-modules.sh
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej_sync_service.sh
+SUDOERS_EOF
+
+# Verify sudoers syntax
+if ! visudo -c -f "$SUDOERS_FILE" 2>/dev/null; then
+    print_error "Sudoers szintaxis hiba! -- Chyba v syntaxi sudoers!"
+    rm -f "$SUDOERS_FILE"
+else
+    print_success "✓ Sudoers beallitva -- Sudoers nastaveny"
+fi
 print_info "Letrehozas -- Vytvorenie: .xinitrc"
 cat > "$USER_HOME/.xinitrc" <<'XINITRC_EOF'
 #!/bin/bash
@@ -311,8 +335,8 @@ print_info "Letrehozas -- Vytvorenie: Openbox autostart"
 mkdir -p "$USER_HOME/.config/openbox"
 cat > "$USER_HOME/.config/openbox/autostart" <<'AUTOSTART_EOF'
 #!/bin/bash
-# Openbox autostart - Launch terminal on main display
-# Simple and reliable
+# Openbox autostart - Launch EduDisplej terminal script
+# Terminal script handles update, download, and browser launch
 
 LOG="/tmp/openbox-autostart.log"
 exec >> "$LOG" 2>&1
@@ -368,7 +392,6 @@ if command -v xrandr >/dev/null 2>&1; then
         echo "WARNING: No connected output found!"
         echo "Trying fallback display configuration..."
         # Try common output names as fallback
-        # This list covers most common display outputs on Raspberry Pi and other systems
         FALLBACK_OUTPUTS="HDMI-1 HDMI-2 HDMI-3 HDMI1 HDMI2 HDMI3 VGA-1 VGA1 LVDS-1 LVDS1 DSI-1 DSI1 eDP-1 eDP1 DP-1 DP1"
         for OUT in $FALLBACK_OUTPUTS; do
             if xrandr 2>/dev/null | grep -q "^$OUT connected"; then
@@ -400,31 +423,36 @@ command -v xsetroot >/dev/null 2>&1 && {
     echo "Background set to black"
 }
 
-# Launch terminal with script - THIS IS THE GOAL
-SCRIPT="/opt/edudisplej/init/edudisplej_terminal_script.sh"
-if [ -x "$SCRIPT" ]; then
-    echo "Launching terminal with $SCRIPT"
+# Launch EduDisplej Terminal Script
+# This script handles: update, module download, and browser launch
+TERMINAL_SCRIPT="/opt/edudisplej/init/edudisplej_terminal_script.sh"
+
+if [ -x "$TERMINAL_SCRIPT" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Launching EduDisplej terminal script"
+    # Run xterm in background so openbox keeps running
+    # xterm will stay open until user closes it or error occurs
+    # Pass DISPLAY and other environment variables to sudo
     xterm -display :0 -fullscreen -fa Monospace -fs 14 \
-          -bg black -fg green -title "EduDisplej" +sb \
-          -e "$SCRIPT" &
-    XTERM_PID=$!
-    echo "Terminal launched (PID: $XTERM_PID)"
+          -bg black -fg green -title "EduDisplej Kiosk" +sb \
+          -e "sudo DISPLAY=:0 XAUTHORITY=/home/edudisplej/.Xauthority bash $TERMINAL_SCRIPT" &
     
-    # Verify terminal is running
-    sleep 2
-    if kill -0 $XTERM_PID 2>/dev/null; then
-        echo "Terminal is running"
-    else
-        echo "ERROR: Terminal process died!"
-    fi
+    XTERM_PID=$!
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Terminal script launched (PID: $XTERM_PID)"
 else
-    echo "ERROR: Script not found or not executable: $SCRIPT"
-    # Fallback: simple terminal
-    xterm -display :0 -fullscreen -bg black -fg green +sb &
-    echo "Launched fallback terminal"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Terminal script not found: $TERMINAL_SCRIPT"
+    # Show error xterm in background too
+    xterm -display :0 -fullscreen -fa Monospace -fs 14 \
+          -bg black -fg red -title "EduDisplej Error" +sb \
+          -e "echo 'FATAL ERROR: Terminal script not found'; echo '$TERMINAL_SCRIPT'; sleep 30" &
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart complete"
+# Keep openbox alive - don't exit this script
+# This allows the window manager to stay responsive
+while true; do
+    sleep 60
+done
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart completed"
 AUTOSTART_EOF
 
 chmod +x "$USER_HOME/.config/openbox/autostart"
@@ -440,3 +468,4 @@ print_success "=========================================="
 print_success "Setup complete! Reboot to start terminal"
 print_success "=========================================="
 exit 0
+} >> "$LOG_FILE" 2>&1

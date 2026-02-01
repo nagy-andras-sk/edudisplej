@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clock & Time - EduDisplej</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .clock-container {
+            text-align: center;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Digital Clock */
+        .digital-clock {
+            font-weight: bold;
+            line-height: 1.1;
+            letter-spacing: 0.05em;
+            max-width: 100%;
+            word-wrap: break-word;
+        }
+        
+        .digital-time {
+            margin-bottom: 10px;
+        }
+        
+        .digital-date {
+            opacity: 0.8;
+        }
+        
+        /* Analog Clock */
+        .analog-clock {
+            position: relative;
+            border-radius: 50%;
+            border: 8px solid;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .analog-clock::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        
+        .clock-hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            border-radius: 10px;
+        }
+        
+        .hour-hand {
+            width: 6px;
+            margin-left: -3px;
+            z-index: 3;
+        }
+        
+        .minute-hand {
+            width: 4px;
+            margin-left: -2px;
+            z-index: 2;
+        }
+        
+        .second-hand {
+            width: 2px;
+            margin-left: -1px;
+            z-index: 1;
+        }
+        
+        .clock-number {
+            position: absolute;
+            font-weight: bold;
+        }
+        
+        .analog-date {
+            margin-top: 20px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="clock-container" id="clockContainer"></div>
+    
+    <script>
+        // Get settings from URL parameters or use defaults
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        const settings = {
+            type: urlParams.get('type') || 'digital',           // 'digital' or 'analog'
+            format: urlParams.get('format') || '24h',           // '12h' or '24h'
+            dateFormat: urlParams.get('dateFormat') || 'full',  // 'full', 'short', 'numeric', 'none'
+            timeColor: urlParams.get('timeColor') || '#ffffff',
+            dateColor: urlParams.get('dateColor') || '#ffffff',
+            bgColor: urlParams.get('bgColor') || '#1e40af',
+            fontSize: parseInt(urlParams.get('fontSize')) || 120,
+            clockSize: parseInt(urlParams.get('clockSize')) || 300,
+            showSeconds: urlParams.get('showSeconds') !== 'false',
+            language: urlParams.get('language') || 'hu'         // 'hu' or 'sk'
+        };
+        
+        // Set background color
+        document.body.style.backgroundColor = settings.bgColor;
+        
+        // Auto-scale content to fit viewport
+        function scaleToFit() {
+            const container = document.getElementById('clockContainer');
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Calculate scale based on viewport
+            const scaleX = viewportWidth / 1920; // Base width
+            const scaleY = viewportHeight / 1080; // Base height
+            const scale = Math.min(scaleX, scaleY, 1);
+            
+            // Adjust font sizes if they would overflow
+            if (scale < 1) {
+                settings.fontSize = Math.floor(settings.fontSize * scale);
+                settings.clockSize = Math.floor(settings.clockSize * scale);
+            }
+        }
+        
+        scaleToFit();
+        window.addEventListener('resize', scaleToFit);
+        
+        // Date formatting functions
+        const monthNames = {
+            hu: ['január', 'február', 'március', 'április', 'május', 'június', 
+                 'július', 'augusztus', 'szeptember', 'október', 'november', 'december'],
+            sk: ['január', 'február', 'marec', 'apríl', 'máj', 'jún',
+                 'júl', 'august', 'september', 'október', 'november', 'december']
+        };
+        
+        const dayNames = {
+            hu: ['vasárnap', 'hétfő', 'kedd', 'szerda', 'csütörtök', 'péntek', 'szombat'],
+            sk: ['nedeľa', 'pondelok', 'utorok', 'streda', 'štvrtok', 'piatok', 'sobota']
+        };
+        
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const day = date.getDate();
+            const dayName = dayNames[settings.language][date.getDay()];
+            const monthName = monthNames[settings.language][month];
+            
+            switch(settings.dateFormat) {
+                case 'full':
+                    return `${year}. ${monthName} ${day}. - ${dayName}`;
+                case 'short':
+                    return `${year}. ${monthName} ${day}.`;
+                case 'numeric':
+                    return `${year}.${String(month + 1).padStart(2, '0')}.${String(day).padStart(2, '0')}.`;
+                case 'none':
+                    return '';
+                default:
+                    return `${year}. ${monthName} ${day}. - ${dayName}`;
+            }
+        }
+        
+        // Digital Clock
+        function createDigitalClock() {
+            const container = document.getElementById('clockContainer');
+            container.innerHTML = `
+                <div class="digital-clock">
+                    <div class="digital-time" id="digitalTime"></div>
+                    <div class="digital-date" id="digitalDate"></div>
+                </div>
+            `;
+            
+            const timeEl = document.getElementById('digitalTime');
+            const dateEl = document.getElementById('digitalDate');
+            
+            timeEl.style.fontSize = settings.fontSize + 'px';
+            timeEl.style.color = settings.timeColor;
+            dateEl.style.fontSize = (settings.fontSize * 0.3) + 'px';
+            dateEl.style.color = settings.dateColor;
+            
+            function updateDigitalClock() {
+                const now = new Date();
+                let hours = now.getHours();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                
+                let timeString = '';
+                if (settings.format === '12h') {
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    hours = hours % 12 || 12;
+                    timeString = `${hours}:${minutes}${settings.showSeconds ? ':' + seconds : ''} ${ampm}`;
+                } else {
+                    timeString = `${String(hours).padStart(2, '0')}:${minutes}${settings.showSeconds ? ':' + seconds : ''}`;
+                }
+                
+                timeEl.textContent = timeString;
+                dateEl.textContent = formatDate(now);
+            }
+            
+            updateDigitalClock();
+            setInterval(updateDigitalClock, 1000);
+        }
+        
+        // Analog Clock
+        function createAnalogClock() {
+            const container = document.getElementById('clockContainer');
+            const size = settings.clockSize;
+            
+            container.innerHTML = `
+                <div class="analog-clock" id="analogClock" style="width: ${size}px; height: ${size}px; border-color: ${settings.timeColor};">
+                    <div class="clock-hand hour-hand" id="hourHand" style="height: ${size * 0.25}px; background: ${settings.timeColor};"></div>
+                    <div class="clock-hand minute-hand" id="minuteHand" style="height: ${size * 0.35}px; background: ${settings.timeColor};"></div>
+                    ${settings.showSeconds ? `<div class="clock-hand second-hand" id="secondHand" style="height: ${size * 0.4}px; background: ${settings.dateColor};"></div>` : ''}
+                </div>
+                <div class="analog-date" id="analogDate" style="color: ${settings.timeColor}; font-size: ${size * 0.08}px;"></div>
+            `;
+            
+            // Add clock numbers
+            const clockEl = document.getElementById('analogClock');
+            clockEl.style.setProperty('--center-color', settings.timeColor);
+            clockEl.querySelector('::before')?.style.setProperty('background', settings.timeColor);
+            
+            // Add center dot
+            const centerDot = document.createElement('div');
+            centerDot.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 15px;
+                height: 15px;
+                border-radius: 50%;
+                background: ${settings.timeColor};
+                transform: translate(-50%, -50%);
+                z-index: 10;
+            `;
+            clockEl.appendChild(centerDot);
+            
+            // Add numbers
+            for (let i = 1; i <= 12; i++) {
+                const angle = (i * 30 - 90) * Math.PI / 180;
+                const radius = size * 0.4;
+                const x = Math.cos(angle) * radius + size / 2;
+                const y = Math.sin(angle) * radius + size / 2;
+                
+                const number = document.createElement('div');
+                number.className = 'clock-number';
+                number.textContent = i;
+                number.style.cssText = `
+                    left: ${x}px;
+                    top: ${y}px;
+                    transform: translate(-50%, -50%);
+                    color: ${settings.timeColor};
+                    font-size: ${size * 0.08}px;
+                `;
+                clockEl.appendChild(number);
+            }
+            
+            const dateEl = document.getElementById('analogDate');
+            
+            function updateAnalogClock() {
+                const now = new Date();
+                const hours = now.getHours() % 12;
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+                
+                const hourDeg = (hours * 30) + (minutes * 0.5);
+                const minuteDeg = minutes * 6;
+                const secondDeg = seconds * 6;
+                
+                document.getElementById('hourHand').style.transform = `rotate(${hourDeg}deg)`;
+                document.getElementById('minuteHand').style.transform = `rotate(${minuteDeg}deg)`;
+                if (settings.showSeconds) {
+                    document.getElementById('secondHand').style.transform = `rotate(${secondDeg}deg)`;
+                }
+                
+                dateEl.textContent = formatDate(now);
+            }
+            
+            updateAnalogClock();
+            setInterval(updateAnalogClock, 1000);
+        }
+        
+        // Initialize clock based on type
+        if (settings.type === 'analog') {
+            createAnalogClock();
+        } else {
+            createDigitalClock();
+        }
+    </script>
+</body>
+</html>

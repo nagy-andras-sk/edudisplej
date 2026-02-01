@@ -128,7 +128,7 @@ try {
         
         .license-card h3 {
             margin-bottom: 15px;
-            color: #667eea;
+            color: #1e40af;
         }
         
         .module-item {
@@ -151,7 +151,7 @@ try {
         
         .save-btn {
             padding: 5px 10px;
-            background: #667eea;
+            background: #1e40af;
             color: white;
             border: none;
             border-radius: 3px;
@@ -265,3 +265,4 @@ try {
     </div>
 </body>
 </html>
+

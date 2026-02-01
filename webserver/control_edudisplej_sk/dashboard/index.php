@@ -1,6 +1,6 @@
 <?php
 /**
- * Company Dashboard
+ * Company Dashboard - Saját Kijelzők
  * EduDisplej Control Panel
  */
 
@@ -12,7 +12,7 @@ $success = '';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../admin/index.php');
+    header('Location: ../login.php');
     exit();
 }
 
@@ -21,6 +21,7 @@ $user_id = $_SESSION['user_id'];
 $company_id = null;
 $company_name = '';
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
+$kiosks = [];
 
 try {
     $conn = getDbConnection();
@@ -34,7 +35,8 @@ try {
     $stmt->close();
     
     if (!$user) {
-        header('Location: ../admin/index.php');
+        $conn->close();
+        header('Location: ../login.php');
         exit();
     }
     
@@ -44,17 +46,8 @@ try {
     // Non-admin users must have a company assigned
     if (!$is_admin && !$company_id) {
         $error = 'You are not assigned to any company. Please contact an administrator.';
-    }
-    
-} catch (Exception $e) {
-    $error = 'Database error';
-    error_log($e->getMessage());
-}
-
-// Get company kiosks
-$kiosks = [];
-if ($company_id) {
-    try {
+    } else if ($company_id) {
+        // Get company kiosks
         $query = "SELECT k.* FROM kiosks k WHERE k.company_id = ? ORDER BY k.hostname";
         $stmt = $conn->prepare($query);
         $stmt->bind_param("i", $company_id);
@@ -64,203 +57,399 @@ if ($company_id) {
         while ($row = $result->fetch_assoc()) {
             $kiosks[] = $row;
         }
-        
         $stmt->close();
-    } catch (Exception $e) {
-        error_log($e->getMessage());
     }
-}
-
-// Get available modules for this company
-$available_modules = [];
-if ($company_id) {
-    try {
-        $query = "SELECT m.*, ml.quantity 
-                  FROM modules m 
-                  LEFT JOIN module_licenses ml ON m.id = ml.module_id AND ml.company_id = ?
-                  WHERE m.is_active = 1
-                  ORDER BY m.name";
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("i", $company_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        while ($row = $result->fetch_assoc()) {
-            $available_modules[] = $row;
-        }
-        
-        $stmt->close();
-    } catch (Exception $e) {
-        error_log($e->getMessage());
-    }
-}
-
-if (isset($conn)) {
-    closeDbConnection($conn);
-}
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Company Dashboard - EduDisplej</title>
-    <link rel="stylesheet" href="../admin/style.css">
-    <style>
-        .module-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        
-        .module-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .module-badge {
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        .badge-available {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .badge-unavailable {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .kiosk-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 15px;
-        }
-        
-        .kiosk-card {
-            border: 1px solid #eee;
-            padding: 15px;
-            border-radius: 5px;
-            background: #f9f9f9;
-        }
-        
-        .configure-btn {
-            padding: 8px 15px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            text-decoration: none;
-            display: inline-block;
-        }
-        
-        .configure-btn:hover {
-            background: #5568d3;
-        }
-    </style>
-</head>
-<body>
-    <div class="navbar">
-        <h1>🏢 Company Dashboard</h1>
-        <div class="user-info">
-            <?php if ($is_admin): ?>
-                <a href="../admin/index.php">Admin Panel</a>
-            <?php endif; ?>
-            <a href="groups.php">📁 Groups</a>
-            <span>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?> (<?php echo htmlspecialchars($company_name); ?>)</span>
-            <a href="../admin/index.php?logout=1">Logout</a>
-        </div>
-    </div>
     
-    <div class="container">
-        <?php if ($error): ?>
-            <div class="error"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
+    $conn->close();
+    
+} catch (Exception $e) {
+    $error = 'Database error: ' . $e->getMessage();
+    error_log($e->getMessage());
+}
+
+$logout_url = '../login.php?logout=1';
+?>
+<?php include '../admin/header.php'; ?>
         
-        <?php if ($success): ?>
-            <div class="success"><?php echo htmlspecialchars($success); ?></div>
+        <?php if ($error): ?>
+            <div class="error">⚠️ <?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
         
         <?php if ($company_id): ?>
             <div class="stats">
                 <div class="stat-card">
-                    <h3>Total Kiosks</h3>
+                    <h3>🖥️ Össz Kijelzők</h3>
                     <div class="number"><?php echo count($kiosks); ?></div>
                 </div>
                 <div class="stat-card">
-                    <h3>Online Kiosks</h3>
+                    <h3>🟢 Online</h3>
                     <div class="number"><?php echo count(array_filter($kiosks, fn($k) => $k['status'] == 'online')); ?></div>
                 </div>
                 <div class="stat-card">
-                    <h3>Available Modules</h3>
-                    <div class="number"><?php echo count(array_filter($available_modules, fn($m) => $m['quantity'] > 0)); ?></div>
+                    <h3>🔴 Offline</h3>
+                    <div class="number"><?php echo count(array_filter($kiosks, fn($k) => $k['status'] == 'offline')); ?></div>
                 </div>
             </div>
             
-            <h2>Your Kiosks</h2>
+            <h2>Saját Kijelzők</h2>
+            <p style="color: #666; margin-bottom: 15px;">A cégjéhez rendelt összes kijelző</p>
             
             <?php if (empty($kiosks)): ?>
                 <div style="text-align: center; padding: 40px; color: #999; background: white; border-radius: 10px;">
-                    No kiosks assigned to your company yet.
+                    Nincs kijelző hozzárendelve a cégjéhez
                 </div>
             <?php else: ?>
-                <div class="kiosk-grid">
-                    <?php foreach ($kiosks as $kiosk): ?>
-                        <div class="kiosk-card">
-                            <div style="font-weight: 600; margin-bottom: 5px;">
-                                <?php echo htmlspecialchars($kiosk['hostname'] ?? 'Kiosk #' . $kiosk['id']); ?>
-                            </div>
-                            <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
-                                📍 <?php echo htmlspecialchars($kiosk['location'] ?? 'No location'); ?>
-                            </div>
-                            <span class="status-badge status-<?php echo $kiosk['status']; ?>">
-                                <?php echo ucfirst($kiosk['status']); ?>
-                            </span>
-                            <div style="margin-top: 10px;">
-                                <a href="kiosk_modules.php?id=<?php echo $kiosk['id']; ?>" class="configure-btn">⚙️ Configure Modules</a>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Hostname</th>
+                                <th>Státusz</th>
+                                <th>Hely</th>
+                                <th>Utolsó szinkronizálás</th>
+                                <th>Loop</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($kiosks as $kiosk): ?>
+                                <tr>
+                                    <td><small><?php echo $kiosk['id']; ?></small></td>
+                                    <td>
+                                        <strong style="cursor: pointer; color: #1e40af;" onclick="openKioskDetail(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>')">
+                                            <?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-<?php echo $kiosk['status']; ?>">
+                                            <?php echo $kiosk['status'] == 'online' ? '🟢 Online' : '🔴 Offline'; ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?></td>
+                                    <td><small id="sync-time-<?php echo $kiosk['id']; ?>" data-last-seen="<?php echo htmlspecialchars($kiosk['last_seen']); ?>"></small></td>
+                                    <td>
+                                        <button onclick="viewKioskLoop(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A', ENT_QUOTES); ?>')" 
+                                                style="background: #667eea; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                                            🔄 Loop
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             <?php endif; ?>
-            
-            <h2 style="margin-top: 40px;">Available Modules</h2>
-            
-            <?php if (empty($available_modules)): ?>
-                <div style="text-align: center; padding: 40px; color: #999; background: white; border-radius: 10px;">
-                    No modules available.
-                </div>
-            <?php else: ?>
-                <?php foreach ($available_modules as $module): 
-                    $has_license = $module['quantity'] > 0;
-                ?>
-                    <div class="module-card">
-                        <div class="module-header">
-                            <div>
-                                <h3 style="margin: 0;"><?php echo htmlspecialchars($module['name']); ?></h3>
-                                <small style="color: #999;"><?php echo htmlspecialchars($module['module_key']); ?></small>
-                            </div>
-                            <span class="module-badge <?php echo $has_license ? 'badge-available' : 'badge-unavailable'; ?>">
-                                <?php echo $has_license ? "Licensed ({$module['quantity']} units)" : 'Not Licensed'; ?>
-                            </span>
-                        </div>
-                        <p style="color: #666; margin: 0;">
-                            <?php echo htmlspecialchars($module['description'] ?? 'No description'); ?>
-                        </p>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
+        <?php else: ?>
+            <div style="text-align: center; padding: 40px; color: #999;">
+                <p>Nem rendelt cég vagy nincs hozzáférése az adatokhoz.</p>
+            </div>
         <?php endif; ?>
     </div>
-</body>
-</html>
+    
+    <script>
+        // Update sync times on page load
+        function updateSyncTimes() {
+            document.querySelectorAll('[id^="sync-time-"]').forEach(el => {
+                const lastSeen = el.getAttribute('data-last-seen');
+                if (!lastSeen || lastSeen === 'NULL' || lastSeen === '') {
+                    el.innerHTML = '<span style="color: #999;">Soha</span>';
+                    return;
+                }
+                
+                const lastDate = new Date(lastSeen);
+                const now = new Date();
+                const diffMs = now - lastDate;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffSecs = Math.floor((diffMs % 60000) / 1000);
+                
+                let timeStr = '';
+                if (diffMins > 0) {
+                    timeStr = `${diffMins} perc${diffSecs > 0 ? ` ${diffSecs}s` : ''} elôtte`;
+                } else {
+                    timeStr = `${diffSecs}s elôtte`;
+                }
+                
+                // If more than 120 minutes, show as red OFFLINE
+                if (diffMins > 120) {
+                    el.innerHTML = `<span style="color: #d32f2f; font-weight: bold;">OFFLINE (${timeStr})</span>`;
+                } else {
+                    el.innerHTML = timeStr;
+                }
+            });
+        }
+        
+        updateSyncTimes();
+        setInterval(updateSyncTimes, 5000); // Update every 5 seconds (real-time)
+        
+        function updateSyncInterval(kioskId, newInterval) {
+            if (!confirm(`Biztosan beállítja a szinkronizálási időközt ${newInterval} másodpercre?`)) {
+                location.reload();
+                return;
+            }
+            
+            fetch('../api/update_sync_interval.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kiosk_id: kioskId, sync_interval: parseInt(newInterval) })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Szinkronizálási időköz frissítve');
+                } else {
+                    alert('⚠️ Hiba: ' + data.message);
+                    location.reload();
+                }
+            })
+            .catch(err => {
+                alert('⚠️ Hiba történt: ' + err);
+                location.reload();
+            });
+        }
+        
+        function openKioskDetail(kioskId, hostname) {
+            // Create modal
+            const modal = document.createElement('div');
+            modal.id = 'kiosk-detail-modal';
+            modal.style.cssText = `
+                display: flex;
+                position: fixed;
+                z-index: 1000;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            // Close modal when clicking outside
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+            
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 30px;
+                    border-radius: 8px;
+                    max-width: 600px;
+                    width: 90%;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">Kijelző Részletek: ${hostname}</h2>
+                        <button onclick="document.getElementById('kiosk-detail-modal').remove()" style="
+                            background: #1e40af;
+                            color: white;
+                            border: none;
+                            font-size: 16px;
+                            cursor: pointer;
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            transition: background 0.2s;
+                        " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#1e40af'">✕</button>
+                    </div>
+                    
+                    <div id="kiosk-detail-content" style="color: #666;">
+                        <p style="text-align: center; padding: 40px;">Betöltés...</p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Load kiosk details via AJAX
+            fetch(`../api/kiosk_details.php?id=${kioskId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const content = document.getElementById('kiosk-detail-content');
+                    if (data.success) {
+                        content.innerHTML = `
+                            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                                <h3 style="margin-top: 0;">ℹ️ Alapadatok</h3>
+                                <table style="width: 100%; font-size: 13px;">
+                                    <tr><td style="font-weight: bold; width: 30%;">MAC Cím:</td><td><code>${data.mac}</code></td></tr>
+                                    <tr><td style="font-weight: bold;">Státusz:</td><td>${data.status === 'online' ? '🟢 Online' : '🔴 Offline'}</td></tr>
+                                    <tr><td style="font-weight: bold;">Hely:</td><td>${data.location || '-'}</td></tr>
+                                    <tr><td style="font-weight: bold;">Utolsó szinkronizálás:</td><td>${data.last_seen || 'Soha'}</td></tr>
+                                    <tr>
+                                        <td style="font-weight: bold;">Szinkronizálás gyakorisága:</td>
+                                        <td>
+                                            <select id="sync-interval-selector-${kioskId}" onchange="updateSyncInterval(${kioskId}, this.value)" style="padding: 5px; border-radius: 3px; border: 1px solid #ccc;">
+                                                <option value="10" ${data.sync_interval === 10 ? 'selected' : ''}>10 másodperc</option>
+                                                <option value="120" ${data.sync_interval === 120 ? 'selected' : ''}>2 perc (120s)</option>
+                                                <option value="300" ${data.sync_interval === 300 ? 'selected' : ''}>5 perc (300s)</option>
+                                                <option value="600" ${data.sync_interval === 600 ? 'selected' : ''}>10 perc (600s)</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            
+                            ${data.hw_info ? `
+                            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                                <h3 style="margin-top: 0;">🖥️ Hardware Adatok</h3>
+                                <table style="width: 100%; font-size: 13px;">
+                                    ${data.hw_info.cpu ? `<tr><td style="font-weight: bold;">CPU:</td><td>${data.hw_info.cpu}</td></tr>` : ''}
+                                    ${data.hw_info.ram ? `<tr><td style="font-weight: bold;">RAM:</td><td>${data.hw_info.ram}</td></tr>` : ''}
+                                    ${data.hw_info.disk ? `<tr><td style="font-weight: bold;">Tárhely:</td><td>${data.hw_info.disk}</td></tr>` : ''}
+                                    ${data.hw_info.uptime ? `<tr><td style="font-weight: bold;">Üzemidő:</td><td>${data.hw_info.uptime}</td></tr>` : ''}
+                                </table>
+                            </div>
+                            ` : ''}
+                            
+                            ${data.modules && data.modules.length > 0 ? `
+                            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
+                                <h3 style="margin-top: 0;">🎬 Modulok Loop Sorrendje</h3>
+                                <div id="modules-loop" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px;">
+                                    ${data.modules.map(m => `<div style="background: white; padding: 10px; border-radius: 3px; border-left: 4px solid #1e40af; text-align: center; font-size: 12px;">${m}</div>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                        `;
+                    } else {
+                        content.innerHTML = `<p style="color: #d32f2f;">Hiba: ${data.message}</p>`;
+                    }
+                })
+                .catch(err => {
+                    if (document.getElementById('kiosk-detail-content')) {
+                        document.getElementById('kiosk-detail-content').innerHTML = `<p style="color: #d32f2f;">Hiba: ${err}</p>`;
+                    }
+                });
+        }
+        
+        function viewKioskLoop(kioskId, hostname) {
+            // Get kiosk's group(s) first
+            fetch(`../api/get_kiosk_loop.php?kiosk_id=${kioskId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const loops = data.loops;
+                        let html = '<div style="max-height: 500px; overflow-y: auto;">';
+                        
+                        if (loops.length === 0) {
+                            html += '<p style="text-align: center; color: #999; padding: 20px;">Nincs beállított loop ehhez a kijelzőhöz</p>';
+                        } else {
+                            html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
+                            loops.forEach((loop, index) => {
+                                html += `<div style="
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    color: white;
+                                    padding: 15px;
+                                    border-radius: 8px;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 15px;
+                                    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                                ">
+                                    <div style="
+                                        background: rgba(255,255,255,0.2);
+                                        padding: 8px 12px;
+                                        border-radius: 5px;
+                                        font-weight: bold;
+                                        font-size: 14px;
+                                    ">${index + 1}</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: bold; font-size: 14px;">${loop.module_name}</div>
+                                        <div style="font-size: 12px; opacity: 0.9;">${loop.description || ''}</div>
+                                    </div>
+                                    <div style="
+                                        background: rgba(255,255,255,0.2);
+                                        padding: 8px 12px;
+                                        border-radius: 5px;
+                                        text-align: center;
+                                    ">
+                                        <div style="font-size: 18px; font-weight: bold;">${loop.duration_seconds}</div>
+                                        <div style="font-size: 11px; opacity: 0.9;">sec</div>
+                                    </div>
+                                </div>`;
+                            });
+                            html += '</div>';
+                            
+                            // Add total duration
+                            const totalDuration = loops.reduce((sum, loop) => sum + parseInt(loop.duration_seconds), 0);
+                            html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                                <strong>Teljes loop időtartam:</strong> ${totalDuration} másodperc (${Math.floor(totalDuration / 60)} perc ${totalDuration % 60} mp)
+                            </div>`;
+                        }
+                        html += '</div>';
+                        
+                        showModal('🔄 Loop Konfiguráció - ' + hostname, html);
+                    } else {
+                        alert('⚠️ ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('⚠️ Hiba történt: ' + error);
+                });
+        }
+        
+        function showModal(title, content) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                display: flex;
+                position: fixed;
+                z-index: 1000;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+            
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 30px;
+                    border-radius: 12px;
+                    max-width: 700px;
+                    width: 90%;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">${title}</h2>
+                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
+                            background: #1e40af;
+                            color: white;
+                            border: none;
+                            font-size: 16px;
+                            cursor: pointer;
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            transition: background 0.2s;
+                        " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#1e40af'">✕</button>
+                    </div>
+                    <div>${content}</div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+    </script>
+
+<?php include '../admin/footer.php'; ?>
+

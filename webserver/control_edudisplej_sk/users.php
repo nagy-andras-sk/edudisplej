@@ -219,7 +219,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         }
         
         .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
             color: white;
             padding: 15px 30px;
             display: flex;
@@ -298,7 +298,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         
         button, .btn {
             padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
             color: white;
             border: none;
             border-radius: 5px;
@@ -320,7 +320,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         }
         
         .btn-danger {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
         
         .btn-warning {
@@ -519,3 +519,4 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     </div>
 </body>
 </html>
+

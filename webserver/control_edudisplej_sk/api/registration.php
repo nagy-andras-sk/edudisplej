@@ -179,7 +179,16 @@ try {
     // Step 9: Check if kiosk already exists
     add_debug('query_existing', 'Checking if kiosk already registered...');
     
-    $stmt = $conn->prepare("SELECT id, device_id, is_configured, company_id FROM kiosks WHERE mac = ?");
+    $stmt = $conn->prepare("
+        SELECT k.id, k.device_id, k.is_configured, k.company_id,
+               c.name as company_name,
+               kg.name as group_name
+        FROM kiosks k
+        LEFT JOIN companies c ON k.company_id = c.id
+        LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
+        LEFT JOIN kiosk_groups kg ON kga.group_id = kg.id
+        WHERE k.mac = ?
+    ");
     
     if (!$stmt) {
         $response['message'] = 'Database query preparation failed: ' . $conn->error;
@@ -234,6 +243,8 @@ try {
         $response['device_id'] = $kiosk['device_id'];
         $response['is_configured'] = (bool)$kiosk['is_configured'];
         $response['company_assigned'] = !empty($kiosk['company_id']);
+        $response['company_name'] = $kiosk['company_name'] ?? 'Unknown';
+        $response['group_name'] = $kiosk['group_name'] ?? 'Unknown';
         
         add_debug('result', 'Existing kiosk updated successfully');
         
@@ -297,6 +308,8 @@ try {
         $response['device_id'] = $device_id;
         $response['is_configured'] = false;
         $response['company_assigned'] = false;
+        $response['company_name'] = 'Unknown';
+        $response['group_name'] = 'Unknown';
         
         add_debug('result', 'New kiosk registered successfully');
     }
@@ -347,3 +360,4 @@ function generateDeviceId($mac) {
     return $random_chars . $mac_chars;
 }
 ?>
+

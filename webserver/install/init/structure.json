@@ -94,9 +94,21 @@
       "permissions": "644"
     },
     {
+      "source": "waiting_registration.html",
+      "destination": "/opt/edudisplej/init/waiting_registration.html",
+      "permissions": "644",
+      "description": "Waiting screen displayed when device is not yet registered"
+    },
+    {
       "source": "download.php",
       "destination": "/opt/edudisplej/init/download.php",
       "permissions": "644"
+    },
+    {
+      "source": "edudisplej-download-modules.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-download-modules.sh",
+      "permissions": "755",
+      "description": "Downloads modules and loop configuration from server"
     }
   ],
   "services": [

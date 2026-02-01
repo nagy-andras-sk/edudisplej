@@ -124,6 +124,9 @@ fi
 if ! command -v surf >/dev/null 2>&1; then
   MISSING_TOOLS+=("surf")
 fi
+if ! command -v jq >/dev/null 2>&1; then
+  MISSING_TOOLS+=("jq")
+fi
 
 if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
   echo "[*] Instalacia zakladnych nastroje - Installing basic tools: ${MISSING_TOOLS[*]}"
@@ -361,11 +364,19 @@ except Exception as e:
             echo "  [!] VAROVANIE: daemon-reload zlyhal"
         fi
         
-        # Verify service exists
-        if systemctl list-unit-files | grep -q "^$name"; then
-            echo "  [✓] Service existuje v systemd"
+        # Verify service exists (check if file exists first, systemctl may be slow)
+        if [ -f "$DEST_PATH" ]; then
+            echo "  [✓] Service file existuje: $DEST_PATH"
+            
+            # Double-check with systemctl (optional, may fail on some systems)
+            if systemctl list-unit-files "$name" >/dev/null 2>&1; then
+                echo "  [✓] Service rozpoznany v systemd"
+            else
+                # Not critical - systemd sometimes needs time to recognize new units
+                echo "  [*] Service subor nainstalovany (systemd ho rozpozna po reloade)"
+            fi
         else
-            echo "  [!] CHYBA: Service nebol najdeny v systemd"
+            echo "  [!] CHYBA: Service file neexistuje: $DEST_PATH"
             continue
         fi
         
@@ -447,12 +458,31 @@ fi
 echo "[*] Konfiguracia sudo - Configuring sudo..."
 mkdir -p /etc/sudoers.d
 cat > /etc/sudoers.d/edudisplej <<EOF
+# EduDisplej - Passwordless sudo for system scripts
 $CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-init.sh
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/update.sh
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej_terminal_script.sh
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-download-modules.sh
 EOF
 chmod 0440 /etc/sudoers.d/edudisplej
 
+# Verify sudoers syntax
+if visudo -c -f /etc/sudoers.d/edudisplej >/dev/null 2>&1; then
+    echo "[✓] Sudoers konfiguracia overena - Sudoers configuration verified"
+else
+    echo "[!] VAROVANIE: Sudoers syntax check failed, removing file"
+    rm -f /etc/sudoers.d/edudisplej
+fi
+
 # Deaktivacia getty@tty1 - Disable getty
 systemctl disable getty@tty1.service 2>/dev/null || true
+
+# Mark kiosk system as configured (so edudisplej-init.sh won't run installation on boot)
+echo "[*] Jelolom a rendszert konfiguraltnak - Marking system as configured..."
+mkdir -p "$TARGET_DIR"
+KIOSK_CONFIGURED_FILE="${TARGET_DIR}/.kiosk_system_configured"
+touch "$KIOSK_CONFIGURED_FILE"
+echo "[✓] Konfiguracios flag letrehozva - Configuration flag created"
 
 echo ""
 echo "=========================================="

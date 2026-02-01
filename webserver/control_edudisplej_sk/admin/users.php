@@ -237,7 +237,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         }
         
         .btn-danger {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
         
         .btn-warning {
@@ -398,3 +398,4 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     </div>
 </body>
 </html>
+
