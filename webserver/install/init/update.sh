@@ -41,108 +41,248 @@ echo "    Zaloha: $BACKUP_DIR"
 # Vytvorenie zalohy / Biztonsagi mentes
 cp -r "$TARGET_DIR" "$BACKUP_DIR"
 
-# Nacitanie zoznamu suborov / Fajlok listajanak letoltese
-echo "[*] Nacitavame zoznam suborov..."
-
-FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles" 2>/dev/null | tr -d '\r')"
-CURL_EXIT_CODE=$?
-
-if [ $CURL_EXIT_CODE -ne 0 ]; then
-  echo "[!] Chyba pripojenia k serveru (kod: $CURL_EXIT_CODE)"
-  echo "[!] Zaloha zachovana v: $BACKUP_DIR"
-  exit 1
-fi
-
-if [ -z "$FILES_LIST" ]; then
-  echo "[!] Server vratil prazdny zoznam"
-  echo "[!] Zaloha zachovana v: $BACKUP_DIR"
-  exit 1
-fi
-
-# Pocet suborov / Fajlok szama
-TOTAL_FILES=0
-while IFS= read -r line; do
-    if [[ -n "$line" && "$line" == *";"* ]]; then
-        TOTAL_FILES=$((TOTAL_FILES + 1))
+# Kontrola ci server podporuje structure.json / Ellenorzes hogy a szerver tamogatja-e a structure.json-t
+echo "[*] Kontrolujem dostupnost structure.json..."
+STRUCTURE_JSON=""
+if curl -sf --max-time 10 --connect-timeout 5 "${INIT_BASE}/download.php?getstructure" >/dev/null 2>&1; then
+    echo "[*] Pouzivam novu metodu (structure.json)..."
+    USE_STRUCTURE=true
+    
+    # Stiahnuť structure.json / Structure.json letoltese
+    STRUCTURE_JSON="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getstructure" 2>/dev/null | tr -d '\r')"
+    CURL_EXIT_CODE=$?
+    
+    if [ $CURL_EXIT_CODE -ne 0 ] || [ -z "$STRUCTURE_JSON" ]; then
+        echo "[!] Chyba pri stiahnovani structure.json, prepínam na staru metodu..."
+        USE_STRUCTURE=false
     fi
-done <<< "$FILES_LIST"
-
-if [ $TOTAL_FILES -eq 0 ]; then
-    echo "[!] Ziadne subory na stiahnutie"
-    exit 1
+else
+    echo "[*] Server nepodporuje structure.json, pouzivam staru metodu..."
+    USE_STRUCTURE=false
 fi
 
-CURRENT_FILE=0
-echo ""
-echo "=========================================="
-echo "Stahovanie: ${TOTAL_FILES} suborov"
-echo "=========================================="
-echo ""
-
-# Stiahnutie suborov / Fajlok letoltese
-while IFS=";" read -r NAME SIZE MODIFIED; do
-    [ -z "${NAME:-}" ] && continue
-
-    CURRENT_FILE=$((CURRENT_FILE + 1))
-    PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
+if [ "$USE_STRUCTURE" = true ]; then
+    # Nova metoda: pouzivat structure.json / Uj modszer: structure.json hasznalata
     
-    echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) ${NAME} (${SIZE} bajtov)"
+    # Kontrola ci je nainstalovaný jq, inak použijeme grep/sed
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[!] jq nie je nainstalovany, pouzivam alternativny parser..."
+        USE_JQ=false
+    else
+        USE_JQ=true
+    fi
     
-    MAX_DOWNLOAD_ATTEMPTS=3
-    DOWNLOAD_SUCCESS=false
+    # Parsovanie JSON / JSON elemzes
+    if [ "$USE_JQ" = true ]; then
+        # Použiť jq pre parsovanie
+        TOTAL_FILES=$(echo "$STRUCTURE_JSON" | jq '.files | length')
+    else
+        # Alternatívny parser bez jq
+        TOTAL_FILES=$(echo "$STRUCTURE_JSON" | grep -o '"source"' | wc -l)
+    fi
     
-    for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
-        if curl -sL --max-time 60 --connect-timeout 10 \
-            "${INIT_BASE}/download.php?streamfile=${NAME}" \
-            -o "${INIT_DIR}/${NAME}" 2>&1; then
-            
-            ACTUAL_SIZE=$(stat -c%s "${INIT_DIR}/${NAME}" 2>/dev/null || echo "0")
-            
-            if [ "$ACTUAL_SIZE" -eq "$SIZE" ]; then
-                DOWNLOAD_SUCCESS=true
-                break
+    if [ "$TOTAL_FILES" -eq 0 ]; then
+        echo "[!] Ziadne subory v structure.json"
+        echo "[!] Zaloha zachovana v: $BACKUP_DIR"
+        exit 1
+    fi
+    
+    CURRENT_FILE=0
+    echo ""
+    echo "=========================================="
+    echo "Stahovanie: ${TOTAL_FILES} suborov"
+    echo "=========================================="
+    echo ""
+    
+    # Stiahnutie a inštalácia súborov podľa structure.json
+    # Letoltes es telepites structure.json szerint
+    for i in $(seq 0 $((TOTAL_FILES - 1))); do
+        if [ "$USE_JQ" = true ]; then
+            SOURCE=$(echo "$STRUCTURE_JSON" | jq -r ".files[$i].source")
+            DESTINATION=$(echo "$STRUCTURE_JSON" | jq -r ".files[$i].destination")
+            PERMISSIONS=$(echo "$STRUCTURE_JSON" | jq -r ".files[$i].permissions")
+        else
+            # Alternatívny parser
+            SOURCE=$(echo "$STRUCTURE_JSON" | grep -A 3 "\"source\"" | sed -n "$((i*3 + 1))p" | sed 's/.*"source": "\([^"]*\)".*/\1/')
+            DESTINATION=$(echo "$STRUCTURE_JSON" | grep -A 3 "\"destination\"" | sed -n "$((i*3 + 1))p" | sed 's/.*"destination": "\([^"]*\)".*/\1/')
+            PERMISSIONS=$(echo "$STRUCTURE_JSON" | grep -A 3 "\"permissions\"" | sed -n "$((i*3 + 1))p" | sed 's/.*"permissions": "\([^"]*\)".*/\1/')
+        fi
+        
+        [ -z "$SOURCE" ] && continue
+        
+        CURRENT_FILE=$((CURRENT_FILE + 1))
+        PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
+        
+        echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) ${SOURCE} -> ${DESTINATION}"
+        
+        # Vytvorenie cieľového adresára / Cel konyvtar letrehozasa
+        DEST_DIR=$(dirname "$DESTINATION")
+        if [ ! -d "$DEST_DIR" ]; then
+            mkdir -p "$DEST_DIR"
+        fi
+        
+        # Stiahnutie suboru / Fajl letoltese
+        MAX_DOWNLOAD_ATTEMPTS=3
+        DOWNLOAD_SUCCESS=false
+        TEMP_FILE="/tmp/edudisplej_download_$$_${SOURCE}"
+        
+        for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
+            if curl -sL --max-time 60 --connect-timeout 10 \
+                "${INIT_BASE}/download.php?streamfile=${SOURCE}" \
+                -o "$TEMP_FILE" 2>&1; then
+                
+                # Kontrola ci sa subor stiahol / Ellenorzes hogy letoltodott-e
+                if [ -f "$TEMP_FILE" ] && [ -s "$TEMP_FILE" ]; then
+                    DOWNLOAD_SUCCESS=true
+                    break
+                else
+                    echo "    [!] Subor je prazdny alebo sa nevytvoril"
+                    if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
+                        sleep 2
+                        rm -f "$TEMP_FILE"
+                    fi
+                fi
             else
-                echo "    [!] Velkost nesedi (ocakavane: ${SIZE}, skutocne: ${ACTUAL_SIZE})"
                 if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
+                    echo "    [!] Pokus ${attempt}/${MAX_DOWNLOAD_ATTEMPTS} zlyhal, skusam znova..."
                     sleep 2
-                    rm -f "${INIT_DIR}/${NAME}"
                 fi
             fi
-        else
-            if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
-                echo "    [!] Pokus ${attempt}/${MAX_DOWNLOAD_ATTEMPTS} zlyhal, skusam znova..."
-                sleep 2
+        done
+        
+        if [ "$DOWNLOAD_SUCCESS" != "true" ]; then
+            echo ""
+            echo "[!] CHYBA: Subor $SOURCE sa nepodarilo stiahnut po ${MAX_DOWNLOAD_ATTEMPTS} pokusoch"
+            echo "[!] Obnovujem zalohu..."
+            rm -f "$TEMP_FILE"
+            rm -rf "$TARGET_DIR"
+            mv "$BACKUP_DIR" "$TARGET_DIR"
+            echo "[!] Zaloha obnovena"
+            exit 1
+        fi
+        
+        # Oprava konca riadkov / Sorvegek javitasa
+        sed -i 's/\r$//' "$TEMP_FILE"
+        
+        # Presunúť na cieľové miesto / Celhelyre mozgatas
+        mv -f "$TEMP_FILE" "$DESTINATION"
+        
+        # Nastavenie opravneni / Jogok beallitasa
+        chmod "$PERMISSIONS" "$DESTINATION"
+        
+        # Kontrola a oprava shebang pre shell skripty / Shebang ellenorzes shell scripteknel
+        if [[ "${SOURCE}" == *.sh ]]; then
+            FIRST_LINE="$(head -n1 "$DESTINATION" || true)"
+            if [[ "${FIRST_LINE}" != "#!"* ]]; then
+                sed -i '1i #!/bin/bash' "$DESTINATION"
             fi
         fi
     done
     
-    if [ "$DOWNLOAD_SUCCESS" != "true" ]; then
-        echo ""
-        echo "[!] CHYBA: Subor $NAME sa nepodarilo stiahnut po ${MAX_DOWNLOAD_ATTEMPTS} pokusoch"
-        echo "[!] Obnovujem zalohu..."
-        rm -rf "$TARGET_DIR"
-        mv "$BACKUP_DIR" "$TARGET_DIR"
-        echo "[!] Zaloha obnovena"
+else
+    # Stara metoda: pouzivat getfiles / Regi modszer: getfiles hasznalata
+    echo "[*] Nacitavame zoznam suborov..."
+    
+    FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles" 2>/dev/null | tr -d '\r')"
+    CURL_EXIT_CODE=$?
+    
+    if [ $CURL_EXIT_CODE -ne 0 ]; then
+      echo "[!] Chyba pripojenia k serveru (kod: $CURL_EXIT_CODE)"
+      echo "[!] Zaloha zachovana v: $BACKUP_DIR"
+      exit 1
+    fi
+    
+    if [ -z "$FILES_LIST" ]; then
+      echo "[!] Server vratil prazdny zoznam"
+      echo "[!] Zaloha zachovana v: $BACKUP_DIR"
+      exit 1
+    fi
+    
+    # Pocet suborov / Fajlok szama
+    TOTAL_FILES=0
+    while IFS= read -r line; do
+        if [[ -n "$line" && "$line" == *";"* ]]; then
+            TOTAL_FILES=$((TOTAL_FILES + 1))
+        fi
+    done <<< "$FILES_LIST"
+    
+    if [ $TOTAL_FILES -eq 0 ]; then
+        echo "[!] Ziadne subory na stiahnutie"
         exit 1
     fi
-
-    # Oprava konca riadkov / Sorvegek javitasa
-    sed -i 's/\r$//' "${INIT_DIR}/${NAME}"
-
-    # Kontrola a oprava shebang / Shebang ellenorzes es javitas
-    if [[ "${NAME}" == *.sh ]]; then
-        chmod +x "${INIT_DIR}/${NAME}"
-        FIRST_LINE="$(head -n1 "${INIT_DIR}/${NAME}" || true)"
-        if [[ "${FIRST_LINE}" != "#!"* ]]; then
-            sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
+    
+    CURRENT_FILE=0
+    echo ""
+    echo "=========================================="
+    echo "Stahovanie: ${TOTAL_FILES} suborov"
+    echo "=========================================="
+    echo ""
+    
+    # Stiahnutie suborov / Fajlok letoltese
+    while IFS=";" read -r NAME SIZE MODIFIED; do
+        [ -z "${NAME:-}" ] && continue
+    
+        CURRENT_FILE=$((CURRENT_FILE + 1))
+        PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
+        
+        echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) ${NAME} (${SIZE} bajtov)"
+        
+        MAX_DOWNLOAD_ATTEMPTS=3
+        DOWNLOAD_SUCCESS=false
+        
+        for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
+            if curl -sL --max-time 60 --connect-timeout 10 \
+                "${INIT_BASE}/download.php?streamfile=${NAME}" \
+                -o "${INIT_DIR}/${NAME}" 2>&1; then
+                
+                ACTUAL_SIZE=$(stat -c%s "${INIT_DIR}/${NAME}" 2>/dev/null || echo "0")
+                
+                if [ "$ACTUAL_SIZE" -eq "$SIZE" ]; then
+                    DOWNLOAD_SUCCESS=true
+                    break
+                else
+                    echo "    [!] Velkost nesedi (ocakavane: ${SIZE}, skutocne: ${ACTUAL_SIZE})"
+                    if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
+                        sleep 2
+                        rm -f "${INIT_DIR}/${NAME}"
+                    fi
+                fi
+            else
+                if [ $attempt -lt $MAX_DOWNLOAD_ATTEMPTS ]; then
+                    echo "    [!] Pokus ${attempt}/${MAX_DOWNLOAD_ATTEMPTS} zlyhal, skusam znova..."
+                    sleep 2
+                fi
+            fi
+        done
+        
+        if [ "$DOWNLOAD_SUCCESS" != "true" ]; then
+            echo ""
+            echo "[!] CHYBA: Subor $NAME sa nepodarilo stiahnut po ${MAX_DOWNLOAD_ATTEMPTS} pokusoch"
+            echo "[!] Obnovujem zalohu..."
+            rm -rf "$TARGET_DIR"
+            mv "$BACKUP_DIR" "$TARGET_DIR"
+            echo "[!] Zaloha obnovena"
+            exit 1
         fi
-    elif [[ "${NAME}" == *.html ]]; then
-      cp -f "${INIT_DIR}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"
-    fi
-done <<< "$FILES_LIST"
-
-# Nastavenie opravneni / Jogok beallitasa
-chmod -R 755 "$TARGET_DIR"
+    
+        # Oprava konca riadkov / Sorvegek javitasa
+        sed -i 's/\r$//' "${INIT_DIR}/${NAME}"
+    
+        # Kontrola a oprava shebang / Shebang ellenorzes es javitas
+        if [[ "${NAME}" == *.sh ]]; then
+            chmod +x "${INIT_DIR}/${NAME}"
+            FIRST_LINE="$(head -n1 "${INIT_DIR}/${NAME}" || true)"
+            if [[ "${FIRST_LINE}" != "#!"* ]]; then
+                sed -i '1i #!/bin/bash' "${INIT_DIR}/${NAME}"
+            fi
+        elif [[ "${NAME}" == *.html ]]; then
+          cp -f "${INIT_DIR}/${NAME}" "${LOCAL_WEB_DIR}/${NAME}"
+        fi
+    done <<< "$FILES_LIST"
+    
+    # Nastavenie opravneni / Jogok beallitasa
+    chmod -R 755 "$TARGET_DIR"
+fi
 
 echo ""
 echo "=========================================="
