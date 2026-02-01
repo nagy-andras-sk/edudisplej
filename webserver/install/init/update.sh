@@ -113,10 +113,16 @@ if [ "$USE_STRUCTURE" = true ]; then
             DESTINATION=$(echo "$STRUCTURE_JSON" | jq -r ".files[$i].destination")
             PERMISSIONS=$(echo "$STRUCTURE_JSON" | jq -r ".files[$i].permissions")
         else
-            # Alternatívny parser pomocou python3
-            SOURCE=$(echo "$STRUCTURE_JSON" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['files'][$i]['source'])" 2>/dev/null || echo "")
-            DESTINATION=$(echo "$STRUCTURE_JSON" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['files'][$i]['destination'])" 2>/dev/null || echo "")
-            PERMISSIONS=$(echo "$STRUCTURE_JSON" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['files'][$i]['permissions'])" 2>/dev/null || echo "")
+            # Alternatívny parser pomocou python3 - parsovanie jedným volaním
+            read -r SOURCE DESTINATION PERMISSIONS < <(echo "$STRUCTURE_JSON" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    f = data['files'][$i]
+    print(f'{f[\"source\"]} {f[\"destination\"]} {f[\"permissions\"]}')
+except:
+    print('')
+" 2>/dev/null)
         fi
         
         [ -z "$SOURCE" ] && continue
@@ -135,7 +141,9 @@ if [ "$USE_STRUCTURE" = true ]; then
         # Stiahnutie suboru / Fajl letoltese
         MAX_DOWNLOAD_ATTEMPTS=3
         DOWNLOAD_SUCCESS=false
-        TEMP_FILE="/tmp/edudisplej_download_$$_${SOURCE}"
+        # Sanitizovanie názvu pre dočasný súbor / Sanitized file name
+        SAFE_SOURCE=$(basename "$SOURCE")
+        TEMP_FILE="/tmp/edudisplej_download_$$_${SAFE_SOURCE}"
         
         for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
             if curl -sL --max-time 60 --connect-timeout 10 \
