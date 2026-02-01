@@ -98,5 +98,35 @@
       "destination": "/opt/edudisplej/init/download.php",
       "permissions": "644"
     }
+  ],
+  "services": [
+    {
+      "source": "edudisplej-kiosk.service",
+      "name": "edudisplej-kiosk.service",
+      "enabled": true,
+      "autostart": true,
+      "description": "Kiosk display service"
+    },
+    {
+      "source": "edudisplej-sync.service",
+      "name": "edudisplej-sync.service",
+      "enabled": true,
+      "autostart": true,
+      "description": "Sync service for kiosk registration and module updates"
+    },
+    {
+      "source": "edudisplej-watchdog.service",
+      "name": "edudisplej-watchdog.service",
+      "enabled": true,
+      "autostart": true,
+      "description": "Watchdog service for monitoring kiosk health"
+    },
+    {
+      "source": "edudisplej-terminal.service",
+      "name": "edudisplej-terminal.service",
+      "enabled": false,
+      "autostart": false,
+      "description": "Terminal status display (optional)"
+    }
   ]
 }
