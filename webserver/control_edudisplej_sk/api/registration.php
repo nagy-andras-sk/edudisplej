@@ -6,6 +6,17 @@
 
 // Debug mode - set to true to see detailed errors in response
 // IMPORTANT: Set to false in production!
+// 
+// Enable debug mode (true) when:
+// - Setting up the system for the first time
+// - Troubleshooting registration issues
+// - Diagnosing "Server exception" errors
+//
+// Disable debug mode (false) when:
+// - System is stable and working correctly
+// - Running in production environment
+// - You want to avoid exposing system details
+//
 define('DEBUG_MODE', true);
 
 // Error reporting configuration
@@ -301,12 +312,20 @@ echo json_encode($response, JSON_PRETTY_PRINT);
  * Generate device ID: 4 random chars + 6 from MAC
  */
 function generateDeviceId($mac) {
-    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    $random = '';
+    // Generate 4 cryptographically secure random alphanumeric characters
+    // Excluding easily confused characters (I, O, 0, 1)
+    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    $random_chars = '';
+    $random_bytes = random_bytes(4);
     for ($i = 0; $i < 4; $i++) {
-        $random .= $chars[random_int(0, strlen($chars) - 1)];
+        $random_chars .= $chars[ord($random_bytes[$i]) % strlen($chars)];
     }
-    $mac_suffix = strtoupper(substr(str_replace(':', '', $mac), -6));
-    return $random . $mac_suffix;
+    
+    // Extract 6 characters from MAC address (remove colons and take first 6)
+    $mac_clean = str_replace([':', '-'], '', strtoupper($mac));
+    $mac_chars = substr($mac_clean, 0, 6);
+    
+    // Combine to create device ID (min 10 chars)
+    return $random_chars . $mac_chars;
 }
 ?>

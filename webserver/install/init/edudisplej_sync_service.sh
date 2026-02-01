@@ -151,13 +151,14 @@ register_and_sync() {
         
         # Extract and display debug keys
         if command -v jq >/dev/null 2>&1; then
-            # Use jq if available for nice formatting
-            echo "$response" | jq '.debug' 2>/dev/null | while IFS= read -r line; do
+            # Use jq if available for nice formatting - handles nested structures properly
+            echo "$response" | jq -r '.debug | to_entries[] | "\(.key): \(.value)"' 2>/dev/null | while IFS= read -r line; do
                 log_debug "$line"
             done
         else
-            # Fallback: extract key debug info manually
-            log_debug "$(echo "$response" | grep -o '"debug":{[^}]*' | sed 's/"debug":{//' || echo 'Debug section found but could not parse')"
+            # Fallback: log that debug section exists but needs jq for full parsing
+            log_debug "Debug information available in response (install 'jq' for formatted output)"
+            log_debug "Raw response: $response"
         fi
         
         log "=== END DEBUG ==="
