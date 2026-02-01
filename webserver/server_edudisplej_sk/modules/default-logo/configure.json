@@ -1,0 +1,38 @@
+{
+  "module_key": "default-logo",
+  "module_name": "Default Logo",
+  "version": "1.0.0",
+  "description": "Display EduDisplej logo with version number",
+  "settings": {
+    "version": {
+      "type": "text",
+      "label": "Version Number",
+      "default": "1.0.0",
+      "validation": {
+        "pattern": "^\\d+\\.\\d+\\.\\d+$",
+        "message": "Version must be in format X.Y.Z (e.g., 1.0.0)"
+      }
+    },
+    "bgGradientStart": {
+      "type": "color",
+      "label": "Background Gradient Start Color",
+      "default": "#667eea"
+    },
+    "bgGradientEnd": {
+      "type": "color",
+      "label": "Background Gradient End Color",
+      "default": "#764ba2"
+    },
+    "textColor": {
+      "type": "color",
+      "label": "Text Color",
+      "default": "#ffffff"
+    }
+  },
+  "defaults": {
+    "version": "1.0.0",
+    "bgGradientStart": "#667eea",
+    "bgGradientEnd": "#764ba2",
+    "textColor": "#ffffff"
+  }
+}

@@ -357,7 +357,9 @@ try {
         ['key' => 'clock', 'name' => 'Clock & Time', 'description' => 'Display date and time with customizable formats and colors'],
         ['key' => 'namedays', 'name' => 'Name Days', 'description' => 'Display Hungarian and Slovak name days with customizable style'],
         ['key' => 'split_clock_namedays', 'name' => 'Split: Clock + Name Days', 'description' => 'Combined module for 16:9 displays showing clock and name days together'],
-        ['key' => 'unconfigured', 'name' => 'Unconfigured Display', 'description' => 'Default screen for unconfigured kiosks']
+        ['key' => 'unconfigured', 'name' => 'Unconfigured Display', 'description' => 'Default screen for unconfigured kiosks'],
+        ['key' => 'default-logo', 'name' => 'Default Logo', 'description' => 'Display EduDisplej logo with version number'],
+        ['key' => 'dateclock', 'name' => 'Date & Clock Module', 'description' => 'Enhanced date and clock module with full customization options (analog/digital, formats, languages, sizes)']
     ];
     
     foreach ($default_modules as $module) {
