@@ -5,6 +5,12 @@
 
 set -euo pipefail
 
+# Source common functions if available
+INIT_DIR="/opt/edudisplej/init"
+if [[ -f "${INIT_DIR}/common.sh" ]]; then
+    source "${INIT_DIR}/common.sh"
+fi
+
 # Configuration
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 REGISTRATION_API="${API_BASE_URL}/api/registration.php"
@@ -25,44 +31,55 @@ DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment
 # Create directories
 mkdir -p "$CONFIG_DIR" "$LOG_DIR"
 
-# Logging functions
-log() {
-    local level="INFO"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
-}
+# Logging functions (fallback if common.sh not available)
+if ! command -v print_info &> /dev/null; then
+    log() {
+        local level="INFO"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
+    }
+    
+    log_debug() {
+        if [ "$DEBUG" = true ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" | tee -a "$LOG_FILE"
+        fi
+    }
+    
+    log_error() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" | tee -a "$LOG_FILE" >&2
+    }
+    
+    log_success() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
+    }
+else
+    # Use print_* functions from common.sh wrapped for logging
+    log() { print_info "$*" | tee -a "$LOG_FILE"; }
+    log_debug() { [ "$DEBUG" = true ] && print_info "[DEBUG] $*" | tee -a "$LOG_FILE" || true; }
+    log_error() { print_error "$*" | tee -a "$LOG_FILE" >&2; }
+    log_success() { print_success "$*" | tee -a "$LOG_FILE"; }
+fi
 
-log_debug() {
-    if [ "$DEBUG" = true ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" | tee -a "$LOG_FILE"
-    fi
-}
+# Use shared functions from common.sh if available, otherwise define fallbacks
+if ! command -v get_mac_address &> /dev/null; then
+    get_mac_address() {
+        local mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':')
+        log_debug "Detected MAC address: $mac"
+        echo "$mac"
+    }
+fi
 
-log_error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" | tee -a "$LOG_FILE" >&2
-}
+if ! command -v get_hostname &> /dev/null; then
+    get_hostname() {
+        local host=$(hostname)
+        log_debug "Detected hostname: $host"
+        echo "$host"
+    }
+fi
 
-log_success() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
-}
-
-# Get MAC address
-get_mac_address() {
-    local mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':')
-    log_debug "Detected MAC address: $mac"
-    echo "$mac"
-}
-
-# Get hostname
-get_hostname() {
-    local host=$(hostname)
-    log_debug "Detected hostname: $host"
-    echo "$host"
-}
-
-# Get hardware info
-get_hw_info() {
-    log_debug "Collecting hardware information..."
-    cat << EOF
+if ! command -v get_hw_info &> /dev/null; then
+    get_hw_info() {
+        log_debug "Collecting hardware information..."
+        cat << EOF
 {
     "hostname": "$(hostname)",
     "os": "$(lsb_release -ds 2>/dev/null || echo 'Unknown')",
@@ -73,18 +90,21 @@ get_hw_info() {
     "uptime": "$(uptime -p)"
 }
 EOF
-}
+    }
+fi
 
-# Parse JSON value (jq if available, fallback to sed)
-json_get() {
-    local json="$1"
-    local key="$2"
-    if command -v jq >/dev/null 2>&1; then
-        echo "$json" | jq -r ".$key // empty" 2>/dev/null
-    else
-        echo "$json" | tr -d '\n\r' | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
-    fi
-}
+# Parse JSON value (use shared function or fallback)
+if ! command -v json_get &> /dev/null; then
+    json_get() {
+        local json="$1"
+        local key="$2"
+        if command -v jq >/dev/null 2>&1; then
+            echo "$json" | jq -r ".$key // empty" 2>/dev/null
+        else
+            echo "$json" | tr -d '\n\r' | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+        fi
+    }
+fi
 
 # Sync hardware data (also returns sync interval and update status)
 sync_hw_data() {

@@ -18,66 +18,21 @@ else
     print_success() { echo "[SUCCESS] $1"; }
     print_error() { echo "[ERROR] $1"; }
     print_warning() { echo "[WARNING] $1"; }
+    
+    # Fallback get_mac_address if common.sh not available
+    get_mac_address() {
+        if [[ -f /sys/class/net/eth0/address ]]; then
+            cat /sys/class/net/eth0/address 2>/dev/null | tr -d ':' | tr '[:lower:]' '[:upper:]'
+        elif command -v ip >/dev/null 2>&1; then
+            ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':' | tr '[:lower:]' '[:upper:]'
+        fi
+    }
+    
+    get_mac_suffix() {
+        local mac="$1"
+        echo "${mac: -6}"
+    }
 fi
-
-# =============================================================================
-# MAC Address Functions
-# =============================================================================
-
-get_primary_mac_address() {
-    # Try to get MAC address from primary network interface
-    local mac=""
-    
-    # Method 1: Try eth0 first (wired connection)
-    if [[ -f /sys/class/net/eth0/address ]]; then
-        mac=$(cat /sys/class/net/eth0/address 2>/dev/null | tr -d ':' | tr '[:lower:]' '[:upper:]')
-        if [[ -n "$mac" && "$mac" != "000000000000" ]]; then
-            echo "$mac"
-            return 0
-        fi
-    fi
-    
-    # Method 2: Try wlan0 (wireless connection)
-    if [[ -f /sys/class/net/wlan0/address ]]; then
-        mac=$(cat /sys/class/net/wlan0/address 2>/dev/null | tr -d ':' | tr '[:lower:]' '[:upper:]')
-        if [[ -n "$mac" && "$mac" != "000000000000" ]]; then
-            echo "$mac"
-            return 0
-        fi
-    fi
-    
-    # Method 3: Find first non-loopback interface
-    for iface in /sys/class/net/*; do
-        local ifname=$(basename "$iface")
-        if [[ "$ifname" == "lo" ]]; then
-            continue
-        fi
-        if [[ -f "$iface/address" ]]; then
-            mac=$(cat "$iface/address" 2>/dev/null | tr -d ':' | tr '[:lower:]' '[:upper:]')
-            if [[ -n "$mac" && "$mac" != "000000000000" ]]; then
-                echo "$mac"
-                return 0
-            fi
-        fi
-    done
-    
-    # Method 4: Use ip command as fallback
-    if command -v ip >/dev/null 2>&1; then
-        mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':' | tr '[:lower:]' '[:upper:]')
-        if [[ -n "$mac" && "$mac" != "000000000000" ]]; then
-            echo "$mac"
-            return 0
-        fi
-    fi
-    
-    return 1
-}
-
-get_mac_suffix() {
-    local mac="$1"
-    # Get last 6 characters of MAC address (last 3 bytes)
-    echo "${mac: -6}"
-}
 
 # =============================================================================
 # Hostname Configuration
@@ -86,9 +41,9 @@ get_mac_suffix() {
 configure_hostname() {
     print_info "Configuring hostname based on MAC address..."
     
-    # Get MAC address
+    # Get MAC address using shared function
     local mac=""
-    if ! mac=$(get_primary_mac_address); then
+    if ! mac=$(get_mac_address); then
         print_error "Could not determine MAC address"
         return 1
     fi
@@ -171,7 +126,7 @@ configure_hostname() {
 
 # Always check and fix hostname if incorrect
 current_hostname=$(hostname)
-mac=$(get_primary_mac_address 2>/dev/null || echo "")
+mac=$(get_mac_address 2>/dev/null || echo "")
 
 if [ -n "$mac" ]; then
     mac_suffix=$(get_mac_suffix "$mac")
