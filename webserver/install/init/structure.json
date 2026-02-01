@@ -1,4 +1,5 @@
 {
+  "version": "1.0",
   "files": [
     {
       "source": "common.sh",
@@ -7,8 +8,15 @@
     },
     {
       "source": "update.sh",
+      "destination": "/opt/edudisplej/update.sh",
+      "permissions": "755",
+      "description": "Main update script - accessible from root"
+    },
+    {
+      "source": "update.sh",
       "destination": "/opt/edudisplej/init/update.sh",
-      "permissions": "755"
+      "permissions": "755",
+      "description": "Backup copy in init folder for compatibility"
     },
     {
       "source": "edudisplej_sync_service.sh",
@@ -19,6 +27,16 @@
       "source": "edudisplej_sync_service_enhanced.sh",
       "destination": "/opt/edudisplej/edudisplej_sync_service_enhanced.sh",
       "permissions": "755"
+    },
+    {
+      "source": "edudisplej_terminal_display.sh",
+      "destination": "/opt/edudisplej/init/edudisplej_terminal_display.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej-terminal.service",
+      "destination": "/opt/edudisplej/init/edudisplej-terminal.service",
+      "permissions": "644"
     },
     {
       "source": "edudisplej_terminal_script.sh",
@@ -73,6 +91,11 @@
     {
       "source": "clock.html",
       "destination": "/opt/edudisplej/localweb/clock.html",
+      "permissions": "644"
+    },
+    {
+      "source": "download.php",
+      "destination": "/opt/edudisplej/init/download.php",
       "permissions": "644"
     }
   ]
