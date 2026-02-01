@@ -169,8 +169,30 @@ configure_hostname() {
 # Main Execution
 # =============================================================================
 
+# Always check and fix hostname if incorrect
+current_hostname=$(hostname)
+mac=$(get_primary_mac_address 2>/dev/null || echo "")
+
+if [ -n "$mac" ]; then
+    mac_suffix=$(get_mac_suffix "$mac")
+    expected_hostname="edudisplej-${mac_suffix}"
+    
+    if [ "$current_hostname" = "$expected_hostname" ]; then
+        print_info "Hostname already configured correctly: $expected_hostname"
+        touch "$HOSTNAME_FLAG"
+        exit 0
+    fi
+fi
+
+# Check if already configured but hostname is different (network might have been down before)
+# Remove flag to allow reconfiguration
+if [ -f "$HOSTNAME_FLAG" ] && [ "$current_hostname" != "edudisplej-"* ]; then
+    print_warning "Hostname flag exists but hostname not set correctly, reconfiguring..."
+    rm -f "$HOSTNAME_FLAG"
+fi
+
 # Check if already configured
-if [[ -f "$HOSTNAME_FLAG" ]]; then
+if [ -f "$HOSTNAME_FLAG" ]; then
     print_info "Hostname already configured (flag exists)"
     exit 0
 fi

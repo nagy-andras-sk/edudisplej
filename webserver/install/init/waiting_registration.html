@@ -19,39 +19,20 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
 
         .logo {
-            position: absolute;
-            top: 30px;
-            left: 40px;
-            font-size: 48px;
+            font-size: 72px;
             font-weight: bold;
-            letter-spacing: 2px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            z-index: 10;
+            letter-spacing: 4px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+            margin-bottom: 50px;
         }
 
         .container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
             text-align: center;
-            padding: 40px;
-        }
-
-        .sad-face {
-            font-size: 180px;
-            margin-bottom: 40px;
-            animation: pulse 2s ease-in-out infinite;
-            filter: drop-shadow(0 0 20px rgba(0,0,0,0.2));
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
         }
 
         .message-box {
@@ -59,31 +40,30 @@
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 50px 60px;
-            max-width: 900px;
+            max-width: 800px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.2);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .message {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
 
         .message h1 {
-            font-size: 42px;
-            margin-bottom: 15px;
+            font-size: 32px;
+            margin-bottom: 10px;
             font-weight: 600;
         }
 
         .message p {
-            font-size: 24px;
+            font-size: 20px;
             opacity: 0.9;
-            line-height: 1.6;
         }
 
         .divider {
             height: 2px;
             background: rgba(255, 255, 255, 0.3);
-            margin: 35px 0;
+            margin: 25px 0;
             border-radius: 2px;
         }
 
@@ -124,68 +104,46 @@
         }
 
         .device-info {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 18px;
-            opacity: 0.7;
+            margin-top: 30px;
+            font-size: 24px;
+            opacity: 0.9;
             background: rgba(0,0,0,0.2);
             padding: 15px 30px;
             border-radius: 10px;
         }
 
         @media (max-width: 768px) {
-            .logo { font-size: 32px; top: 20px; left: 20px; }
-            .sad-face { font-size: 120px; }
-            .message h1 { font-size: 32px; }
-            .message p { font-size: 18px; }
-            .instructions { font-size: 16px; }
+            .logo { font-size: 48px; }
+            .message h1 { font-size: 24px; }
+            .message p { font-size: 16px; }
         }
     </style>
 </head>
 <body>
-    <div class="logo">EDUDISPLEJ</div>
-    
     <div class="container">
-        <div class="sad-face">😞</div>
+        <div class="logo">EDUDISPLEJ</div>
         
         <div class="message-box">
-            <!-- Slovak -->
+            <!-- Slovak (first) -->
             <div class="message">
-                <h1>Obrazovka ešte nie je zaregistrovaná</h1>
-                <p>Toto zariadenie čaká na priradenie k spoločnosti.</p>
+                <h1>Kijelző még nincs konfigurálva</h1>
+                <p>Toto zariadenie ešte nebolo nakonfigurované.</p>
             </div>
 
             <div class="divider"></div>
 
-            <!-- Hungarian -->
+            <!-- English (second) -->
             <div class="message">
-                <h1>Ez a kijelző még nincs regisztrálva</h1>
-                <p>Ez az eszköz várja a céghez való hozzárendelést.</p>
+                <h1>Display Not Yet Configured</h1>
+                <p>This display has not been configured yet.</p>
             </div>
 
             <div class="divider"></div>
 
-            <!-- English -->
+            <!-- Hungarian (third) -->
             <div class="message">
-                <h1>This Display Is Not Registered Yet</h1>
-                <p>This device is waiting to be assigned to a company.</p>
-            </div>
-
-            <div class="instructions">
-                <strong>Návod / Útmutató / Instructions:</strong><br>
-                1. Prihláste sa do admin panelu na <strong>control.edudisplej.sk/admin</strong><br>
-                2. Nájdite toto zariadenie v zozname<br>
-                3. Priraďte zariadenie k spoločnosti<br><br>
-                
-                1. Jelentkezz be az admin panelre: <strong>control.edudisplej.sk/admin</strong><br>
-                2. Keresd meg ezt az eszközt a listában<br>
-                3. Rendeld hozzá az eszközt egy céghez<br><br>
-                
-                1. Login to admin panel at <strong>control.edudisplej.sk/admin</strong><br>
-                2. Find this device in the list<br>
-                3. Assign the device to a company
+                <h1>A kijelző még nincs konfigurálva</h1>
+                <p>Ez a kijelző még nincs konfigurálva.</p>
             </div>
 
             <div class="spinner">
@@ -197,7 +155,7 @@
     </div>
 
     <div class="device-info" id="deviceInfo">
-        Čakám na registráciu... / Regisztrációra várok... / Waiting for registration...
+        Hostname: <span id="hostname">loading...</span>
     </div>
 
     <script>
@@ -206,16 +164,21 @@
             location.reload();
         }, 30000);
 
-        // Update device info with hostname
-        const hostname = window.location.hostname || 'localhost';
-        const deviceInfo = document.getElementById('deviceInfo');
+        // Fetch and display hostname
+        fetch('/opt/edudisplej/kiosk.conf')
+            .catch(() => {
+                // If kiosk.conf doesn't exist, get hostname from system
+                const hostname = window.location.hostname || 'edudisplej';
+                document.getElementById('hostname').textContent = hostname;
+            });
         
-        // Animate the waiting text
-        let dots = 0;
-        setInterval(function() {
-            dots = (dots + 1) % 4;
-            const dotString = '.'.repeat(dots);
-            deviceInfo.textContent = `Čakám na registráciu${dotString} / Regisztrációra várok${dotString} / Waiting for registration${dotString}`;
+        // Alternative: Try to get from a simple API call or just use a placeholder
+        // For now, we'll just show the window hostname
+        setTimeout(() => {
+            const hostname = window.location.hostname || 'loading...';
+            if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+                document.getElementById('hostname').textContent = hostname;
+            }
         }, 500);
     </script>
 </body>

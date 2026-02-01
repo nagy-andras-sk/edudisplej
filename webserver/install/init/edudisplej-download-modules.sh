@@ -315,10 +315,39 @@ $loop_json
                     this.log('Loaded ' + this.loopConfig.loop.length + ' modules');
                     this.log('Last update: ' + this.loopConfig.last_update);
                     
+                    // Start periodic check for configuration updates
+                    this.startUpdateChecker();
+                    
                     this.startLoop();
                 } catch (error) {
                     this.showError('Failed to initialize loop', error);
                 }
+            }
+            
+            startUpdateChecker() {
+                // Check for configuration updates every 30 seconds
+                setInterval(async () => {
+                    try {
+                        const response = await fetch('modules/loop.json', { cache: 'no-store' });
+                        if (!response.ok) return;
+                        
+                        const newConfig = await response.json();
+                        const newUpdate = newConfig.last_update;
+                        const currentUpdate = this.loopConfig.last_update;
+                        
+                        if (newUpdate && currentUpdate && newUpdate !== currentUpdate) {
+                            this.log('Configuration updated detected! Reloading page...');
+                            this.log('Old: ' + currentUpdate + ', New: ' + newUpdate);
+                            // Wait a moment then reload
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                        }
+                    } catch (error) {
+                        // Silently ignore errors in update check
+                        this.log('Update check failed: ' + error.message);
+                    }
+                }, 30000); // Check every 30 seconds
             }
             
             async loadLoopConfig() {

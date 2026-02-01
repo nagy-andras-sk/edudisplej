@@ -148,7 +148,16 @@ if [ ! -f "$KIOSK_CONF" ]; then
         echo "Device not registered yet."
         echo "Showing waiting screen until admin assigns this device..."
         echo ""
-        surf -F "file://${WAITING_PAGE}"
+        
+        # Create a temporary version of waiting page with hostname injected
+        HOSTNAME=$(hostname)
+        TEMP_WAITING_PAGE="/tmp/waiting_registration_with_hostname.html"
+        cp "$WAITING_PAGE" "$TEMP_WAITING_PAGE"
+        
+        # Inject hostname into the page
+        sed -i "s/loading\.\.\./$HOSTNAME/g" "$TEMP_WAITING_PAGE"
+        
+        surf -F "file://${TEMP_WAITING_PAGE}"
         exit 0
     fi
 fi
