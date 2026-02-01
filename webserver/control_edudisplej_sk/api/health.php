@@ -36,7 +36,6 @@ foreach ($required_extensions as $ext) {
 // Check 3: Database Configuration File
 $db_config_path = __DIR__ . '/../dbkonfiguracia.php';
 $health['checks']['db_config_file'] = [
-    'path' => $db_config_path,
     'exists' => file_exists($db_config_path),
     'readable' => is_readable($db_config_path),
     'status' => (file_exists($db_config_path) && is_readable($db_config_path)) ? 'ok' : 'error'
@@ -107,7 +106,6 @@ try {
 // Check 7: Write permissions (logs directory)
 $log_dir = __DIR__ . '/../../logs';
 $health['checks']['log_directory'] = [
-    'path' => $log_dir,
     'exists' => is_dir($log_dir),
     'writable' => is_writable($log_dir),
     'status' => (is_dir($log_dir) && is_writable($log_dir)) ? 'ok' : 'warning'
