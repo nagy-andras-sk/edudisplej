@@ -86,15 +86,33 @@ json_get() {
     fi
 }
 
-# Sync hardware data (also returns sync interval)
+# Sync hardware data (also returns sync interval and update status)
 sync_hw_data() {
     local mac=$(get_mac_address)
     local hostname=$(get_hostname)
     local hw_info=$(get_hw_info)
     
+    # Get last_update from local loop.json if it exists
+    local last_update=""
+    if [ -f "$LOOP_FILE" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
+        fi
+    fi
+    
+    # Build request with last_update if available
+    local request_data
+    if [ -n "$last_update" ]; then
+        request_data="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info,\"last_update\":\"$last_update\"}"
+        log_debug "Sending last_update: $last_update"
+    else
+        request_data="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info}"
+        log_debug "No local last_update found"
+    fi
+    
     response=$(curl -s -X POST "$HW_SYNC_API" \
         -H "Content-Type: application/json" \
-        -d "{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info}")
+        -d "$request_data")
     
     if echo "$response" | grep -q '"success":true'; then
         local new_interval
@@ -102,6 +120,27 @@ sync_hw_data() {
         if [ -n "$new_interval" ]; then
             SYNC_INTERVAL=$new_interval
         fi
+        
+        # Check if update is needed
+        local needs_update
+        needs_update=$(json_get "$response" "needs_update")
+        if [ "$needs_update" = "true" ]; then
+            local update_reason=$(json_get "$response" "update_reason")
+            log "⚠ Update needed: $update_reason"
+            
+            # Trigger module download
+            if [ -x "$DOWNLOAD_SCRIPT" ]; then
+                log "Downloading latest modules due to server update..."
+                if bash "$DOWNLOAD_SCRIPT"; then
+                    log_success "Modules updated successfully due to server change"
+                else
+                    log_error "Module update failed"
+                fi
+            else
+                log_error "Download script not found: $DOWNLOAD_SCRIPT"
+            fi
+        fi
+        
         return 0
     else
         log_error "HW data sync failed: $response"
@@ -110,15 +149,22 @@ sync_hw_data() {
 }
 
 # Check loop changes and update modules if needed
+# This compares local loop.json last_update with server's created_at/updated_at
 check_loop_updates() {
     local device_id="$1"
     [ -z "$device_id" ] && return 0
     
-    local local_hash=""
-    if [ -f "$DOWNLOAD_INFO" ] && command -v jq >/dev/null 2>&1; then
-        local_hash=$(jq -r '.loop_hash // empty' "$DOWNLOAD_INFO" 2>/dev/null)
+    # Get local last_update timestamp from loop.json
+    local local_last_update=""
+    if [ -f "$LOOP_FILE" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            local_last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
+        fi
     fi
     
+    log_debug "Local loop last_update: ${local_last_update:-none}"
+    
+    # Query server for loop configuration
     local response
     response=$(curl -s -X POST "$KIOSK_LOOP_API" -d "device_id=${device_id}" --max-time 30)
     if ! echo "$response" | grep -q '"success":true'; then
@@ -126,22 +172,42 @@ check_loop_updates() {
         return 1
     fi
     
-    local server_hash
-    server_hash=$(json_get "$response" "loop_hash")
+    # Get server's loop update timestamp (created_at or updated_at from kiosk_group_modules)
+    local server_updated_at
+    server_updated_at=$(json_get "$response" "loop_updated_at")
     
-    if [ -z "$local_hash" ] || [ -z "$server_hash" ] || [ "$local_hash" != "$server_hash" ]; then
-        log "Loop configuration changed - downloading latest modules..."
+    log_debug "Server loop updated_at: ${server_updated_at:-none}"
+    
+    # Compare timestamps: if no local timestamp, or server is newer, update
+    local needs_update=false
+    
+    if [ -z "$local_last_update" ]; then
+        log "No local loop found - downloading from server..."
+        needs_update=true
+    elif [ -z "$server_updated_at" ]; then
+        log_debug "Server has no update timestamp - skipping comparison"
+    else
+        # Compare timestamps (works with both datetime strings and unix timestamps)
+        if [[ "$server_updated_at" > "$local_last_update" ]]; then
+            log "Server loop is newer (server: $server_updated_at, local: $local_last_update)"
+            needs_update=true
+        else
+            log_debug "Loop configuration is up-to-date"
+        fi
+    fi
+    
+    # Download modules if update is needed
+    if [ "$needs_update" = "true" ]; then
+        log "Downloading latest loop configuration and modules..."
         if [ -x "$DOWNLOAD_SCRIPT" ]; then
             if bash "$DOWNLOAD_SCRIPT"; then
-                log_success "Modules updated successfully"
+                log_success "Loop and modules updated successfully"
             else
                 log_error "Module update failed"
             fi
         else
             log_error "Download script not found: $DOWNLOAD_SCRIPT"
         fi
-    else
-        log_debug "Loop configuration unchanged"
     fi
 }
 
@@ -302,12 +368,15 @@ EOF
             log "Sync interval updated: ${SYNC_INTERVAL}s"
         fi
         
-        # Sync modules if configured
-        if [ "$is_configured" = "true" ]; then
-            log "Device is configured - syncing modules..."
+        # Always check for loop updates if we have a device_id
+        if [ -n "$device_id" ] && [ "$device_id" != "unknown" ]; then
+            log "Checking for loop configuration changes..."
             check_loop_updates "$device_id"
-        else
-            log "Device not yet configured - waiting for admin assignment"
+        fi
+        
+        # Notify if not fully configured
+        if [ "$is_configured" = "false" ]; then
+            log "Note: Device not fully configured yet"
             log "Visit: https://control.edudisplej.sk/admin/"
         fi
         
