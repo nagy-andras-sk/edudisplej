@@ -116,7 +116,7 @@ $logout_url = '../login.php?logout=1';
                                 <tr>
                                     <td><small><?php echo $kiosk['id']; ?></small></td>
                                     <td>
-                                        <strong style="cursor: pointer; color: #1e40af;" onclick="openKioskDetail(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>')">
+                                        <strong style="cursor: pointer; color: #1a3a52;" onclick="openKioskDetail(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>')">
                                             <?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>
                                         </strong>
                                     </td>
@@ -129,7 +129,7 @@ $logout_url = '../login.php?logout=1';
                                     <td><small id="sync-time-<?php echo $kiosk['id']; ?>" data-last-seen="<?php echo htmlspecialchars($kiosk['last_seen']); ?>"></small></td>
                                     <td>
                                         <button onclick="viewKioskLoop(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A', ENT_QUOTES); ?>')" 
-                                                style="background: #667eea; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                                                style="background: #1a3a52; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;">
                                             🔄 Loop
                                         </button>
                                     </td>
@@ -245,7 +245,7 @@ $logout_url = '../login.php?logout=1';
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h2 style="margin: 0;">Kijelző Részletek: ${hostname}</h2>
                         <button onclick="document.getElementById('kiosk-detail-modal').remove()" style="
-                            background: #1e40af;
+                            background: #1a3a52;
                             color: white;
                             border: none;
                             font-size: 16px;
@@ -257,7 +257,7 @@ $logout_url = '../login.php?logout=1';
                             align-items: center;
                             justify-content: center;
                             transition: background 0.2s;
-                        " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#1e40af'">✕</button>
+                        " onmouseover="this.style.background='#0f2537'" onmouseout="this.style.background='#1a3a52'">✕</button>
                     </div>
                     
                     <div id="kiosk-detail-content" style="color: #666;">
@@ -312,7 +312,7 @@ $logout_url = '../login.php?logout=1';
                             <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
                                 <h3 style="margin-top: 0;">🎬 Modulok Loop Sorrendje</h3>
                                 <div id="modules-loop" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px;">
-                                    ${data.modules.map(m => `<div style="background: white; padding: 10px; border-radius: 3px; border-left: 4px solid #1e40af; text-align: center; font-size: 12px;">${m}</div>`).join('')}
+                                    ${data.modules.map(m => `<div style="background: white; padding: 10px; border-radius: 3px; border-left: 4px solid #1a3a52; text-align: center; font-size: 12px;">${m}</div>`).join('')}
                                 </div>
                             </div>
                             ` : ''}
@@ -343,7 +343,7 @@ $logout_url = '../login.php?logout=1';
                             html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
                             loops.forEach((loop, index) => {
                                 html += `<div style="
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    background: linear-gradient(135deg, #0f2537 0%, #1a4d2e 100%);
                                     color: white;
                                     padding: 15px;
                                     border-radius: 8px;
@@ -429,7 +429,7 @@ $logout_url = '../login.php?logout=1';
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h2 style="margin: 0;">${title}</h2>
                         <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
-                            background: #1e40af;
+                            background: #1a3a52;
                             color: white;
                             border: none;
                             font-size: 16px;
@@ -441,7 +441,7 @@ $logout_url = '../login.php?logout=1';
                             align-items: center;
                             justify-content: center;
                             transition: background 0.2s;
-                        " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#1e40af'">✕</button>
+                        " onmouseover="this.style.background='#0f2537'" onmouseout="this.style.background='#1a3a52'">✕</button>
                     </div>
                     <div>${content}</div>
                 </div>
