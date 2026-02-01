@@ -31,6 +31,32 @@ sudo /opt/edudisplej/update.sh
 - ⏱️ Scheduled content (e.g., lunch menu only at noon)
 - 📊 Real-time monitoring
 - 🔄 Automatic updates
+- 🔑 Module license management
+- 🏢 Multi-company support
+- ⚙️ Per-kiosk module configuration
+
+## 🆕 New Features
+
+### Module System
+- **Custom Modules**: Create your own display modules
+- **License Management**: Control module access per company
+- **Configuration Interface**: Easy-to-use dashboard for module settings
+- **Module Rotation**: Automatic rotation between configured modules
+
+See [MODULES.md](MODULES.md) for detailed documentation on the module system.
+
+### Admin Enhancements
+- **Geolocation**: Automatic location detection from IP address
+- **Search & Filter**: Live search across all kiosks
+- **Sortable Tables**: Sort by company, status, location
+- **Offline Alerts**: Highlight kiosks offline > 10 minutes
+- **Quick Assignment**: Assign kiosks to companies with one click
+
+### Company Dashboard
+- **Self-Service**: Companies can configure their own kiosks
+- **Module Configuration**: Enable/disable and customize modules
+- **License Tracking**: View available and used licenses
+- **Real-Time Status**: Monitor kiosk status and connectivity
 
 ## 🛠️ System Requirements
 
@@ -41,6 +67,18 @@ sudo /opt/edudisplej/update.sh
 ## 📖 Management
 
 Visit the control panel: **https://control.edudisplej.sk/admin/**
+
+### For Administrators
+- Manage companies and users
+- Assign module licenses
+- Monitor all kiosks
+- View system logs
+
+### For Companies
+Visit: **https://control.edudisplej.sk/dashboard/**
+- Configure your kiosks
+- Customize module settings
+- Monitor your displays
 
 ## 🆘 Support
 

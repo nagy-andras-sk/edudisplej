@@ -1,0 +1,105 @@
+{
+  "module_key": "dateclock",
+  "module_name": "Date & Clock Module",
+  "version": "1.0.0",
+  "description": "Enhanced date and clock module with full customization options",
+  "settings": {
+    "clockType": {
+      "type": "select",
+      "label": "Clock Type",
+      "options": [
+        {"value": "digital", "label": "Digital"},
+        {"value": "analog", "label": "Analog"}
+      ],
+      "default": "digital"
+    },
+    "clockSize": {
+      "type": "select",
+      "label": "Clock Size",
+      "options": [
+        {"value": "small", "label": "Small"},
+        {"value": "medium", "label": "Medium"},
+        {"value": "large", "label": "Large"}
+      ],
+      "default": "medium"
+    },
+    "dateSize": {
+      "type": "select",
+      "label": "Date Size",
+      "options": [
+        {"value": "small", "label": "Small"},
+        {"value": "medium", "label": "Medium"},
+        {"value": "large", "label": "Large"}
+      ],
+      "default": "medium"
+    },
+    "showDate": {
+      "type": "boolean",
+      "label": "Show Date",
+      "default": true
+    },
+    "showDayName": {
+      "type": "boolean",
+      "label": "Show Day Name",
+      "default": true
+    },
+    "datePosition": {
+      "type": "select",
+      "label": "Date Position",
+      "options": [
+        {"value": "above", "label": "Above Clock"},
+        {"value": "below", "label": "Below Clock"}
+      ],
+      "default": "above"
+    },
+    "dateFormat": {
+      "type": "select",
+      "label": "Date Format",
+      "options": [
+        {"value": "yyyy-mm-dd", "label": "YYYY-MM-DD"},
+        {"value": "dd-mm-yyyy", "label": "DD-MM-YYYY"},
+        {"value": "mm-dd-yyyy", "label": "MM-DD-YYYY"},
+        {"value": "dd.mm.yyyy", "label": "DD.MM.YYYY"}
+      ],
+      "default": "yyyy-mm-dd"
+    },
+    "language": {
+      "type": "select",
+      "label": "Language",
+      "options": [
+        {"value": "en", "label": "English"},
+        {"value": "hu", "label": "Hungarian (Magyar)"},
+        {"value": "sk", "label": "Slovak (Slovenčina)"}
+      ],
+      "default": "en"
+    },
+    "bgGradientStart": {
+      "type": "color",
+      "label": "Background Gradient Start Color",
+      "default": "#667eea"
+    },
+    "bgGradientEnd": {
+      "type": "color",
+      "label": "Background Gradient End Color",
+      "default": "#764ba2"
+    },
+    "textColor": {
+      "type": "color",
+      "label": "Text Color",
+      "default": "#ffffff"
+    }
+  },
+  "defaults": {
+    "clockType": "digital",
+    "clockSize": "medium",
+    "dateSize": "medium",
+    "showDate": true,
+    "showDayName": true,
+    "datePosition": "above",
+    "dateFormat": "yyyy-mm-dd",
+    "language": "en",
+    "bgGradientStart": "#667eea",
+    "bgGradientEnd": "#764ba2",
+    "textColor": "#ffffff"
+  }
+}
