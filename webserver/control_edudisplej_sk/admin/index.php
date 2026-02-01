@@ -190,6 +190,7 @@ if ($is_logged_in) {
             <div class="user-info">
                 <a href="users.php">👥 Users</a>
                 <a href="companies.php">🏢 Companies</a>
+                <a href="module_licenses.php">🔑 Modules</a>
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
                 <a href="?logout=1">Logout</a>
             </div>
