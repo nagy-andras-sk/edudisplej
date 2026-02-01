@@ -244,7 +244,7 @@ try {
         $device_id = generateDeviceId($mac);
         add_debug('generated_device_id', $device_id);
         
-        $insert_stmt = $conn->prepare("INSERT INTO kiosks (mac, device_id, hostname, hw_info, public_ip, status, is_configured, last_seen) VALUES (?, ?, ?, ?, ?, 'unconfigured', 0, NOW())");
+        $insert_stmt = $conn->prepare("INSERT INTO kiosks (mac, device_id, hostname, hw_info, public_ip, status, is_configured, last_seen) VALUES (?, ?, ?, ?, ?, ?, 0, NOW())");
         
         if (!$insert_stmt) {
             $response['message'] = 'Insert query preparation failed: ' . $conn->error;
@@ -253,19 +253,37 @@ try {
             exit;
         }
         
-        $insert_stmt->bind_param("sssss", $mac, $device_id, $hostname, $hw_info, $public_ip);
+        $status_value = 'unconfigured';
+        $insert_stmt->bind_param("ssssss", $mac, $device_id, $hostname, $hw_info, $public_ip, $status_value);
         
         if (!$insert_stmt->execute()) {
-            $response['message'] = 'Insert execution failed: ' . $insert_stmt->error;
-            add_debug('insert_execute_error', $insert_stmt->error);
-            
-            // Check for duplicate entry error
-            if ($insert_stmt->errno === 1062) {
-                add_debug('duplicate_entry', 'MAC address already exists (race condition?)');
+            $is_status_truncated = (
+                $insert_stmt->errno === 1265 ||
+                strpos($insert_stmt->error, "Data truncated for column 'status'") !== false
+            );
+
+            if ($is_status_truncated) {
+                add_debug('status_fallback', 'Status value truncated, retrying with offline');
+                $status_value = 'offline';
+
+                if (!$insert_stmt->execute()) {
+                    $response['message'] = 'Insert execution failed after fallback: ' . $insert_stmt->error;
+                    add_debug('insert_execute_error', $insert_stmt->error);
+                    echo json_encode($response, JSON_PRETTY_PRINT);
+                    exit;
+                }
+            } else {
+                $response['message'] = 'Insert execution failed: ' . $insert_stmt->error;
+                add_debug('insert_execute_error', $insert_stmt->error);
+
+                // Check for duplicate entry error
+                if ($insert_stmt->errno === 1062) {
+                    add_debug('duplicate_entry', 'MAC address already exists (race condition?)');
+                }
+
+                echo json_encode($response, JSON_PRETTY_PRINT);
+                exit;
             }
-            
-            echo json_encode($response, JSON_PRETTY_PRINT);
-            exit;
         }
         
         $kiosk_id = $conn->insert_id;

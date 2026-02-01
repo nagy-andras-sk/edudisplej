@@ -222,7 +222,7 @@ try {
             $result = $conn->query("DESCRIBE $table_name");
             $existing_columns = [];
             while ($row = $result->fetch_assoc()) {
-                $existing_columns[$row['Field']] = true;
+                $existing_columns[$row['Field']] = $row;
             }
             
             // Add missing columns
@@ -235,6 +235,24 @@ try {
                     } else {
                         logError("Failed to add column '$col_name' to table '$table_name': " . $conn->error);
                     }
+                }
+            }
+
+            // Fix kiosks.status column if type/enum values are outdated
+            if ($table_name === 'kiosks' && isset($existing_columns['status'])) {
+                $current_type = strtolower($existing_columns['status']['Type'] ?? '');
+                $expected_type = strtolower($table_def['columns']['status']);
+
+                if ($current_type !== '' && strpos($current_type, "enum('online','offline','pending','unconfigured')") === false) {
+                    $sql = "ALTER TABLE $table_name MODIFY COLUMN status " . $table_def['columns']['status'];
+                    logResult("Executing SQL: $sql", 'info');
+                    if ($conn->query($sql)) {
+                        logResult("Updated column 'status' in table '$table_name' to include 'unconfigured'", 'success');
+                    } else {
+                        logError("Failed to update column 'status' in table '$table_name': " . $conn->error);
+                    }
+                } else {
+                    logResult("Column 'status' in table '$table_name' already supports expected enum values", 'info');
                 }
             }
         } else {

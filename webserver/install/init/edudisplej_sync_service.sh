@@ -164,12 +164,31 @@ register_and_sync() {
         log "=== END DEBUG ==="
     fi
     
-    if echo "$response" | grep -q '"success":true'; then
-        # Extract fields
-        kiosk_id=$(echo "$response" | grep -o '"kiosk_id":[0-9]*' | cut -d: -f2 || echo "0")
-        device_id=$(echo "$response" | grep -o '"device_id":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-        is_configured=$(echo "$response" | grep -o '"is_configured":[a-z]*' | cut -d: -f2 || echo "false")
-        company_assigned=$(echo "$response" | grep -o '"company_assigned":[a-z]*' | cut -d: -f2 || echo "false")
+    if command -v jq >/dev/null 2>&1; then
+        success=$(echo "$response" | jq -r '.success // false' 2>/dev/null || echo "false")
+        kiosk_id=$(echo "$response" | jq -r '.kiosk_id // 0' 2>/dev/null || echo "0")
+        device_id=$(echo "$response" | jq -r '.device_id // "unknown"' 2>/dev/null || echo "unknown")
+        is_configured=$(echo "$response" | jq -r '.is_configured // false' 2>/dev/null || echo "false")
+        company_assigned=$(echo "$response" | jq -r '.company_assigned // false' 2>/dev/null || echo "false")
+        error_msg=$(echo "$response" | jq -r '.message // "Unknown error"' 2>/dev/null || echo "Unknown error")
+    else
+        compact_response=$(echo "$response" | tr -d '\n\r')
+        success=$(echo "$compact_response" | sed -n 's/.*"success"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -1)
+        [ -z "$success" ] && success="false"
+        kiosk_id=$(echo "$compact_response" | sed -n 's/.*"kiosk_id"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -1)
+        [ -z "$kiosk_id" ] && kiosk_id="0"
+        device_id=$(echo "$compact_response" | sed -n 's/.*"device_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+        [ -z "$device_id" ] && device_id="unknown"
+        is_configured=$(echo "$compact_response" | sed -n 's/.*"is_configured"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -1)
+        [ -z "$is_configured" ] && is_configured="false"
+        company_assigned=$(echo "$compact_response" | sed -n 's/.*"company_assigned"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -1)
+        [ -z "$company_assigned" ] && company_assigned="false"
+        error_msg=$(echo "$compact_response" | sed -n 's/.*"message"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+        [ -z "$error_msg" ] && error_msg="Unknown error"
+    fi
+
+    if [ "$success" = "true" ]; then
+        # Extract fields already parsed above
         
         log_success "✓ Sync successful!"
         log "  Kiosk ID: $kiosk_id"
@@ -191,9 +210,6 @@ register_and_sync() {
         
         return 0
     else
-        # Extract error message
-        error_msg=$(echo "$response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4 || echo "Unknown error")
-        
         log_error "✗ Sync failed: $error_msg"
         log_error "Full response: $response"
         
