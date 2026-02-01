@@ -262,23 +262,185 @@ echo "surf" > "${TARGET_DIR}/.kiosk_mode"
 echo "$CONSOLE_USER" > "${TARGET_DIR}/.console_user"
 echo "$USER_HOME" > "${TARGET_DIR}/.user_home"
 
-# Instalacia systemd sluzby - Install systemd service
-echo "[*] Instalacia systemd sluzby - Installing systemd service..."
+# ============================================================================
+# SERVICE INSTALLATION / SZOLGALTATASOK TELEPITESE
+# ============================================================================
 
-if [ -f "${INIT_DIR}/edudisplej-kiosk.service" ]; then
-    sed -e "s/User=edudisplej/User=$CONSOLE_USER/g" \
-        -e "s/Group=edudisplej/Group=$CONSOLE_USER/g" \
-        -e "s|WorkingDirectory=/home/edudisplej|WorkingDirectory=$USER_HOME|g" \
-        -e "s|Environment=HOME=/home/edudisplej|Environment=HOME=$USER_HOME|g" \
-        -e "s/Environment=USER=edudisplej/Environment=USER=$CONSOLE_USER/g" \
-        "${INIT_DIR}/edudisplej-kiosk.service" > "$SERVICE_FILE"
-    chmod 644 "$SERVICE_FILE"
+install_services_from_structure() {
+    echo ""
+    echo "=========================================="
+    echo "Service fajlok telepitese / Installing services"
+    echo "=========================================="
+    echo ""
     
-    if [ -f "${INIT_DIR}/kiosk-start.sh" ]; then
-        chmod +x "${INIT_DIR}/kiosk-start.sh"
+    # Try to download structure.json
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "[!] VAROVANIE: python3 nie je dostupny, pouzivam staru metodu"
+        return 1
     fi
-else
-    echo "[!] CHYBA - ERROR: Service subor nenajdeny - Service file not found"
+    
+    echo "[*] Sťahujem structure.json / Downloading structure.json..."
+    STRUCTURE_JSON=""
+    if curl -sf --max-time 10 --connect-timeout 5 "${INIT_BASE}/download.php?getstructure" >/dev/null 2>&1; then
+        STRUCTURE_JSON="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getstructure" 2>/dev/null | tr -d '\r')"
+    fi
+    
+    if [ -z "$STRUCTURE_JSON" ]; then
+        echo "[!] Nemozem stiahnut structure.json, pouzivam staru metodu"
+        return 1
+    fi
+    
+    # Extract services using Python
+    SERVICES_JSON=$(echo "$STRUCTURE_JSON" | python3 -c "
+import json
+import sys
+try:
+    data = json.load(sys.stdin)
+    if 'services' in data:
+        for svc in data['services']:
+            print(f\"{svc['source']}|{svc['name']}|{svc.get('enabled', False)}|{svc.get('autostart', False)}|{svc.get('description', '')}\")
+except Exception as e:
+    print(f'ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+")
+    
+    if [ $? -ne 0 ]; then
+        echo "[!] Chyba pri parsovani services z structure.json"
+        return 1
+    fi
+    
+    if [ -z "$SERVICES_JSON" ]; then
+        echo "[*] Ziadne services na instalaciu"
+        return 0
+    fi
+    
+    # Install each service
+    SERVICE_COUNT=0
+    SERVICE_TOTAL=$(echo "$SERVICES_JSON" | wc -l)
+    
+    while IFS='|' read -r source name enabled autostart description; do
+        SERVICE_COUNT=$((SERVICE_COUNT + 1))
+        
+        echo "[$SERVICE_COUNT/$SERVICE_TOTAL] $name"
+        echo "  Popis / Description: $description"
+        
+        # Copy service file from init/ to systemd directory
+        SOURCE_PATH="/opt/edudisplej/init/$source"
+        DEST_PATH="/etc/systemd/system/$name"
+        
+        if [ ! -f "$SOURCE_PATH" ]; then
+            echo "  [!] CHYBA: Service subor nenajdeny: $SOURCE_PATH"
+            continue
+        fi
+        
+        # For kiosk service, apply user substitution
+        if [ "$name" = "edudisplej-kiosk.service" ]; then
+            sed -e "s/User=edudisplej/User=$CONSOLE_USER/g" \
+                -e "s/Group=edudisplej/Group=$CONSOLE_USER/g" \
+                -e "s|WorkingDirectory=/home/edudisplej|WorkingDirectory=$USER_HOME|g" \
+                -e "s|Environment=HOME=/home/edudisplej|Environment=HOME=$USER_HOME|g" \
+                -e "s/Environment=USER=edudisplej/Environment=USER=$CONSOLE_USER/g" \
+                "$SOURCE_PATH" > "$DEST_PATH"
+            chmod 644 "$DEST_PATH"
+            echo "  [✓] Skopirovany s konfiguraciou pouzivatela: $DEST_PATH"
+        else
+            # Copy service file as-is
+            if cp "$SOURCE_PATH" "$DEST_PATH" 2>/dev/null; then
+                chmod 644 "$DEST_PATH"
+                echo "  [✓] Skopirovany do: $DEST_PATH"
+            else
+                echo "  [!] CHYBA: Nepodarilo sa skopirovat service file"
+                continue
+            fi
+        fi
+        
+        # Reload systemd
+        if systemctl daemon-reload 2>/dev/null; then
+            echo "  [✓] systemd daemon-reload"
+        else
+            echo "  [!] VAROVANIE: daemon-reload zlyhal"
+        fi
+        
+        # Verify service exists
+        if systemctl list-unit-files | grep -q "^$name"; then
+            echo "  [✓] Service existuje v systemd"
+        else
+            echo "  [!] CHYBA: Service nebol najdeny v systemd"
+            continue
+        fi
+        
+        # Enable service if required
+        if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
+            if systemctl enable "$name" 2>/dev/null; then
+                echo "  [✓] Service enabled (automaticky start pri boote)"
+            else
+                echo "  [!] VAROVANIE: enable zlyhal"
+            fi
+        else
+            echo "  [*] Service nie je enabled (manualne ovladanie)"
+        fi
+        
+        # Start service if required (but not kiosk service, it will start on reboot)
+        if [ "$autostart" = "True" ] || [ "$autostart" = "true" ]; then
+            if [ "$name" != "edudisplej-kiosk.service" ]; then
+                # Stop first if already running
+                systemctl stop "$name" 2>/dev/null || true
+                sleep 1
+                
+                if systemctl start "$name" 2>/dev/null; then
+                    echo "  [✓] Service spusteny"
+                    
+                    # Wait a moment and check status
+                    sleep 2
+                    if systemctl is-active --quiet "$name"; then
+                        echo "  [✓] Service bezi aktivne"
+                    else
+                        echo "  [!] VAROVANIE: Service nie je aktivny"
+                        echo "  [!] Skontrolujte logy: journalctl -u $name -n 20"
+                    fi
+                else
+                    echo "  [!] CHYBA: Nepodarilo sa spustit service"
+                    echo "  [!] Skontrolujte logy: journalctl -u $name -n 20"
+                fi
+            else
+                echo "  [*] Service sa spusti po restarte / Will start after reboot"
+            fi
+        else
+            echo "  [*] Service nie je spusteny (autostart vypnuty)"
+        fi
+        
+        echo ""
+        
+    done <<< "$SERVICES_JSON"
+    
+    echo "[✓] Service instalacia dokoncena"
+    echo ""
+    return 0
+}
+
+# Try to install services from structure.json
+if ! install_services_from_structure; then
+    # Fallback to old method if structure.json is not available
+    echo "[*] Pouzivam staru metodu instalacie services / Using old method..."
+    
+    # Instalacia systemd sluzby - Install systemd service
+    echo "[*] Instalacia systemd sluzby - Installing systemd service..."
+    
+    if [ -f "${INIT_DIR}/edudisplej-kiosk.service" ]; then
+        sed -e "s/User=edudisplej/User=$CONSOLE_USER/g" \
+            -e "s/Group=edudisplej/Group=$CONSOLE_USER/g" \
+            -e "s|WorkingDirectory=/home/edudisplej|WorkingDirectory=$USER_HOME|g" \
+            -e "s|Environment=HOME=/home/edudisplej|Environment=HOME=$USER_HOME|g" \
+            -e "s/Environment=USER=edudisplej/Environment=USER=$CONSOLE_USER/g" \
+            "${INIT_DIR}/edudisplej-kiosk.service" > "$SERVICE_FILE"
+        chmod 644 "$SERVICE_FILE"
+        
+        if [ -f "${INIT_DIR}/kiosk-start.sh" ]; then
+            chmod +x "${INIT_DIR}/kiosk-start.sh"
+        fi
+    else
+        echo "[!] CHYBA - ERROR: Service subor nenajdeny - Service file not found"
+    fi
 fi
 
 # Sudo konfiguracia - Sudo configuration
@@ -291,71 +453,6 @@ chmod 0440 /etc/sudoers.d/edudisplej
 
 # Deaktivacia getty@tty1 - Disable getty
 systemctl disable getty@tty1.service 2>/dev/null || true
-
-# Aktivacia sluzby - Enable service
-if [ -f "$SERVICE_FILE" ]; then
-    systemctl daemon-reload
-    systemctl enable edudisplej-kiosk.service 2>/dev/null || true
-fi
-
-# Watchdog sluzba - Watchdog service
-echo "[*] Instalacia watchdog - Installing watchdog..."
-if [ -f "${INIT_DIR}/edudisplej-watchdog.service" ]; then
-    cp "${INIT_DIR}/edudisplej-watchdog.service" /etc/systemd/system/
-    chmod 644 /etc/systemd/system/edudisplej-watchdog.service
-    
-    if [ -f "${INIT_DIR}/edudisplej-watchdog.sh" ]; then
-        chmod +x "${INIT_DIR}/edudisplej-watchdog.sh"
-    fi
-    
-    systemctl daemon-reload
-    systemctl enable edudisplej-watchdog.service 2>/dev/null || true
-fi
-
-# Sync Service installation / Sync Szolgaltatas telepitese
-echo "[*] Telepítem Sync Service-t / Installing Sync Service..."
-
-# Remove old api-client service if exists / Regi api-client szolgaltatas eltavolitasa
-if [ -f "/etc/systemd/system/edudisplej-api-client.service" ]; then
-    echo "[*] Odstraňujem starú službu api-client / Removing old api-client service..."
-    systemctl stop edudisplej-api-client.service 2>/dev/null || true
-    systemctl disable edudisplej-api-client.service 2>/dev/null || true
-    rm -f /etc/systemd/system/edudisplej-api-client.service
-    systemctl daemon-reload
-fi
-
-if [ -f "${INIT_DIR}/edudisplej-sync.service" ]; then
-    cp "${INIT_DIR}/edudisplej-sync.service" /etc/systemd/system/
-    chmod 644 /etc/systemd/system/edudisplej-sync.service
-    
-    if [ -f "${TARGET_DIR}/edudisplej_sync_service.sh" ]; then
-        chmod +x "${TARGET_DIR}/edudisplej_sync_service.sh"
-    fi
-    
-    systemctl daemon-reload
-    systemctl enable edudisplej-sync.service 2>/dev/null || true
-    systemctl start edudisplej-sync.service 2>/dev/null || true
-    
-    echo "[✓] Sync Service aktivovaný / Sync Service enabled"
-else
-    echo "[!] VAROVANIE - WARNING: Sync service file not found"
-fi
-
-# Terminal display service installation / Terminal UI szolgaltatas telepitese
-echo "[*] Instalacia Terminal Display / Installing Terminal Display..."
-if [ -f "${INIT_DIR}/edudisplej-terminal.service" ]; then
-    cp "${INIT_DIR}/edudisplej-terminal.service" /etc/systemd/system/
-    chmod 644 /etc/systemd/system/edudisplej-terminal.service
-    
-    if [ -f "${INIT_DIR}/edudisplej_terminal_display.sh" ]; then
-        chmod +x "${INIT_DIR}/edudisplej_terminal_display.sh"
-    fi
-    
-    systemctl daemon-reload
-    systemctl enable edudisplej-terminal.service 2>/dev/null || true
-    
-    echo "[✓] Terminal Display aktivovaný / Terminal Display enabled"
-fi
 
 echo ""
 echo "=========================================="

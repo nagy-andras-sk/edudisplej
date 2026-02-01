@@ -303,6 +303,143 @@ else
     chmod -R 755 "$TARGET_DIR"
 fi
 
+# ============================================================================
+# SERVICE INSTALLATION / SZOLGALTATASOK TELEPITESE
+# ============================================================================
+
+install_services() {
+    echo ""
+    echo "=========================================="
+    echo "Service fajlok telepitese / Installing services"
+    echo "=========================================="
+    echo ""
+    
+    # Check if structure.json has services section
+    if [ "$USE_STRUCTURE" != true ] || [ -z "$STRUCTURE_JSON" ]; then
+        echo "[*] Struktura JSON nie je dostupna, preskakujem service instalaciu"
+        return 0
+    fi
+    
+    # Parse services from structure.json
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "[!] VAROVANIE: python3 nie je dostupny, preskakujem service instalaciu"
+        return 0
+    fi
+    
+    # Extract services using Python
+    SERVICES_JSON=$(echo "$STRUCTURE_JSON" | python3 -c "
+import json
+import sys
+try:
+    data = json.load(sys.stdin)
+    if 'services' in data:
+        for svc in data['services']:
+            print(f\"{svc['source']}|{svc['name']}|{svc.get('enabled', False)}|{svc.get('autostart', False)}|{svc.get('description', '')}\")
+except Exception as e:
+    print(f'ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+")
+    
+    if [ $? -ne 0 ]; then
+        echo "[!] Chyba pri parsovani services z structure.json"
+        return 1
+    fi
+    
+    if [ -z "$SERVICES_JSON" ]; then
+        echo "[*] Ziadne services na instalaciu"
+        return 0
+    fi
+    
+    # Install each service
+    SERVICE_COUNT=0
+    SERVICE_TOTAL=$(echo "$SERVICES_JSON" | wc -l)
+    
+    while IFS='|' read -r source name enabled autostart description; do
+        SERVICE_COUNT=$((SERVICE_COUNT + 1))
+        
+        echo "[$SERVICE_COUNT/$SERVICE_TOTAL] $name"
+        echo "  Popis / Description: $description"
+        
+        # Copy service file from init/ to systemd directory
+        SOURCE_PATH="/opt/edudisplej/init/$source"
+        DEST_PATH="/etc/systemd/system/$name"
+        
+        if [ ! -f "$SOURCE_PATH" ]; then
+            echo "  [!] CHYBA: Service subor nenajdeny: $SOURCE_PATH"
+            continue
+        fi
+        
+        # Copy service file
+        if cp "$SOURCE_PATH" "$DEST_PATH" 2>/dev/null; then
+            chmod 644 "$DEST_PATH"
+            echo "  [✓] Skopirovany do: $DEST_PATH"
+        else
+            echo "  [!] CHYBA: Nepodarilo sa skopirovat service file"
+            continue
+        fi
+        
+        # Reload systemd
+        if systemctl daemon-reload 2>/dev/null; then
+            echo "  [✓] systemd daemon-reload"
+        else
+            echo "  [!] VAROVANIE: daemon-reload zlyhal"
+        fi
+        
+        # Verify service exists
+        if systemctl list-unit-files | grep -q "^$name"; then
+            echo "  [✓] Service existuje v systemd"
+        else
+            echo "  [!] CHYBA: Service nebol najdeny v systemd"
+            continue
+        fi
+        
+        # Enable service if required
+        if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
+            if systemctl enable "$name" 2>/dev/null; then
+                echo "  [✓] Service enabled (automaticky start pri boote)"
+            else
+                echo "  [!] VAROVANIE: enable zlyhal"
+            fi
+        else
+            echo "  [*] Service nie je enabled (manualne ovladanie)"
+        fi
+        
+        # Start service if required
+        if [ "$autostart" = "True" ] || [ "$autostart" = "true" ]; then
+            # Stop first if already running
+            systemctl stop "$name" 2>/dev/null || true
+            sleep 1
+            
+            if systemctl start "$name" 2>/dev/null; then
+                echo "  [✓] Service spusteny"
+                
+                # Wait a moment and check status
+                sleep 2
+                if systemctl is-active --quiet "$name"; then
+                    echo "  [✓] Service bezi aktivne"
+                else
+                    echo "  [!] VAROVANIE: Service nie je aktivny"
+                    echo "  [!] Skontrolujte logy: journalctl -u $name -n 20"
+                fi
+            else
+                echo "  [!] CHYBA: Nepodarilo sa spustit service"
+                echo "  [!] Skontrolujte logy: journalctl -u $name -n 20"
+            fi
+        else
+            echo "  [*] Service nie je spusteny (autostart vypnuty)"
+        fi
+        
+        echo ""
+        
+    done <<< "$SERVICES_JSON"
+    
+    echo "[✓] Service instalacia dokoncena"
+    echo ""
+}
+
+# After file installation, install services
+install_services
+
 echo ""
 echo "=========================================="
 echo "[✓] Aktualizacia dokoncena / Frissites kesz!"
