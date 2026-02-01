@@ -52,11 +52,11 @@ if ! command -v print_info &> /dev/null; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
     }
 else
-    # Use print_* functions from common.sh wrapped for logging
-    log() { print_info "$*" | tee -a "$LOG_FILE"; }
-    log_debug() { [ "$DEBUG" = true ] && print_info "[DEBUG] $*" | tee -a "$LOG_FILE" || true; }
-    log_error() { print_error "$*" | tee -a "$LOG_FILE" >&2; }
-    log_success() { print_success "$*" | tee -a "$LOG_FILE"; }
+    # Use print_* functions from common.sh
+    log() { print_info "$*" >> "$LOG_FILE"; }
+    log_debug() { [ "$DEBUG" = true ] && print_info "[DEBUG] $*" >> "$LOG_FILE" || true; }
+    log_error() { print_error "$*" >> "$LOG_FILE"; }
+    log_success() { print_success "$*" >> "$LOG_FILE"; }
 fi
 
 # Use shared functions from common.sh if available, otherwise define fallbacks

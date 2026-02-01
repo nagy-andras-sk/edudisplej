@@ -336,7 +336,7 @@ $loop_json
                         const currentUpdate = this.loopConfig.last_update;
                         
                         if (newUpdate && currentUpdate && newUpdate !== currentUpdate) {
-                            this.log('Configuration updated detected! Reloading page...');
+                            this.log('Configuration update detected! Reloading page...');
                             this.log('Old: ' + currentUpdate + ', New: ' + newUpdate);
                             // Wait a moment then reload
                             setTimeout(() => {

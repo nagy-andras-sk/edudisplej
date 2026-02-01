@@ -126,7 +126,7 @@
         <div class="message-box">
             <!-- Slovak (first) -->
             <div class="message">
-                <h1>Kijelző még nincs konfigurálva</h1>
+                <h1>Kijelző ešte nie je nakonfigurovaný</h1>
                 <p>Toto zariadenie ešte nebolo nakonfigurované.</p>
             </div>
 
@@ -143,7 +143,7 @@
             <!-- Hungarian (third) -->
             <div class="message">
                 <h1>A kijelző még nincs konfigurálva</h1>
-                <p>Ez a kijelző még nincs konfigurálva.</p>
+                <p>Ez a kijelző még nincs beállítva.</p>
             </div>
 
             <div class="spinner">
@@ -164,22 +164,8 @@
             location.reload();
         }, 30000);
 
-        // Fetch and display hostname
-        fetch('/opt/edudisplej/kiosk.conf')
-            .catch(() => {
-                // If kiosk.conf doesn't exist, get hostname from system
-                const hostname = window.location.hostname || 'edudisplej';
-                document.getElementById('hostname').textContent = hostname;
-            });
-        
-        // Alternative: Try to get from a simple API call or just use a placeholder
-        // For now, we'll just show the window hostname
-        setTimeout(() => {
-            const hostname = window.location.hostname || 'loading...';
-            if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-                document.getElementById('hostname').textContent = hostname;
-            }
-        }, 500);
+        // Hostname will be injected by the server-side script
+        // Nothing to do here - the hostname is already in the HTML
     </script>
 </body>
 </html>

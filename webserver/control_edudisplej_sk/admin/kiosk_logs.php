@@ -21,7 +21,7 @@ $conn = getDbConnection();
 // Get kiosk info
 $kiosk = null;
 if ($kiosk_id > 0) {
-    $stmt = $conn->prepare("SELECT k.*, c.name as company_name FROM kiosks k LEFT JOIN companies c ON k.company_id = c.id WHERE k.id = ?");
+    $stmt = $conn->prepare("SELECT k.id, k.device_id, k.hostname, k.mac, c.name as company_name FROM kiosks k LEFT JOIN companies c ON k.company_id = c.id WHERE k.id = ?");
     $stmt->bind_param("i", $kiosk_id);
     $stmt->execute();
     $result = $stmt->get_result();

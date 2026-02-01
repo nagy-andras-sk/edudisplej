@@ -141,7 +141,7 @@ fi
 
 # Check if already configured but hostname is different (network might have been down before)
 # Remove flag to allow reconfiguration
-if [ -f "$HOSTNAME_FLAG" ] && [ "$current_hostname" != "edudisplej-"* ]; then
+if [ -f "$HOSTNAME_FLAG" ] && [[ "$current_hostname" != "edudisplej-"* ]]; then
     print_warning "Hostname flag exists but hostname not set correctly, reconfiguring..."
     rm -f "$HOSTNAME_FLAG"
 fi

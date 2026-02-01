@@ -87,8 +87,8 @@ try {
         }
     }
     
-    // Clean up old logs (keep only last 30 days)
-    $cleanup_sql = "DELETE FROM kiosk_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)";
+    // Clean up old logs (keep only last 30 days) - run in batches to avoid table locks
+    $cleanup_sql = "DELETE FROM kiosk_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 1000";
     $conn->query($cleanup_sql);
     
     $response['success'] = true;
