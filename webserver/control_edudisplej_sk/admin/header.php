@@ -25,7 +25,7 @@
         
         /* HEADER - Simple navbar */
         .header {
-            background: #1a1a1a;
+            background: #0a1929;
             color: white;
             padding: 12px 30px;
             display: flex;

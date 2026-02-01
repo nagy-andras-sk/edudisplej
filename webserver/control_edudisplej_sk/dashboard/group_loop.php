@@ -19,11 +19,25 @@ $company_id = $_SESSION['company_id'] ?? null;
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
 $error = '';
 $success = '';
+$company_name = '';
 
 $group = null;
 
 try {
     $conn = getDbConnection();
+    
+    // Get user and company info
+    $stmt = $conn->prepare("SELECT u.*, c.name as company_name FROM users u LEFT JOIN companies c ON u.company_id = c.id WHERE u.id = ?");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
+    $stmt->close();
+    
+    if ($user) {
+        $company_id = $user['company_id'];
+        $company_name = $user['company_name'] ?? '';
+    }
     
     // Get group info
     $stmt = $conn->prepare("SELECT * FROM kiosk_groups WHERE id = ?");
@@ -44,6 +58,8 @@ try {
     $error = 'Adatbázis hiba: ' . $e->getMessage();
     error_log($e->getMessage());
 }
+
+$logout_url = '../login.php?logout=1';
 
 // Get available modules for this company
 $available_modules = [];
@@ -74,53 +90,37 @@ try {
     error_log($e->getMessage());
 }
 ?>
-<!DOCTYPE html>
-<html lang="hu">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loop Testreszabás - <?php echo htmlspecialchars($group['name']); ?></title>
+<?php include '../admin/header.php'; ?>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-            min-height: 100vh;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .header {
+        .loop-page-header {
             background: white;
             padding: 20px;
-            border-radius: 12px;
+            border-radius: 8px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        .header h1 {
+        .loop-page-header h1 {
             color: #333;
             margin-bottom: 5px;
+            font-size: 24px;
         }
         
-        .header p {
+        .loop-page-header p {
             color: #666;
             font-size: 14px;
         }
         
-        .content {
+        .content-grid {
             display: grid;
-            grid-template-columns: 300px 1fr 400px;
+            grid-template-columns: 280px 1fr 380px;
             gap: 20px;
+        }
+        
+        @media (max-width: 1200px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
         }
         
         .modules-panel {
@@ -155,7 +155,7 @@ try {
         }
         
         .module-item.selected {
-            border-color: #667eea;
+            border-color: #1a3a52;
             background: #e7f3ff;
         }
         
@@ -201,7 +201,7 @@ try {
         }
         
         .loop-item {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f2537 0%, #1a4d2e 100%);
             color: white;
             padding: 15px;
             border-radius: 8px;
@@ -311,14 +311,14 @@ try {
         }
         
         .btn-primary {
-            background: #667eea;
+            background: #1a3a52;
             color: white;
         }
         
         .btn-primary:hover {
-            background: #5568d3;
+            background: #0f2537;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(26, 58, 82, 0.4);
         }
         
         .btn-secondary {
@@ -466,7 +466,7 @@ try {
         
         .preview-progress-bar {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(90deg, #0f2537 0%, #1a4d2e 100%);
             transition: width 0.1s linear;
             display: flex;
             align-items: center;
@@ -503,23 +503,21 @@ try {
             color: #333;
         }
     </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>⚙️ Loop Testreszabás</h1>
-            <p>Csoport: <strong><?php echo htmlspecialchars($group['name']); ?></strong></p>
-        </div>
-        
-        <?php if ($error): ?>
-            <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
-        <?php endif; ?>
-        
-        <?php if ($success): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>
-        
-        <div class="content">
+
+    <?php if ($error): ?>
+        <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+    <?php endif; ?>
+    
+    <?php if ($success): ?>
+        <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
+    <?php endif; ?>
+    
+    <div class="loop-page-header">
+        <h1>⚙️ Loop Testreszabás</h1>
+        <p>Csoport: <strong><?php echo htmlspecialchars($group['name']); ?></strong></p>
+    </div>
+    
+    <div class="content-grid">
             <!-- Available Modules Panel -->
             <div class="modules-panel">
                 <h2>📦 Elérhető Modulok</h2>
@@ -1226,7 +1224,7 @@ try {
                     // Default fallback - show module name
                     baseUrl = '../modules/default/m_default.html';
                     params.append('text', module.module_name);
-                    params.append('bgColor', '#667eea');
+                    params.append('bgColor', '#1a3a52');
             }
             
             const queryString = params.toString();
@@ -1291,5 +1289,5 @@ try {
         // Load loop on page load
         loadLoop();
     </script>
-</body>
-</html>
+
+<?php include '../admin/footer.php'; ?>

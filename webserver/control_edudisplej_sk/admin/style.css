@@ -115,13 +115,13 @@ input:focus,
 textarea:focus,
 select:focus {
     outline: none;
-    border-color: #1e40af;
-    box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.1);
+    border-color: #1a3a52;
+    box-shadow: 0 0 0 2px rgba(26, 58, 82, 0.1);
 }
 
 button, .btn {
     padding: 12px 24px;
-    background: #1e40af;
+    background: #1a3a52;
     color: white;
     border: none;
     border-radius: 5px;
@@ -134,9 +134,9 @@ button, .btn {
 }
 
 button:hover, .btn:hover {
-    background: #1e3a8a;
+    background: #0f2537;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+    box-shadow: 0 4px 12px rgba(26, 58, 82, 0.3);
 }
 
 .btn-small {
@@ -145,19 +145,19 @@ button:hover, .btn:hover {
 }
 
 .btn-success {
-    background: #059669;
+    background: #16a34a;
 }
 
 .btn-success:hover {
-    background: #047857;
+    background: #15803d;
 }
 
 .btn-warning {
-    background: #10b981;
+    background: #eab308;
 }
 
 .btn-warning:hover {
-    background: #059669;
+    background: #ca8a04;
 }
 
 .btn-danger {
@@ -265,7 +265,7 @@ table tbody tr:last-child {
     padding: 25px;
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    border-left: 4px solid #1e40af;
+    border-left: 4px solid #1a3a52;
 }
 
 .stat-card h3 {
@@ -277,7 +277,7 @@ table tbody tr:last-child {
 .stat-card .number {
     font-size: 36px;
     font-weight: bold;
-    color: #1e40af;
+    color: #1a3a52;
 }
 
 /* Login page specific */
@@ -286,7 +286,7 @@ table tbody tr:last-child {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%);
+    background: linear-gradient(135deg, #0f2537 0%, #1a3a52 100%);
     padding: 20px;
 }
 
@@ -316,8 +316,8 @@ table tbody tr:last-child {
 
 .search-box:focus {
     outline: none;
-    border-color: #1e40af;
-    box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.1);
+    border-color: #1a3a52;
+    box-shadow: 0 0 0 2px rgba(26, 58, 82, 0.1);
 }
 
 /* Action buttons in tables */
@@ -336,8 +336,8 @@ table tbody tr:last-child {
 
 .action-btn:hover {
     background: #f5f5f5;
-    border-color: #1e40af;
-    color: #1e40af;
+    border-color: #1a3a52;
+    color: #1a3a52;
 }
 
 .action-btn-small {
@@ -370,8 +370,8 @@ table tbody tr:last-child {
 }
 
 .tab-button.active {
-    color: #1e40af;
-    border-bottom-color: #1e40af;
+    color: #1a3a52;
+    border-bottom-color: #1a3a52;
 }
 
 .tab-content {
@@ -406,7 +406,7 @@ table tbody tr:last-child {
 }
 
 .register-link a {
-    color: #1e40af;
+    color: #1a3a52;
     text-decoration: none;
     font-weight: 600;
 }

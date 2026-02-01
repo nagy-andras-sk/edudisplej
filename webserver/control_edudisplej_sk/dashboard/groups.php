@@ -193,7 +193,7 @@ closeDbConnection($conn);
                                         </strong>
                                         <button onclick="renameGroup(<?php echo $group['id']; ?>, '<?php echo htmlspecialchars($group['name'], ENT_QUOTES); ?>')" 
                                                 class="action-btn" 
-                                                style="padding: 4px 8px; font-size: 12px; background: #1e40af;" 
+                                                style="padding: 4px 8px; font-size: 12px; background: #1a3a52;" 
                                                 title="Átnevezés">
                                             ✏️
                                         </button>
@@ -312,7 +312,7 @@ closeDbConnection($conn);
                             html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
                             loops.forEach((loop, index) => {
                                 html += `<div style="
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    background: linear-gradient(135deg, #0f2537 0%, #1a4d2e 100%);
                                     color: white;
                                     padding: 15px;
                                     border-radius: 8px;
@@ -398,7 +398,7 @@ closeDbConnection($conn);
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h2 style="margin: 0;">${title}</h2>
                         <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
-                            background: #1e40af;
+                            background: #1a3a52;
                             color: white;
                             border: none;
                             font-size: 16px;
@@ -410,7 +410,7 @@ closeDbConnection($conn);
                             align-items: center;
                             justify-content: center;
                             transition: background 0.2s;
-                        " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#1e40af'">✕</button>
+                        " onmouseover="this.style.background='#0f2537'" onmouseout="this.style.background='#1a3a52'">✕</button>
                     </div>
                     <div>${content}</div>
                 </div>
