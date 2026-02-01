@@ -55,6 +55,32 @@ View logs:
 tail -f /opt/edudisplej/logs/sync.log
 ```
 
+## 🔍 Troubleshooting
+
+### Check API Health
+
+```bash
+curl https://control.edudisplej.sk/api/health.php
+```
+
+This will show:
+- PHP version and extensions
+- Database connection status
+- Kiosks table existence
+- Current kiosk count
+
+### Debug Registration Issues
+
+If kiosks fail to register, check the detailed debug output:
+
+```bash
+# Enable debug mode in registration.php (set DEBUG_MODE = true)
+# Then check sync logs:
+sudo journalctl -u edudisplej-sync.service -n 100 --no-pager
+```
+
+The debug output will show exactly which step failed.
+
 ## 📄 Licencia / License
 
 Tento projekt je proprietárny softvér. Všetky práva vyhradené.
