@@ -1,6 +1,30 @@
-
 <?php
 $baseDir = __DIR__;
+
+if (isset($_GET['getstructure'])) {
+    $structureFile = $baseDir . '/structure.json';
+    
+    if (!file_exists($structureFile)) {
+        http_response_code(404);
+        echo "Structure file not found.";
+        exit;
+    }
+    
+    $structureContent = file_get_contents($structureFile);
+    if ($structureContent === false) {
+        http_response_code(500);
+        echo "Error reading structure file.";
+        exit;
+    }
+    
+    header('Content-Type: application/json');
+    header('Content-Length: ' . strlen($structureContent));
+    header('Cache-Control: no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    
+    echo $structureContent;
+    exit;
+}
 
 if (isset($_GET['getfiles'])) {
     foreach (scandir($baseDir) as $file) {
@@ -68,5 +92,5 @@ if (isset($_GET['streamfile'])) {
     exit;
 }
 
-echo "Invalid request. Use ?getfiles or ?streamfile=filename";
+echo "Invalid request. Use ?getstructure, ?getfiles or ?streamfile=filename";
 ?>

@@ -1,0 +1,79 @@
+{
+  "files": [
+    {
+      "source": "common.sh",
+      "destination": "/opt/edudisplej/init/common.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "update.sh",
+      "destination": "/opt/edudisplej/init/update.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej_sync_service.sh",
+      "destination": "/opt/edudisplej/edudisplej_sync_service.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej_sync_service_enhanced.sh",
+      "destination": "/opt/edudisplej/edudisplej_sync_service_enhanced.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej_terminal_script.sh",
+      "destination": "/opt/edudisplej/init/edudisplej_terminal_script.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "kiosk-start.sh",
+      "destination": "/opt/edudisplej/init/kiosk-start.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "kiosk.sh",
+      "destination": "/opt/edudisplej/init/kiosk.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej-hostname.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-hostname.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej-system.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-system.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej-watchdog.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-watchdog.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej-init.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-init.sh",
+      "permissions": "755"
+    },
+    {
+      "source": "edudisplej-kiosk.service",
+      "destination": "/opt/edudisplej/init/edudisplej-kiosk.service",
+      "permissions": "644"
+    },
+    {
+      "source": "edudisplej-sync.service",
+      "destination": "/opt/edudisplej/init/edudisplej-sync.service",
+      "permissions": "644"
+    },
+    {
+      "source": "edudisplej-watchdog.service",
+      "destination": "/opt/edudisplej/init/edudisplej-watchdog.service",
+      "permissions": "644"
+    },
+    {
+      "source": "clock.html",
+      "destination": "/opt/edudisplej/localweb/clock.html",
+      "permissions": "644"
+    }
+  ]
+}
