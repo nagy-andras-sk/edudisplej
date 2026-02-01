@@ -44,7 +44,7 @@ display_status() {
     # Parse JSON (basic parsing)
     local last_sync=$(echo "$status_json" | grep -o '"last_sync":"[^"]*"' | cut -d'"' -f4 || echo "Never")
     local status=$(echo "$status_json" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-    local kiosk_id=$(echo "$status_json" | grep -o '"kiosk_id":[0-9]*' | cut -d: -f2 || echo "N/A")
+    local kiosk_id=$(echo "$status_json" | grep -o '"kiosk_id":[0-9]\+' | cut -d: -f2 || echo "N/A")
     local device_id=$(echo "$status_json" | grep -o '"device_id":"[^"]*"' | cut -d'"' -f4 || echo "N/A")
     local is_configured=$(echo "$status_json" | grep -o '"is_configured":[a-z]*' | cut -d: -f2 || echo "false")
     local next_sync=$(echo "$status_json" | grep -o '"next_sync":"[^"]*"' | cut -d'"' -f4 || echo "Unknown")
@@ -69,13 +69,6 @@ display_status() {
     echo -e "${BOLD}Configuration:${NC}"
     if [ "$is_configured" = "true" ]; then
         echo -e "  Configured:   ${GREEN}✓ Yes${NC}"
-        echo ""
-        echo -e "${BOLD}Active Modules:${NC}"
-        
-        # Parse active modules (simplified)
-        # TODO: Better JSON parsing for modules array
-        echo -e "  ${YELLOW}→${NC} Loading modules..."
-        
     else
         echo -e "  Configured:   ${YELLOW}⚠ Waiting for configuration${NC}"
         echo ""

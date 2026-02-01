@@ -78,7 +78,7 @@ register_and_sync() {
     "kiosk_id": $kiosk_id,
     "device_id": "$device_id",
     "is_configured": $is_configured,
-    "next_sync": "$(date -d "+${SYNC_INTERVAL} seconds" '+%Y-%m-%d %H:%M:%S')"
+    "next_sync": "$(date '+%Y-%m-%d %H:%M:%S' -d "+${SYNC_INTERVAL} seconds" 2>/dev/null || date -v +${SYNC_INTERVAL}S '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')"
 }
 EOF
         
@@ -100,7 +100,7 @@ EOF
     "device_id": "unknown",
     "is_configured": false,
     "error": "$(echo "$response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4 || echo 'Connection failed')",
-    "next_sync": "$(date -d "+60 seconds" '+%Y-%m-%d %H:%M:%S')"
+    "next_sync": "$(date '+%Y-%m-%d %H:%M:%S' -d "+60 seconds" 2>/dev/null || date -v +60S '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')"
 }
 EOF
         log "✗ Sync failed: $response"

@@ -10,7 +10,7 @@ ExecStart=/opt/edudisplej/edudisplej_sync_service.sh start
 Restart=always
 RestartSec=30
 User=root
-Environment=EDUDISPLEJ_API_URL=https://control.edudisplej.sk/api/registration.php
+Environment=EDUDISPLEJ_API_URL=https://control.edudisplej.sk
 StandardOutput=journal
 StandardError=journal
 
