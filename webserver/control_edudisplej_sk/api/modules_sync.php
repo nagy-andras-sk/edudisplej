@@ -79,35 +79,82 @@ try {
         exit;
     }
     
-    // Get active modules for this kiosk
-    $query = "SELECT m.module_key, m.name, km.display_order, km.duration_seconds, km.settings
-              FROM kiosk_modules km
-              JOIN modules m ON km.module_id = m.id
-              WHERE km.kiosk_id = ? AND km.is_active = 1
-              ORDER BY km.display_order ASC";
-    
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("i", $kiosk['id']);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
+    // First, try to get modules from group configuration
     $modules = [];
-    while ($row = $result->fetch_assoc()) {
-        $settings = [];
-        if (!empty($row['settings'])) {
-            $settings = json_decode($row['settings'], true) ?? [];
+    
+    // Check if kiosk belongs to any group
+    $group_query = "SELECT group_id FROM kiosk_group_assignments WHERE kiosk_id = ? LIMIT 1";
+    $group_stmt = $conn->prepare($group_query);
+    $group_stmt->bind_param("i", $kiosk['id']);
+    $group_stmt->execute();
+    $group_result = $group_stmt->get_result();
+    $group_row = $group_result->fetch_assoc();
+    $group_stmt->close();
+    
+    if ($group_row) {
+        // Get modules from group configuration
+        $query = "SELECT m.module_key, m.name, gm.display_order, gm.duration_seconds, gm.settings
+                  FROM group_modules gm
+                  JOIN modules m ON gm.module_id = m.id
+                  WHERE gm.group_id = ? AND gm.is_active = 1
+                  ORDER BY gm.display_order ASC";
+        
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $group_row['group_id']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $settings = [];
+            if (!empty($row['settings'])) {
+                $settings = json_decode($row['settings'], true) ?? [];
+            }
+            
+            $modules[] = [
+                'module_key' => $row['module_key'],
+                'name' => $row['name'],
+                'display_order' => (int)$row['display_order'],
+                'duration_seconds' => (int)$row['duration_seconds'],
+                'settings' => $settings
+            ];
         }
         
-        $modules[] = [
-            'module_key' => $row['module_key'],
-            'name' => $row['name'],
-            'display_order' => (int)$row['display_order'],
-            'duration_seconds' => (int)$row['duration_seconds'],
-            'settings' => $settings
-        ];
+        $stmt->close();
+        $response['config_source'] = 'group';
+        $response['group_id'] = (int)$group_row['group_id'];
     }
     
-    $stmt->close();
+    // If no group modules found, fall back to kiosk-specific configuration
+    if (empty($modules)) {
+        $query = "SELECT m.module_key, m.name, km.display_order, km.duration_seconds, km.settings
+                  FROM kiosk_modules km
+                  JOIN modules m ON km.module_id = m.id
+                  WHERE km.kiosk_id = ? AND km.is_active = 1
+                  ORDER BY km.display_order ASC";
+        
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $kiosk['id']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $settings = [];
+            if (!empty($row['settings'])) {
+                $settings = json_decode($row['settings'], true) ?? [];
+            }
+            
+            $modules[] = [
+                'module_key' => $row['module_key'],
+                'name' => $row['name'],
+                'display_order' => (int)$row['display_order'],
+                'duration_seconds' => (int)$row['duration_seconds'],
+                'settings' => $settings
+            ];
+        }
+        
+        $stmt->close();
+        $response['config_source'] = 'kiosk';
+    }
     $response['success'] = true;
     $response['message'] = count($modules) > 0 ? 'Modules retrieved' : 'No modules configured';
     $response['modules'] = $modules;

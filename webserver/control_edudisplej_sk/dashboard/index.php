@@ -176,6 +176,7 @@ if (isset($conn)) {
             <?php if ($is_admin): ?>
                 <a href="../admin/index.php">Admin Panel</a>
             <?php endif; ?>
+            <a href="groups.php">📁 Groups</a>
             <span>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?> (<?php echo htmlspecialchars($company_name); ?>)</span>
             <a href="../admin/index.php?logout=1">Logout</a>
         </div>
