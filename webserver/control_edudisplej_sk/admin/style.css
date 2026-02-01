@@ -233,3 +233,82 @@ tr:hover {
     text-decoration: none;
     font-weight: 600;
 }
+
+/* Offline alert styling */
+.offline-alert {
+    background-color: #ffebee !important;
+}
+
+.offline-alert:hover {
+    background-color: #ffcdd2 !important;
+}
+
+/* Search box styling */
+.search-container {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.search-box {
+    flex: 1;
+    max-width: 400px;
+    padding: 12px 20px;
+    border: 2px solid #ddd;
+    border-radius: 25px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.search-box:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Sortable table headers */
+th[data-sort] {
+    cursor: pointer;
+    user-select: none;
+}
+
+th[data-sort]:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6539a0 100%);
+}
+
+th[data-sort]::after {
+    content: ' ⇅';
+    opacity: 0.5;
+    font-size: 12px;
+}
+
+/* Company assignment dropdown */
+.company-select {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    background: white;
+    min-width: 120px;
+}
+
+.company-select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Fetch location button */
+.fetch-location-btn {
+    padding: 4px 8px;
+    background: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.fetch-location-btn:hover {
+    background: #138496;
+}

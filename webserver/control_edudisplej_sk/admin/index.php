@@ -294,6 +294,14 @@ if ($is_logged_in) {
                                         <?php echo ucfirst($kiosk['status']); ?>
                                     </span>
                                     <div style="margin-top: 10px;">
+                                        <select class="company-select" onchange="assignCompany(<?php echo $kiosk['id']; ?>, this.value)">
+                                            <option value="">Assign to company...</option>
+                                            <?php foreach ($companies as $company): ?>
+                                                <option value="<?php echo $company['id']; ?>"><?php echo htmlspecialchars($company['name']); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div style="margin-top: 10px;">
                                         <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" style="font-size: 11px; color: #667eea;">View details →</a>
                                     </div>
                                 </div>
@@ -306,18 +314,22 @@ if ($is_logged_in) {
             
             <h2 style="margin-bottom: 20px;">All Kiosks - Detailed View</h2>
             
-            <table>
+            <div class="search-container">
+                <input type="text" id="kioskSearch" class="search-box" placeholder="🔍 Search kiosks by hostname, MAC, company, location...">
+            </div>
+            
+            <table id="kioskTable">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th data-sort="id">ID</th>
                         <th>Device ID</th>
                         <th>Hostname</th>
                         <th>MAC Address</th>
-                        <th>Company</th>
-                        <th>Status</th>
-                        <th>Last Seen</th>
+                        <th data-sort="company">Company</th>
+                        <th data-sort="status">Status</th>
+                        <th data-sort="last-seen">Last Seen</th>
                         <th>Sync Interval</th>
-                        <th>Location</th>
+                        <th data-sort="location">Location</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -327,8 +339,21 @@ if ($is_logged_in) {
                             <td colspan="10" style="text-align: center; color: #999;">No kiosks registered yet</td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($kiosks as $kiosk): ?>
-                            <tr>
+                        <?php foreach ($kiosks as $kiosk): 
+                            $last_seen_timestamp = $kiosk['last_seen'] ? strtotime($kiosk['last_seen']) : 0;
+                            $time_diff = $last_seen_timestamp ? time() - $last_seen_timestamp : 0;
+                            $is_offline_long = $time_diff > 600; // 10 minutes
+                        ?>
+                            <tr 
+                                data-kiosk-id="<?php echo $kiosk['id']; ?>"
+                                data-id="<?php echo $kiosk['id']; ?>"
+                                data-company="<?php echo htmlspecialchars($kiosk['company_name'] ?? 'Unassigned'); ?>"
+                                data-status="<?php echo $kiosk['status']; ?>"
+                                data-last-seen="<?php echo $kiosk['last_seen'] ?? ''; ?>"
+                                data-location="<?php echo htmlspecialchars($kiosk['location'] ?? ''); ?>"
+                                data-ip="<?php echo htmlspecialchars($kiosk['public_ip'] ?? ''); ?>"
+                                <?php echo $is_offline_long ? 'class="offline-alert"' : ''; ?>
+                            >
                                 <td><?php echo htmlspecialchars($kiosk['id']); ?></td>
                                 <td><code><?php echo htmlspecialchars($kiosk['device_id'] ?? 'N/A'); ?></code></td>
                                 <td><?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?></td>
@@ -339,9 +364,25 @@ if ($is_logged_in) {
                                         <?php echo ucfirst($kiosk['status']); ?>
                                     </span>
                                 </td>
-                                <td><?php echo $kiosk['last_seen'] ? date('Y-m-d H:i', strtotime($kiosk['last_seen'])) : 'Never'; ?></td>
+                                <td>
+                                    <?php 
+                                    if ($kiosk['last_seen']) {
+                                        echo date('Y-m-d H:i', strtotime($kiosk['last_seen']));
+                                        if ($is_offline_long) {
+                                            echo '<br><small style="color: #c33;">⚠️ Offline > 10min</small>';
+                                        }
+                                    } else {
+                                        echo 'Never';
+                                    }
+                                    ?>
+                                </td>
                                 <td><?php echo $kiosk['sync_interval']; ?>s</td>
-                                <td><?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?></td>
+                                <td class="location-cell">
+                                    <?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?>
+                                    <?php if (!$kiosk['location'] && $kiosk['public_ip']): ?>
+                                        <button class="fetch-location-btn" onclick="fetchLocation(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['public_ip']); ?>')">📍 Fetch</button>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <a href="kiosk_details.php?id=<?php echo $kiosk['id']; ?>" class="btn btn-sm">👁️ View</a>
                                     <a href="?screenshot=<?php echo $kiosk['id']; ?>" class="btn btn-sm btn-success" onclick="return confirm('Request screenshot?')">📸 Screenshot</a>
