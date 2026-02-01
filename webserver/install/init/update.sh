@@ -64,10 +64,21 @@ fi
 if [ "$USE_STRUCTURE" = true ]; then
     # Nova metoda: pouzivat structure.json / Uj modszer: structure.json hasznalata
     
-    # Kontrola ci je nainstalovaný jq, inak použijeme grep/sed
+    # Kontrola ci je nainstalovaný jq, inak použijeme python3
     if ! command -v jq >/dev/null 2>&1; then
-        echo "[!] jq nie je nainstalovany, pouzivam alternativny parser..."
-        USE_JQ=false
+        if ! command -v python3 >/dev/null 2>&1; then
+            echo "[!] CHYBA: Ani jq ani python3 nie su nainstalovane!"
+            echo "[!] Instalujem python3..."
+            apt-get update -qq && apt-get install -y python3 >/dev/null 2>&1 || {
+                echo "[!] Nepodarilo sa nainstalovat python3"
+                echo "[!] Prepínam na staru metodu..."
+                USE_STRUCTURE=false
+            }
+        fi
+        if [ "$USE_STRUCTURE" = true ]; then
+            echo "[*] Pouzivam python3 pre parsovanie JSON..."
+            USE_JQ=false
+        fi
     else
         USE_JQ=true
     fi
@@ -102,10 +113,10 @@ if [ "$USE_STRUCTURE" = true ]; then
             DESTINATION=$(echo "$STRUCTURE_JSON" | jq -r ".files[$i].destination")
             PERMISSIONS=$(echo "$STRUCTURE_JSON" | jq -r ".files[$i].permissions")
         else
-            # Alternatívny parser
-            SOURCE=$(echo "$STRUCTURE_JSON" | grep -A 3 "\"source\"" | sed -n "$((i*3 + 1))p" | sed 's/.*"source": "\([^"]*\)".*/\1/')
-            DESTINATION=$(echo "$STRUCTURE_JSON" | grep -A 3 "\"destination\"" | sed -n "$((i*3 + 1))p" | sed 's/.*"destination": "\([^"]*\)".*/\1/')
-            PERMISSIONS=$(echo "$STRUCTURE_JSON" | grep -A 3 "\"permissions\"" | sed -n "$((i*3 + 1))p" | sed 's/.*"permissions": "\([^"]*\)".*/\1/')
+            # Alternatívny parser pomocou python3
+            SOURCE=$(echo "$STRUCTURE_JSON" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['files'][$i]['source'])" 2>/dev/null || echo "")
+            DESTINATION=$(echo "$STRUCTURE_JSON" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['files'][$i]['destination'])" 2>/dev/null || echo "")
+            PERMISSIONS=$(echo "$STRUCTURE_JSON" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['files'][$i]['permissions'])" 2>/dev/null || echo "")
         fi
         
         [ -z "$SOURCE" ] && continue
