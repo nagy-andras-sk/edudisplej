@@ -145,6 +145,24 @@ register_and_sync() {
     # Parse JSON response
     log "Parsing API response..."
     
+    # Check for debug information and display it
+    if echo "$response" | grep -q '"debug"'; then
+        log "=== DEBUG INFORMATION ==="
+        
+        # Extract and display debug keys
+        if command -v jq >/dev/null 2>&1; then
+            # Use jq if available for nice formatting
+            echo "$response" | jq '.debug' 2>/dev/null | while IFS= read -r line; do
+                log_debug "$line"
+            done
+        else
+            # Fallback: extract key debug info manually
+            log_debug "$(echo "$response" | grep -o '"debug":{[^}]*' | sed 's/"debug":{//' || echo 'Debug section found but could not parse')"
+        fi
+        
+        log "=== END DEBUG ==="
+    fi
+    
     if echo "$response" | grep -q '"success":true'; then
         # Extract fields
         kiosk_id=$(echo "$response" | grep -o '"kiosk_id":[0-9]*' | cut -d: -f2 || echo "0")
