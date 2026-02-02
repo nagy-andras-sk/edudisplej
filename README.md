@@ -1,21 +1,27 @@
-# EduDisplej - Digital Signage for Educational Institutions
+# EduDisplej - Digital Signage System / Digitálny zobrazovacie systém
 
-Simple, powerful digital display system for schools and universities.
+**EduDisplej** is a simple, powerful digital display system designed for educational institutions.
+**EduDisplej** je jednoduchý, výkonný systém digitálnych zobrazení navrhnutý pre vzdelávacie inštitúcie.
 
-## 🚀 Quick Install
+---
+
+## 🚀 Quick Install / Rýchla inštalácia
 
 ```bash
 curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash
 ```
 
 After installation, **reboot your device**. The system will:
-1. **Automatically register** with the control panel
-2. **Wait for admin assignment** (assign device to company)
-3. **Download modules** and start displaying
+Po inštalácii **reštartujte zariadenie**. Systém bude:
+1. **Automatically register** with the control panel / **Automaticky sa zaregistrovať** v kontrolnom paneli
+2. **Wait for admin assignment** (assign device to company) / **Čakať na priradenie správcom** (priradenie zariadenia k spoločnosti)
+3. **Download modules** and start displaying / **Stiahnuť moduly** a začať zobrazovať
 
-## 🔄 Complete Reinstall
+---
 
-To completely remove and reinstall the system:
+## 🔄 Complete Reinstall / Úplná preinštalácia
+
+To completely remove and reinstall the system / Na úplné odstránenie a preinštalovanie systému:
 
 ```bash
 sudo systemctl stop edudisplej-kiosk.service edudisplej-watchdog.service edudisplej-sync.service edudisplej-terminal.service 2>/dev/null; \
@@ -27,180 +33,123 @@ sudo systemctl daemon-reload; \
 curl https://install.edudisplej.sk/install.sh | sed 's/\r$//' | sudo bash
 ```
 
-## 🔄 Update
+---
+
+## 🔄 System Updates / Aktualizácie systému
 
 System updates are installed **automatically every 24 hours**. No manual intervention needed.
+Aktualizácie systému sa inštalujú **automaticky každých 24 hodín**. Nie je potrebná manuálna intervencia.
 
-To update manually:
+To update manually / Pre manuálnu aktualizáciu:
 
 ```bash
 sudo /opt/edudisplej/init/update.sh
 ```
 
-## 📺 How It Works
+---
 
-1. **Automatic Registration**: Devices automatically register on first boot
-2. **Web Management**: Configure displays at https://control.edudisplej.sk/admin/
-3. **Module Sync**: Content syncs automatically every 5 minutes
-4. **Display Rotation**: Modules rotate based on your configuration
+## 📺 How It Works / Ako to funguje
 
-## 🎯 Features
+1. **Automatic Registration** / **Automatická registrácia**: Devices automatically register on first boot / Zariadenia sa automaticky registrujú pri prvom spustení
+2. **Web Management** / **Webová správa**: Configure displays at https://control.edudisplej.sk/admin/
+3. **Module Sync** / **Synchronizácia modulov**: Content syncs automatically every 5 minutes / Obsah sa synchronizuje automaticky každých 5 minút
+4. **Display Rotation** / **Rotácia zobrazení**: Modules rotate based on your configuration / Moduly sa striedajú podľa vašej konfigurácie
 
-- ⏰ Clock module (digital/analog)
-- 📅 Name days (Slovak/Hungarian)
-- 🖥️ Split-screen layouts
-- ⏱️ Scheduled content (e.g., lunch menu only at noon)
-- 📊 Real-time monitoring
-- 🔄 Automatic updates
-- 🔑 Module license management
-- 🏢 Multi-company support
-- ⚙️ Per-kiosk module configuration
+---
 
-## 🆕 New Features
+## 🎯 Features / Funkcie
 
-### Module System
-- **Custom Modules**: Create your own display modules
-- **License Management**: Control module access per company
-- **Configuration Interface**: Easy-to-use dashboard for module settings
-- **Module Rotation**: Automatic rotation between configured modules
-- **Group Loop Configuration**: Configure module loops per group with drag-drop
-- **Live Preview**: Real-time preview of module loop with progress tracking
-- **Module Download**: Automatic download of modules to kiosks at startup
-- **Local Caching**: Modules cached locally for offline operation
+- ⏰ Clock module (digital/analog) / Modul hodín (digitálne/analógové)
+- 📅 Name days (Slovak/Hungarian) / Meniny (slovenské/maďarské)
+- 🖥️ Split-screen layouts / Rozdelené obrazovky
+- ⏱️ Scheduled content / Naplánovaný obsah
+- 📊 Real-time monitoring / Monitorovanie v reálnom čase
+- 🔄 Automatic updates / Automatické aktualizácie
+- 🔑 Module license management / Správa licencií modulov
+- 🏢 Multi-company support / Podpora viacerých spoločností
+- ⚙️ Per-kiosk module configuration / Konfigurácia modulov pre každý kiosk
 
-See [MODULES.md](MODULES.md) for detailed documentation on the module system.
+---
 
-### Admin Enhancements
-- **Geolocation**: Automatic location detection from IP address
-- **Search & Filter**: Live search across all kiosks
-- **Sortable Tables**: Sort by company, status, location
-- **Offline Alerts**: Highlight kiosks offline > 10 minutes
-- **Quick Assignment**: Assign kiosks to companies with one click
+## 🛠️ System Requirements / Systémové požiadavky
 
-### Company Dashboard
-- **Self-Service**: Companies can configure their own kiosks
-- **Module Configuration**: Enable/disable and customize modules
-- **License Tracking**: View available and used licenses
-- **Real-Time Status**: Monitor kiosk status and connectivity
+- Raspberry Pi or x86 Linux / Raspberry Pi alebo x86 Linux
+- Internet connection / Internetové pripojenie
+- HDMI display / HDMI displej
 
-## 🛠️ System Requirements
+---
 
-- Raspberry Pi or x86 Linux
-- Internet connection
-- HDMI display
+## 📖 Management / Správa
 
-## 📖 Management
+Visit the control panel / Navštívte kontrolný panel: **https://control.edudisplej.sk/admin/**
 
-Visit the control panel: **https://control.edudisplej.sk/admin/**
+### For Administrators / Pre správcov
+- Manage companies and users / Spravujte spoločnosti a používateľov
+- Assign module licenses / Priraďte licencie modulov
+- Monitor all kiosks / Monitorujte všetky kioski
+- View system logs / Zobrazujte systémové logy
 
-### Automatic System Updates
+### For Companies / Pre spoločnosti
+Visit / Navštívte: **https://control.edudisplej.sk/dashboard/**
+- Configure your kiosks / Konfigurujte svoje kioski
+- Customize module settings / Prispôsobte nastavenia modulov
+- Monitor your displays / Monitorujte svoje displeje
 
-The kiosk automatically checks for system updates **once per day** through the background sync service:
+---
 
-- **What's updated**: System packages, scripts, and configuration files
-- **When**: Daily automatic check at first startup, then every 24 hours
-- **How**: System checks remote server (structure.json) and downloads changes if needed
-- **Zero downtime**: Updates happen while kiosk is running, no reboot required (unless critical)
+## 🆘 Support / Podpora
 
-The update process is **fully automatic** - after the initial install, no manual update commands are needed.
-
-### For Administrators
-- Manage companies and users
-- Assign module licenses
-- Monitor all kiosks
-- View system logs
-
-### For Companies
-Visit: **https://control.edudisplej.sk/dashboard/**
-- Configure your kiosks
-- Customize module settings
-- Monitor your displays
-
-## 🆘 Support
-
-For issues, check system status:
+For issues, check system status / Pri problémoch skontrolujte stav systému:
 ```bash
 sudo systemctl status edudisplej-sync.service
 sudo systemctl status edudisplej-kiosk.service
 ```
 
-View logs:
+View logs / Zobraziť logy:
 ```bash
 tail -f /opt/edudisplej/logs/sync.log
 ```
 
-## 🔍 Troubleshooting
+---
 
-### Module Download Issues
+## 🔧 Technical Architecture / Technická architektúra
 
-If modules fail to download on kiosk startup:
+### System Components / Systémové komponenty
 
-```bash
-# Manually run the download script
-sudo /opt/edudisplej/init/edudisplej-download-modules.sh
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    KIOSK STARTUP FLOW                        │
+└─────────────────────────────────────────────────────────────┘
 
-# Check download logs
-cat /tmp/edudisplej_download.log
-
-# Verify device ID is configured
-cat /opt/edudisplej/kiosk.conf
-
-# Check API connectivity
-curl -X POST https://control.edudisplej.sk/api/kiosk_loop.php \
-  -d "device_id=YOUR_DEVICE_ID"
+1. System Boot
+   └─> Auto-login (edudisplej user)
+       └─> startx (X server)
+           └─> Openbox
+               └─> Terminal Script
+                   ├─> Wait for device registration
+                   ├─> Download modules & loop config
+                   └─> Launch browser with loop player
 ```
 
-### Loop Player Not Starting
+### Synchronization / Synchronizácia
 
-If the surf browser doesn't start or shows errors:
+- **Sync Interval**: Configurable (default: 5 minutes) / **Interval synchronizácie**: Konfigurovateľný (predvolené: 5 minút)
+- **Loop Auto-Update**: Checks for configuration changes every 30 seconds / **Automatická aktualizácia slučky**: Kontroluje zmeny konfigurácie každých 30 sekúnd
+- **Automatic Reload**: Browser reloads when new configuration detected / **Automatické načítanie**: Prehliadač sa znovu načíta pri detekcii novej konfigurácie
 
-```bash
-# Check if surf is installed
-which surf
+### Hostname Configuration / Konfigurácia názvu zariadenia
 
-# Check loop player file
-ls -l /opt/edudisplej/localweb/loop_player.html
+Devices are automatically named: `edudisplej-XXXXXX` (last 6 chars of MAC address)
+Zariadenia sú automaticky pomenované: `edudisplej-XXXXXX` (posledných 6 znakov MAC adresy)
 
-# Check loop configuration
-cat /opt/edudisplej/localweb/modules/loop.json
+---
 
-# View openbox autostart log
-cat /tmp/openbox-autostart.log
+## 📄 License / Licencia
 
-# Restart kiosk service
-sudo systemctl restart edudisplej-kiosk.service
-```
-
-### Check API Health
-
-```bash
-curl https://control.edudisplej.sk/api/health.php
-```
-
-This will show:
-- PHP version and extensions
-- Database connection status
-- Kiosks table existence
-- Current kiosk count
-
-### Debug Registration Issues
-
-If kiosks fail to register, check the detailed debug output:
-
-```bash
-# Enable debug mode in registration.php (set DEBUG_MODE = true)
-# Then check sync logs:
-sudo journalctl -u edudisplej-sync.service -n 100 --no-pager
-```
-
-The debug output will show exactly which step failed.
-
-## 📄 Licencia / License
-
-Tento projekt je proprietárny softvér. Všetky práva vyhradené.
 This project is proprietary software. All rights reserved.
+Tento projekt je proprietárny softvér. Všetky práva vyhradené.
 
-## 👥 Autor / Author
+## 👥 Author / Autor
 
 **Nagy András** - [nagy-andras-sk](https://github.com/nagy-andras-sk)
 

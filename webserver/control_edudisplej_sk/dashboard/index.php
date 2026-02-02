@@ -92,14 +92,29 @@ $logout_url = '../login.php?logout=1';
             </div>
             
             <h2>Saját Kijelzők</h2>
-            <p style="color: #666; margin-bottom: 15px;">A cégjéhez rendelt összes kijelző</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <p style="color: #666; margin: 0;">A cégjéhez rendelt összes kijelző</p>
+                <button id="toggleViewBtn" onclick="toggleView()" style="
+                    background: #1a3a52;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background 0.2s;
+                " onmouseover="this.style.background='#0f2537'" onmouseout="this.style.background='#1a3a52'">
+                    📸 Realtime Nézet
+                </button>
+            </div>
             
             <?php if (empty($kiosks)): ?>
                 <div style="text-align: center; padding: 40px; color: #999; background: white; border-radius: 10px;">
                     Nincs kijelző hozzárendelve a cégjéhez
                 </div>
             <?php else: ?>
-                <div style="overflow-x: auto;">
+                <!-- List View -->
+                <div id="listView" style="overflow-x: auto;">
                     <table style="width: 100%;">
                         <thead>
                             <tr>
@@ -137,6 +152,69 @@ $logout_url = '../login.php?logout=1';
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+                
+                <!-- Realtime Screenshot View -->
+                <div id="realtimeView" style="display: none;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                        <?php foreach ($kiosks as $kiosk): ?>
+                            <div class="screenshot-card" data-kiosk-id="<?php echo $kiosk['id']; ?>" style="
+                                background: white;
+                                border-radius: 10px;
+                                padding: 15px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                transition: transform 0.2s;
+                            " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                                <div style="margin-bottom: 10px;">
+                                    <h3 style="margin: 0; font-size: 16px; color: #1a3a52;">
+                                        <?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>
+                                    </h3>
+                                    <small style="color: #999;">
+                                        <span class="status-badge status-<?php echo $kiosk['status']; ?>">
+                                            <?php echo $kiosk['status'] == 'online' ? '🟢' : '🔴'; ?>
+                                        </span>
+                                        <?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?>
+                                    </small>
+                                </div>
+                                <div class="screenshot-container" style="
+                                    position: relative;
+                                    width: 100%;
+                                    padding-top: 56.25%; /* 16:9 aspect ratio */
+                                    background: #f5f5f5;
+                                    border-radius: 5px;
+                                    overflow: hidden;
+                                ">
+                                    <img class="screenshot-img" 
+                                         src="<?php echo !empty($kiosk['screenshot_url']) ? '../' . $kiosk['screenshot_url'] : 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\'%3E%3Crect fill=\'%23f5f5f5\' width=\'400\' height=\'300\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%23999\' font-size=\'18\' dy=\'.3em\'%3ENo screenshot%3C/text%3E%3C/svg%3E'; ?>" 
+                                         alt="Screenshot"
+                                         style="
+                                            position: absolute;
+                                            top: 0;
+                                            left: 0;
+                                            width: 100%;
+                                            height: 100%;
+                                            object-fit: contain;
+                                         "
+                                    />
+                                    <div class="screenshot-timestamp" style="
+                                        position: absolute;
+                                        bottom: 5px;
+                                        right: 5px;
+                                        background: rgba(0,0,0,0.7);
+                                        color: white;
+                                        padding: 3px 8px;
+                                        border-radius: 3px;
+                                        font-size: 11px;
+                                    ">
+                                        <span id="screenshot-time-<?php echo $kiosk['id']; ?>">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+                        <span id="autoRefreshIndicator">Auto-refresh: <span id="refreshCountdown">15</span>s</span>
+                    </div>
                 </div>
             <?php endif; ?>
         <?php else: ?>
@@ -464,14 +542,85 @@ $logout_url = '../login.php?logout=1';
                 .then(data => {
                     if (data.success) {
                         const loops = data.loops;
-                        let html = '<div style="max-height: 500px; overflow-y: auto;">';
+                        let html = '';
                         
                         if (loops.length === 0) {
                             html += '<p style="text-align: center; color: #999; padding: 20px;">Nincs beállított loop ehhez a kijelzőhöz</p>';
                         } else {
+                            // Preview section with speed controls
+                            html += `
+                            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <h3 style="margin-top: 0; margin-bottom: 10px;">🎬 Előnézet Lejátszó</h3>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    <button onclick="playLoopPreview(${kioskId}, 1)" style="
+                                        background: #1a3a52;
+                                        color: white;
+                                        border: none;
+                                        padding: 8px 16px;
+                                        border-radius: 5px;
+                                        cursor: pointer;
+                                        font-size: 13px;
+                                    ">▶️ Lejátszás (1x)</button>
+                                    <button onclick="playLoopPreview(${kioskId}, 2)" style="
+                                        background: #1a3a52;
+                                        color: white;
+                                        border: none;
+                                        padding: 8px 16px;
+                                        border-radius: 5px;
+                                        cursor: pointer;
+                                        font-size: 13px;
+                                    ">⏩ Gyors (2x)</button>
+                                    <button onclick="playLoopPreview(${kioskId}, 4)" style="
+                                        background: #1a3a52;
+                                        color: white;
+                                        border: none;
+                                        padding: 8px 16px;
+                                        border-radius: 5px;
+                                        cursor: pointer;
+                                        font-size: 13px;
+                                    ">⏩⏩ Nagyon Gyors (4x)</button>
+                                    <button onclick="stopLoopPreview()" style="
+                                        background: #d32f2f;
+                                        color: white;
+                                        border: none;
+                                        padding: 8px 16px;
+                                        border-radius: 5px;
+                                        cursor: pointer;
+                                        font-size: 13px;
+                                    ">⏹️ Stop</button>
+                                </div>
+                                <div id="preview-display" style="
+                                    background: #1a1a1a;
+                                    color: white;
+                                    padding: 40px;
+                                    border-radius: 8px;
+                                    text-align: center;
+                                    font-size: 24px;
+                                    font-weight: bold;
+                                    min-height: 150px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    flex-direction: column;
+                                    gap: 10px;
+                                ">
+                                    <div>Nyomja meg a lejátszás gombot</div>
+                                    <div style="font-size: 14px; opacity: 0.7; font-weight: normal;">Az előnézet a modulokat fogja megjeleníteni az időzítések szerint</div>
+                                </div>
+                                <div id="preview-progress" style="
+                                    margin-top: 10px;
+                                    font-size: 12px;
+                                    color: #666;
+                                    text-align: center;
+                                "></div>
+                            </div>`;
+                            
+                            // Loop configuration list
+                            html += '<div style="max-height: 400px; overflow-y: auto;">';
+                            html += '<h3 style="margin-top: 0;">📋 Modul Sorrend</h3>';
                             html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
                             loops.forEach((loop, index) => {
-                                html += `<div style="
+                                html += `<div class="loop-item-${index}" style="
                                     background: linear-gradient(135deg, #0f2537 0%, #1a4d2e 100%);
                                     color: white;
                                     padding: 15px;
@@ -480,6 +629,7 @@ $logout_url = '../login.php?logout=1';
                                     align-items: center;
                                     gap: 15px;
                                     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                                    transition: transform 0.2s;
                                 ">
                                     <div style="
                                         background: rgba(255,255,255,0.2);
@@ -510,10 +660,13 @@ $logout_url = '../login.php?logout=1';
                             html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
                                 <strong>Teljes loop időtartam:</strong> ${totalDuration} másodperc (${Math.floor(totalDuration / 60)} perc ${totalDuration % 60} mp)
                             </div>`;
+                            html += '</div>';
                         }
-                        html += '</div>';
                         
                         showModal('🔄 Loop Konfiguráció - ' + hostname, html);
+                        
+                        // Store loop data for preview
+                        window.currentLoopData = loops;
                     } else {
                         alert('⚠️ ' + data.message);
                     }
@@ -577,6 +730,231 @@ $logout_url = '../login.php?logout=1';
             `;
             
             document.body.appendChild(modal);
+        }
+        
+        // Toggle between list and realtime view
+        let currentView = 'list';
+        let realtimeRefreshInterval = null;
+        let countdownInterval = null;
+        
+        function toggleView() {
+            const listView = document.getElementById('listView');
+            const realtimeView = document.getElementById('realtimeView');
+            const toggleBtn = document.getElementById('toggleViewBtn');
+            
+            if (currentView === 'list') {
+                listView.style.display = 'none';
+                realtimeView.style.display = 'block';
+                toggleBtn.textContent = '📋 Lista Nézet';
+                currentView = 'realtime';
+                startRealtimeRefresh();
+            } else {
+                listView.style.display = 'block';
+                realtimeView.style.display = 'none';
+                toggleBtn.textContent = '📸 Realtime Nézet';
+                currentView = 'list';
+                stopRealtimeRefresh();
+            }
+        }
+        
+        function startRealtimeRefresh() {
+            // Initial load
+            refreshScreenshots();
+            
+            // Set up auto-refresh every 15 seconds
+            let countdown = 15;
+            realtimeRefreshInterval = setInterval(() => {
+                refreshScreenshots();
+                countdown = 15;
+            }, 15000);
+            
+            // Countdown timer
+            countdownInterval = setInterval(() => {
+                countdown--;
+                const countdownEl = document.getElementById('refreshCountdown');
+                if (countdownEl) {
+                    countdownEl.textContent = countdown;
+                }
+                if (countdown <= 0) {
+                    countdown = 15;
+                }
+            }, 1000);
+        }
+        
+        function stopRealtimeRefresh() {
+            if (realtimeRefreshInterval) {
+                clearInterval(realtimeRefreshInterval);
+                realtimeRefreshInterval = null;
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+        }
+        
+        function refreshScreenshots() {
+            // Get all screenshot cards
+            const cards = document.querySelectorAll('.screenshot-card');
+            
+            cards.forEach(card => {
+                const kioskId = card.getAttribute('data-kiosk-id');
+                
+                // Fetch latest screenshot URL for this kiosk
+                fetch(`../api/kiosk_details.php?id=${kioskId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const img = card.querySelector('.screenshot-img');
+                            const timestampEl = document.getElementById(`screenshot-time-${kioskId}`);
+                            
+                            // Update screenshot if URL changed
+                            if (data.screenshot_url) {
+                                const newSrc = '../' + data.screenshot_url + '?t=' + new Date().getTime();
+                                if (img.src !== newSrc) {
+                                    img.src = newSrc;
+                                }
+                                
+                                // Update timestamp
+                                if (timestampEl) {
+                                    const now = new Date();
+                                    timestampEl.textContent = now.toLocaleTimeString('hu-HU');
+                                }
+                            }
+                        }
+                    })
+                    .catch(err => console.error('Failed to refresh screenshot for kiosk ' + kioskId, err));
+            });
+        }
+        
+        // Loop preview functions
+        let previewInterval = null;
+        let previewTimeout = null;
+        
+        function playLoopPreview(kioskId, speed) {
+            stopLoopPreview(); // Stop any existing preview
+            
+            if (!window.currentLoopData || window.currentLoopData.length === 0) {
+                alert('Nincs elérhető loop adat');
+                return;
+            }
+            
+            const loops = window.currentLoopData;
+            const previewDisplay = document.getElementById('preview-display');
+            const previewProgress = document.getElementById('preview-progress');
+            
+            if (!previewDisplay) return;
+            
+            let currentIndex = 0;
+            let cycleCount = 0;
+            const maxCycles = 2; // Show 2 full cycles
+            
+            function showModule(index) {
+                if (!loops[index]) return;
+                
+                const loop = loops[index];
+                const actualDuration = parseInt(loop.duration_seconds) * 1000; // ms
+                const displayDuration = actualDuration / speed; // Adjust for speed
+                
+                // Highlight current module in list
+                document.querySelectorAll('[class^="loop-item-"]').forEach((el, i) => {
+                    if (i === index) {
+                        el.style.transform = 'scale(1.05)';
+                        el.style.border = '3px solid #ffd700';
+                    } else {
+                        el.style.transform = 'scale(1)';
+                        el.style.border = 'none';
+                    }
+                });
+                
+                // Update preview display
+                previewDisplay.innerHTML = `
+                    <div style="font-size: 32px; font-weight: bold;">${loop.module_name}</div>
+                    <div style="font-size: 16px; opacity: 0.8;">${loop.description || ''}</div>
+                    <div style="margin-top: 20px; font-size: 14px; opacity: 0.6;">
+                        Modul ${index + 1} / ${loops.length} | 
+                        ${speed}x sebesség | 
+                        Eredeti időtartam: ${loop.duration_seconds}s
+                    </div>
+                    <div style="margin-top: 10px; width: 100%; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                        <div id="progress-bar" style="width: 0%; height: 100%; background: #4caf50; transition: width ${displayDuration}ms linear;"></div>
+                    </div>
+                `;
+                
+                // Animate progress bar
+                setTimeout(() => {
+                    const progressBar = document.getElementById('progress-bar');
+                    if (progressBar) {
+                        progressBar.style.width = '100%';
+                    }
+                }, 50);
+                
+                // Update progress text
+                if (previewProgress) {
+                    previewProgress.textContent = `Ciklus ${cycleCount + 1}/${maxCycles} - Modul ${index + 1}/${loops.length}`;
+                }
+                
+                // Schedule next module
+                previewTimeout = setTimeout(() => {
+                    currentIndex++;
+                    if (currentIndex >= loops.length) {
+                        currentIndex = 0;
+                        cycleCount++;
+                        
+                        if (cycleCount >= maxCycles) {
+                            stopLoopPreview();
+                            previewDisplay.innerHTML = `
+                                <div style="font-size: 24px;">✅ Előnézet befejezve</div>
+                                <div style="font-size: 14px; opacity: 0.7; margin-top: 10px;">
+                                    ${maxCycles} teljes ciklus lejátszva ${speed}x sebességgel
+                                </div>
+                            `;
+                            if (previewProgress) {
+                                previewProgress.textContent = '';
+                            }
+                            // Reset highlighting
+                            document.querySelectorAll('[class^="loop-item-"]').forEach(el => {
+                                el.style.transform = 'scale(1)';
+                                el.style.border = 'none';
+                            });
+                            return;
+                        }
+                    }
+                    showModule(currentIndex);
+                }, displayDuration);
+            }
+            
+            // Start preview
+            showModule(0);
+        }
+        
+        function stopLoopPreview() {
+            if (previewTimeout) {
+                clearTimeout(previewTimeout);
+                previewTimeout = null;
+            }
+            if (previewInterval) {
+                clearInterval(previewInterval);
+                previewInterval = null;
+            }
+            
+            // Reset highlighting
+            document.querySelectorAll('[class^="loop-item-"]').forEach(el => {
+                el.style.transform = 'scale(1)';
+                el.style.border = 'none';
+            });
+            
+            const previewDisplay = document.getElementById('preview-display');
+            const previewProgress = document.getElementById('preview-progress');
+            
+            if (previewDisplay) {
+                previewDisplay.innerHTML = `
+                    <div>Előnézet leállítva</div>
+                    <div style="font-size: 14px; opacity: 0.7; font-weight: normal;">Nyomja meg a lejátszás gombot újra</div>
+                `;
+            }
+            if (previewProgress) {
+                previewProgress.textContent = '';
+            }
         }
     </script>
 

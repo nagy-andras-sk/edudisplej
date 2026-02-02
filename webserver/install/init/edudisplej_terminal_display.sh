@@ -3,6 +3,9 @@
 # Real-time sync status viewer for kiosk terminal
 # =============================================================================
 
+# Service version
+SERVICE_VERSION="1.0.0"
+
 set -euo pipefail
 
 CONFIG_DIR="/opt/edudisplej"

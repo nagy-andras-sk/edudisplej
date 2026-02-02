@@ -361,3 +361,99 @@ countdown_with_f2() {
 }
 
 load_config
+
+
+# =============================================================================
+# Hardware Information Functions / Hardverove informacne funkcie
+# =============================================================================
+
+# Get MAC address (unified function used across all scripts)
+get_mac_address() {
+    # Try to get MAC address from primary network interface
+    local mac=""
+    
+    # Method 1: Try eth0 first (wired connection)
+    if [[ -f /sys/class/net/eth0/address ]]; then
+        mac=$(cat /sys/class/net/eth0/address 2>/dev/null | tr -d ':' | tr '[:lower:]' '[:upper:]')
+        if [[ -n "$mac" && "$mac" != "000000000000" ]]; then
+            echo "$mac"
+            return 0
+        fi
+    fi
+    
+    # Method 2: Try wlan0 (wireless connection)
+    if [[ -f /sys/class/net/wlan0/address ]]; then
+        mac=$(cat /sys/class/net/wlan0/address 2>/dev/null | tr -d ':' | tr '[:lower:]' '[:upper:]')
+        if [[ -n "$mac" && "$mac" != "000000000000" ]]; then
+            echo "$mac"
+            return 0
+        fi
+    fi
+    
+    # Method 3: Find first non-loopback interface
+    for iface in /sys/class/net/*; do
+        local ifname=$(basename "$iface")
+        if [[ "$ifname" == "lo" ]]; then
+            continue
+        fi
+        if [[ -f "$iface/address" ]]; then
+            mac=$(cat "$iface/address" 2>/dev/null | tr -d ':' | tr '[:lower:]' '[:upper:]')
+            if [[ -n "$mac" && "$mac" != "000000000000" ]]; then
+                echo "$mac"
+                return 0
+            fi
+        fi
+    done
+    
+    # Method 4: Use ip command as fallback
+    if command -v ip >/dev/null 2>&1; then
+        mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':' | tr '[:lower:]' '[:upper:]')
+        if [[ -n "$mac" && "$mac" != "000000000000" ]]; then
+            echo "$mac"
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# Get MAC suffix (last 6 characters)
+get_mac_suffix() {
+    local mac="$1"
+    echo "${mac: -6}"
+}
+
+# Get hostname
+get_hostname() {
+    hostname
+}
+
+# Get hardware info (JSON format)
+get_hw_info() {
+    cat << HWEOF
+{
+    "hostname": "$(hostname)",
+    "os": "$(lsb_release -ds 2>/dev/null || echo 'Unknown')",
+    "kernel": "$(uname -r)",
+    "architecture": "$(uname -m)",
+    "cpu": "$(grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs || echo 'Unknown')",
+    "memory": "$(free -h | awk '/^Mem:/ {print $2}')",
+    "uptime": "$(uptime -p)"
+}
+HWEOF
+}
+
+# =============================================================================
+# JSON Parsing Functions / JSON parsovanie funkcie
+# =============================================================================
+
+# Parse JSON value (jq if available, fallback to sed)
+json_get() {
+    local json="$1"
+    local key="$2"
+    if command -v jq >/dev/null 2>&1; then
+        echo "$json" | jq -r ".$key // empty" 2>/dev/null
+    else
+        echo "$json" | tr -d '\n\r' | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+    fi
+}

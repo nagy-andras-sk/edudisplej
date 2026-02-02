@@ -3,7 +3,16 @@
 # Enhanced with detailed logging and error reporting
 # =============================================================================
 
+# Service version
+SERVICE_VERSION="1.0.0"
+
 set -euo pipefail
+
+# Source common functions if available
+INIT_DIR="/opt/edudisplej/init"
+if [[ -f "${INIT_DIR}/common.sh" ]]; then
+    source "${INIT_DIR}/common.sh"
+fi
 
 # Configuration
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
@@ -11,6 +20,7 @@ REGISTRATION_API="${API_BASE_URL}/api/registration.php"
 MODULES_API="${API_BASE_URL}/api/modules_sync.php"
 HW_SYNC_API="${API_BASE_URL}/api/hw_data_sync.php"
 KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
+VERSION_CHECK_API="${API_BASE_URL}/api/check_versions.php"
 SYNC_INTERVAL=300  # 5 minutes
 CONFIG_DIR="/opt/edudisplej"
 LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
@@ -20,49 +30,61 @@ DOWNLOAD_SCRIPT="${CONFIG_DIR}/init/edudisplej-download-modules.sh"
 STATUS_FILE="${CONFIG_DIR}/sync_status.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/sync.log"
+VERSION_FILE="${CONFIG_DIR}/local_versions.json"
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment variable
 
 # Create directories
 mkdir -p "$CONFIG_DIR" "$LOG_DIR"
 
-# Logging functions
-log() {
-    local level="INFO"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
-}
+# Logging functions (fallback if common.sh not available)
+if ! command -v print_info &> /dev/null; then
+    log() {
+        local level="INFO"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
+    }
+    
+    log_debug() {
+        if [ "$DEBUG" = true ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" | tee -a "$LOG_FILE"
+        fi
+    }
+    
+    log_error() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" | tee -a "$LOG_FILE" >&2
+    }
+    
+    log_success() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
+    }
+else
+    # Use print_* functions from common.sh
+    log() { print_info "$*" >> "$LOG_FILE"; }
+    log_debug() { [ "$DEBUG" = true ] && print_info "[DEBUG] $*" >> "$LOG_FILE" || true; }
+    log_error() { print_error "$*" >> "$LOG_FILE"; }
+    log_success() { print_success "$*" >> "$LOG_FILE"; }
+fi
 
-log_debug() {
-    if [ "$DEBUG" = true ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" | tee -a "$LOG_FILE"
-    fi
-}
+# Use shared functions from common.sh if available, otherwise define fallbacks
+if ! command -v get_mac_address &> /dev/null; then
+    get_mac_address() {
+        local mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':')
+        log_debug "Detected MAC address: $mac"
+        echo "$mac"
+    }
+fi
 
-log_error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" | tee -a "$LOG_FILE" >&2
-}
+if ! command -v get_hostname &> /dev/null; then
+    get_hostname() {
+        local host=$(hostname)
+        log_debug "Detected hostname: $host"
+        echo "$host"
+    }
+fi
 
-log_success() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
-}
-
-# Get MAC address
-get_mac_address() {
-    local mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':')
-    log_debug "Detected MAC address: $mac"
-    echo "$mac"
-}
-
-# Get hostname
-get_hostname() {
-    local host=$(hostname)
-    log_debug "Detected hostname: $host"
-    echo "$host"
-}
-
-# Get hardware info
-get_hw_info() {
-    log_debug "Collecting hardware information..."
-    cat << EOF
+if ! command -v get_hw_info &> /dev/null; then
+    get_hw_info() {
+        log_debug "Collecting hardware information..."
+        cat << EOF
 {
     "hostname": "$(hostname)",
     "os": "$(lsb_release -ds 2>/dev/null || echo 'Unknown')",
@@ -73,18 +95,21 @@ get_hw_info() {
     "uptime": "$(uptime -p)"
 }
 EOF
-}
+    }
+fi
 
-# Parse JSON value (jq if available, fallback to sed)
-json_get() {
-    local json="$1"
-    local key="$2"
-    if command -v jq >/dev/null 2>&1; then
-        echo "$json" | jq -r ".$key // empty" 2>/dev/null
-    else
-        echo "$json" | tr -d '\n\r' | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
-    fi
-}
+# Parse JSON value (use shared function or fallback)
+if ! command -v json_get &> /dev/null; then
+    json_get() {
+        local json="$1"
+        local key="$2"
+        if command -v jq >/dev/null 2>&1; then
+            echo "$json" | jq -r ".$key // empty" 2>/dev/null
+        else
+            echo "$json" | tr -d '\n\r' | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+        fi
+    }
+fi
 
 # Sync hardware data (also returns sync interval and update status)
 sync_hw_data() {
@@ -149,20 +174,20 @@ sync_hw_data() {
 }
 
 # Check loop changes and update modules if needed
-# This compares local loop.json last_update timestamp with server's loop_last_update
-sync_loop_config() {
+# This compares local loop.json last_update with server's created_at/updated_at
+check_loop_updates() {
     local device_id="$1"
     [ -z "$device_id" ] && return 0
     
-    log "Checking loop configuration changes..."
-    
-    # Get local loop timestamp if exists
+    # Get local last_update timestamp from loop.json
     local local_last_update=""
     if [ -f "$LOOP_FILE" ]; then
         if command -v jq >/dev/null 2>&1; then
             local_last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
         fi
     fi
+    
+    log_debug "Local loop last_update: ${local_last_update:-none}"
     
     # Query server for loop configuration
     local response
@@ -172,94 +197,43 @@ sync_loop_config() {
         return 1
     fi
     
-    # Get server's loop update timestamp
-    local loop_last_update
-    local loop_config
-    if command -v jq >/dev/null 2>&1; then
-        loop_last_update=$(echo "$response" | jq -r '.loop_last_update // empty' 2>/dev/null)
-        loop_config=$(echo "$response" | jq -c '.loop_config // []' 2>/dev/null)
-    else
-        loop_last_update=$(json_get "$response" "loop_last_update")
-        loop_config=$(echo "$response" | tr -d '\n\r' | sed -n 's/.*"loop_config"[[:space:]]*:[[:space:]]*\(\[[^]]*\]\).*/\1/p')
-    fi
+    # Get server's loop update timestamp (created_at or updated_at from kiosk_group_modules)
+    local server_updated_at
+    server_updated_at=$(json_get "$response" "loop_updated_at")
     
-    log "  Local loop update:  ${local_last_update:-none}"
-    log "  Server loop update: ${loop_last_update:-none}"
+    log_debug "Server loop updated_at: ${server_updated_at:-none}"
     
-    # Compare timestamps: if server is newer, update
+    # Compare timestamps: if no local timestamp, or server is newer, update
     local needs_update=false
     
     if [ -z "$local_last_update" ]; then
         log "No local loop found - downloading from server..."
         needs_update=true
-    elif [ -z "$loop_last_update" ]; then
-        log "Could not determine server loop timestamp - skipping update"
-        return 0
-    elif [[ "$loop_last_update" > "$local_last_update" ]]; then
-        log "⚠ Loop configuration changed!"
-        log "  Local:  $local_last_update"
-        log "  Server: $loop_last_update"
-        needs_update=true
+    elif [ -z "$server_updated_at" ]; then
+        log_debug "Server has no update timestamp - skipping comparison"
     else
-        log "✓ Loop configuration is up-to-date"
-        log "  Timestamp: $local_last_update"
+        # Compare timestamps (works with both datetime strings and unix timestamps)
+        if [[ "$server_updated_at" > "$local_last_update" ]]; then
+            log "Server loop is newer (server: $server_updated_at, local: $local_last_update)"
+            needs_update=true
+        else
+            log_debug "Loop configuration is up-to-date"
+        fi
     fi
     
-    # Update local loop.json if needed
+    # Download modules if update is needed
     if [ "$needs_update" = "true" ]; then
-        log "Updating local loop.json..."
-        
-        # Create modules directory if it doesn't exist
-        mkdir -p "$(dirname "$LOOP_FILE")"
-        
-        # Write new loop.json - { "last_update": "...", "loop": [...] }
-        if command -v jq >/dev/null 2>&1; then
-            # Use jq to format properly
-            echo "$response" | jq '{
-                last_update: .loop_last_update,
-                loop: .loop_config
-            }' > "$LOOP_FILE" 2>/dev/null || {
-                # Fallback if jq fails - build JSON manually
-                log_error "jq formatting failed, using manual method"
-                cat > "$LOOP_FILE" <<EOF
-{
-    "last_update": "${loop_last_update}",
-    "loop": ${loop_config}
-}
-EOF
-            }
-        else
-            # Fallback without jq
-            cat > "$LOOP_FILE" <<EOF
-{
-    "last_update": "${loop_last_update}",
-    "loop": ${loop_config}
-}
-EOF
-        fi
-        
-        log_success "✓ Loop configuration updated"
-        
-        # Download modules if needed
+        log "Downloading latest loop configuration and modules..."
         if [ -x "$DOWNLOAD_SCRIPT" ]; then
-            log "Downloading modules..."
             if bash "$DOWNLOAD_SCRIPT"; then
-                log_success "✓ Modules downloaded successfully"
+                log_success "Loop and modules updated successfully"
             else
-                log_error "Module download failed"
+                log_error "Module update failed"
             fi
-        fi
-        
-        # Restart kiosk service to apply changes
-        log "Restarting kiosk display service..."
-        if systemctl restart edudisplej-kiosk.service 2>/dev/null; then
-            log_success "✓ Kiosk service restarted successfully"
         else
-            log_error "Failed to restart kiosk service (may require manual restart)"
+            log_error "Download script not found: $DOWNLOAD_SCRIPT"
         fi
     fi
-    
-    return 0
 }
 
 # Register kiosk and sync
@@ -416,23 +390,41 @@ EOF
         
         # Update sync interval from server
         if sync_hw_data; then
-            log "Sync interval updated: ${SYNC_INTERVAL}s"
+            log "Sync interval: ${SYNC_INTERVAL}s"
         fi
         
         # Always check for loop updates if we have a device_id
         if [ -n "$device_id" ] && [ "$device_id" != "unknown" ]; then
             log "Checking for loop configuration changes..."
-            sync_loop_config "$device_id"
+            check_loop_updates "$device_id"
+            
+            # Collect and upload logs
+            log_debug "Uploading logs to server..."
+            collect_and_upload_logs "$device_id"
+            
+            # Capture and upload screenshot periodically (every 5th sync cycle)
+            # Check if screenshot should be taken
+            SCREENSHOT_COUNTER_FILE="${CONFIG_DIR}/.screenshot_counter"
+            SCREENSHOT_COUNTER=0
+            if [ -f "$SCREENSHOT_COUNTER_FILE" ]; then
+                SCREENSHOT_COUNTER=$(cat "$SCREENSHOT_COUNTER_FILE")
+            fi
+            SCREENSHOT_COUNTER=$((SCREENSHOT_COUNTER + 1))
+            echo "$SCREENSHOT_COUNTER" > "$SCREENSHOT_COUNTER_FILE"
+            
+            # Take screenshot every 5 sync cycles (e.g., every 25 minutes if sync is 5 min)
+            if [ $((SCREENSHOT_COUNTER % 5)) -eq 0 ]; then
+                log "Taking screenshot..."
+                if [ -x "${INIT_DIR}/edudisplej-screenshot.sh" ]; then
+                    bash "${INIT_DIR}/edudisplej-screenshot.sh" &
+                fi
+            fi
         fi
         
         # Notify if not fully configured
         if [ "$is_configured" = "false" ]; then
-            if [ "$company_assigned" = "true" ] && [ "$group_name" != "Unknown" ]; then
-                log "Status: ✓ Ready - Company and group assigned, loop configured"
-            else
-                log "Note: Device configuration incomplete"
-                log "Visit: https://control.edudisplej.sk/admin/"
-            fi
+            log "Note: Device not fully configured yet"
+            log "Visit: https://control.edudisplej.sk/admin/"
         fi
         
         return 0
@@ -521,6 +513,150 @@ sync_modules() {
     # Future implementation: download modules from MODULES_API
 }
 
+# Collect and upload logs to server
+collect_and_upload_logs() {
+    local device_id="$1"
+    [ -z "$device_id" ] && return 0
+    
+    log_debug "Collecting logs for upload..."
+    
+    local logs_json="["
+    local first=true
+    
+    # Collect recent errors and warnings from sync log
+    if [ -f "$LOG_FILE" ]; then
+        while IFS= read -r line; do
+            # Only send ERROR and WARNING logs
+            if echo "$line" | grep -qE "\[ERROR\]|\[WARNING\]"; then
+                # Extract log level and message
+                local timestamp=$(echo "$line" | sed -n 's/^\[\([^]]*\)\].*/\1/p')
+                local level=$(echo "$line" | sed -n 's/.*\[\(ERROR\|WARNING\)\].*/\1/p' | tr '[:upper:]' '[:lower:]')
+                local message=$(echo "$line" | sed 's/^[^]]*\] \[[^]]*\] //')
+                
+                # Build JSON entry
+                if [ "$first" = true ]; then
+                    first=false
+                else
+                    logs_json+=","
+                fi
+                
+                # Escape quotes in message
+                message=$(echo "$message" | sed 's/"/\\"/g' | tr -d '\n\r')
+                
+                logs_json+="{\"type\":\"sync\",\"level\":\"$level\",\"message\":\"$message\",\"timestamp\":\"$timestamp\"}"
+            fi
+        done < <(tail -100 "$LOG_FILE" 2>/dev/null)
+    fi
+    
+    # Collect systemd service errors if available
+    if command -v journalctl >/dev/null 2>&1; then
+        local service_logs=$(journalctl -u edudisplej-kiosk.service -u edudisplej-sync.service --since "5 minutes ago" -p err -n 20 --no-pager 2>/dev/null || true)
+        if [ -n "$service_logs" ]; then
+            while IFS= read -r line; do
+                if [ -n "$line" ]; then
+                    if [ "$first" = false ]; then
+                        logs_json+=","
+                    fi
+                    first=false
+                    
+                    local message=$(echo "$line" | sed 's/"/\\"/g' | tr -d '\n\r')
+                    logs_json+="{\"type\":\"systemd\",\"level\":\"error\",\"message\":\"$message\"}"
+                fi
+            done <<< "$service_logs"
+        fi
+    fi
+    
+    logs_json+="]"
+    
+    # Only send if we have logs
+    if [ "$logs_json" = "[]" ]; then
+        log_debug "No error/warning logs to upload"
+        return 0
+    fi
+    
+    # Send logs to server
+    local mac=$(get_mac_address)
+    local request_body="{\"mac\":\"$mac\",\"device_id\":\"$device_id\",\"logs\":$logs_json}"
+    
+    local response=$(curl -s -X POST "${API_BASE_URL}/api/log_sync.php" \
+        -H "Content-Type: application/json" \
+        -d "$request_body" \
+        --max-time 30)
+    
+    if echo "$response" | grep -q '"success":true'; then
+        local logs_inserted=$(json_get "$response" "logs_inserted")
+        log_debug "Uploaded $logs_inserted logs to server"
+    else
+        log_debug "Log upload failed (non-critical)"
+    fi
+}
+
+# Check for service updates (version check)
+check_service_updates() {
+    log_debug "Checking for service updates..."
+    
+    # Create local version file if it doesn't exist
+    if [ ! -f "$VERSION_FILE" ]; then
+        log "Creating local version file..."
+        echo "{\"edudisplej_sync_service.sh\": \"$SERVICE_VERSION\"}" > "$VERSION_FILE"
+    fi
+    
+    # Query server for current versions
+    local response
+    response=$(curl -s -X GET "$VERSION_CHECK_API" --max-time 10 2>/dev/null || echo '{"success":false}')
+    
+    if ! echo "$response" | grep -q '"success":true'; then
+        log_debug "Version check failed or unavailable"
+        return 0
+    fi
+    
+    # Check if this service needs update
+    local server_version
+    if command -v jq >/dev/null 2>&1; then
+        server_version=$(echo "$response" | jq -r '.versions["edudisplej_sync_service.sh"] // empty')
+    else
+        server_version=$(echo "$response" | grep -o '"edudisplej_sync_service.sh":"[^"]*"' | cut -d'"' -f4)
+    fi
+    
+    if [ -n "$server_version" ] && [ "$server_version" != "$SERVICE_VERSION" ]; then
+        log "⚠ Service update available: $SERVICE_VERSION -> $server_version"
+        log "Downloading updated service..."
+        
+        # Download updated service
+        local temp_file="/tmp/edudisplej_sync_service.sh.new"
+        if curl -s -o "$temp_file" "${API_BASE_URL%/api*}/install/init/edudisplej_sync_service.sh" --max-time 30; then
+            # Verify it's a valid script
+            if head -1 "$temp_file" | grep -q "^#!/bin/bash"; then
+                # Backup current version
+                cp "${INIT_DIR}/edudisplej_sync_service.sh" "${INIT_DIR}/edudisplej_sync_service.sh.backup"
+                # Replace with new version
+                cp "$temp_file" "${INIT_DIR}/edudisplej_sync_service.sh"
+                chmod +x "${INIT_DIR}/edudisplej_sync_service.sh"
+                rm -f "$temp_file"
+                
+                log_success "Service updated to version $server_version"
+                log "Restarting service..."
+                
+                # Update local version file
+                if command -v jq >/dev/null 2>&1; then
+                    jq --arg v "$server_version" '.["edudisplej_sync_service.sh"] = $v' "$VERSION_FILE" > "${VERSION_FILE}.tmp" && mv "${VERSION_FILE}.tmp" "$VERSION_FILE"
+                fi
+                
+                # Restart the service
+                systemctl restart edudisplej-sync.service 2>/dev/null || true
+                exit 0
+            else
+                log_error "Downloaded file is not a valid script"
+                rm -f "$temp_file"
+            fi
+        else
+            log_error "Failed to download updated service"
+        fi
+    else
+        log_debug "Service is up to date (version $SERVICE_VERSION)"
+    fi
+}
+
 # Check for system updates (runs daily)
 check_and_update() {
     local update_check_file="/tmp/edudisplej_update_check"
@@ -563,7 +699,7 @@ main() {
     log "=========================================="
     log "EduDisplej Sync Service Started"
     log "=========================================="
-    log "Version: 2.1"
+    log "Version: $SERVICE_VERSION"
     log "API URL: $REGISTRATION_API"
     log "Sync interval: ${SYNC_INTERVAL}s"
     log "Auto-update: Enabled (daily)"
@@ -574,9 +710,15 @@ main() {
     # Run update check on service start
     check_and_update
     
+    # Check for service updates
+    check_service_updates
+    
     while true; do
         # Check for daily updates
         check_and_update
+        
+        # Check for service updates (every sync cycle)
+        check_service_updates
         
         if register_and_sync; then
             log "Sync completed successfully"
