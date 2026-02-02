@@ -1,10 +1,29 @@
 #!/bin/bash
 set -euo pipefail
 
+# Parse command line arguments
+API_TOKEN=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --token=*)
+            API_TOKEN="${1#*=}"
+            shift
+            ;;
+        --token)
+            API_TOKEN="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 # Zakladne nastavenia - Base settings
 TARGET_DIR="/opt/edudisplej"
 INIT_DIR="${TARGET_DIR}/init"
 LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
+LIC_DIR="${TARGET_DIR}/lic"
 INIT_BASE="https://install.edudisplej.sk/init"
 SERVICE_FILE="/etc/systemd/system/edudisplej-kiosk.service"
 
@@ -143,7 +162,15 @@ if [ -d "$TARGET_DIR" ]; then
 fi
 
 # Vytvorenie priecinkov - Create directories
-mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR"
+mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR"
+
+# Save API token if provided
+if [ -n "$API_TOKEN" ]; then
+    echo "[*] Ukladanie API tokenu - Saving API token..."
+    echo "$API_TOKEN" > "${LIC_DIR}/token"
+    chmod 600 "${LIC_DIR}/token"
+    echo "[✓] API token ulozeny - API token saved"
+fi
 
 # Nacitanie zoznamu suborov - Loading file list
 echo "[*] Nacitavame zoznam suborov - Loading file list..."

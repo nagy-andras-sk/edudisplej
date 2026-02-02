@@ -390,7 +390,7 @@ EOF
         
         # Update sync interval from server
         if sync_hw_data; then
-            log "Sync interval updated: ${SYNC_INTERVAL}s"
+            log "Sync interval: ${SYNC_INTERVAL}s"
         fi
         
         # Always check for loop updates if we have a device_id
@@ -401,6 +401,24 @@ EOF
             # Collect and upload logs
             log_debug "Uploading logs to server..."
             collect_and_upload_logs "$device_id"
+            
+            # Capture and upload screenshot periodically (every 5th sync cycle)
+            # Check if screenshot should be taken
+            SCREENSHOT_COUNTER_FILE="${CONFIG_DIR}/.screenshot_counter"
+            SCREENSHOT_COUNTER=0
+            if [ -f "$SCREENSHOT_COUNTER_FILE" ]; then
+                SCREENSHOT_COUNTER=$(cat "$SCREENSHOT_COUNTER_FILE")
+            fi
+            SCREENSHOT_COUNTER=$((SCREENSHOT_COUNTER + 1))
+            echo "$SCREENSHOT_COUNTER" > "$SCREENSHOT_COUNTER_FILE"
+            
+            # Take screenshot every 5 sync cycles (e.g., every 25 minutes if sync is 5 min)
+            if [ $((SCREENSHOT_COUNTER % 5)) -eq 0 ]; then
+                log "Taking screenshot..."
+                if [ -x "${INIT_DIR}/edudisplej-screenshot.sh" ]; then
+                    bash "${INIT_DIR}/edudisplej-screenshot.sh" &
+                fi
+            fi
         fi
         
         # Notify if not fully configured
