@@ -19,6 +19,11 @@ try {
     $public_ip = $_SERVER['REMOTE_ADDR'] ?? '';
     $client_last_update = $data['last_update'] ?? null; // Timestamp from kiosk's loop.json
     
+    // New technical info fields
+    $version = $data['version'] ?? null;
+    $screen_resolution = $data['screen_resolution'] ?? null;
+    $screen_status = $data['screen_status'] ?? null;
+    
     if (empty($mac)) {
         $response['message'] = 'MAC address required';
         echo json_encode($response);
@@ -27,9 +32,9 @@ try {
     
     $conn = getDbConnection();
     
-    // Update kiosk hardware data and public IP
-    $stmt = $conn->prepare("UPDATE kiosks SET hostname = ?, hw_info = ?, public_ip = ?, status = 'online', last_seen = NOW() WHERE mac = ?");
-    $stmt->bind_param("ssss", $hostname, $hw_info, $public_ip, $mac);
+    // Update kiosk hardware data, public IP and technical info
+    $stmt = $conn->prepare("UPDATE kiosks SET hostname = ?, hw_info = ?, public_ip = ?, version = ?, screen_resolution = ?, screen_status = ?, status = 'online', last_seen = NOW() WHERE mac = ?");
+    $stmt->bind_param("sssssss", $hostname, $hw_info, $public_ip, $version, $screen_resolution, $screen_status, $mac);
     $stmt->execute();
     
     // Get kiosk data with company information

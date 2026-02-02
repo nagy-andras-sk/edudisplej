@@ -307,6 +307,14 @@ else
     
     # Nastavenie opravneni / Jogok beallitasa
     chmod -R 755 "$TARGET_DIR"
+    
+    # Setup screenshot service directories and permissions
+    mkdir -p "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic"
+    chmod 755 "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic"
+    # Ensure config.json is readable by screenshot service
+    [ -f "${TARGET_DIR}/data/config.json" ] && chmod 644 "${TARGET_DIR}/data/config.json"
+    # Cleanup old log directory if exists
+    rm -rf "${TARGET_DIR}/logs"
 fi
 
 # ============================================================================
@@ -591,6 +599,13 @@ if systemctl is-enabled edudisplej-kiosk.service >/dev/null 2>&1; then
     echo "[✓] Displej restartovany"
 else
     echo "[!] edudisplej-kiosk.service nie je aktivovana"
+fi
+
+# Restart screenshot service if enabled
+if systemctl is-enabled edudisplej-screenshot-service.service >/dev/null 2>&1; then
+    echo "[*] Restartujem edudisplej-screenshot-service..."
+    systemctl restart edudisplej-screenshot-service.service 2>/dev/null || true
+    echo "[✓] Screenshot service restartovany"
 fi
 
 echo ""

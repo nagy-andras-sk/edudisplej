@@ -11,6 +11,8 @@ Restart=always
 RestartSec=30
 User=root
 Environment=EDUDISPLEJ_API_URL=https://control.edudisplej.sk
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/edudisplej/.Xauthority
 StandardOutput=journal
 StandardError=journal
 

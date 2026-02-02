@@ -47,8 +47,16 @@ try {
     if (!$is_admin && !$company_id) {
         $error = 'You are not assigned to any company. Please contact an administrator.';
     } else if ($company_id) {
-        // Get company kiosks
-        $query = "SELECT k.* FROM kiosks k WHERE k.company_id = ? ORDER BY k.hostname";
+        // Get company kiosks with group information
+        $query = "SELECT k.*, 
+                  GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as group_names,
+                  GROUP_CONCAT(DISTINCT g.id SEPARATOR ',') as group_ids
+                  FROM kiosks k 
+                  LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
+                  LEFT JOIN kiosk_groups g ON kga.group_id = g.id
+                  WHERE k.company_id = ? 
+                  GROUP BY k.id
+                  ORDER BY k.hostname";
         $stmt = $conn->prepare($query);
         $stmt->bind_param("i", $company_id);
         $stmt->execute();
@@ -58,6 +66,23 @@ try {
             $kiosks[] = $row;
         }
         $stmt->close();
+        
+        // Get all groups for filtering
+        $groups_query = "SELECT DISTINCT g.id, g.name FROM kiosk_groups g 
+                        INNER JOIN kiosk_group_assignments kga ON g.id = kga.group_id
+                        INNER JOIN kiosks k ON kga.kiosk_id = k.id
+                        WHERE k.company_id = ?
+                        ORDER BY g.name";
+        $groups_stmt = $conn->prepare($groups_query);
+        $groups_stmt->bind_param("i", $company_id);
+        $groups_stmt->execute();
+        $groups_result = $groups_stmt->get_result();
+        
+        $groups = [];
+        while ($group_row = $groups_result->fetch_assoc()) {
+            $groups[] = $group_row;
+        }
+        $groups_stmt->close();
     }
     
     $conn->close();
@@ -92,20 +117,38 @@ $logout_url = '../login.php?logout=1';
             </div>
             
             <h2>Saját Kijelzők</h2>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 15px; flex-wrap: wrap;">
                 <p style="color: #666; margin: 0;">A cégjéhez rendelt összes kijelző</p>
-                <button id="toggleViewBtn" onclick="toggleView()" style="
-                    background: #1a3a52;
-                    color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    transition: background 0.2s;
-                " onmouseover="this.style.background='#0f2537'" onmouseout="this.style.background='#1a3a52'">
-                    📸 Realtime Nézet
-                </button>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <!-- Group Filter -->
+                    <?php if (!empty($groups)): ?>
+                    <select id="groupFilter" onchange="filterByGroup()" style="
+                        padding: 10px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                        font-size: 14px;
+                        cursor: pointer;
+                    ">
+                        <option value="">Minden csoport</option>
+                        <?php foreach ($groups as $group): ?>
+                            <option value="<?php echo $group['id']; ?>"><?php echo htmlspecialchars($group['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php endif; ?>
+                    
+                    <button id="toggleViewBtn" onclick="toggleView()" style="
+                        background: #1a3a52;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        transition: background 0.2s;
+                    " onmouseover="this.style.background='#0f2537'" onmouseout="this.style.background='#1a3a52'">
+                        📸 Realtime Nézet
+                    </button>
+                </div>
             </div>
             
             <?php if (empty($kiosks)): ?>
@@ -156,9 +199,12 @@ $logout_url = '../login.php?logout=1';
                 
                 <!-- Realtime Screenshot View -->
                 <div id="realtimeView" style="display: none;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
                         <?php foreach ($kiosks as $kiosk): ?>
-                            <div class="screenshot-card" data-kiosk-id="<?php echo $kiosk['id']; ?>" style="
+                            <div class="screenshot-card" 
+                                 data-kiosk-id="<?php echo $kiosk['id']; ?>"
+                                 data-group-ids="<?php echo htmlspecialchars($kiosk['group_ids'] ?? ''); ?>"
+                                 style="
                                 background: white;
                                 border-radius: 10px;
                                 padding: 15px;
@@ -166,15 +212,57 @@ $logout_url = '../login.php?logout=1';
                                 transition: transform 0.2s;
                             " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                                 <div style="margin-bottom: 10px;">
-                                    <h3 style="margin: 0; font-size: 16px; color: #1a3a52;">
+                                    <h3 style="margin: 0 0 5px 0; font-size: 16px; color: #1a3a52;">
                                         <?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>
                                     </h3>
-                                    <small style="color: #999;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
                                         <span class="status-badge status-<?php echo $kiosk['status']; ?>">
                                             <?php echo $kiosk['status'] == 'online' ? '🟢' : '🔴'; ?>
                                         </span>
+                                        <?php if (!empty($kiosk['group_names'])): ?>
+                                            <span style="background: #e3f2fd; color: #1976d2; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600;">
+                                                📁 <?php echo htmlspecialchars($kiosk['group_names']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <small style="color: #999; display: block;">
                                         <?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?>
                                     </small>
+                                    <!-- Tech Info -->
+                                    <div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 5px; font-size: 11px; color: #666;">
+                                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 5px; margin-bottom: 8px;">
+                                            <?php if (!empty($kiosk['version'])): ?>
+                                                <span style="font-weight: 600;">📦 Verzió:</span>
+                                                <span id="version-<?php echo $kiosk['id']; ?>"><?php echo htmlspecialchars($kiosk['version']); ?></span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($kiosk['screen_resolution'])): ?>
+                                                <span style="font-weight: 600;">🖥️ Felbontás:</span>
+                                                <span id="resolution-<?php echo $kiosk['id']; ?>"><?php echo htmlspecialchars($kiosk['screen_resolution']); ?></span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($kiosk['screen_status'])): ?>
+                                                <span style="font-weight: 600;">💡 Képernyő:</span>
+                                                <span id="screen-status-<?php echo $kiosk['id']; ?>">
+                                                    <?php 
+                                                        $status = $kiosk['screen_status'];
+                                                        if ($status == 'on') echo '✅ Bekapcsolva';
+                                                        elseif ($status == 'off') echo '❌ Kikapcsolva';
+                                                        else echo '❓ ' . htmlspecialchars($status);
+                                                    ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <!-- Sync timestamps -->
+                                        <div style="border-top: 1px solid #ddd; padding-top: 5px; display: grid; grid-template-columns: auto 1fr; gap: 5px;">
+                                            <span style="font-weight: 600;">⏱️ Szinkronizálás:</span>
+                                            <span id="last-sync-<?php echo $kiosk['id']; ?>" style="color: #666;">
+                                                <?php echo (!empty($kiosk['last_sync']) && $kiosk['last_sync'] !== 'NULL') ? date('H:i', strtotime($kiosk['last_sync'])) : '-'; ?>
+                                            </span>
+                                            <span style="font-weight: 600;">🔄 Loop verzió:</span>
+                                            <span id="loop-version-<?php echo $kiosk['id']; ?>" style="color: #666;">
+                                                <?php echo (!empty($kiosk['loop_last_update']) && $kiosk['loop_last_update'] !== 'NULL') ? date('H:i', strtotime($kiosk['loop_last_update'])) : '-'; ?>
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="screenshot-container" style="
                                     position: relative;
@@ -792,6 +880,26 @@ $logout_url = '../login.php?logout=1';
             }
         }
         
+        // Filter by group function
+        function filterByGroup() {
+            const groupFilter = document.getElementById('groupFilter');
+            const selectedGroupId = groupFilter.value;
+            const cards = document.querySelectorAll('.screenshot-card');
+            
+            cards.forEach(card => {
+                const groupIds = (card.getAttribute('data-group-ids') || '').split(',').filter(id => id);
+                
+                // Show card if no group selected or card belongs to selected group
+                if (!selectedGroupId) {
+                    card.style.display = '';
+                } else if (groupIds.includes(selectedGroupId)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+        
         function refreshScreenshots() {
             // Get all screenshot cards
             const cards = document.querySelectorAll('.screenshot-card');
@@ -818,6 +926,45 @@ $logout_url = '../login.php?logout=1';
                                 if (timestampEl) {
                                     const now = new Date();
                                     timestampEl.textContent = now.toLocaleTimeString('hu-HU');
+                                }
+                            }
+                            
+                            // Update tech info
+                            if (data.version) {
+                                const versionEl = document.getElementById(`version-${kioskId}`);
+                                if (versionEl) versionEl.textContent = data.version;
+                            }
+                            
+                            if (data.screen_resolution) {
+                                const resEl = document.getElementById(`resolution-${kioskId}`);
+                                if (resEl) resEl.textContent = data.screen_resolution;
+                            }
+                            
+                            if (data.screen_status) {
+                                const statusEl = document.getElementById(`screen-status-${kioskId}`);
+                                if (statusEl) {
+                                    let statusText = '';
+                                    if (data.screen_status == 'on') statusText = '✅ Bekapcsolva';
+                                    else if (data.screen_status == 'off') statusText = '❌ Kikapcsolva';
+                                    else statusText = '❓ ' + data.screen_status;
+                                    statusEl.textContent = statusText;
+                                }
+                            }
+                            
+                            // Update sync timestamps
+                            if (data.last_sync) {
+                                const syncEl = document.getElementById(`last-sync-${kioskId}`);
+                                if (syncEl) {
+                                    const syncTime = new Date(data.last_sync);
+                                    syncEl.textContent = syncTime.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+                                }
+                            }
+                            
+                            if (data.loop_last_update) {
+                                const loopEl = document.getElementById(`loop-version-${kioskId}`);
+                                if (loopEl) {
+                                    const loopTime = new Date(data.loop_last_update);
+                                    loopEl.textContent = loopTime.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
                                 }
                             }
                         }

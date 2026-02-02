@@ -101,6 +101,43 @@ EOF
     }
 fi
 
+if ! command -v get_tech_info &> /dev/null; then
+    get_tech_info() {
+        local version="unknown"
+        local screen_resolution="unknown"
+        local screen_status="unknown"
+        
+        if [ -f "/opt/edudisplej/VERSION" ]; then
+            version=$(cat /opt/edudisplej/VERSION 2>/dev/null || echo "unknown")
+        fi
+        
+        if command -v xrandr &>/dev/null; then
+            screen_resolution=$(DISPLAY=:0 xrandr 2>/dev/null | grep '\*' | awk '{print $1}' | head -1)
+            [ -z "$screen_resolution" ] && screen_resolution="unknown"
+        elif command -v xdpyinfo &>/dev/null; then
+            screen_resolution=$(DISPLAY=:0 xdpyinfo 2>/dev/null | grep dimensions | awk '{print $2}')
+            [ -z "$screen_resolution" ] && screen_resolution="unknown"
+        fi
+        
+        if command -v xset &>/dev/null; then
+            local dpms_status=$(DISPLAY=:0 xset q 2>/dev/null | grep "Monitor is" | awk '{print $3}')
+            if [ "$dpms_status" = "On" ]; then
+                screen_status="on"
+            elif [ "$dpms_status" = "Off" ]; then
+                screen_status="off"
+            else
+                if DISPLAY=:0 xset q &>/dev/null; then
+                    screen_status="on"
+                else
+                    screen_status="unknown"
+                fi
+            fi
+        fi
+        
+        echo "{\"version\":\"$version\",\"screen_resolution\":\"$screen_resolution\",\"screen_status\":\"$screen_status\"}"
+    }
+fi
+
 # Parse JSON value (use shared function or fallback)
 if ! command -v json_get &> /dev/null; then
     json_get() {
@@ -190,6 +227,12 @@ sync_hw_data() {
     local hostname=$(get_hostname)
     local hw_info=$(get_hw_info)
     
+    # Get technical info (version, screen resolution, screen status)
+    local tech_info=$(get_tech_info)
+    local version=$(json_get "$tech_info" "version")
+    local screen_resolution=$(json_get "$tech_info" "screen_resolution")
+    local screen_status=$(json_get "$tech_info" "screen_status")
+    
     # Get last_update from local loop.json if it exists
     local last_update=""
     if [ -f "$LOOP_FILE" ]; then
@@ -198,14 +241,14 @@ sync_hw_data() {
         fi
     fi
     
-    # Build request with last_update if available
+    # Build request with last_update and tech info if available
     local request_data
     if [ -n "$last_update" ]; then
-        request_data="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info,\"last_update\":\"$last_update\"}"
-        log_debug "Sending last_update: $last_update"
+        request_data="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info,\"last_update\":\"$last_update\",\"version\":\"$version\",\"screen_resolution\":\"$screen_resolution\",\"screen_status\":\"$screen_status\"}"
+        log_debug "Sending last_update: $last_update with tech info (v:$version, res:$screen_resolution, status:$screen_status)"
     else
-        request_data="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info}"
-        log_debug "No local last_update found"
+        request_data="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info,\"version\":\"$version\",\"screen_resolution\":\"$screen_resolution\",\"screen_status\":\"$screen_status\"}"
+        log_debug "No local last_update found, sending tech info (v:$version, res:$screen_resolution, status:$screen_status)"
     fi
     
     response=$(curl -s -X POST "$HW_SYNC_API" \
@@ -330,6 +373,73 @@ check_loop_updates() {
             log_error "Download script not found: $DOWNLOAD_SCRIPT"
         fi
     fi
+}
+
+# Screenshot capture and upload function
+capture_and_upload_screenshot() {
+    local screenshot_enabled=$(get_config_field "screenshot_enabled")
+    
+    # Return silently if screenshots are disabled
+    if [ "$screenshot_enabled" != "true" ]; then
+        log "📸 Screenshot: Disabled (screenshot_enabled=$screenshot_enabled)"
+        return 0
+    fi
+    
+    log "📸 Screenshot: Enabled - capturing..."
+    
+    if ! command -v scrot >/dev/null 2>&1; then
+        log_error "📸 Screenshot failed: 'scrot' not installed (run: apt-get install scrot)"
+        return 0
+    fi
+    
+    # Try to capture screenshot
+    local temp_file="/tmp/edudisplej_screenshot_$$.png"
+    if ! DISPLAY=:0 timeout 5 scrot "$temp_file" 2>/dev/null; then
+        log_error "📸 Screenshot failed: Unable to capture screen (check DISPLAY=:0 and X server)"
+        rm -f "$temp_file"
+        return 0
+    fi
+    
+    if [ ! -f "$temp_file" ] || [ ! -s "$temp_file" ]; then
+        log_error "📸 Screenshot failed: File empty or not created"
+        rm -f "$temp_file"
+        return 0
+    fi
+    
+    # Get MAC address for filename
+    local mac=$(get_mac_address)
+    local timestamp=$(date '+%Y%m%d%H%M%S')
+    local filename="scrn_edudisplej${mac}_${timestamp}.png"
+    
+    # Encode to base64 and upload
+    local base64_data=$(base64 -w 0 "$temp_file" 2>/dev/null)
+    if [ -z "$base64_data" ]; then
+        log_error "📸 Screenshot failed: Unable to encode to base64"
+        rm -f "$temp_file"
+        return 0
+    fi
+    
+    log "📸 Uploading screenshot ($filename)..."
+    
+    # Upload screenshot
+    local screenshot_api="${API_BASE_URL}/api/screenshot_sync.php"
+    local upload_response=$(curl -s -X POST "$screenshot_api" \
+        -H "Content-Type: application/json" \
+        -d "{\"mac\":\"$mac\",\"filename\":\"$filename\",\"screenshot\":\"data:image/png;base64,$base64_data\"}" \
+        --max-time 30 --connect-timeout 10 2>&1)
+    
+    if echo "$upload_response" | grep -q '"success":true'; then
+        log_success "📸 Screenshot uploaded successfully: $filename"
+        # Update last_screenshot time in config
+        local now=$(date '+%Y-%m-%d %H:%M:%S')
+        update_config_field "last_screenshot" "$now"
+    else
+        log_error "📸 Screenshot upload failed: $upload_response"
+    fi
+    
+    # Cleanup
+    rm -f "$temp_file"
+    return 0
 }
 
 # Register kiosk and sync
@@ -493,6 +603,32 @@ EOF
         if [ -n "$device_id" ] && [ "$device_id" != "unknown" ]; then
             log "Checking for loop configuration changes..."
             check_loop_updates "$device_id"
+            
+            # Get loop version for logging and DB update
+            local loop_updated_at=""
+            if [ -f "$LOOP_FILE" ]; then
+                if command -v jq >/dev/null 2>&1; then
+                    loop_updated_at=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
+                fi
+            fi
+            
+            # Update sync timestamps on server
+            local timestamp_update_api="${API_BASE_URL}/api/update_sync_timestamp.php"
+            local sync_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+            
+            local timestamp_data="{\"mac\":\"$mac\",\"last_sync\":\"$sync_timestamp\""
+            if [ -n "$loop_updated_at" ]; then
+                timestamp_data="${timestamp_data},\"loop_last_update\":\"$loop_updated_at\""
+                log "Loop version: $loop_updated_at (local)"
+            fi
+            timestamp_data="${timestamp_data}}"
+            
+            curl -s -X POST "$timestamp_update_api" \
+                -H "Content-Type: application/json" \
+                -d "$timestamp_data" \
+                --max-time 10 >/dev/null 2>&1 || log_debug "Failed to update sync timestamp"
+            
+            log "Last sync: $sync_timestamp"
             
             # Collect and upload logs
             log_debug "Uploading logs to server..."
@@ -805,6 +941,8 @@ main() {
         
         if register_and_sync; then
             log "Sync completed successfully"
+            # Take screenshot if enabled
+            capture_and_upload_screenshot
             log "Waiting $SYNC_INTERVAL seconds until next sync..."
         else
             log_error "Sync failed - retrying in 60 seconds..."

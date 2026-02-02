@@ -65,16 +65,19 @@ try {
     
     // If no specific modules, get from group(s)
     if (empty($loops)) {
-        $stmt = $conn->prepare("SELECT kgm.*, m.name as module_name, m.module_key, m.description
+        $stmt = $conn->prepare("SELECT kgm.*, m.name as module_name, m.module_key, m.description,
+                                MAX(kgm.updated_at) as group_updated_at
                                 FROM kiosk_group_assignments kga
                                 JOIN kiosk_group_modules kgm ON kga.group_id = kgm.group_id
                                 JOIN modules m ON kgm.module_id = m.id
                                 WHERE kga.kiosk_id = ? AND kgm.is_active = 1
+                                GROUP BY kgm.id, kgm.group_id, kgm.module_id, kgm.duration_seconds, kgm.display_order, kgm.is_active
                                 ORDER BY kgm.display_order");
         $stmt->bind_param("i", $kiosk_id);
         $stmt->execute();
         $result = $stmt->get_result();
         
+        $group_updated_at = null;
         while ($row = $result->fetch_assoc()) {
             $loops[] = [
                 'module_id' => $row['module_id'],
@@ -85,13 +88,24 @@ try {
                 'display_order' => $row['display_order'],
                 'source' => 'group'
             ];
+            // Get latest updated_at timestamp
+            if ($row['group_updated_at'] && (!$group_updated_at || $row['group_updated_at'] > $group_updated_at)) {
+                $group_updated_at = $row['group_updated_at'];
+            }
         }
         $stmt->close();
     }
     
     closeDbConnection($conn);
     
-    echo json_encode(['success' => true, 'loops' => $loops]);
+    $response = ['success' => true, 'loops' => $loops];
+    
+    // Add loop version info (latest updated_at timestamp)
+    if (!empty($loops)) {
+        $response['loop_updated_at'] = $group_updated_at ?? date('Y-m-d H:i:s');
+    }
+    
+    echo json_encode($response);
     
 } catch (Exception $e) {
     error_log($e->getMessage());

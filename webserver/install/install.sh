@@ -146,6 +146,9 @@ fi
 if ! command -v jq >/dev/null 2>&1; then
   MISSING_TOOLS+=("jq")
 fi
+if ! command -v scrot >/dev/null 2>&1; then
+  MISSING_TOOLS+=("scrot")
+fi
 
 if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
   echo "[*] Instalacia zakladnych nastroje - Installing basic tools: ${MISSING_TOOLS[*]}"
@@ -163,7 +166,7 @@ fi
 
 # Vytvorenie priecinkov - Create directories
 echo "[*] Vytvaranie adresarov - Creating directories..."
-mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR" "${TARGET_DIR}/data" "${TARGET_DIR}/logs"
+mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR" "${TARGET_DIR}/data" "${TARGET_DIR}/data/screenshots" "${TARGET_DIR}/logs"
 echo "[✓] Adresare vytvorene - Directories created"
 
 # Save API token if provided
@@ -275,9 +278,6 @@ if [ ! -f "${INIT_DIR}/edudisplej-init.sh" ]; then
     exit 1
 fi
 
-# Nastavenie opravneni - Set permissions
-chmod -R 755 "$TARGET_DIR"
-
 # Urcenie pouzivatela - Determine user
 CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
 [ -z "${CONSOLE_USER}" ] && CONSOLE_USER="pi"
@@ -288,6 +288,26 @@ if [ -z "$USER_HOME" ]; then
     exit 1
 fi
 echo "[*] Pouzivatel - User: $CONSOLE_USER, Domov - Home: $USER_HOME"
+
+# Nastavenie opravneni - Set permissions
+chmod -R 755 "$TARGET_DIR"
+
+# Setup screenshot service directories and permissions
+echo "[*] Konfiguracia oprávnení - Configuring permissions..."
+chmod 755 "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic" "${TARGET_DIR}/data/screenshots"
+
+# Set proper ownership for data directory and config (CONSOLE_USER owns all)
+chown -R "$CONSOLE_USER:$CONSOLE_USER" "${TARGET_DIR}/data"
+chmod 755 "${TARGET_DIR}/data"
+chmod 755 "${TARGET_DIR}/data/screenshots"
+
+# config.json should be readable/writable by CONSOLE_USER
+[ -f "${TARGET_DIR}/data/config.json" ] && chmod 664 "${TARGET_DIR}/data/config.json"
+
+# Cleanup old log directory if exists
+rm -rf "${TARGET_DIR}/logs"
+
+echo "[✓] Oprávnenia nastavené - Permissions configured"
 
 # Ulozenie nastaveni - Save settings
 echo "surf" > "${TARGET_DIR}/.kiosk_mode"

@@ -104,6 +104,7 @@ try {
                 'last_seen' => "timestamp NULL DEFAULT NULL",
                 'hw_info' => "text DEFAULT NULL",
                 'screenshot_url' => "text DEFAULT NULL",
+                'screenshot_enabled' => "tinyint(1) DEFAULT 0",
                 'screenshot_requested' => "tinyint(1) DEFAULT 0",
                 'screenshot_timestamp' => "timestamp NULL DEFAULT NULL",
                 'status' => "enum('online','offline','pending','unconfigured') DEFAULT 'unconfigured'",

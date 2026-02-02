@@ -22,6 +22,56 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Handle bulk refresh for dashboard
+if (isset($_GET['refresh_list'])) {
+    $kiosk_ids = array_map('intval', explode(',', $_GET['refresh_list']));
+    $company_id = $_SESSION['company_id'] ?? null;
+    
+    try {
+        $conn = getDbConnection();
+        $placeholders = implode(',', array_fill(0, count($kiosk_ids), '?'));
+        
+        $query = "
+            SELECT k.id, k.hostname, k.last_seen, k.status, k.screenshot_url,
+                   GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as group_names,
+                   k.version, k.screen_resolution, k.screen_status,
+                   k.last_sync, k.loop_last_update
+            FROM kiosks k 
+            LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
+            LEFT JOIN kiosk_groups g ON kga.group_id = g.id
+            WHERE k.id IN ($placeholders) AND k.company_id = ?
+            GROUP BY k.id
+        ";
+        
+        $stmt = $conn->prepare($query);
+        $types = str_repeat('i', count($kiosk_ids)) . 'i';
+        $params = array_merge($kiosk_ids, [$company_id]);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $kiosks = [];
+        while ($row = $result->fetch_assoc()) {
+            $kiosks[] = $row;
+        }
+        $stmt->close();
+        closeDbConnection($conn);
+        
+        echo json_encode([
+            'success' => true,
+            'kiosks' => $kiosks
+        ]);
+        exit();
+        
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Database error: ' . $e->getMessage()
+        ]);
+        exit();
+    }
+}
+
 $kiosk_id = intval($_GET['id'] ?? 0);
 $user_id = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
@@ -35,8 +85,17 @@ if (!$kiosk_id) {
 try {
     $conn = getDbConnection();
     
-    // Get kiosk data
-    $stmt = $conn->prepare("SELECT k.* FROM kiosks k WHERE k.id = ? AND k.company_id = ?");
+    // Get kiosk data with group information
+    $stmt = $conn->prepare("
+        SELECT k.*, 
+               GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as group_names,
+               GROUP_CONCAT(DISTINCT g.id SEPARATOR ',') as group_ids
+        FROM kiosks k 
+        LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
+        LEFT JOIN kiosk_groups g ON kga.group_id = g.id
+        WHERE k.id = ? AND k.company_id = ?
+        GROUP BY k.id
+    ");
     $stmt->bind_param("ii", $kiosk_id, $company_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -57,7 +116,21 @@ try {
     $response['location'] = $kiosk['location'];
     $response['last_seen'] = $kiosk['last_seen'] ? date('Y-m-d H:i', strtotime($kiosk['last_seen'])) : 'Never';
     $response['sync_interval'] = (int)$kiosk['sync_interval'];
+    $response['screenshot_enabled'] = (bool)$kiosk['screenshot_enabled'];
     $response['screenshot_url'] = $kiosk['screenshot_url'] ?? null;
+    
+    // Add group information
+    $response['group_names'] = $kiosk['group_names'] ?? null;
+    $response['group_ids'] = $kiosk['group_ids'] ?? null;
+    
+    // Add technical information
+    $response['version'] = $kiosk['version'] ?? null;
+    $response['screen_resolution'] = $kiosk['screen_resolution'] ?? null;
+    $response['screen_status'] = $kiosk['screen_status'] ?? null;
+    
+    // Add sync timing information
+    $response['last_sync'] = $kiosk['last_sync'] ? date('Y-m-d H:i:s', strtotime($kiosk['last_sync'])) : null;
+    $response['loop_last_update'] = $kiosk['loop_last_update'] ? date('Y-m-d H:i:s', strtotime($kiosk['loop_last_update'])) : null;
     
     // Parse HW info
     if ($kiosk['hw_info']) {

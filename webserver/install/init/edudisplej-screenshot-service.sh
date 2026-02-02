@@ -2,6 +2,7 @@
 # EduDisplej Screenshot Service
 # Separate service for handling screenshots independently
 # Reads configuration from /opt/edudisplej/data/config.json
+# Saves temp files to /tmp, uploads via API
 # =============================================================================
 
 SERVICE_VERSION="1.0.0"
@@ -12,27 +13,27 @@ set -euo pipefail
 CONFIG_DIR="/opt/edudisplej"
 DATA_DIR="${CONFIG_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
-LOG_DIR="${CONFIG_DIR}/logs"
-LOG_FILE="${LOG_DIR}/screenshot-service.log"
+TEMP_DIR="/tmp/edudisplej-screenshots"
 SCREENSHOT_INTERVAL=15  # Default 15 seconds
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 SCREENSHOT_API="${API_BASE_URL}/api/screenshot_sync.php"
 
-# Create directories
-mkdir -p "$DATA_DIR" "$LOG_DIR"
+# Create temp directory
+mkdir -p "$TEMP_DIR"
+chmod 755 "$TEMP_DIR" 2>/dev/null || true
 
-# Logging functions
+# Logging functions - use echo only (systemd journal handles it)
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $*" | tee -a "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $*"
 }
 
 log_error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" | tee -a "$LOG_FILE" >&2
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2
 }
 
 log_debug() {
     if [ "${DEBUG:-false}" = "true" ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" | tee -a "$LOG_FILE"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*"
     fi
 }
 
@@ -66,26 +67,30 @@ is_screenshot_enabled() {
 
 # Capture screenshot
 capture_screenshot() {
-    local temp_file="/tmp/screen.png"
+    local temp_file="${TEMP_DIR}/screen_$$.png"
     
-    log_debug "Capturing screenshot..."
+    log_debug "Capturing screenshot to $temp_file..."
     
     # Remove old temp file if exists
     rm -f "$temp_file"
     
     # Use scrot to capture screenshot
     if command -v scrot >/dev/null 2>&1; then
-        DISPLAY=:0 scrot "$temp_file" 2>/dev/null || return 1
+        DISPLAY=:0 scrot "$temp_file" 2>/dev/null || {
+            log_error "Failed to capture screenshot with scrot"
+            return 1
+        }
     else
-        log_error "scrot not installed"
+        log_error "scrot not installed. Install with: apt-get install -y scrot"
         return 1
     fi
     
     if [ ! -f "$temp_file" ]; then
-        log_error "Screenshot file not created"
+        log_error "Screenshot file not created at $temp_file"
         return 1
     fi
     
+    log_debug "Screenshot captured successfully: $temp_file ($(du -h "$temp_file" | cut -f1))"
     echo "$temp_file"
 }
 
@@ -103,32 +108,46 @@ upload_screenshot() {
     local timestamp=$(date '+%Y%m%d%H%M%S')
     local filename="scrn_edudisplej${mac}_${timestamp}.png"
     
-    log "Uploading screenshot: $filename"
+    log_debug "Uploading screenshot: $filename (from $screenshot_file)"
     
     # Convert to base64
     local base64_data=$(base64 -w 0 "$screenshot_file" 2>/dev/null)
+    if [ -z "$base64_data" ]; then
+        log_error "Failed to encode screenshot to base64"
+        rm -f "$screenshot_file"
+        return 1
+    fi
     
     # Prepare JSON request
     local request_data="{\"mac\":\"$mac\",\"filename\":\"$filename\",\"screenshot\":\"data:image/png;base64,$base64_data\"}"
     
-    # Upload to API
+    log_debug "Sending to API: $SCREENSHOT_API"
+    
+    # Upload to API with better error handling
     local response=$(curl -s -X POST "$SCREENSHOT_API" \
         -H "Content-Type: application/json" \
         -d "$request_data" \
-        --max-time 30)
+        --max-time 30 --connect-timeout 10 2>&1)
+    
+    local curl_code=$?
+    if [ $curl_code -ne 0 ]; then
+        log_error "Curl error ($curl_code) uploading screenshot: $response"
+        rm -f "$screenshot_file"
+        return 1
+    fi
     
     if echo "$response" | grep -q '"success":true'; then
-        log "Screenshot uploaded successfully: $filename"
+        log "✓ Screenshot uploaded: $filename"
         rm -f "$screenshot_file"
         return 0
     else
-        log_error "Screenshot upload failed: $response"
+        log_error "API error - Upload failed: $response"
         rm -f "$screenshot_file"
         return 1
     fi
 }
 
-# Update last screenshot time in config
+# Update last screenshot time in config (silent, non-critical)
 update_last_screenshot_time() {
     if [ ! -f "$CONFIG_FILE" ]; then
         return 0
@@ -137,8 +156,19 @@ update_last_screenshot_time() {
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     
     if command -v jq >/dev/null 2>&1; then
+        # Try to update, but don't fail if we can't write
         local temp_file=$(mktemp)
-        jq --arg ts "$timestamp" '.last_screenshot = $ts' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
+        if jq --arg ts "$timestamp" '.last_screenshot = $ts' "$CONFIG_FILE" > "$temp_file" 2>/dev/null; then
+            if mv "$temp_file" "$CONFIG_FILE" 2>/dev/null; then
+                chmod 664 "$CONFIG_FILE" 2>/dev/null || true
+            else
+                # Failed to move (permission issue) - just delete temp file
+                rm -f "$temp_file"
+                log_debug "Could not update last_screenshot time (permission denied - expected on some setups)"
+            fi
+        else
+            rm -f "$temp_file"
+        fi
     fi
 }
 

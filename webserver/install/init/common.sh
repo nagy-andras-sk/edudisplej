@@ -443,6 +443,46 @@ get_hw_info() {
 HWEOF
 }
 
+# Get technical info (version, screen resolution, screen status)
+get_tech_info() {
+    local version="unknown"
+    local screen_resolution="unknown"
+    local screen_status="unknown"
+    
+    # Get version from config or service file
+    if [ -f "/opt/edudisplej/VERSION" ]; then
+        version=$(cat /opt/edudisplej/VERSION 2>/dev/null || echo "unknown")
+    fi
+    
+    # Get screen resolution - try xrandr first, then xdpyinfo
+    if command -v xrandr &>/dev/null; then
+        screen_resolution=$(DISPLAY=:0 xrandr 2>/dev/null | grep '\*' | awk '{print $1}' | head -1)
+        [ -z "$screen_resolution" ] && screen_resolution="unknown"
+    elif command -v xdpyinfo &>/dev/null; then
+        screen_resolution=$(DISPLAY=:0 xdpyinfo 2>/dev/null | grep dimensions | awk '{print $2}')
+        [ -z "$screen_resolution" ] && screen_resolution="unknown"
+    fi
+    
+    # Get screen status - check if display is on
+    if command -v xset &>/dev/null; then
+        local dpms_status=$(DISPLAY=:0 xset q 2>/dev/null | grep "Monitor is" | awk '{print $3}')
+        if [ "$dpms_status" = "On" ]; then
+            screen_status="on"
+        elif [ "$dpms_status" = "Off" ]; then
+            screen_status="off"
+        else
+            # Alternative: check if X is running
+            if DISPLAY=:0 xset q &>/dev/null; then
+                screen_status="on"
+            else
+                screen_status="unknown"
+            fi
+        fi
+    fi
+    
+    echo "{\"version\":\"$version\",\"screen_resolution\":\"$screen_resolution\",\"screen_status\":\"$screen_status\"}"
+}
+
 # =============================================================================
 # JSON Parsing Functions / JSON parsovanie funkcie
 # =============================================================================
