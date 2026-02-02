@@ -107,12 +107,22 @@ try {
         
         // Compare timestamps to determine if update is needed
         if ($last_loop_update && $server_timestamp) {
-            $client_time = strtotime($last_loop_update);
-            $server_time = strtotime($server_timestamp);
-            
-            // Only send update if server timestamp is newer
-            if ($server_time <= $client_time) {
-                $needs_update = false;
+            // Validate timestamp format using DateTime
+            try {
+                $client_dt = new DateTime($last_loop_update);
+                $server_dt = new DateTime($server_timestamp);
+                
+                $client_time = $client_dt->getTimestamp();
+                $server_time = $server_dt->getTimestamp();
+                
+                // Only send update if server timestamp is newer
+                if ($server_time <= $client_time) {
+                    $needs_update = false;
+                }
+            } catch (Exception $e) {
+                // Invalid timestamp format, force update to be safe
+                error_log('Invalid timestamp in modules_sync: ' . $e->getMessage());
+                $needs_update = true;
             }
         }
     }

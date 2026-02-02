@@ -159,15 +159,19 @@ function validate_api_token() {
 
 /**
  * Verify OTP code for two-factor authentication
- * @param string $secret The user's OTP secret
- * @param string $code The code entered by user
+ * Uses TOTP (Time-based One-Time Password) algorithm as per RFC 6238
+ * Compatible with Google Authenticator, Authy, Microsoft Authenticator, etc.
+ * 
+ * @param string $secret The user's OTP secret (Base32 encoded)
+ * @param string $code The 6-digit code entered by user
  * @return bool True if valid
  */
 function verify_otp_code($secret, $code) {
     // Time-based OTP using RFC 6238 (TOTP)
+    // Uses 30-second time steps and SHA1 hashing (standard for authenticator apps)
     $time = floor(time() / 30); // 30-second window
     
-    // Check current window and ±1 window for clock drift
+    // Check current window and ±1 window for clock drift tolerance
     for ($i = -1; $i <= 1; $i++) {
         $calc_code = generate_otp_code($secret, $time + $i);
         if (hash_equals($calc_code, $code)) {

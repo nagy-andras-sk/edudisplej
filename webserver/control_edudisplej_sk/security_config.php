@@ -12,8 +12,16 @@ ini_set('session.cookie_secure', 1);
 ini_set('session.use_only_cookies', 1);
 ini_set('session.cookie_samesite', 'Strict');
 
-// Encryption key - should be stored securely in production
-define('ENCRYPTION_KEY', getenv('EDUDISPLEJ_ENCRYPTION_KEY') ?: 'default-key-change-in-production');
+// Encryption key - MUST be set via environment variable in production
+if (!getenv('EDUDISPLEJ_ENCRYPTION_KEY')) {
+    // In development, use a warning
+    if (php_sapi_name() !== 'cli' && (!defined('ENVIRONMENT') || ENVIRONMENT === 'production')) {
+        error_log('CRITICAL: EDUDISPLEJ_ENCRYPTION_KEY environment variable not set!');
+    }
+    define('ENCRYPTION_KEY', 'dev-only-key-not-for-production-' . __DIR__);
+} else {
+    define('ENCRYPTION_KEY', getenv('EDUDISPLEJ_ENCRYPTION_KEY'));
+}
 define('ENCRYPTION_METHOD', 'AES-256-CBC');
 
 /**
@@ -35,8 +43,16 @@ function encrypt_data($data) {
  * @return string|false Decrypted data or false on failure
  */
 function decrypt_data($data) {
-    $data = base64_decode($data);
+    $data = base64_decode($data, true);
+    if ($data === false) {
+        return false; // Invalid base64
+    }
+    
     $iv_length = openssl_cipher_iv_length(ENCRYPTION_METHOD);
+    
+    if (strlen($data) < $iv_length) {
+        return false; // Data too short
+    }
     
     $iv = substr($data, 0, $iv_length);
     $encrypted = substr($data, $iv_length);

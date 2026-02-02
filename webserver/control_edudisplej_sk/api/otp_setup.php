@@ -101,7 +101,28 @@ try {
             break;
             
         case 'disable':
-            // Disable OTP (requires password confirmation in production)
+            // Disable OTP - requires password confirmation
+            $password = $_POST['password'] ?? '';
+            
+            if (empty($password)) {
+                echo json_encode(['success' => false, 'message' => 'Password required to disable 2FA']);
+                exit();
+            }
+            
+            // Verify password
+            $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $user = $result->fetch_assoc();
+            $stmt->close();
+            
+            if (!$user || !password_verify($password, $user['password'])) {
+                echo json_encode(['success' => false, 'message' => 'Invalid password']);
+                exit();
+            }
+            
+            // Password verified, disable OTP
             $stmt = $conn->prepare("UPDATE users SET otp_enabled = 0, otp_secret = NULL, otp_verified = 0 WHERE id = ?");
             $stmt->bind_param("i", $user_id);
             $stmt->execute();
