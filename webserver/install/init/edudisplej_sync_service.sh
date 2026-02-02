@@ -149,20 +149,20 @@ sync_hw_data() {
 }
 
 # Check loop changes and update modules if needed
-# This compares local loop.json last_update with server's created_at/updated_at
-check_loop_updates() {
+# This compares local loop.json last_update timestamp with server's loop_last_update
+sync_loop_config() {
     local device_id="$1"
     [ -z "$device_id" ] && return 0
     
-    # Get local last_update timestamp from loop.json
+    log "Checking loop configuration changes..."
+    
+    # Get local loop timestamp if exists
     local local_last_update=""
     if [ -f "$LOOP_FILE" ]; then
         if command -v jq >/dev/null 2>&1; then
             local_last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
         fi
     fi
-    
-    log_debug "Local loop last_update: ${local_last_update:-none}"
     
     # Query server for loop configuration
     local response
@@ -172,43 +172,94 @@ check_loop_updates() {
         return 1
     fi
     
-    # Get server's loop update timestamp (created_at or updated_at from kiosk_group_modules)
-    local server_updated_at
-    server_updated_at=$(json_get "$response" "loop_updated_at")
+    # Get server's loop update timestamp
+    local loop_last_update
+    local loop_config
+    if command -v jq >/dev/null 2>&1; then
+        loop_last_update=$(echo "$response" | jq -r '.loop_last_update // empty' 2>/dev/null)
+        loop_config=$(echo "$response" | jq -c '.loop_config // []' 2>/dev/null)
+    else
+        loop_last_update=$(json_get "$response" "loop_last_update")
+        loop_config=$(echo "$response" | tr -d '\n\r' | sed -n 's/.*"loop_config"[[:space:]]*:[[:space:]]*\(\[[^]]*\]\).*/\1/p')
+    fi
     
-    log_debug "Server loop updated_at: ${server_updated_at:-none}"
+    log "  Local loop update:  ${local_last_update:-none}"
+    log "  Server loop update: ${loop_last_update:-none}"
     
-    # Compare timestamps: if no local timestamp, or server is newer, update
+    # Compare timestamps: if server is newer, update
     local needs_update=false
     
     if [ -z "$local_last_update" ]; then
         log "No local loop found - downloading from server..."
         needs_update=true
-    elif [ -z "$server_updated_at" ]; then
-        log_debug "Server has no update timestamp - skipping comparison"
+    elif [ -z "$loop_last_update" ]; then
+        log "Could not determine server loop timestamp - skipping update"
+        return 0
+    elif [[ "$loop_last_update" > "$local_last_update" ]]; then
+        log "⚠ Loop configuration changed!"
+        log "  Local:  $local_last_update"
+        log "  Server: $loop_last_update"
+        needs_update=true
     else
-        # Compare timestamps (works with both datetime strings and unix timestamps)
-        if [[ "$server_updated_at" > "$local_last_update" ]]; then
-            log "Server loop is newer (server: $server_updated_at, local: $local_last_update)"
-            needs_update=true
+        log "✓ Loop configuration is up-to-date"
+        log "  Timestamp: $local_last_update"
+    fi
+    
+    # Update local loop.json if needed
+    if [ "$needs_update" = "true" ]; then
+        log "Updating local loop.json..."
+        
+        # Create modules directory if it doesn't exist
+        mkdir -p "$(dirname "$LOOP_FILE")"
+        
+        # Write new loop.json - { "last_update": "...", "loop": [...] }
+        if command -v jq >/dev/null 2>&1; then
+            # Use jq to format properly
+            echo "$response" | jq '{
+                last_update: .loop_last_update,
+                loop: .loop_config
+            }' > "$LOOP_FILE" 2>/dev/null || {
+                # Fallback if jq fails - build JSON manually
+                log_error "jq formatting failed, using manual method"
+                cat > "$LOOP_FILE" <<EOF
+{
+    "last_update": "${loop_last_update}",
+    "loop": ${loop_config}
+}
+EOF
+            }
         else
-            log_debug "Loop configuration is up-to-date"
+            # Fallback without jq
+            cat > "$LOOP_FILE" <<EOF
+{
+    "last_update": "${loop_last_update}",
+    "loop": ${loop_config}
+}
+EOF
+        fi
+        
+        log_success "✓ Loop configuration updated"
+        
+        # Download modules if needed
+        if [ -x "$DOWNLOAD_SCRIPT" ]; then
+            log "Downloading modules..."
+            if bash "$DOWNLOAD_SCRIPT"; then
+                log_success "✓ Modules downloaded successfully"
+            else
+                log_error "Module download failed"
+            fi
+        fi
+        
+        # Restart kiosk service to apply changes
+        log "Restarting kiosk display service..."
+        if systemctl restart edudisplej-kiosk.service 2>/dev/null; then
+            log_success "✓ Kiosk service restarted successfully"
+        else
+            log_error "Failed to restart kiosk service (may require manual restart)"
         fi
     fi
     
-    # Download modules if update is needed
-    if [ "$needs_update" = "true" ]; then
-        log "Downloading latest loop configuration and modules..."
-        if [ -x "$DOWNLOAD_SCRIPT" ]; then
-            if bash "$DOWNLOAD_SCRIPT"; then
-                log_success "Loop and modules updated successfully"
-            else
-                log_error "Module update failed"
-            fi
-        else
-            log_error "Download script not found: $DOWNLOAD_SCRIPT"
-        fi
-    fi
+    return 0
 }
 
 # Register kiosk and sync
@@ -371,13 +422,17 @@ EOF
         # Always check for loop updates if we have a device_id
         if [ -n "$device_id" ] && [ "$device_id" != "unknown" ]; then
             log "Checking for loop configuration changes..."
-            check_loop_updates "$device_id"
+            sync_loop_config "$device_id"
         fi
         
         # Notify if not fully configured
         if [ "$is_configured" = "false" ]; then
-            log "Note: Device not fully configured yet"
-            log "Visit: https://control.edudisplej.sk/admin/"
+            if [ "$company_assigned" = "true" ] && [ "$group_name" != "Unknown" ]; then
+                log "Status: ✓ Ready - Company and group assigned, loop configured"
+            else
+                log "Note: Device configuration incomplete"
+                log "Visit: https://control.edudisplej.sk/admin/"
+            fi
         fi
         
         return 0

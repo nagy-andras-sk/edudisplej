@@ -147,6 +147,9 @@ $logout_url = '../login.php?logout=1';
     </div>
     
     <script>
+        // Store the initial load time
+        let pageLoadTime = new Date();
+        
         // Update sync times on page load
         function updateSyncTimes() {
             document.querySelectorAll('[id^="sync-time-"]').forEach(el => {
@@ -164,9 +167,9 @@ $logout_url = '../login.php?logout=1';
                 
                 let timeStr = '';
                 if (diffMins > 0) {
-                    timeStr = `${diffMins} perc${diffSecs > 0 ? ` ${diffSecs}s` : ''} elôtte`;
+                    timeStr = `${diffMins} perc${diffSecs > 0 ? ` ${diffSecs}s` : ''} előtt`;
                 } else {
-                    timeStr = `${diffSecs}s elôtte`;
+                    timeStr = `${diffSecs}s előtt`;
                 }
                 
                 // If more than 120 minutes, show as red OFFLINE
@@ -178,8 +181,40 @@ $logout_url = '../login.php?logout=1';
             });
         }
         
+        // Refresh kiosk data from server to get updated last_seen values
+        function refreshKioskData() {
+            <?php if (!empty($kiosks)): ?>
+            const kioskIds = [<?php echo implode(',', array_column($kiosks, 'id')); ?>];
+            
+            fetch('../api/kiosk_details.php?refresh_list=' + kioskIds.join(','))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.kiosks) {
+                        data.kiosks.forEach(kiosk => {
+                            const el = document.getElementById('sync-time-' + kiosk.id);
+                            if (el && kiosk.last_seen) {
+                                // Update the data attribute with fresh value from server
+                                el.setAttribute('data-last-seen', kiosk.last_seen);
+                            }
+                        });
+                        // Update the display after refreshing data
+                        updateSyncTimes();
+                    }
+                })
+                .catch(err => {
+                    console.error('Error refreshing kiosk data:', err);
+                });
+            <?php endif; ?>
+        }
+        
+        // Initial display
         updateSyncTimes();
-        setInterval(updateSyncTimes, 5000); // Update every 5 seconds (real-time)
+        
+        // Refresh data from server every 30 seconds
+        setInterval(refreshKioskData, 30000);
+        
+        // Update display every 5 seconds (shows time elapsed)
+        setInterval(updateSyncTimes, 5000);
         
         function updateSyncInterval(kioskId, newInterval) {
             if (!confirm(`Biztosan beállítja a szinkronizálási időközt ${newInterval} másodpercre?`)) {
@@ -205,6 +240,69 @@ $logout_url = '../login.php?logout=1';
                 alert('⚠️ Hiba történt: ' + err);
                 location.reload();
             });
+        }
+        
+        function toggleScreenshot(kioskId, enabled) {
+            const targetInterval = enabled ? 15 : 120;
+            
+            fetch('../api/toggle_screenshot.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    kiosk_id: kioskId, 
+                    screenshot_enabled: enabled ? 1 : 0 
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the toggle label
+                    const checkbox = document.getElementById('screenshot-toggle-' + kioskId);
+                    const label = checkbox.parentElement.querySelector('span');
+                    label.textContent = enabled ? '✅ Bekapcsolva' : '⭕ Kikapcsolva';
+                    label.style.color = enabled ? '#2e7d32' : '#999';
+                    
+                    // Update screenshot container
+                    const container = document.getElementById('screenshot-container-' + kioskId);
+                    if (enabled) {
+                        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Még nincs képernyőkép feltöltve. Várjon a következő szinkronizálásig.</p>';
+                    } else {
+                        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">A képernyőkép funkció ki van kapcsolva. Kapcsolja be a képernyőképek fogadásához.</p>';
+                    }
+                    
+                    // Update sync interval dropdown
+                    const selector = document.getElementById('sync-interval-selector-' + kioskId);
+                    if (selector) {
+                        selector.value = targetInterval;
+                    }
+                    
+                    alert(`✅ Képernyőkép funkció ${enabled ? 'bekapcsolva' : 'kikapcsolva'}\nSzinkronizálási időköz: ${targetInterval} másodperc`);
+                } else {
+                    alert('⚠️ Hiba: ' + data.message);
+                    location.reload();
+                }
+            })
+            .catch(err => {
+                alert('⚠️ Hiba történt: ' + err);
+                location.reload();
+            });
+        }
+        
+        function refreshScreenshot(kioskId) {
+            // Request a new screenshot from the kiosk
+            fetch('../api/kiosk_details.php?id=' + kioskId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.screenshot_url) {
+                        const container = document.getElementById('screenshot-container-' + kioskId);
+                        container.innerHTML = '<img src="../' + data.screenshot_url + '?t=' + Date.now() + '" alt="Screenshot" style="width: 100%; max-width: 600px; border: 2px solid #ddd; border-radius: 5px; display: block; margin: 0 auto;" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'block\';"><p style="display: none; text-align: center; color: #999; padding: 20px;">Screenshot nem elérhető</p>';
+                    } else {
+                        alert('⚠️ Nincs elérhető képernyőkép');
+                    }
+                })
+                .catch(err => {
+                    alert('⚠️ Hiba történt: ' + err);
+                });
         }
         
         function openKioskDetail(kioskId, hostname) {
@@ -287,6 +385,9 @@ $logout_url = '../login.php?logout=1';
                                         <td>
                                             <select id="sync-interval-selector-${kioskId}" onchange="updateSyncInterval(${kioskId}, this.value)" style="padding: 5px; border-radius: 3px; border: 1px solid #ccc;">
                                                 <option value="10" ${data.sync_interval === 10 ? 'selected' : ''}>10 másodperc</option>
+                                                <option value="15" ${data.sync_interval === 15 ? 'selected' : ''}>15 másodperc</option>
+                                                <option value="30" ${data.sync_interval === 30 ? 'selected' : ''}>30 másodperc</option>
+                                                <option value="60" ${data.sync_interval === 60 ? 'selected' : ''}>1 perc</option>
                                                 <option value="120" ${data.sync_interval === 120 ? 'selected' : ''}>2 perc (120s)</option>
                                                 <option value="300" ${data.sync_interval === 300 ? 'selected' : ''}>5 perc (300s)</option>
                                                 <option value="600" ${data.sync_interval === 600 ? 'selected' : ''}>10 perc (600s)</option>
@@ -294,6 +395,34 @@ $logout_url = '../login.php?logout=1';
                                         </td>
                                     </tr>
                                 </table>
+                            </div>
+                            
+                            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <h3 style="margin: 0;">📸 Képernyőkép</h3>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                                            <input type="checkbox" id="screenshot-toggle-${kioskId}" ${data.screenshot_enabled ? 'checked' : ''} 
+                                                onchange="toggleScreenshot(${kioskId}, this.checked)" 
+                                                style="margin-right: 5px; cursor: pointer;">
+                                            <span style="font-weight: bold; color: ${data.screenshot_enabled ? '#2e7d32' : '#999'};">
+                                                ${data.screenshot_enabled ? '✅ Bekapcsolva' : '⭕ Kikapcsolva'}
+                                            </span>
+                                        </label>
+                                        ${data.screenshot_enabled && data.screenshot_url ? 
+                                            '<button onclick="refreshScreenshot(' + kioskId + ')" style="background: #1a3a52; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;">🔄 Frissítés</button>' 
+                                            : ''}
+                                    </div>
+                                </div>
+                                <div id="screenshot-container-${kioskId}" style="margin-top: 10px;">
+                                    ${data.screenshot_enabled ? 
+                                        (data.screenshot_url ? 
+                                            '<img src="../' + data.screenshot_url + '?t=' + Date.now() + '" alt="Screenshot" style="width: 100%; max-width: 600px; border: 2px solid #ddd; border-radius: 5px; display: block; margin: 0 auto;" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'block\';"><p style="display: none; text-align: center; color: #999; padding: 20px;">Screenshot nem elérhető</p>' 
+                                            : '<p style="text-align: center; color: #999; padding: 20px;">Még nincs képernyőkép feltöltve. Várjon a következő szinkronizálásig.</p>'
+                                        ) 
+                                        : '<p style="text-align: center; color: #999; padding: 20px;">A képernyőkép funkció ki van kapcsolva. Kapcsolja be a képernyőképek fogadásához.</p>'
+                                    }
+                                </div>
                             </div>
                             
                             ${data.hw_info ? `

@@ -33,7 +33,7 @@ try {
     $stmt->execute();
     
     // Get kiosk data
-    $stmt = $conn->prepare("SELECT id, device_id, sync_interval, screenshot_requested FROM kiosks WHERE mac = ?");
+    $stmt = $conn->prepare("SELECT id, device_id, sync_interval, screenshot_requested, COALESCE(screenshot_enabled, 0) as screenshot_enabled FROM kiosks WHERE mac = ?");
     $stmt->bind_param("s", $mac);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -45,6 +45,7 @@ try {
         $response['device_id'] = $kiosk['device_id'];
         $response['sync_interval'] = $kiosk['sync_interval'];
         $response['screenshot_requested'] = (bool)$kiosk['screenshot_requested'];
+        $response['screenshot_enabled'] = (bool)$kiosk['screenshot_enabled'];
         
         // Check if configuration has been updated on server side
         $need_update = false;

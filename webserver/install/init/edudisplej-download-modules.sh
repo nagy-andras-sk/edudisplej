@@ -156,13 +156,12 @@ save_loop_config() {
     log "Saving loop configuration..."
     
     if command -v jq >/dev/null 2>&1; then
-        # Parse loop data and add metadata (keep as JSON, not raw)
+        # Parse loop data and add metadata
         local loop_data=$(echo "$loop_response" | jq '.loop_config')
         local loop_last_update=$(echo "$loop_response" | jq -r '.loop_last_update // empty')
-        local loop_hash=$(echo "$loop_response" | jq -r '.loop_hash // empty')
         [ -z "$loop_last_update" ] && loop_last_update="$(date '+%Y-%m-%d %H:%M:%S')"
         
-        # Create enhanced loop config with metadata
+        # Create loop config with timestamp
         cat > "$LOOP_FILE" <<EOF
 {
     "last_update": "$loop_last_update",
@@ -171,13 +170,13 @@ save_loop_config() {
 EOF
         
         log_success "Loop configuration saved to $LOOP_FILE"
+        log "  Last update: $loop_last_update"
         
         # Store download info locally
         cat > "${MODULES_DIR}/.download_info.json" <<EOF
 {
     "last_download": "$(date '+%Y-%m-%d %H:%M:%S')",
-    "loop_last_update": "$loop_last_update",
-    "loop_hash": "$loop_hash"
+    "loop_last_update": "$loop_last_update"
 }
 EOF
         
@@ -326,13 +325,30 @@ $loop_json
                 
                 try {
                     const embedded = document.getElementById('loop-config');
-                    if (embedded && embedded.textContent && embedded.textContent.trim().length > 2) {
-                        this.loopConfig = JSON.parse(embedded.textContent);
-                        if (this.loopConfig && this.loopConfig.loop) {
-                            return this.loopConfig;
+                    if (embedded && embedded.textContent) {
+                        const text = embedded.textContent.trim();
+                        // Check if embedded config has content (at least more than just {})
+                        if (text.length > 4 && text !== '{}') {
+                            try {
+                                this.loopConfig = JSON.parse(text);
+                                // Normalize format: support both "loop" and "loop_config" fields
+                                if (this.loopConfig) {
+                                    if (!this.loopConfig.loop && this.loopConfig.loop_config) {
+                                        this.loopConfig.loop = this.loopConfig.loop_config;
+                                    }
+                                    // Ensure loop is an array
+                                    if (this.loopConfig.loop && Array.isArray(this.loopConfig.loop) && this.loopConfig.loop.length > 0) {
+                                        this.log('Using embedded loop configuration');
+                                        return this.loopConfig;
+                                    }
+                                }
+                            } catch (parseError) {
+                                this.log('Failed to parse embedded config: ' + parseError.message + ', trying to fetch from file...');
+                            }
                         }
                     }
                     
+                    // Try to load from file
                     let response = await fetch(new URL('modules/loop.json', window.location.href), { cache: 'no-store' });
                     
                     if (!response.ok) {
@@ -346,10 +362,21 @@ $loop_json
                     
                     this.loopConfig = await response.json();
                     
-                    if (!this.loopConfig.loop) {
-                        throw new Error('Invalid loop configuration format');
+                    // Normalize format: support both "loop" and "loop_config" fields
+                    if (this.loopConfig && !this.loopConfig.loop && this.loopConfig.loop_config) {
+                        this.loopConfig.loop = this.loopConfig.loop_config;
                     }
                     
+                    // Validate loop configuration
+                    if (!this.loopConfig || !this.loopConfig.loop) {
+                        throw new Error('Invalid loop configuration format - missing "loop" or "loop_config" field');
+                    }
+                    
+                    if (!Array.isArray(this.loopConfig.loop) || this.loopConfig.loop.length === 0) {
+                        throw new Error('Loop configuration is empty or not an array');
+                    }
+                    
+                    this.log('Using loop configuration from file');
                     return this.loopConfig;
                 } catch (error) {
                     throw new Error('Cannot load loop.json: ' + error.message);

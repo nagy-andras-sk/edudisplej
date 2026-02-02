@@ -61,7 +61,7 @@ try {
             'module_key' => $row['module_key'],
             'duration_seconds' => (int)$row['duration_seconds'],
             'display_order' => (int)$row['display_order'],
-            'settings' => $row['settings'] ?? '{}',
+            'settings' => $row['settings'] ? json_decode($row['settings'], true) : (object)[],
             'source' => 'kiosk'
         ];
     }
@@ -92,7 +92,7 @@ try {
                 'module_key' => $row['module_key'],
                 'duration_seconds' => (int)$row['duration_seconds'],
                 'display_order' => (int)$row['display_order'],
-                'settings' => $row['settings'] ?? '{}',
+                'settings' => $row['settings'] ? json_decode($row['settings'], true) : (object)[],
                 'source' => 'group'
             ];
         }
@@ -100,9 +100,12 @@ try {
     }
     
     // Determine loop last update based on source
+    // Use MAX of created_at to detect module changes
     $loop_last_update = null;
     if ($config_source === 'kiosk') {
-        $stmt = $conn->prepare("SELECT MAX(created_at) as last_update FROM kiosk_modules WHERE kiosk_id = ? AND is_active = 1");
+        $stmt = $conn->prepare("SELECT MAX(created_at) as last_update 
+                                FROM kiosk_modules 
+                                WHERE kiosk_id = ? AND is_active = 1");
         $stmt->bind_param("i", $kiosk_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -110,7 +113,9 @@ try {
         $loop_last_update = $row['last_update'] ?? null;
         $stmt->close();
     } else if ($group_id) {
-        $stmt = $conn->prepare("SELECT MAX(created_at) as last_update FROM kiosk_group_modules WHERE group_id = ? AND is_active = 1");
+        $stmt = $conn->prepare("SELECT MAX(created_at) as last_update 
+                                FROM kiosk_group_modules 
+                                WHERE group_id = ? AND is_active = 1");
         $stmt->bind_param("i", $group_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -122,8 +127,6 @@ try {
         $loop_last_update = date('Y-m-d H:i:s');
     }
     
-    $loop_hash = hash('sha1', json_encode($loop_config));
-    
     closeDbConnection($conn);
     
     $response['success'] = true;
@@ -132,7 +135,6 @@ try {
     $response['loop_config'] = $loop_config;
     $response['module_count'] = count($loop_config);
     $response['loop_last_update'] = $loop_last_update;
-    $response['loop_hash'] = $loop_hash;
     
     // Use JSON encoding options to prevent output truncation
     echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

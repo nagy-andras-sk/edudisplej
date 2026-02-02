@@ -310,26 +310,6 @@ try {
             display: inline-block;
         }
         
-        .btn-primary {
-            background: #1a3a52;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #0f2537;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(26, 58, 82, 0.4);
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-        
         .btn-success {
             background: #28a745;
             color: white;
@@ -337,6 +317,17 @@ try {
         
         .btn-success:hover {
             background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
         }
         
         .total-duration {
@@ -428,12 +419,17 @@ try {
             transition: all 0.2s;
         }
         
+        .preview-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         .preview-btn-play {
             background: #28a745;
             color: white;
         }
         
-        .preview-btn-play:hover {
+        .preview-btn-play:hover:not(:disabled) {
             background: #218838;
         }
         
@@ -442,7 +438,7 @@ try {
             color: #000;
         }
         
-        .preview-btn-pause:hover {
+        .preview-btn-pause:hover:not(:disabled) {
             background: #e0a800;
         }
         
@@ -451,8 +447,49 @@ try {
             color: white;
         }
         
-        .preview-btn-stop:hover {
+        .preview-btn-stop:hover:not(:disabled) {
             background: #c82333;
+        }
+        
+        .preview-navigation {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .preview-nav-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.2s;
+            background: #1a3a52;
+            color: white;
+        }
+        
+        .preview-nav-btn:hover:not(:disabled) {
+            background: #0f2537;
+            transform: scale(1.05);
+        }
+        
+        .preview-nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .preview-nav-info {
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #333;
+            min-width: 80px;
+            text-align: center;
         }
         
         .preview-progress {
@@ -546,8 +583,7 @@ try {
                 
                 <div class="control-panel">
                     <button class="btn btn-success" onclick="saveLoop()">💾 Mentés</button>
-                    <button class="btn btn-secondary" onclick="clearLoop()">🗑️ Összes törlése</button>
-                    <a href="groups.php" class="btn btn-secondary">← Vissza</a>
+                    <button class="btn btn-danger" onclick="clearLoop()">🗑️ Összes törlése</button>
                     <div class="total-duration" id="total-duration">Össz: 0 mp</div>
                 </div>
             </div>
@@ -574,6 +610,12 @@ try {
                     <div class="preview-progress-bar" id="progressBar" style="width: 0%;">
                         <span id="progressText">0s / 0s</span>
                     </div>
+                </div>
+                
+                <div class="preview-navigation">
+                    <button class="preview-nav-btn" id="btnPrev" onclick="previousModule()" title="Előző modul">◄</button>
+                    <div class="preview-nav-info" id="navInfo">—</div>
+                    <button class="preview-nav-btn" id="btnNext" onclick="nextModule()" title="Következő modul">►</button>
                 </div>
                 
                 <div class="preview-info" id="previewInfo">
@@ -1111,10 +1153,53 @@ try {
             document.getElementById('progressBar').style.width = '0%';
             document.getElementById('progressText').textContent = '0s / 0s';
             document.getElementById('loopCount').textContent = '0';
+            document.getElementById('navInfo').textContent = '—';
             
             // Hide iframe, show empty message
             document.getElementById('previewIframe').style.display = 'none';
             document.getElementById('previewEmpty').style.display = 'block';
+        }
+        
+        function previousModule() {
+            if (loopItems.length === 0) return;
+            
+            // Stop current playback
+            clearTimeout(previewTimeout);
+            clearInterval(previewInterval);
+            
+            // Go to previous module
+            currentPreviewIndex--;
+            if (currentPreviewIndex < 0) {
+                currentPreviewIndex = loopItems.length - 1;
+                if (loopCycleCount > 0) loopCycleCount--;
+            }
+            
+            // Update cycle count display
+            document.getElementById('loopCount').textContent = loopCycleCount;
+            
+            // Play the module
+            playCurrentModule();
+        }
+        
+        function nextModule() {
+            if (loopItems.length === 0) return;
+            
+            // Stop current playback
+            clearTimeout(previewTimeout);
+            clearInterval(previewInterval);
+            
+            // Go to next module
+            currentPreviewIndex++;
+            if (currentPreviewIndex >= loopItems.length) {
+                currentPreviewIndex = 0;
+                loopCycleCount++;
+            }
+            
+            // Update cycle count display
+            document.getElementById('loopCount').textContent = loopCycleCount;
+            
+            // Play the module
+            playCurrentModule();
         }
         
         function playCurrentModule() {
@@ -1132,6 +1217,7 @@ try {
             
             // Update info
             document.getElementById('currentModule').textContent = `${currentPreviewIndex + 1}. ${module.module_name}`;
+            document.getElementById('navInfo').textContent = `${currentPreviewIndex + 1} / ${loopItems.length}`;
             
             // Build module URL with settings
             const moduleUrl = buildModuleUrl(module);

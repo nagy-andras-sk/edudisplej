@@ -23,8 +23,51 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $kiosk_id = intval($_GET['id'] ?? 0);
+$refresh_list = $_GET['refresh_list'] ?? null;
 $user_id = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
+
+// Handle refresh_list request (get multiple kiosk's last_seen values)
+if ($refresh_list) {
+    try {
+        $conn = getDbConnection();
+        
+        $kiosk_ids = array_map('intval', explode(',', $refresh_list));
+        $placeholders = str_repeat('?,', count($kiosk_ids) - 1) . '?';
+        
+        $query = "SELECT k.id, k.last_seen FROM kiosks k WHERE k.id IN ($placeholders) AND k.company_id = ?";
+        $stmt = $conn->prepare($query);
+        
+        $types = str_repeat('i', count($kiosk_ids)) . 'i';
+        $params = array_merge($kiosk_ids, [$company_id]);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $kiosks = [];
+        while ($row = $result->fetch_assoc()) {
+            $kiosks[] = [
+                'id' => $row['id'],
+                'last_seen' => $row['last_seen']
+            ];
+        }
+        $stmt->close();
+        closeDbConnection($conn);
+        
+        echo json_encode([
+            'success' => true,
+            'kiosks' => $kiosks
+        ]);
+        exit();
+        
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Database error: ' . $e->getMessage()
+        ]);
+        exit();
+    }
+}
 
 if (!$kiosk_id) {
     $response['message'] = 'Kiosk ID is required';
@@ -36,7 +79,7 @@ try {
     $conn = getDbConnection();
     
     // Get kiosk data
-    $stmt = $conn->prepare("SELECT k.* FROM kiosks k WHERE k.id = ? AND k.company_id = ?");
+    $stmt = $conn->prepare("SELECT k.*, COALESCE(k.screenshot_enabled, 0) as screenshot_enabled FROM kiosks k WHERE k.id = ? AND k.company_id = ?");
     $stmt->bind_param("ii", $kiosk_id, $company_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -57,6 +100,8 @@ try {
     $response['location'] = $kiosk['location'];
     $response['last_seen'] = $kiosk['last_seen'] ? date('Y-m-d H:i', strtotime($kiosk['last_seen'])) : 'Never';
     $response['sync_interval'] = (int)$kiosk['sync_interval'];
+    $response['screenshot_enabled'] = (int)$kiosk['screenshot_enabled'];
+    $response['screenshot_url'] = $kiosk['screenshot_url'] ?? null;
     
     // Parse HW info
     if ($kiosk['hw_info']) {
