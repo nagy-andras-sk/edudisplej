@@ -5,6 +5,12 @@
 
 set -euo pipefail
 
+# Source common functions if available
+INIT_DIR="/opt/edudisplej/init"
+if [[ -f "${INIT_DIR}/common.sh" ]]; then
+    source "${INIT_DIR}/common.sh"
+fi
+
 # Configuration
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 REGISTRATION_API="${API_BASE_URL}/api/registration.php"
@@ -25,44 +31,55 @@ DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment
 # Create directories
 mkdir -p "$CONFIG_DIR" "$LOG_DIR"
 
-# Logging functions
-log() {
-    local level="INFO"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
-}
+# Logging functions (fallback if common.sh not available)
+if ! command -v print_info &> /dev/null; then
+    log() {
+        local level="INFO"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
+    }
+    
+    log_debug() {
+        if [ "$DEBUG" = true ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" | tee -a "$LOG_FILE"
+        fi
+    }
+    
+    log_error() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" | tee -a "$LOG_FILE" >&2
+    }
+    
+    log_success() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
+    }
+else
+    # Use print_* functions from common.sh
+    log() { print_info "$*" >> "$LOG_FILE"; }
+    log_debug() { [ "$DEBUG" = true ] && print_info "[DEBUG] $*" >> "$LOG_FILE" || true; }
+    log_error() { print_error "$*" >> "$LOG_FILE"; }
+    log_success() { print_success "$*" >> "$LOG_FILE"; }
+fi
 
-log_debug() {
-    if [ "$DEBUG" = true ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" | tee -a "$LOG_FILE"
-    fi
-}
+# Use shared functions from common.sh if available, otherwise define fallbacks
+if ! command -v get_mac_address &> /dev/null; then
+    get_mac_address() {
+        local mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':')
+        log_debug "Detected MAC address: $mac"
+        echo "$mac"
+    }
+fi
 
-log_error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" | tee -a "$LOG_FILE" >&2
-}
+if ! command -v get_hostname &> /dev/null; then
+    get_hostname() {
+        local host=$(hostname)
+        log_debug "Detected hostname: $host"
+        echo "$host"
+    }
+fi
 
-log_success() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
-}
-
-# Get MAC address
-get_mac_address() {
-    local mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':')
-    log_debug "Detected MAC address: $mac"
-    echo "$mac"
-}
-
-# Get hostname
-get_hostname() {
-    local host=$(hostname)
-    log_debug "Detected hostname: $host"
-    echo "$host"
-}
-
-# Get hardware info
-get_hw_info() {
-    log_debug "Collecting hardware information..."
-    cat << EOF
+if ! command -v get_hw_info &> /dev/null; then
+    get_hw_info() {
+        log_debug "Collecting hardware information..."
+        cat << EOF
 {
     "hostname": "$(hostname)",
     "os": "$(lsb_release -ds 2>/dev/null || echo 'Unknown')",
@@ -73,18 +90,21 @@ get_hw_info() {
     "uptime": "$(uptime -p)"
 }
 EOF
-}
+    }
+fi
 
-# Parse JSON value (jq if available, fallback to sed)
-json_get() {
-    local json="$1"
-    local key="$2"
-    if command -v jq >/dev/null 2>&1; then
-        echo "$json" | jq -r ".$key // empty" 2>/dev/null
-    else
-        echo "$json" | tr -d '\n\r' | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
-    fi
-}
+# Parse JSON value (use shared function or fallback)
+if ! command -v json_get &> /dev/null; then
+    json_get() {
+        local json="$1"
+        local key="$2"
+        if command -v jq >/dev/null 2>&1; then
+            echo "$json" | jq -r ".$key // empty" 2>/dev/null
+        else
+            echo "$json" | tr -d '\n\r' | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+        fi
+    }
+fi
 
 # Sync hardware data (also returns sync interval and update status)
 sync_hw_data() {
@@ -372,6 +392,10 @@ EOF
         if [ -n "$device_id" ] && [ "$device_id" != "unknown" ]; then
             log "Checking for loop configuration changes..."
             check_loop_updates "$device_id"
+            
+            # Collect and upload logs
+            log_debug "Uploading logs to server..."
+            collect_and_upload_logs "$device_id"
         fi
         
         # Notify if not fully configured
@@ -464,6 +488,84 @@ sync_modules() {
     local kiosk_id=$1
     log "TODO: Implement module sync for kiosk ID: $kiosk_id"
     # Future implementation: download modules from MODULES_API
+}
+
+# Collect and upload logs to server
+collect_and_upload_logs() {
+    local device_id="$1"
+    [ -z "$device_id" ] && return 0
+    
+    log_debug "Collecting logs for upload..."
+    
+    local logs_json="["
+    local first=true
+    
+    # Collect recent errors and warnings from sync log
+    if [ -f "$LOG_FILE" ]; then
+        while IFS= read -r line; do
+            # Only send ERROR and WARNING logs
+            if echo "$line" | grep -qE "\[ERROR\]|\[WARNING\]"; then
+                # Extract log level and message
+                local timestamp=$(echo "$line" | sed -n 's/^\[\([^]]*\)\].*/\1/p')
+                local level=$(echo "$line" | sed -n 's/.*\[\(ERROR\|WARNING\)\].*/\1/p' | tr '[:upper:]' '[:lower:]')
+                local message=$(echo "$line" | sed 's/^[^]]*\] \[[^]]*\] //')
+                
+                # Build JSON entry
+                if [ "$first" = true ]; then
+                    first=false
+                else
+                    logs_json+=","
+                fi
+                
+                # Escape quotes in message
+                message=$(echo "$message" | sed 's/"/\\"/g' | tr -d '\n\r')
+                
+                logs_json+="{\"type\":\"sync\",\"level\":\"$level\",\"message\":\"$message\",\"timestamp\":\"$timestamp\"}"
+            fi
+        done < <(tail -100 "$LOG_FILE" 2>/dev/null)
+    fi
+    
+    # Collect systemd service errors if available
+    if command -v journalctl >/dev/null 2>&1; then
+        local service_logs=$(journalctl -u edudisplej-kiosk.service -u edudisplej-sync.service --since "5 minutes ago" -p err -n 20 --no-pager 2>/dev/null || true)
+        if [ -n "$service_logs" ]; then
+            while IFS= read -r line; do
+                if [ -n "$line" ]; then
+                    if [ "$first" = false ]; then
+                        logs_json+=","
+                    fi
+                    first=false
+                    
+                    local message=$(echo "$line" | sed 's/"/\\"/g' | tr -d '\n\r')
+                    logs_json+="{\"type\":\"systemd\",\"level\":\"error\",\"message\":\"$message\"}"
+                fi
+            done <<< "$service_logs"
+        fi
+    fi
+    
+    logs_json+="]"
+    
+    # Only send if we have logs
+    if [ "$logs_json" = "[]" ]; then
+        log_debug "No error/warning logs to upload"
+        return 0
+    fi
+    
+    # Send logs to server
+    local mac=$(get_mac_address)
+    local request_body="{\"mac\":\"$mac\",\"device_id\":\"$device_id\",\"logs\":$logs_json}"
+    
+    local response=$(curl -s -X POST "${API_BASE_URL}/api/log_sync.php" \
+        -H "Content-Type: application/json" \
+        -d "$request_body" \
+        --max-time 30)
+    
+    if echo "$response" | grep -q '"success":true'; then
+        local logs_inserted=$(json_get "$response" "logs_inserted")
+        log_debug "Uploaded $logs_inserted logs to server"
+    else
+        log_debug "Log upload failed (non-critical)"
+    fi
 }
 
 # Check for system updates (runs daily)
