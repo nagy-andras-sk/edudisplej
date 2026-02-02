@@ -162,7 +162,9 @@ if [ -d "$TARGET_DIR" ]; then
 fi
 
 # Vytvorenie priecinkov - Create directories
-mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR"
+echo "[*] Vytvaranie adresarov - Creating directories..."
+mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR" "${TARGET_DIR}/data" "${TARGET_DIR}/logs"
+echo "[✓] Adresare vytvorene - Directories created"
 
 # Save API token if provided
 if [ -n "$API_TOKEN" ]; then
@@ -503,6 +505,34 @@ fi
 
 # Deaktivacia getty@tty1 - Disable getty
 systemctl disable getty@tty1.service 2>/dev/null || true
+
+# ============================================================================
+# INITIALIZE CENTRALIZED DATA DIRECTORY / CENTRALIZOVANY DATOVY ADRESAR
+# ============================================================================
+
+echo ""
+echo "[*] Inicializujem centralizovany data adresar - Initializing centralized data directory..."
+
+DATA_DIR="${TARGET_DIR}/data"
+CONFIG_FILE="${DATA_DIR}/config.json"
+
+# Data directory was already created at line 166, just verify
+if [ ! -d "$DATA_DIR" ]; then
+    mkdir -p "$DATA_DIR"
+fi
+echo "[✓] Data adresar pripraveny - Data directory ready: $DATA_DIR"
+
+# Initialize config.json using config manager
+if [ -x "${INIT_DIR}/edudisplej-config-manager.sh" ]; then
+    echo "[*] Inicializujem config.json - Initializing config.json..."
+    bash "${INIT_DIR}/edudisplej-config-manager.sh" init
+    echo "[✓] Config.json inicializovany - config.json initialized"
+else
+    echo "[!] VAROVANIE: Config manager nenajdeny - Config manager not found"
+    echo "[!] Config.json bude vytvoreny pri prvom sync - Config.json will be created on first sync"
+fi
+
+echo ""
 
 # Mark kiosk system as configured (so edudisplej-init.sh won't run installation on boot)
 echo "[*] Jelolom a rendszert konfiguraltnak - Marking system as configured..."

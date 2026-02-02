@@ -15,6 +15,7 @@ try {
     
     $mac = $data['mac'] ?? '';
     $screenshot_data = $data['screenshot'] ?? '';
+    $custom_filename = $data['filename'] ?? ''; // Support custom filename format
     
     if (empty($mac) || empty($screenshot_data)) {
         $response['message'] = 'MAC address and screenshot data required';
@@ -24,8 +25,12 @@ try {
     
     $conn = getDbConnection();
     
-    // Save screenshot
-    $filename = 'screenshot_' . md5($mac . time()) . '.png';
+    // Use custom filename if provided, otherwise generate default
+    if (!empty($custom_filename)) {
+        $filename = $custom_filename;
+    } else {
+        $filename = 'screenshot_' . md5($mac . time()) . '.png';
+    }
     $filepath = '../screenshots/' . $filename;
     
     // Create screenshots directory if it doesn't exist

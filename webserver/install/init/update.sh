@@ -514,6 +514,40 @@ else
     echo "[!] Mozno je potrebny manualy restart"
 fi
 
+# ============================================================================
+# ENSURE DATA DIRECTORY EXISTS / OVERENIE EXISTENCIE DATA ADRESARA
+# ============================================================================
+
+echo ""
+echo "[*] Kontrolujem centralizovany data adresar - Checking centralized data directory..."
+
+DATA_DIR="${TARGET_DIR}/data"
+CONFIG_FILE="${DATA_DIR}/config.json"
+
+# Create data directory if it doesn't exist
+if [ ! -d "$DATA_DIR" ]; then
+    mkdir -p "$DATA_DIR"
+    echo "[✓] Data adresar vytvoreny - Data directory created: $DATA_DIR"
+else
+    echo "[✓] Data adresar uz existuje - Data directory already exists: $DATA_DIR"
+fi
+
+# Initialize config.json if it doesn't exist
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[*] Config.json neexistuje, inicializujem - Config.json not found, initializing..."
+    if [ -x "${INIT_DIR}/edudisplej-config-manager.sh" ]; then
+        bash "${INIT_DIR}/edudisplej-config-manager.sh" init
+        echo "[✓] Config.json inicializovany - config.json initialized"
+    else
+        echo "[!] VAROVANIE: Config manager nenajdeny - Config manager not found"
+        echo "[!] Config.json bude vytvoreny pri prvom sync - Config.json will be created on first sync"
+    fi
+else
+    echo "[✓] Config.json uz existuje - Config.json already exists"
+fi
+
+echo ""
+
 # Restart display surface / Restart zobrazenej plochy
 echo ""
 echo "[*] Restartujem zobrazenu plochu / Restarting display surface..."

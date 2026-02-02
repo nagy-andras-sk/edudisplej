@@ -32,8 +32,15 @@ try {
     $stmt->bind_param("ssss", $hostname, $hw_info, $public_ip, $mac);
     $stmt->execute();
     
-    // Get kiosk data
-    $stmt = $conn->prepare("SELECT id, device_id, sync_interval, screenshot_requested, COALESCE(screenshot_enabled, 0) as screenshot_enabled FROM kiosks WHERE mac = ?");
+    // Get kiosk data with company information
+    $stmt = $conn->prepare("
+        SELECT k.id, k.device_id, k.sync_interval, k.screenshot_requested, 
+               COALESCE(k.screenshot_enabled, 0) as screenshot_enabled,
+               k.company_id, c.name as company_name
+        FROM kiosks k
+        LEFT JOIN companies c ON k.company_id = c.id
+        WHERE k.mac = ?
+    ");
     $stmt->bind_param("s", $mac);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -46,6 +53,22 @@ try {
         $response['sync_interval'] = $kiosk['sync_interval'];
         $response['screenshot_requested'] = (bool)$kiosk['screenshot_requested'];
         $response['screenshot_enabled'] = (bool)$kiosk['screenshot_enabled'];
+        
+        // Add company information for config.json
+        $response['company_id'] = $kiosk['company_id'];
+        $response['company_name'] = $kiosk['company_name'] ?? '';
+        
+        // Add token if exists (for future use)
+        if ($kiosk['company_id']) {
+            $token_stmt = $conn->prepare("SELECT token FROM companies WHERE id = ?");
+            $token_stmt->bind_param("i", $kiosk['company_id']);
+            $token_stmt->execute();
+            $token_result = $token_stmt->get_result();
+            if ($token_row = $token_result->fetch_assoc()) {
+                $response['token'] = $token_row['token'] ?? '';
+            }
+            $token_stmt->close();
+        }
         
         // Check if configuration has been updated on server side
         $need_update = false;
