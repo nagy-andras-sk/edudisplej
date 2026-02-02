@@ -1,0 +1,13 @@
+{
+  "services": {
+    "edudisplej_sync_service.sh": "1.0.0",
+    "edudisplej_terminal_display.sh": "1.0.0",
+    "edudisplej_terminal_script.sh": "1.0.0",
+    "edudisplej-download-modules.sh": "1.0.0",
+    "edudisplej-watchdog.sh": "1.0.0",
+    "update.sh": "1.0.0",
+    "common.sh": "1.0.0",
+    "kiosk.sh": "1.0.0"
+  },
+  "last_updated": "2026-02-02T11:58:00Z"
+}
