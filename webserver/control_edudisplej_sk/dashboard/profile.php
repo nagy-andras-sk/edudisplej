@@ -117,6 +117,80 @@ $logout_url = '../login.php?logout=1';
                 </div>
             </div>
             
+            <!-- API TOKEN AND INSTALLATION -->
+            <div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #eee;">
+                <h2 style="margin-top: 0;">🔑 API Token és Telepítés</h2>
+                
+                <?php
+                $api_token = $company_data['api_token'] ?? null;
+                $install_command = $api_token ? "curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token={$api_token}" : '';
+                ?>
+                
+                <?php if ($api_token): ?>
+                    <!-- Token Display -->
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">API Token (Licenszkulcs):</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" value="<?php echo htmlspecialchars($api_token); ?>" id="tokenInput" readonly style="
+                                flex: 1;
+                                padding: 10px;
+                                border: 1px solid #ccc;
+                                border-radius: 5px;
+                                font-family: monospace;
+                                font-size: 12px;
+                            " />
+                            <button onclick="copyToClipboard(event, 'tokenInput')" style="
+                                background: #4caf50;
+                                color: white;
+                                border: none;
+                                padding: 10px 20px;
+                                border-radius: 5px;
+                                cursor: pointer;
+                            ">📋 Másolás</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Install Command Display -->
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Telepítő Parancs:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" value="<?php echo htmlspecialchars($install_command); ?>" id="installInput" readonly style="
+                                flex: 1;
+                                padding: 10px;
+                                border: 1px solid #ccc;
+                                border-radius: 5px;
+                                font-family: monospace;
+                                font-size: 11px;
+                            " />
+                            <button onclick="copyToClipboard(event, 'installInput')" style="
+                                background: #4caf50;
+                                color: white;
+                                border: none;
+                                padding: 10px 20px;
+                                border-radius: 5px;
+                                cursor: pointer;
+                            ">📋 Másolás</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Warning Box -->
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
+                        <strong>⚠️ Fontos:</strong>
+                        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                            <li>Ez a token biztosítja az API hozzáférést a cég eszközeihez</li>
+                            <li>Tartsa biztonságban és ne ossza meg illetéktelen személyekkel</li>
+                            <li>Használja a telepítő parancsot új eszközök beállításához</li>
+                        </ul>
+                    </div>
+                <?php else: ?>
+                    <!-- No Token Message -->
+                    <div style="text-align: center; padding: 30px; color: #999; background: #f9f9f9; border-radius: 3px; border: 1px dashed #ddd;">
+                        <p style="margin: 0 0 15px 0;">📭 Még nincs API token generálva</p>
+                        <p style="margin: 0; font-size: 14px;">Kérjen API token generálást a rendszer adminisztrátortól.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+            
             <!-- LICENSES -->
             <div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #eee;">
                 <h2 style="margin-top: 0;">📜 Licenszek Kezelése</h2>
@@ -238,6 +312,23 @@ $logout_url = '../login.php?logout=1';
     </div>
     
     <script>
+        function copyToClipboard(event, elementId) {
+            const input = document.getElementById(elementId);
+            input.select();
+            document.execCommand('copy');
+            
+            // Show feedback
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '✅ Másolva!';
+            button.style.background = '#4caf50';
+            
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = '#4caf50';
+            }, 2000);
+        }
+        
         function openAddUserForm() {
             const form = document.createElement('div');
             form.style.cssText = `
