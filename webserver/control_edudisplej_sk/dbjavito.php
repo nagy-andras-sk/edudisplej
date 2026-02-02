@@ -73,6 +73,9 @@ try {
                 'is_super_admin' => "tinyint(1) NOT NULL DEFAULT 0",
                 'role' => "enum('super_admin','admin','content_editor','viewer') DEFAULT 'viewer'",
                 'company_id' => "int(11) DEFAULT NULL",
+                'otp_enabled' => "tinyint(1) NOT NULL DEFAULT 0",
+                'otp_secret' => "varchar(255) DEFAULT NULL",
+                'otp_verified' => "tinyint(1) NOT NULL DEFAULT 0",
                 'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()",
                 'last_login' => "timestamp NULL DEFAULT NULL"
             ],
@@ -86,10 +89,14 @@ try {
             'columns' => [
                 'id' => "int(11) NOT NULL AUTO_INCREMENT",
                 'name' => "varchar(255) NOT NULL",
+                'license_key' => "varchar(255) DEFAULT NULL",
+                'api_token' => "varchar(255) DEFAULT NULL",
+                'token_created_at' => "timestamp NULL DEFAULT NULL",
+                'is_active' => "tinyint(1) NOT NULL DEFAULT 1",
                 'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
             ],
             'primary_key' => 'id',
-            'unique_keys' => [],
+            'unique_keys' => ['license_key', 'api_token'],
             'foreign_keys' => []
         ],
         'kiosks' => [
@@ -103,6 +110,11 @@ try {
                 'public_ip' => "varchar(45) DEFAULT NULL",
                 'last_seen' => "timestamp NULL DEFAULT NULL",
                 'hw_info' => "text DEFAULT NULL",
+                'version' => "varchar(50) DEFAULT NULL",
+                'screen_resolution' => "varchar(50) DEFAULT NULL",
+                'screen_status' => "varchar(20) DEFAULT NULL",
+                'loop_last_update' => "datetime DEFAULT NULL",
+                'last_sync' => "datetime DEFAULT NULL",
                 'screenshot_url' => "text DEFAULT NULL",
                 'screenshot_enabled' => "tinyint(1) DEFAULT 0",
                 'screenshot_requested' => "tinyint(1) DEFAULT 0",
@@ -197,7 +209,8 @@ try {
                 'duration_seconds' => "int(11) DEFAULT 10",
                 'settings' => "text DEFAULT NULL",
                 'is_active' => "tinyint(1) DEFAULT 1",
-                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()",
+                'updated_at' => "timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()"
             ],
             'primary_key' => 'id',
             'unique_keys' => [],
