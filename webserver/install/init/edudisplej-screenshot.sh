@@ -2,6 +2,9 @@
 # Screenshot Capture and Upload Script
 # Takes a screenshot and uploads it to the control panel
 
+# Service version
+SERVICE_VERSION="1.0.0"
+
 set -euo pipefail
 
 CONFIG_DIR="/opt/edudisplej"
