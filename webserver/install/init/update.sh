@@ -537,24 +537,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
         bash "${INIT_DIR}/edudisplej-config-manager.sh" init
         echo "[✓] Config.json inicializovany - config.json initialized"
     else
-        echo "[*] Vytvaranie zakladneho config.json - Creating basic config.json..."
-        cat > "$CONFIG_FILE" <<'CONFIGEOF'
-{
-    "company_name": "",
-    "company_id": null,
-    "device_id": "",
-    "token": "",
-    "sync_interval": 300,
-    "last_update": "",
-    "last_sync": "",
-    "screenshot_enabled": false,
-    "last_screenshot": "",
-    "module_versions": {},
-    "service_versions": {}
-}
-CONFIGEOF
-        chmod 644 "$CONFIG_FILE"
-        echo "[✓] Zakladny config.json vytvoreny - Basic config.json created"
+        echo "[!] VAROVANIE: Config manager nenajdeny - Config manager not found"
+        echo "[!] Config.json bude vytvoreny pri prvom sync - Config.json will be created on first sync"
     fi
 else
     echo "[✓] Config.json uz existuje - Config.json already exists"
