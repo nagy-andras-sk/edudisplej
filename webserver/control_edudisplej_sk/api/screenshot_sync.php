@@ -6,6 +6,10 @@
 
 header('Content-Type: application/json');
 require_once '../dbkonfiguracia.php';
+require_once 'auth.php';
+
+// Validate API authentication for device requests
+validate_api_token();
 
 $response = ['success' => false, 'message' => ''];
 

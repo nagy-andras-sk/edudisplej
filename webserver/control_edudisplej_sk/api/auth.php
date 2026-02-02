@@ -1,7 +1,7 @@
 <?php
 /**
  * API Authentication Middleware
- * Validates bearer tokens for API requests
+ * Validates bearer tokens and license keys for API requests
  */
 
 function validate_api_token() {
@@ -41,7 +41,7 @@ function validate_api_token() {
                 try {
                     $conn = getDbConnection();
                     $stmt = $conn->prepare("
-                        SELECT c.api_token 
+                        SELECT c.api_token, c.license_key, c.is_active 
                         FROM kiosks k 
                         JOIN companies c ON k.company_id = c.id 
                         WHERE k.mac = ? AND c.api_token IS NOT NULL
@@ -52,6 +52,19 @@ function validate_api_token() {
                     
                     if ($result->num_rows > 0) {
                         $row = $result->fetch_assoc();
+                        
+                        // Check if company is active
+                        if (!$row['is_active']) {
+                            $stmt->close();
+                            $conn->close();
+                            
+                            header('HTTP/1.1 403 Forbidden');
+                            header('Content-Type: application/json');
+                            $response['message'] = 'Company license is inactive';
+                            echo json_encode($response);
+                            exit;
+                        }
+                        
                         $token = $row['api_token'];
                     }
                     $stmt->close();
@@ -84,8 +97,8 @@ function validate_api_token() {
     try {
         $conn = getDbConnection();
         
-        // Check if token exists in companies table
-        $stmt = $conn->prepare("SELECT id, name FROM companies WHERE api_token = ?");
+        // Check if token exists in companies table and verify license
+        $stmt = $conn->prepare("SELECT id, name, license_key, is_active FROM companies WHERE api_token = ?");
         $stmt->bind_param("s", $token);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -103,11 +116,35 @@ function validate_api_token() {
         
         $company = $result->fetch_assoc();
         $stmt->close();
+        
+        // Verify company is active
+        if (!$company['is_active']) {
+            $conn->close();
+            
+            header('HTTP/1.1 403 Forbidden');
+            header('Content-Type: application/json');
+            $response['message'] = 'Company license is inactive';
+            echo json_encode($response);
+            exit;
+        }
+        
+        // Verify license key exists
+        if (empty($company['license_key'])) {
+            $conn->close();
+            
+            header('HTTP/1.1 403 Forbidden');
+            header('Content-Type: application/json');
+            $response['message'] = 'No valid license key';
+            echo json_encode($response);
+            exit;
+        }
+        
         $conn->close();
         
         // Token is valid, store company info for use in API
         $_SESSION['api_company_id'] = $company['id'];
         $_SESSION['api_company_name'] = $company['name'];
+        $_SESSION['api_license_key'] = $company['license_key'];
         
         return true;
         
@@ -118,6 +155,94 @@ function validate_api_token() {
         echo json_encode($response);
         exit;
     }
+}
+
+/**
+ * Verify OTP code for two-factor authentication
+ * Uses TOTP (Time-based One-Time Password) algorithm as per RFC 6238
+ * Compatible with Google Authenticator, Authy, Microsoft Authenticator, etc.
+ * 
+ * @param string $secret The user's OTP secret (Base32 encoded)
+ * @param string $code The 6-digit code entered by user
+ * @return bool True if valid
+ */
+function verify_otp_code($secret, $code) {
+    // Time-based OTP using RFC 6238 (TOTP)
+    // Uses 30-second time steps and SHA1 hashing (standard for authenticator apps)
+    $time = floor(time() / 30); // 30-second window
+    
+    // Check current window and ±1 window for clock drift tolerance
+    for ($i = -1; $i <= 1; $i++) {
+        $calc_code = generate_otp_code($secret, $time + $i);
+        if (hash_equals($calc_code, $code)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Generate OTP code for given time
+ * @param string $secret Base32 encoded secret
+ * @param int $time Time counter
+ * @return string 6-digit code
+ */
+function generate_otp_code($secret, $time) {
+    $secret = base32_decode($secret);
+    $time = pack('N*', 0) . pack('N*', $time);
+    $hash = hash_hmac('sha1', $time, $secret, true);
+    $offset = ord($hash[19]) & 0xf;
+    $code = (
+        ((ord($hash[$offset + 0]) & 0x7f) << 24) |
+        ((ord($hash[$offset + 1]) & 0xff) << 16) |
+        ((ord($hash[$offset + 2]) & 0xff) << 8) |
+        (ord($hash[$offset + 3]) & 0xff)
+    ) % 1000000;
+    
+    return str_pad($code, 6, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Decode Base32 string
+ * @param string $data Base32 encoded data
+ * @return string Decoded binary data
+ */
+function base32_decode($data) {
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $data = strtoupper($data);
+    $output = '';
+    $v = 0;
+    $vbits = 0;
+    
+    for ($i = 0, $j = strlen($data); $i < $j; $i++) {
+        $v <<= 5;
+        if (($idx = strpos($alphabet, $data[$i])) !== false) {
+            $v += $idx;
+        }
+        $vbits += 5;
+        
+        while ($vbits >= 8) {
+            $vbits -= 8;
+            $output .= chr($v >> $vbits);
+            $v &= ((1 << $vbits) - 1);
+        }
+    }
+    
+    return $output;
+}
+
+/**
+ * Generate a new OTP secret
+ * @return string Base32 encoded secret
+ */
+function generate_otp_secret() {
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $secret = '';
+    for ($i = 0; $i < 32; $i++) {
+        $secret .= $alphabet[random_int(0, 31)];
+    }
+    return $secret;
 }
 
 // Auto-start session if not already started

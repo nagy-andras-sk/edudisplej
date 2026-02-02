@@ -33,6 +33,7 @@ if (isset($_SESSION['user_id']) && isset($_SESSION['username'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
+    $otp_code = trim($_POST['otp_code'] ?? '');
     $remember = isset($_POST['remember']) ? true : false;
     
     if (empty($username) || empty($password)) {
@@ -41,8 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         try {
             $conn = getDbConnection();
             
-            // Get user with isadmin flag
-            $stmt = $conn->prepare("SELECT id, username, password, isadmin, company_id FROM users WHERE username = ?");
+            // Get user with OTP settings
+            $stmt = $conn->prepare("SELECT id, username, password, isadmin, company_id, otp_enabled, otp_secret, otp_verified FROM users WHERE username = ?");
             $stmt->bind_param("s", $username);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -52,30 +53,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 
                 // Verify password
                 if (password_verify($password, $user['password'])) {
-                    // Set session variables
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['username'] = $user['username'];
-                    $_SESSION['isadmin'] = (bool)$user['isadmin'];
-                    $_SESSION['company_id'] = $user['company_id'];
-                    
-                    // Remember me functionality (optional)
-                    if ($remember) {
-                        setcookie('edudisplej_user', $user['username'], time() + (30 * 24 * 60 * 60), '/', '', true, true);
-                    }
-                    
-                    // Update last login
-                    $update_stmt = $conn->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
-                    $update_stmt->bind_param("i", $user['id']);
-                    $update_stmt->execute();
-                    $update_stmt->close();
-                    
-                    // Redirect based on role
-                    if ($user['isadmin']) {
-                        header('Location: admin/dashboard.php');
+                    // Check if OTP is enabled
+                    if ($user['otp_enabled'] && $user['otp_verified']) {
+                        if (empty($otp_code)) {
+                            // OTP required but not provided
+                            // Store encrypted temporary token instead of user_id
+                            require_once 'security_config.php';
+                            $temp_token = encrypt_data(json_encode([
+                                'user_id' => $user['id'],
+                                'timestamp' => time(),
+                                'username' => $username
+                            ]));
+                            $_SESSION['otp_pending_token'] = $temp_token;
+                            $_SESSION['otp_pending'] = true;
+                            $error = 'Two-factor authentication code required';
+                        } else {
+                            // Verify we have a pending token
+                            if (!isset($_SESSION['otp_pending_token'])) {
+                                $error = 'Invalid authentication state. Please try again.';
+                            } else {
+                                // Decrypt and verify pending token
+                                require_once 'security_config.php';
+                                $token_data = json_decode(decrypt_data($_SESSION['otp_pending_token']), true);
+                                
+                                // Verify token is recent (within 5 minutes) and matches username
+                                if (!$token_data || 
+                                    $token_data['user_id'] != $user['id'] || 
+                                    $token_data['username'] !== $username ||
+                                    (time() - $token_data['timestamp']) > 300) {
+                                    $error = 'Authentication session expired. Please try again.';
+                                    unset($_SESSION['otp_pending_token']);
+                                    unset($_SESSION['otp_pending']);
+                                } else {
+                                    // Verify OTP code
+                                    require_once 'api/auth.php';
+                                    if (verify_otp_code($user['otp_secret'], $otp_code)) {
+                                        // OTP verified, complete login
+                                        unset($_SESSION['otp_pending']);
+                                        unset($_SESSION['otp_pending_token']);
+                                        
+                                        $_SESSION['user_id'] = $user['id'];
+                                        $_SESSION['username'] = $user['username'];
+                                        $_SESSION['isadmin'] = (bool)$user['isadmin'];
+                                        $_SESSION['company_id'] = $user['company_id'];
+                                
+                                        // Remember me functionality (optional)
+                                        if ($remember) {
+                                            setcookie('edudisplej_user', $user['username'], time() + (30 * 24 * 60 * 60), '/', '', true, true);
+                                        }
+                                        
+                                        // Update last login
+                                        $update_stmt = $conn->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+                                        $update_stmt->bind_param("i", $user['id']);
+                                        $update_stmt->execute();
+                                        $update_stmt->close();
+                                        
+                                        // Redirect based on role
+                                        if ($user['isadmin']) {
+                                            header('Location: admin/dashboard.php');
+                                        } else {
+                                            header('Location: dashboard/index.php');
+                                        }
+                                        exit();
+                                    } else {
+                                        $error = 'Invalid two-factor authentication code';
+                                    }
+                                }
+                            }
+                        }
+                        }
                     } else {
-                        header('Location: dashboard/index.php');
+                        // No OTP required, complete login
+                        $_SESSION['user_id'] = $user['id'];
+                        $_SESSION['username'] = $user['username'];
+                        $_SESSION['isadmin'] = (bool)$user['isadmin'];
+                        $_SESSION['company_id'] = $user['company_id'];
+                        
+                        // Remember me functionality (optional)
+                        if ($remember) {
+                            setcookie('edudisplej_user', $user['username'], time() + (30 * 24 * 60 * 60), '/', '', true, true);
+                        }
+                        
+                        // Update last login
+                        $update_stmt = $conn->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+                        $update_stmt->bind_param("i", $user['id']);
+                        $update_stmt->execute();
+                        $update_stmt->close();
+                        
+                        // Redirect based on role
+                        if ($user['isadmin']) {
+                            header('Location: admin/dashboard.php');
+                        } else {
+                            header('Location: dashboard/index.php');
+                        }
+                        exit();
                     }
-                    exit();
                 } else {
                     $error = 'Invalid username or password';
                 }
@@ -328,6 +400,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                     autocomplete="current-password"
                 >
             </div>
+            
+            <?php if (isset($_SESSION['otp_pending']) && $_SESSION['otp_pending']): ?>
+            <div class="form-group" style="background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <label for="otp_code">Two-Factor Authentication Code</label>
+                <input 
+                    type="text" 
+                    id="otp_code" 
+                    name="otp_code" 
+                    placeholder="Enter 6-digit code"
+                    pattern="\d{6}"
+                    maxlength="6"
+                    required
+                    autocomplete="one-time-code"
+                    style="text-align: center; letter-spacing: 5px; font-size: 18px;"
+                >
+                <p style="font-size: 12px; color: #856404; margin-top: 8px;">
+                    Enter the 6-digit code from your authenticator app
+                </p>
+            </div>
+            <?php endif; ?>
             
             <div class="form-group checkbox">
                 <input type="checkbox" id="remember" name="remember">
