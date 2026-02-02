@@ -37,7 +37,7 @@ try {
     $conn = getDbConnection();
     
     // Check if company exists
-    $stmt = $conn->prepare("SELECT id, name, api_token FROM companies WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, name, api_token, license_key FROM companies WHERE id = ?");
     $stmt->bind_param("i", $company_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -64,9 +64,20 @@ try {
     // Generate new token
     $new_token = bin2hex(random_bytes(32)); // 64 character hex string
     
-    // Update company with new token
-    $update_stmt = $conn->prepare("UPDATE companies SET api_token = ?, token_created_at = NOW() WHERE id = ?");
-    $update_stmt->bind_param("si", $new_token, $company_id);
+    // Generate license key if not exists
+    $license_key = null;
+    if (empty($company['license_key'])) {
+        $license_key = strtoupper(bin2hex(random_bytes(16))); // 32 character uppercase hex string
+    }
+    
+    // Update company with new token and license key
+    if ($license_key) {
+        $update_stmt = $conn->prepare("UPDATE companies SET api_token = ?, license_key = ?, token_created_at = NOW() WHERE id = ?");
+        $update_stmt->bind_param("ssi", $new_token, $license_key, $company_id);
+    } else {
+        $update_stmt = $conn->prepare("UPDATE companies SET api_token = ?, token_created_at = NOW() WHERE id = ?");
+        $update_stmt->bind_param("si", $new_token, $company_id);
+    }
     
     if (!$update_stmt->execute()) {
         $response['message'] = 'Failed to save token: ' . $update_stmt->error;
