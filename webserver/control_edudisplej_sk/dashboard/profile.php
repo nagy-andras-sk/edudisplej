@@ -139,7 +139,7 @@ $logout_url = '../login.php?logout=1';
                                 font-family: monospace;
                                 font-size: 12px;
                             " />
-                            <button onclick="copyToClipboard('tokenInput')" style="
+                            <button onclick="copyToClipboard(event, 'tokenInput')" style="
                                 background: #4caf50;
                                 color: white;
                                 border: none;
@@ -162,7 +162,7 @@ $logout_url = '../login.php?logout=1';
                                 font-family: monospace;
                                 font-size: 11px;
                             " />
-                            <button onclick="copyToClipboard('installInput')" style="
+                            <button onclick="copyToClipboard(event, 'installInput')" style="
                                 background: #4caf50;
                                 color: white;
                                 border: none;
@@ -312,7 +312,7 @@ $logout_url = '../login.php?logout=1';
     </div>
     
     <script>
-        function copyToClipboard(elementId) {
+        function copyToClipboard(event, elementId) {
             const input = document.getElementById(elementId);
             input.select();
             document.execCommand('copy');
