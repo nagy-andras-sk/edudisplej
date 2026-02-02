@@ -226,6 +226,21 @@ sync_hw_data() {
             update_config_field "screenshot_enabled" "$screenshot_enabled"
         fi
         
+        # Update company information
+        local company_id=$(json_get "$response" "company_id")
+        local company_name=$(json_get "$response" "company_name")
+        local token=$(json_get "$response" "token")
+        
+        if [ -n "$company_id" ] && [ "$company_id" != "null" ]; then
+            update_config_field "company_id" "$company_id"
+        fi
+        if [ -n "$company_name" ]; then
+            update_config_field "company_name" "$company_name"
+        fi
+        if [ -n "$token" ]; then
+            update_config_field "token" "$token"
+        fi
+        
         # Check if update is needed
         local needs_update
         needs_update=$(json_get "$response" "needs_update")
