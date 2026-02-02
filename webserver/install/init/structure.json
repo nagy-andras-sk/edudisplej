@@ -109,6 +109,18 @@
       "destination": "/opt/edudisplej/init/edudisplej-download-modules.sh",
       "permissions": "755",
       "description": "Downloads modules and loop configuration from server"
+    },
+    {
+      "source": "edudisplej-screenshot-service.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-screenshot-service.sh",
+      "permissions": "755",
+      "description": "Screenshot service for capturing and uploading screen images"
+    },
+    {
+      "source": "edudisplej-config-manager.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-config-manager.sh",
+      "permissions": "755",
+      "description": "Configuration manager for centralized config.json"
     }
   ],
   "services": [
@@ -139,6 +151,13 @@
       "enabled": false,
       "autostart": false,
       "description": "Terminal status display (optional)"
+    },
+    {
+      "source": "edudisplej-screenshot-service.service",
+      "name": "edudisplej-screenshot-service.service",
+      "enabled": true,
+      "autostart": true,
+      "description": "Screenshot capture and upload service"
     }
   ]
 }

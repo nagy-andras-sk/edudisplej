@@ -23,10 +23,13 @@ KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
 VERSION_CHECK_API="${API_BASE_URL}/api/check_versions.php"
 SYNC_INTERVAL=300  # 5 minutes
 CONFIG_DIR="/opt/edudisplej"
+DATA_DIR="${CONFIG_DIR}/data"
+CONFIG_FILE="${DATA_DIR}/config.json"
 LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
 LOOP_FILE="${LOCAL_WEB_DIR}/modules/loop.json"
 DOWNLOAD_INFO="${LOCAL_WEB_DIR}/modules/.download_info.json"
 DOWNLOAD_SCRIPT="${CONFIG_DIR}/init/edudisplej-download-modules.sh"
+CONFIG_MANAGER="${CONFIG_DIR}/init/edudisplej-config-manager.sh"
 STATUS_FILE="${CONFIG_DIR}/sync_status.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/sync.log"
@@ -34,7 +37,7 @@ VERSION_FILE="${CONFIG_DIR}/local_versions.json"
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment variable
 
 # Create directories
-mkdir -p "$CONFIG_DIR" "$LOG_DIR"
+mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
 
 # Logging functions (fallback if common.sh not available)
 if ! command -v print_info &> /dev/null; then
@@ -111,6 +114,76 @@ if ! command -v json_get &> /dev/null; then
     }
 fi
 
+# Config.json management functions
+init_config_file() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        log "Initializing centralized config file: $CONFIG_FILE"
+        cat > "$CONFIG_FILE" <<'CONFIGEOF'
+{
+    "company_name": "",
+    "company_id": null,
+    "device_id": "",
+    "token": "",
+    "sync_interval": 300,
+    "last_update": "",
+    "last_sync": "",
+    "screenshot_enabled": false,
+    "last_screenshot": "",
+    "module_versions": {},
+    "service_versions": {}
+}
+CONFIGEOF
+        chmod 644 "$CONFIG_FILE"
+        log_success "Config file created"
+    fi
+}
+
+# Update config.json field
+update_config_field() {
+    local key="$1"
+    local value="$2"
+    
+    init_config_file
+    
+    if command -v jq >/dev/null 2>&1; then
+        local temp_file=$(mktemp)
+        
+        # Handle different value types
+        if [[ "$value" =~ ^[0-9]+$ ]] && [ "$key" != "device_id" ] && [ "$key" != "token" ]; then
+            # Numeric value
+            jq --arg k "$key" --argjson v "$value" '.[$k] = $v' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
+        elif [ "$value" = "true" ] || [ "$value" = "false" ]; then
+            # Boolean value
+            jq --arg k "$key" --argjson v "$value" '.[$k] = $v' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
+        elif [ "$value" = "null" ]; then
+            # Null value
+            jq --arg k "$key" '.[$k] = null' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
+        else
+            # String value
+            jq --arg k "$key" --arg v "$value" '.[$k] = $v' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
+        fi
+        
+        log_debug "Updated config: $key = $value"
+    fi
+}
+
+# Get config.json field
+get_config_field() {
+    local key="$1"
+    
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo ""
+        return 1
+    fi
+    
+    if command -v jq >/dev/null 2>&1; then
+        jq -r ".$key // empty" "$CONFIG_FILE" 2>/dev/null
+    else
+        # Fallback without jq
+        grep "\"$key\"" "$CONFIG_FILE" | sed 's/.*: *"\?\([^",]*\)"\?.*/\1/' | head -1
+    fi
+}
+
 # Sync hardware data (also returns sync interval and update status)
 sync_hw_data() {
     local mac=$(get_mac_address)
@@ -144,6 +217,13 @@ sync_hw_data() {
         new_interval=$(echo "$response" | grep -o '"sync_interval":[0-9]*' | cut -d: -f2)
         if [ -n "$new_interval" ]; then
             SYNC_INTERVAL=$new_interval
+            update_config_field "sync_interval" "$new_interval"
+        fi
+        
+        # Update screenshot_enabled from server response
+        local screenshot_enabled=$(json_get "$response" "screenshot_enabled")
+        if [ -n "$screenshot_enabled" ]; then
+            update_config_field "screenshot_enabled" "$screenshot_enabled"
         fi
         
         # Check if update is needed
@@ -158,6 +238,7 @@ sync_hw_data() {
                 log "Downloading latest modules due to server update..."
                 if bash "$DOWNLOAD_SCRIPT"; then
                     log_success "Modules updated successfully due to server change"
+                    update_config_field "last_update" "$(date '+%Y-%m-%d %H:%M:%S')"
                 else
                     log_error "Module update failed"
                 fi
@@ -401,24 +482,6 @@ EOF
             # Collect and upload logs
             log_debug "Uploading logs to server..."
             collect_and_upload_logs "$device_id"
-            
-            # Capture and upload screenshot periodically (every 5th sync cycle)
-            # Check if screenshot should be taken
-            SCREENSHOT_COUNTER_FILE="${CONFIG_DIR}/.screenshot_counter"
-            SCREENSHOT_COUNTER=0
-            if [ -f "$SCREENSHOT_COUNTER_FILE" ]; then
-                SCREENSHOT_COUNTER=$(cat "$SCREENSHOT_COUNTER_FILE")
-            fi
-            SCREENSHOT_COUNTER=$((SCREENSHOT_COUNTER + 1))
-            echo "$SCREENSHOT_COUNTER" > "$SCREENSHOT_COUNTER_FILE"
-            
-            # Take screenshot every 5 sync cycles (e.g., every 25 minutes if sync is 5 min)
-            if [ $((SCREENSHOT_COUNTER % 5)) -eq 0 ]; then
-                log "Taking screenshot..."
-                if [ -x "${INIT_DIR}/edudisplej-screenshot.sh" ]; then
-                    bash "${INIT_DIR}/edudisplej-screenshot.sh" &
-                fi
-            fi
         fi
         
         # Notify if not fully configured
@@ -472,6 +535,11 @@ write_success_status() {
 }
 EOF
     log_debug "Status file updated: $STATUS_FILE"
+    
+    # Update centralized config.json
+    update_config_field "device_id" "$device_id"
+    update_config_field "company_name" "$company_name"
+    update_config_field "last_sync" "$(date '+%Y-%m-%d %H:%M:%S')"
 }
 
 # Write error status

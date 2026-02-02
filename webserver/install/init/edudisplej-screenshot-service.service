@@ -1,0 +1,19 @@
+[Unit]
+Description=EduDisplej Screenshot Service
+After=network-online.target graphical.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/edudisplej
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/pi/.Xauthority"
+ExecStart=/bin/bash /opt/edudisplej/init/edudisplej-screenshot-service.sh start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
