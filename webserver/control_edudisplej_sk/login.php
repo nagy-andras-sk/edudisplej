@@ -7,6 +7,7 @@
 
 session_start();
 require_once 'dbkonfiguracia.php';
+require_once 'logging.php';
 
 $error = '';
 $success = '';
@@ -31,20 +32,20 @@ if (isset($_SESSION['user_id']) && isset($_SESSION['username'])) {
 
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
-    $username = trim($_POST['username'] ?? '');
+    $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $otp_code = trim($_POST['otp_code'] ?? '');
     $remember = isset($_POST['remember']) ? true : false;
     
-    if (empty($username) || empty($password)) {
-        $error = 'Username and password are required';
+    if (empty($email) || empty($password)) {
+        $error = 'Email and password are required';
     } else {
         try {
             $conn = getDbConnection();
             
             // Get user with OTP settings
-            $stmt = $conn->prepare("SELECT id, username, password, isadmin, company_id, otp_enabled, otp_secret, otp_verified FROM users WHERE username = ?");
-            $stmt->bind_param("s", $username);
+            $stmt = $conn->prepare("SELECT id, username, email, password, isadmin, company_id, otp_enabled, otp_secret, otp_verified FROM users WHERE email = ?");
+            $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
             
@@ -62,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                             $temp_token = encrypt_data(json_encode([
                                 'user_id' => $user['id'],
                                 'timestamp' => time(),
-                                'username' => $username
+                                'email' => $email
                             ]));
                             $_SESSION['otp_pending_token'] = $temp_token;
                             $_SESSION['otp_pending'] = true;
@@ -76,10 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                 require_once 'security_config.php';
                                 $token_data = json_decode(decrypt_data($_SESSION['otp_pending_token']), true);
                                 
-                                // Verify token is recent (within 5 minutes) and matches username
+                                // Verify token is recent (within 5 minutes) and matches email
                                 if (!$token_data || 
                                     $token_data['user_id'] != $user['id'] || 
-                                    $token_data['username'] !== $username ||
+                                    $token_data['email'] !== $email ||
                                     (time() - $token_data['timestamp']) > 300) {
                                     $error = 'Authentication session expired. Please try again.';
                                     unset($_SESSION['otp_pending_token']);
@@ -99,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                 
                                         // Remember me functionality (optional)
                                         if ($remember) {
-                                            setcookie('edudisplej_user', $user['username'], time() + (30 * 24 * 60 * 60), '/', '', true, true);
+                                            setcookie('edudisplej_user', $user['email'], time() + (30 * 24 * 60 * 60), '/', '', true, true);
                                         }
                                         
                                         // Update last login
@@ -107,6 +108,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                         $update_stmt->bind_param("i", $user['id']);
                                         $update_stmt->execute();
                                         $update_stmt->close();
+                                        
+                                        // Log successful login with OTP
+                                        $log_username = $user['username'] ?: ($user['email'] ?? $email);
+                                        log_security_event('successful_login', $user['id'], $log_username, get_client_ip(), get_user_agent(), ['method' => 'otp']);
                                         
                                         // Redirect based on role
                                         if ($user['isadmin']) {
@@ -117,10 +122,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                         exit();
                                     } else {
                                         $error = 'Invalid two-factor authentication code';
+                                        $log_username = $user['username'] ?: ($user['email'] ?? $email);
+                                        log_security_event('failed_otp', $user['id'], $log_username, get_client_ip(), get_user_agent(), ['reason' => 'invalid_otp_code']);
                                     }
                                 }
                             }
-                        }
                         }
                     } else {
                         // No OTP required, complete login
@@ -131,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         
                         // Remember me functionality (optional)
                         if ($remember) {
-                            setcookie('edudisplej_user', $user['username'], time() + (30 * 24 * 60 * 60), '/', '', true, true);
+                            setcookie('edudisplej_user', $user['email'], time() + (30 * 24 * 60 * 60), '/', '', true, true);
                         }
                         
                         // Update last login
@@ -139,6 +145,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         $update_stmt->bind_param("i", $user['id']);
                         $update_stmt->execute();
                         $update_stmt->close();
+                        
+                        // Log successful login
+                        $log_username = $user['username'] ?: ($user['email'] ?? $email);
+                        log_security_event('successful_login', $user['id'], $log_username, get_client_ip(), get_user_agent(), ['method' => 'password']);
                         
                         // Redirect based on role
                         if ($user['isadmin']) {
@@ -149,10 +159,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         exit();
                     }
                 } else {
-                    $error = 'Invalid username or password';
+                    $error = 'Invalid email or password';
+                    // Log failed login attempt
+                    $log_username = $user['username'] ?: ($user['email'] ?? $email);
+                    log_security_event('failed_login', null, $log_username, get_client_ip(), get_user_agent(), ['reason' => 'invalid_password']);
                 }
             } else {
-                $error = 'Invalid username or password';
+                $error = 'Invalid email or password';
+                // Log failed login attempt
+                log_security_event('failed_login', null, $email, get_client_ip(), get_user_agent(), ['reason' => 'user_not_found']);
             }
             
             $stmt->close();
@@ -170,6 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - EduDisplej Control</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style>
         * {
             margin: 0;
@@ -241,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             font-size: 14px;
         }
         
-        input[type="text"],
+        input[type="email"],
         input[type="password"] {
             width: 100%;
             padding: 12px 15px;
@@ -251,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             transition: all 0.3s ease;
         }
         
-        input[type="text"]:focus,
+        input[type="email"]:focus,
         input[type="password"]:focus {
             outline: none;
             border-color: #1e40af;
@@ -377,15 +393,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         
         <form method="POST" action="" autocomplete="off">
             <div class="form-group">
-                <label for="username">Username</label>
+                <label for="email">Email</label>
                 <input 
-                    type="text" 
-                    id="username" 
-                    name="username" 
-                    placeholder="Enter your username"
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    placeholder="Enter your email"
                     required 
                     autofocus
-                    autocomplete="username"
+                    autocomplete="email"
                 >
             </div>
             

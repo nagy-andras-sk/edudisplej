@@ -1,29 +1,20 @@
 <?php
 /**
  * Admin Panel - EduDisplej Control System
- * Complete admin control with tabular interface
+ * Redirects to modern dashboard
  */
 
 session_start();
-require_once '../dbkonfiguracia.php';
-
-$error = '';
-$success = '';
-
-// Handle logout
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header('Location: ../login.php');
-    exit();
-}
 
 // Check if user is logged in and is admin
-$is_logged_in = isset($_SESSION['user_id']) && isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
-
-if (!$is_logged_in) {
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: ../login.php');
     exit();
 }
+
+// Redirect to dashboard
+header('Location: dashboard.php');
+exit();
 
 // Handle screenshot request
 if ($is_logged_in && isset($_GET['screenshot']) && is_numeric($_GET['screenshot'])) {

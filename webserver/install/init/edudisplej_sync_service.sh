@@ -366,6 +366,18 @@ check_loop_updates() {
         if [ -x "$DOWNLOAD_SCRIPT" ]; then
             if bash "$DOWNLOAD_SCRIPT"; then
                 log_success "Loop and modules updated successfully"
+                
+                # Restart browser to apply new loop configuration
+                log "Restarting kiosk display to apply new configuration..."
+                if systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
+                    if systemctl restart edudisplej-kiosk.service 2>/dev/null; then
+                        log_success "✓ Kiosk display restarted successfully"
+                    else
+                        log_error "Failed to restart kiosk display service"
+                    fi
+                else
+                    log "Kiosk display service not active - skipping restart"
+                fi
             else
                 log_error "Module update failed"
             fi

@@ -63,6 +63,7 @@ $online_count = count(array_filter($kiosks, fn($k) => $k['status'] == 'online'))
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EDUDISPLEJ - Irányítási Panel</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <style>
         * {
             margin: 0;

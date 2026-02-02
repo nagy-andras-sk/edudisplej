@@ -6,11 +6,13 @@
  * Provides encryption and security utilities
  */
 
-// Session security settings
-ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_secure', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_samesite', 'Strict');
+// Session security settings - only set if session hasn't started yet
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.cookie_secure', 1);
+    ini_set('session.use_only_cookies', 1);
+    ini_set('session.cookie_samesite', 'Strict');
+}
 
 // Encryption key - MUST be set via environment variable in production
 if (!getenv('EDUDISPLEJ_ENCRYPTION_KEY')) {

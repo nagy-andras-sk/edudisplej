@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduDisplej - Digitálny Informačný Systém pre Vzdelávacie Inštitúcie</title>
+    <title>EduDisplej - Vo vývoji</title>
     <style>
         * {
             margin: 0;
@@ -13,415 +13,98 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-        }
-        
-        /* Header */
-        header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-        
-        nav {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
+            min-height: 100vh;
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
-        }
-        
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-            text-decoration: none;
             color: white;
         }
         
-        .nav-links {
-            display: flex;
-            gap: 20px;
-            align-items: center;
+        .container {
+            text-align: center;
+            padding: 40px;
         }
         
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            transition: background 0.3s;
+        .emoji {
+            font-size: 120px;
+            margin-bottom: 30px;
+            animation: bounce 2s infinite;
         }
         
-        .nav-links a:hover {
-            background: rgba(255,255,255,0.2);
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+        
+        h1 {
+            font-size: 48px;
+            margin-bottom: 30px;
+            font-weight: 600;
         }
         
         .lang-switcher {
             display: flex;
-            gap: 5px;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 40px;
         }
         
         .lang-switcher button {
             background: rgba(255,255,255,0.2);
             color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background 0.3s;
-        }
-        
-        .lang-switcher button:hover,
-        .lang-switcher button.active {
-            background: rgba(255,255,255,0.4);
-        }
-        
-        .btn-primary {
-            background: white;
-            color: #667eea;
+            border: 2px solid rgba(255,255,255,0.3);
             padding: 10px 20px;
             border-radius: 5px;
-            text-decoration: none;
+            cursor: pointer;
+            font-size: 16px;
             font-weight: 600;
-            transition: transform 0.3s;
+            transition: all 0.3s;
         }
         
-        .btn-primary:hover {
-            transform: translateY(-2px);
-        }
-        
-        /* Hero Section */
-        .hero {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 100px 20px;
-            text-align: center;
-        }
-        
-        .hero h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-        
-        .hero p {
-            font-size: 20px;
-            margin-bottom: 30px;
-            max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .beta-badge {
-            display: inline-block;
+        .lang-switcher button:hover {
             background: rgba(255,255,255,0.3);
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-        
-        /* Main Content */
-        main {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 60px 20px;
-        }
-        
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 40px;
-        }
-        
-        .feature-card {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .feature-card h3 {
-            color: #667eea;
-            margin-bottom: 15px;
-            font-size: 24px;
-        }
-        
-        .feature-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-        
-        .cta-section {
-            text-align: center;
-            padding: 60px 20px;
-            background: #f9f9f9;
-            border-radius: 10px;
-            margin-top: 60px;
-        }
-        
-        .cta-section h2 {
-            font-size: 36px;
-            margin-bottom: 20px;
-            color: #333;
-        }
-        
-        .cta-section p {
-            font-size: 18px;
-            margin-bottom: 30px;
-            color: #666;
-        }
-        
-        .btn-large {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 40px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-size: 18px;
-            font-weight: 600;
-            transition: transform 0.3s;
-        }
-        
-        .btn-large:hover {
             transform: translateY(-2px);
         }
         
-        /* Footer */
-        footer {
-            background: #333;
-            color: white;
-            padding: 40px 20px;
-            text-align: center;
-        }
-        
-        footer p {
-            margin: 10px 0;
-        }
-        
-        .hidden {
-            display: none;
+        .lang-switcher button.active {
+            background: white;
+            color: #667eea;
+            border-color: white;
         }
     </style>
 </head>
 <body>
-    <header>
-        <nav>
-            <a href="#" class="logo">🖥️ EduDisplej</a>
-            <div class="nav-links">
-                <div class="lang-switcher">
-                    <button onclick="setLanguage('sk')" class="active" id="lang-sk">SK</button>
-                    <button onclick="setLanguage('hu')" id="lang-hu">HU</button>
-                    <button onclick="setLanguage('en')" id="lang-en">EN</button>
-                </div>
-                <a href="https://control.edudisplej.sk/login.php" class="login-link" data-translate="login">Prihlásenie</a>
-                <!-- TODO: Replace with actual contact form URL -->
-                <a href="mailto:info@edudisplej.sk?subject=Záujem o EduDisplej" class="btn-primary" data-translate="inquiry">Záujem</a>
-            </div>
-        </nav>
-    </header>
-    
-    <section class="hero">
-        <div class="beta-badge" data-translate="beta">BETA VERZIA</div>
-        <h1 data-translate="hero-title">Moderný Digitálny Displej pre Školy</h1>
-        <p data-translate="hero-subtitle">Komplexný informačný systém pre vzdelávacie inštitúcie. Zobrazte dôležité informácie elegantne a efektívne.</p>
-    </section>
-    
-    <main>
-        <section>
-            <h2 style="text-align: center; font-size: 36px; margin-bottom: 20px;" data-translate="what-is">Čo je EduDisplej?</h2>
-            <p style="text-align: center; font-size: 18px; color: #666; max-width: 800px; margin: 0 auto;" data-translate="description">
-                EduDisplej je inteligentný digitálny informačný systém špeciálne navrhnutý pre vzdelávacie inštitúcie. 
-                Umožňuje efektívne zobrazovanie rozmanitých informácií na digitálnych obrazovkách umiestnených v školských priestoroch.
-            </p>
-            
-            <div class="features">
-                <div class="feature-card">
-                    <div class="feature-icon">⏰</div>
-                    <h3 data-translate="feature-clock">Hodiny & Čas</h3>
-                    <p data-translate="feature-clock-desc">Presné zobrazenie aktuálneho času a dátumu s rôznymi formátmi a dizajnmi.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🌤️</div>
-                    <h3 data-translate="feature-weather">Počasie</h3>
-                    <p data-translate="feature-weather-desc">Aktuálne informácie o počasí a predpoveď pre váš región.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🍽️</div>
-                    <h3 data-translate="feature-menu">Jedálny Lístok</h3>
-                    <p data-translate="feature-menu-desc">Denný a týždenný jedálny lístok školskej jedálne.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">📅</div>
-                    <h3 data-translate="feature-calendar">Kalendár</h3>
-                    <p data-translate="feature-calendar-desc">Školský kalendár s dôležitými udalosťami a termínmi.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">📚</div>
-                    <h3 data-translate="feature-schedule">Rozvrh Hodín</h3>
-                    <p data-translate="feature-schedule-desc">Aktuálny rozvrh tried, učiteľov a miestností.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🖼️</div>
-                    <h3 data-translate="feature-gallery">Fotogaléria</h3>
-                    <p data-translate="feature-gallery-desc">Prezentácia školských podujatí a aktivít cez fotografie.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🎂</div>
-                    <h3 data-translate="feature-namedays">Meniny</h3>
-                    <p data-translate="feature-namedays-desc">Denné meniny a narodeniny študentov a zamestnancov.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">📢</div>
-                    <h3 data-translate="feature-announcements">Oznamy</h3>
-                    <p data-translate="feature-announcements-desc">Dôležité informácie a oznamy pre študentov a rodičov.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">📝</div>
-                    <h3 data-translate="feature-exams">Skúšky & Testy</h3>
-                    <p data-translate="feature-exams-desc">Harmonogram skúšok, testov a kontrolných prác.</p>
-                </div>
-            </div>
-        </section>
+    <div class="container">
+        <div class="emoji">🚧</div>
+        <h1 id="message">Vo vývoji</h1>
         
-        <section class="cta-section">
-            <h2 data-translate="cta-title">Chcete EduDisplej pre vašu školu?</h2>
-            <p data-translate="cta-text">Kontaktujte nás a zistite viac o možnostiach nasadenia EduDisplej systému vo vašej inštitúcii.</p>
-            <!-- TODO: Replace with actual contact form URL -->
-            <a href="mailto:info@edudisplej.sk?subject=Záujem o EduDisplej&body=Dobrý deň,%0D%0A%0D%0AMám záujem o nasadenie systému EduDisplej v našej inštitúcii.%0D%0A%0D%0ANázov inštitúcie:%0D%0AKontaktná osoba:%0D%0ATelefón:%0D%0A%0D%0AĎakujem" class="btn-large" data-translate="cta-button">Vyplniť Formulár</a>
-        </section>
-    </main>
-    
-    <footer>
-        <p data-translate="footer-copyright">&copy; 2024 EduDisplej. Všetky práva vyhradené.</p>
-        <p data-translate="footer-beta">Beta verzia - Systém v aktívnom vývoji</p>
-    </footer>
+        <div class="lang-switcher">
+            <button onclick="setLanguage('sk')" class="active" id="lang-sk">SK</button>
+            <button onclick="setLanguage('hu')" id="lang-hu">HU</button>
+            <button onclick="setLanguage('en')" id="lang-en">EN</button>
+        </div>
+    </div>
     
     <script>
         const translations = {
             sk: {
-                'login': 'Prihlásenie',
-                'inquiry': 'Záujem',
-                'beta': 'BETA VERZIA',
-                'hero-title': 'Moderný Digitálny Displej pre Školy',
-                'hero-subtitle': 'Komplexný informačný systém pre vzdelávacie inštitúcie. Zobrazte dôležité informácie elegantne a efektívne.',
-                'what-is': 'Čo je EduDisplej?',
-                'description': 'EduDisplej je inteligentný digitálny informačný systém špeciálne navrhnutý pre vzdelávacie inštitúcie. Umožňuje efektívne zobrazovanie rozmanitých informácií na digitálnych obrazovkách umiestnených v školských priestoroch.',
-                'feature-clock': 'Hodiny & Čas',
-                'feature-clock-desc': 'Presné zobrazenie aktuálneho času a dátumu s rôznymi formátmi a dizajnmi.',
-                'feature-weather': 'Počasie',
-                'feature-weather-desc': 'Aktuálne informácie o počasí a predpoveď pre váš región.',
-                'feature-menu': 'Jedálny Lístok',
-                'feature-menu-desc': 'Denný a týždenný jedálny lístok školskej jedálne.',
-                'feature-calendar': 'Kalendár',
-                'feature-calendar-desc': 'Školský kalendár s dôležitými udalosťami a termínmi.',
-                'feature-schedule': 'Rozvrh Hodín',
-                'feature-schedule-desc': 'Aktuálny rozvrh tried, učiteľov a miestností.',
-                'feature-gallery': 'Fotogaléria',
-                'feature-gallery-desc': 'Prezentácia školských podujatí a aktivít cez fotografie.',
-                'feature-namedays': 'Meniny',
-                'feature-namedays-desc': 'Denné meniny a narodeniny študentov a zamestnancov.',
-                'feature-announcements': 'Oznamy',
-                'feature-announcements-desc': 'Dôležité informácie a oznamy pre študentov a rodičov.',
-                'feature-exams': 'Skúšky & Testy',
-                'feature-exams-desc': 'Harmonogram skúšok, testov a kontrolných prác.',
-                'cta-title': 'Chcete EduDisplej pre vašu školu?',
-                'cta-text': 'Kontaktujte nás a zistite viac o možnostiach nasadenia EduDisplej systému vo vašej inštitúcii.',
-                'cta-button': 'Vyplniť Formulár',
-                'footer-copyright': '© 2024 EduDisplej. Všetky práva vyhradené.',
-                'footer-beta': 'Beta verzia - Systém v aktívnom vývoji'
+                message: 'Vo vývoji'
             },
             hu: {
-                'login': 'Bejelentkezés',
-                'inquiry': 'Érdeklődés',
-                'beta': 'BETA VERZIÓ',
-                'hero-title': 'Modern Digitális Kijelző Iskolák Számára',
-                'hero-subtitle': 'Átfogó információs rendszer oktatási intézmények számára. Jelenítse meg a fontos információkat elegánsan és hatékonyan.',
-                'what-is': 'Mi az EduDisplej?',
-                'description': 'Az EduDisplej egy intelligens digitális információs rendszer, amelyet kifejezetten oktatási intézmények számára terveztek. Lehetővé teszi különböző információk hatékony megjelenítését iskolai helyiségekben elhelyezett digitális képernyőkön.',
-                'feature-clock': 'Óra & Idő',
-                'feature-clock-desc': 'Az aktuális idő és dátum pontos megjelenítése különböző formátumokban és dizájnokban.',
-                'feature-weather': 'Időjárás',
-                'feature-weather-desc': 'Aktuális időjárási információk és előrejelzés az Ön régiójára.',
-                'feature-menu': 'Étlap',
-                'feature-menu-desc': 'Napi és heti étrend az iskolai étkezőből.',
-                'feature-calendar': 'Naptár',
-                'feature-calendar-desc': 'Iskolai naptár fontos eseményekkel és határidőkkel.',
-                'feature-schedule': 'Órarend',
-                'feature-schedule-desc': 'Aktuális órarend osztályoknak, tanároknak és termeknek.',
-                'feature-gallery': 'Fotógaléria',
-                'feature-gallery-desc': 'Iskolai események és tevékenységek bemutatása fényképeken keresztül.',
-                'feature-namedays': 'Névnapok',
-                'feature-namedays-desc': 'Napi névnapok és diákok, alkalmazottak születésnapjai.',
-                'feature-announcements': 'Közlemények',
-                'feature-announcements-desc': 'Fontos információk és közlemények diákoknak és szülőknek.',
-                'feature-exams': 'Vizsgák & Tesztek',
-                'feature-exams-desc': 'Vizsgák, tesztek és dolgozatok ütemterve.',
-                'cta-title': 'Szeretné az EduDisplej-t az iskolájába?',
-                'cta-text': 'Lépjen kapcsolatba velünk, és tudjon meg többet az EduDisplej rendszer telepítési lehetőségeiről az Ön intézményében.',
-                'cta-button': 'Űrlap Kitöltése',
-                'footer-copyright': '© 2024 EduDisplej. Minden jog fenntartva.',
-                'footer-beta': 'Beta verzió - Rendszer aktív fejlesztés alatt'
+                message: 'Fejlesztés alatt'
             },
             en: {
-                'login': 'Login',
-                'inquiry': 'Inquiry',
-                'beta': 'BETA VERSION',
-                'hero-title': 'Modern Digital Display for Schools',
-                'hero-subtitle': 'Comprehensive information system for educational institutions. Display important information elegantly and efficiently.',
-                'what-is': 'What is EduDisplej?',
-                'description': 'EduDisplej is an intelligent digital information system specially designed for educational institutions. It enables efficient display of various information on digital screens placed in school premises.',
-                'feature-clock': 'Clock & Time',
-                'feature-clock-desc': 'Accurate display of current time and date with various formats and designs.',
-                'feature-weather': 'Weather',
-                'feature-weather-desc': 'Current weather information and forecast for your region.',
-                'feature-menu': 'Menu',
-                'feature-menu-desc': 'Daily and weekly menu from the school cafeteria.',
-                'feature-calendar': 'Calendar',
-                'feature-calendar-desc': 'School calendar with important events and deadlines.',
-                'feature-schedule': 'Schedule',
-                'feature-schedule-desc': 'Current timetable for classes, teachers, and rooms.',
-                'feature-gallery': 'Photo Gallery',
-                'feature-gallery-desc': 'Presentation of school events and activities through photos.',
-                'feature-namedays': 'Name Days',
-                'feature-namedays-desc': 'Daily name days and birthdays of students and staff.',
-                'feature-announcements': 'Announcements',
-                'feature-announcements-desc': 'Important information and announcements for students and parents.',
-                'feature-exams': 'Exams & Tests',
-                'feature-exams-desc': 'Schedule of exams, tests, and assignments.',
-                'cta-title': 'Want EduDisplej for Your School?',
-                'cta-text': 'Contact us and learn more about the possibilities of deploying the EduDisplej system in your institution.',
-                'cta-button': 'Fill Out Form',
-                'footer-copyright': '© 2024 EduDisplej. All rights reserved.',
-                'footer-beta': 'Beta version - System under active development'
+                message: 'Under Development'
             }
         };
         
-        let currentLang = 'sk';
-        
         function setLanguage(lang) {
-            currentLang = lang;
             document.documentElement.lang = lang;
             
             // Update active button
@@ -430,13 +113,8 @@
             });
             document.getElementById('lang-' + lang).classList.add('active');
             
-            // Translate all elements
-            document.querySelectorAll('[data-translate]').forEach(element => {
-                const key = element.getAttribute('data-translate');
-                if (translations[lang] && translations[lang][key]) {
-                    element.textContent = translations[lang][key];
-                }
-            });
+            // Update message
+            document.getElementById('message').textContent = translations[lang].message;
         }
         
         // Set initial language

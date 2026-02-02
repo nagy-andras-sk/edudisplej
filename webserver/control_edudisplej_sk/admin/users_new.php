@@ -236,7 +236,6 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Management - EduDisplej</title>
-    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="stylesheet" href="style.css">
     <style>
         * {
@@ -480,7 +479,7 @@ try {
 <body>
     <div class="header">
         <h1>👥 User Management</h1>
-        <a href="dashboard.php" class="header-btn">← Back to Dashboard</a>
+        <a href="dashboard_new.php" class="header-btn">← Back to Dashboard</a>
     </div>
     
     <div class="container">
@@ -568,7 +567,7 @@ try {
                     </button>
                     
                     <?php if ($edit_user): ?>
-                        <a href="users.php" class="btn btn-secondary">Cancel</a>
+                        <a href="users_new.php" class="btn btn-secondary">Cancel</a>
                     <?php endif; ?>
                 </div>
             </form>
