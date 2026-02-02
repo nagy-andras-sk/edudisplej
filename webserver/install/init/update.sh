@@ -514,6 +514,54 @@ else
     echo "[!] Mozno je potrebny manualy restart"
 fi
 
+# ============================================================================
+# ENSURE DATA DIRECTORY EXISTS / OVERENIE EXISTENCIE DATA ADRESARA
+# ============================================================================
+
+echo ""
+echo "[*] Kontrolujem centralizovany data adresar - Checking centralized data directory..."
+
+DATA_DIR="${TARGET_DIR}/data"
+CONFIG_FILE="${DATA_DIR}/config.json"
+
+# Create data directory if it doesn't exist
+if [ ! -d "$DATA_DIR" ]; then
+    mkdir -p "$DATA_DIR"
+    echo "[✓] Data adresar vytvoreny - Data directory created: $DATA_DIR"
+fi
+
+# Initialize config.json if it doesn't exist
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[*] Config.json neexistuje, inicializujem - Config.json not found, initializing..."
+    if [ -x "${INIT_DIR}/edudisplej-config-manager.sh" ]; then
+        bash "${INIT_DIR}/edudisplej-config-manager.sh" init
+        echo "[✓] Config.json inicializovany - config.json initialized"
+    else
+        echo "[*] Vytvaranie zakladneho config.json - Creating basic config.json..."
+        cat > "$CONFIG_FILE" <<'CONFIGEOF'
+{
+    "company_name": "",
+    "company_id": null,
+    "device_id": "",
+    "token": "",
+    "sync_interval": 300,
+    "last_update": "",
+    "last_sync": "",
+    "screenshot_enabled": false,
+    "last_screenshot": "",
+    "module_versions": {},
+    "service_versions": {}
+}
+CONFIGEOF
+        chmod 644 "$CONFIG_FILE"
+        echo "[✓] Zakladny config.json vytvoreny - Basic config.json created"
+    fi
+else
+    echo "[✓] Config.json uz existuje - Config.json already exists"
+fi
+
+echo ""
+
 # Restart display surface / Restart zobrazenej plochy
 echo ""
 echo "[*] Restartujem zobrazenu plochu / Restarting display surface..."

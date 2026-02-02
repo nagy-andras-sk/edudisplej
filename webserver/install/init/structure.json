@@ -20,13 +20,9 @@
     },
     {
       "source": "edudisplej_sync_service.sh",
-      "destination": "/opt/edudisplej/edudisplej_sync_service.sh",
-      "permissions": "755"
-    },
-    {
-      "source": "edudisplej_sync_service_enhanced.sh",
-      "destination": "/opt/edudisplej/edudisplej_sync_service_enhanced.sh",
-      "permissions": "755"
+      "destination": "/opt/edudisplej/init/edudisplej_sync_service.sh",
+      "permissions": "755",
+      "description": "Main sync service - uses centralized config.json"
     },
     {
       "source": "edudisplej_terminal_display.sh",

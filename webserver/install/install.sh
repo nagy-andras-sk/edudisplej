@@ -162,7 +162,9 @@ if [ -d "$TARGET_DIR" ]; then
 fi
 
 # Vytvorenie priecinkov - Create directories
-mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR"
+echo "[*] Vytvaranie adresarov - Creating directories..."
+mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR" "${TARGET_DIR}/data" "${TARGET_DIR}/logs"
+echo "[✓] Adresare vytvorene - Directories created"
 
 # Save API token if provided
 if [ -n "$API_TOKEN" ]; then
@@ -503,6 +505,49 @@ fi
 
 # Deaktivacia getty@tty1 - Disable getty
 systemctl disable getty@tty1.service 2>/dev/null || true
+
+# ============================================================================
+# INITIALIZE CENTRALIZED DATA DIRECTORY / CENTRALIZOVANY DATOVY ADRESAR
+# ============================================================================
+
+echo ""
+echo "[*] Inicializujem centralizovany data adresar - Initializing centralized data directory..."
+
+DATA_DIR="${TARGET_DIR}/data"
+CONFIG_FILE="${DATA_DIR}/config.json"
+
+# Create data directory
+mkdir -p "$DATA_DIR"
+echo "[✓] Data adresar vytvoreny - Data directory created: $DATA_DIR"
+
+# Initialize config.json using config manager
+if [ -x "${INIT_DIR}/edudisplej-config-manager.sh" ]; then
+    echo "[*] Inicializujem config.json - Initializing config.json..."
+    bash "${INIT_DIR}/edudisplej-config-manager.sh" init
+    echo "[✓] Config.json inicializovany - config.json initialized"
+else
+    echo "[!] VAROVANIE: Config manager nenajdeny - Config manager not found"
+    echo "[*] Vytvaranie zakladneho config.json - Creating basic config.json..."
+    cat > "$CONFIG_FILE" <<'CONFIGEOF'
+{
+    "company_name": "",
+    "company_id": null,
+    "device_id": "",
+    "token": "",
+    "sync_interval": 300,
+    "last_update": "",
+    "last_sync": "",
+    "screenshot_enabled": false,
+    "last_screenshot": "",
+    "module_versions": {},
+    "service_versions": {}
+}
+CONFIGEOF
+    chmod 644 "$CONFIG_FILE"
+    echo "[✓] Zakladny config.json vytvoreny - Basic config.json created"
+fi
+
+echo ""
 
 # Mark kiosk system as configured (so edudisplej-init.sh won't run installation on boot)
 echo "[*] Jelolom a rendszert konfiguraltnak - Marking system as configured..."
