@@ -44,7 +44,10 @@
 - Independent screenshot capture service
 - Reads config from: `/opt/edudisplej/data/config.json`
 - Runs every 15 seconds when enabled
-- Uploads screenshots with proper naming: `scrn_edudisplejmac_YYYYMMDDHHMMSS.png`
+- Uploads screenshots with proper naming: `scrn_edudisplej{mac}_{timestamp}.png`
+  - Example: `scrn_edudisplejaabbccddeeff_20260202132542.png`
+  - `{mac}` = MAC address without colons (e.g., aabbccddeeff)
+  - `{timestamp}` = YYYYMMDDHHmmss format
 
 **edudisplej-watchdog.sh** ✅
 - Monitors system health

@@ -528,6 +528,8 @@ CONFIG_FILE="${DATA_DIR}/config.json"
 if [ ! -d "$DATA_DIR" ]; then
     mkdir -p "$DATA_DIR"
     echo "[✓] Data adresar vytvoreny - Data directory created: $DATA_DIR"
+else
+    echo "[✓] Data adresar uz existuje - Data directory already exists: $DATA_DIR"
 fi
 
 # Initialize config.json if it doesn't exist

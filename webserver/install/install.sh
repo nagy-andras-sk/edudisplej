@@ -516,9 +516,11 @@ echo "[*] Inicializujem centralizovany data adresar - Initializing centralized d
 DATA_DIR="${TARGET_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
 
-# Create data directory
-mkdir -p "$DATA_DIR"
-echo "[✓] Data adresar vytvoreny - Data directory created: $DATA_DIR"
+# Data directory was already created at line 166, just verify
+if [ ! -d "$DATA_DIR" ]; then
+    mkdir -p "$DATA_DIR"
+fi
+echo "[✓] Data adresar pripraveny - Data directory ready: $DATA_DIR"
 
 # Initialize config.json using config manager
 if [ -x "${INIT_DIR}/edudisplej-config-manager.sh" ]; then
