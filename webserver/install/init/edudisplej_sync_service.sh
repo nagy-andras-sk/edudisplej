@@ -3,9 +3,6 @@
 # Enhanced with detailed logging and error reporting
 # =============================================================================
 
-# Service version
-SERVICE_VERSION="1.0.0"
-
 set -euo pipefail
 
 # Source common functions if available
@@ -20,7 +17,6 @@ REGISTRATION_API="${API_BASE_URL}/api/registration.php"
 MODULES_API="${API_BASE_URL}/api/modules_sync.php"
 HW_SYNC_API="${API_BASE_URL}/api/hw_data_sync.php"
 KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
-VERSION_CHECK_API="${API_BASE_URL}/api/check_versions.php"
 SYNC_INTERVAL=300  # 5 minutes
 CONFIG_DIR="/opt/edudisplej"
 LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
@@ -30,7 +26,6 @@ DOWNLOAD_SCRIPT="${CONFIG_DIR}/init/edudisplej-download-modules.sh"
 STATUS_FILE="${CONFIG_DIR}/sync_status.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/sync.log"
-VERSION_FILE="${CONFIG_DIR}/local_versions.json"
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment variable
 
 # Create directories
@@ -390,7 +385,7 @@ EOF
         
         # Update sync interval from server
         if sync_hw_data; then
-            log "Sync interval: ${SYNC_INTERVAL}s"
+            log "Sync interval updated: ${SYNC_INTERVAL}s"
         fi
         
         # Always check for loop updates if we have a device_id
@@ -401,24 +396,6 @@ EOF
             # Collect and upload logs
             log_debug "Uploading logs to server..."
             collect_and_upload_logs "$device_id"
-            
-            # Capture and upload screenshot periodically (every 5th sync cycle)
-            # Check if screenshot should be taken
-            SCREENSHOT_COUNTER_FILE="${CONFIG_DIR}/.screenshot_counter"
-            SCREENSHOT_COUNTER=0
-            if [ -f "$SCREENSHOT_COUNTER_FILE" ]; then
-                SCREENSHOT_COUNTER=$(cat "$SCREENSHOT_COUNTER_FILE")
-            fi
-            SCREENSHOT_COUNTER=$((SCREENSHOT_COUNTER + 1))
-            echo "$SCREENSHOT_COUNTER" > "$SCREENSHOT_COUNTER_FILE"
-            
-            # Take screenshot every 5 sync cycles (e.g., every 25 minutes if sync is 5 min)
-            if [ $((SCREENSHOT_COUNTER % 5)) -eq 0 ]; then
-                log "Taking screenshot..."
-                if [ -x "${INIT_DIR}/edudisplej-screenshot.sh" ]; then
-                    bash "${INIT_DIR}/edudisplej-screenshot.sh" &
-                fi
-            fi
         fi
         
         # Notify if not fully configured
@@ -591,72 +568,6 @@ collect_and_upload_logs() {
     fi
 }
 
-# Check for service updates (version check)
-check_service_updates() {
-    log_debug "Checking for service updates..."
-    
-    # Create local version file if it doesn't exist
-    if [ ! -f "$VERSION_FILE" ]; then
-        log "Creating local version file..."
-        echo "{\"edudisplej_sync_service.sh\": \"$SERVICE_VERSION\"}" > "$VERSION_FILE"
-    fi
-    
-    # Query server for current versions
-    local response
-    response=$(curl -s -X GET "$VERSION_CHECK_API" --max-time 10 2>/dev/null || echo '{"success":false}')
-    
-    if ! echo "$response" | grep -q '"success":true'; then
-        log_debug "Version check failed or unavailable"
-        return 0
-    fi
-    
-    # Check if this service needs update
-    local server_version
-    if command -v jq >/dev/null 2>&1; then
-        server_version=$(echo "$response" | jq -r '.versions["edudisplej_sync_service.sh"] // empty')
-    else
-        server_version=$(echo "$response" | grep -o '"edudisplej_sync_service.sh":"[^"]*"' | cut -d'"' -f4)
-    fi
-    
-    if [ -n "$server_version" ] && [ "$server_version" != "$SERVICE_VERSION" ]; then
-        log "⚠ Service update available: $SERVICE_VERSION -> $server_version"
-        log "Downloading updated service..."
-        
-        # Download updated service
-        local temp_file="/tmp/edudisplej_sync_service.sh.new"
-        if curl -s -o "$temp_file" "${API_BASE_URL%/api*}/install/init/edudisplej_sync_service.sh" --max-time 30; then
-            # Verify it's a valid script
-            if head -1 "$temp_file" | grep -q "^#!/bin/bash"; then
-                # Backup current version
-                cp "${INIT_DIR}/edudisplej_sync_service.sh" "${INIT_DIR}/edudisplej_sync_service.sh.backup"
-                # Replace with new version
-                cp "$temp_file" "${INIT_DIR}/edudisplej_sync_service.sh"
-                chmod +x "${INIT_DIR}/edudisplej_sync_service.sh"
-                rm -f "$temp_file"
-                
-                log_success "Service updated to version $server_version"
-                log "Restarting service..."
-                
-                # Update local version file
-                if command -v jq >/dev/null 2>&1; then
-                    jq --arg v "$server_version" '.["edudisplej_sync_service.sh"] = $v' "$VERSION_FILE" > "${VERSION_FILE}.tmp" && mv "${VERSION_FILE}.tmp" "$VERSION_FILE"
-                fi
-                
-                # Restart the service
-                systemctl restart edudisplej-sync.service 2>/dev/null || true
-                exit 0
-            else
-                log_error "Downloaded file is not a valid script"
-                rm -f "$temp_file"
-            fi
-        else
-            log_error "Failed to download updated service"
-        fi
-    else
-        log_debug "Service is up to date (version $SERVICE_VERSION)"
-    fi
-}
-
 # Check for system updates (runs daily)
 check_and_update() {
     local update_check_file="/tmp/edudisplej_update_check"
@@ -699,7 +610,7 @@ main() {
     log "=========================================="
     log "EduDisplej Sync Service Started"
     log "=========================================="
-    log "Version: $SERVICE_VERSION"
+    log "Version: 2.1"
     log "API URL: $REGISTRATION_API"
     log "Sync interval: ${SYNC_INTERVAL}s"
     log "Auto-update: Enabled (daily)"
@@ -710,15 +621,9 @@ main() {
     # Run update check on service start
     check_and_update
     
-    # Check for service updates
-    check_service_updates
-    
     while true; do
         # Check for daily updates
         check_and_update
-        
-        # Check for service updates (every sync cycle)
-        check_service_updates
         
         if register_and_sync; then
             log "Sync completed successfully"

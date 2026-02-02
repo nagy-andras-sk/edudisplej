@@ -2,9 +2,6 @@
 # EduDisplej Terminal Script - Fully automatic kiosk initialization
 # =============================================================================
 
-# Service version
-SERVICE_VERSION="1.0.0"
-
 set -u  # Error on undefined variables, but allow non-zero exit codes
 
 # ===== LOGGING =====

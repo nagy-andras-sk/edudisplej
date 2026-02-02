@@ -182,8 +182,7 @@ try {
     $stmt = $conn->prepare("
         SELECT k.id, k.device_id, k.is_configured, k.company_id,
                c.name as company_name,
-               kg.name as group_name,
-               kg.id as group_id
+               kg.name as group_name
         FROM kiosks k
         LEFT JOIN companies c ON k.company_id = c.id
         LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
@@ -238,42 +237,14 @@ try {
         
         $update_stmt->close();
         
-        // Check if kiosk is fully configured (has company, group, and loop)
-        $has_company = !empty($kiosk['company_id']);
-        $has_group = !empty($kiosk['group_id']);
-        $has_loop = false;
-        
-        // Check if group has loop modules
-        if ($has_group) {
-            $loop_check = $conn->prepare("SELECT COUNT(*) as count FROM kiosk_group_modules WHERE group_id = ?");
-            $loop_check->bind_param("i", $kiosk['group_id']);
-            $loop_check->execute();
-            $loop_result = $loop_check->get_result()->fetch_assoc();
-            $has_loop = $loop_result['count'] > 0;
-            $loop_check->close();
-        }
-        
-        $is_fully_configured = $has_company && $has_group && $has_loop;
-        
-        // Update is_configured flag if it changed
-        if ($is_fully_configured != $kiosk['is_configured']) {
-            $config_update = $conn->prepare("UPDATE kiosks SET is_configured = ? WHERE id = ?");
-            $config_flag = $is_fully_configured ? 1 : 0;
-            $config_update->bind_param("ii", $config_flag, $kiosk['id']);
-            $config_update->execute();
-            $config_update->close();
-            add_debug('is_configured_updated', $is_fully_configured ? 'true' : 'false');
-        }
-        
         $response['success'] = true;
         $response['message'] = 'Kiosk synced successfully';
         $response['kiosk_id'] = (int)$kiosk['id'];
         $response['device_id'] = $kiosk['device_id'];
-        $response['is_configured'] = $is_fully_configured;
-        $response['company_assigned'] = $has_company;
+        $response['is_configured'] = (bool)$kiosk['is_configured'];
+        $response['company_assigned'] = !empty($kiosk['company_id']);
         $response['company_name'] = $kiosk['company_name'] ?? 'Unknown';
         $response['group_name'] = $kiosk['group_name'] ?? 'Unknown';
-        $response['has_loop'] = $has_loop;
         
         add_debug('result', 'Existing kiosk updated successfully');
         

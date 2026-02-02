@@ -57,7 +57,6 @@ try {
     $response['location'] = $kiosk['location'];
     $response['last_seen'] = $kiosk['last_seen'] ? date('Y-m-d H:i', strtotime($kiosk['last_seen'])) : 'Never';
     $response['sync_interval'] = (int)$kiosk['sync_interval'];
-    $response['screenshot_url'] = $kiosk['screenshot_url'] ?? null;
     
     // Parse HW info
     if ($kiosk['hw_info']) {
