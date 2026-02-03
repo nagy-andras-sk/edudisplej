@@ -4,9 +4,17 @@
  * GET /api/kiosk/get_command_result.php?command_id=1
  */
 
+session_start();
 header('Content-Type: application/json');
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
 
 try {
+    $api_company = null;
+    if (!isset($_SESSION['user_id']) || empty($_SESSION['isadmin'])) {
+        $api_company = validate_api_token();
+    }
+
     $conn = getDbConnection();
     
     $command_id = intval($_GET['command_id'] ?? 0);
@@ -35,6 +43,15 @@ try {
     }
     
     $command = $result->fetch_assoc();
+
+    if ($api_company && !api_is_admin_session($api_company)) {
+        $stmt_company = $conn->prepare("SELECT company_id FROM kiosks WHERE id = ?");
+        $stmt_company->bind_param("i", $command['kiosk_id']);
+        $stmt_company->execute();
+        $company_row = $stmt_company->get_result()->fetch_assoc();
+        $stmt_company->close();
+        api_require_company_match($api_company, $company_row['company_id'] ?? null, 'Unauthorized');
+    }
     
     echo json_encode([
         'success' => true,

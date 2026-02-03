@@ -7,6 +7,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once 'auth.php';
 
 header('Content-Type: application/json');
 
@@ -16,15 +17,13 @@ $response = [
 ];
 
 // Check authentication
+$api_company = null;
 if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    $response['message'] = 'Not authenticated';
-    echo json_encode($response);
-    exit();
+    $api_company = validate_api_token();
+} else {
+    $user_id = $_SESSION['user_id'];
+    $company_id = $_SESSION['company_id'] ?? null;
 }
-
-$user_id = $_SESSION['user_id'];
-$company_id = $_SESSION['company_id'] ?? null;
 
 try {
     $data = json_decode(file_get_contents('php://input'), true);
@@ -39,12 +38,21 @@ try {
     
     $conn = getDbConnection();
     
-    // Verify kiosk belongs to user's company
-    $stmt = $conn->prepare("SELECT id, screenshot_enabled FROM kiosks WHERE id = ? AND company_id = ?");
-    $stmt->bind_param("ii", $kiosk_id, $company_id);
+    // Verify kiosk belongs to user's company or token company
+    if ($api_company && !api_is_admin_session($api_company)) {
+        $stmt = $conn->prepare("SELECT id, screenshot_enabled, company_id FROM kiosks WHERE id = ?");
+        $stmt->bind_param("i", $kiosk_id);
+    } else {
+        $stmt = $conn->prepare("SELECT id, screenshot_enabled FROM kiosks WHERE id = ? AND company_id = ?");
+        $stmt->bind_param("ii", $kiosk_id, $company_id);
+    }
     $stmt->execute();
     $result = $stmt->get_result();
     $kiosk = $result->fetch_assoc();
+
+    if ($api_company && !api_is_admin_session($api_company)) {
+        api_require_company_match($api_company, $kiosk['company_id'] ?? null, 'Unauthorized');
+    }
     
     if (!$kiosk) {
         $response['message'] = 'Kiosk not found or access denied';

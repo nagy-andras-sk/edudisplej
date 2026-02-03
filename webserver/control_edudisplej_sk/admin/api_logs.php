@@ -7,6 +7,11 @@
 session_start();
 require_once '../dbkonfiguracia.php';
 
+// Generate CSRF token
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: ../login.php');
@@ -86,7 +91,9 @@ try {
     
     if (!empty($filter_endpoint)) {
         $where_clauses[] = "l.endpoint LIKE ?";
-        $params[] = "%$filter_endpoint%";
+        // Escape special LIKE characters
+        $safe_endpoint = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filter_endpoint);
+        $params[] = "%$safe_endpoint%";
         $types .= 's';
     }
     
@@ -454,6 +461,7 @@ $total_pages = ceil($total_logs / $per_page);
         <div class="card">
             <h2 style="margin-bottom: 20px;">🔍 Filters</h2>
             <form method="GET" action="">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                 <div class="filters">
                     <div class="filter-group">
                         <label>Company</label>

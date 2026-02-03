@@ -5,8 +5,11 @@
  * 
  * Usage: curl https://control.edudisplej.sk/api/health.php
  */
-
+$start_time = microtime(true);
 header('Content-Type: application/json');
+require_once __DIR__ . '/auth.php';
+
+validate_api_token();
 
 $health = [
     'status' => 'ok',
@@ -133,6 +136,23 @@ if ($health['status'] === 'error') {
 } else {
     http_response_code(200);
 }
+
+// Log API request
+require_once '../logging.php';
+$execution_time = microtime(true) - $start_time;
+$status_code = $health['status'] === 'ok' ? 200 : 503;
+log_api_request(
+    null,
+    null,
+    '/api/health.php',
+    'GET',
+    $status_code,
+    $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+    $_SERVER['HTTP_USER_AGENT'] ?? null,
+    null,
+    null,
+    $execution_time
+);
 
 echo json_encode($health, JSON_PRETTY_PRINT);
 ?>

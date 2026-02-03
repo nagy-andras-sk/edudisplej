@@ -42,6 +42,13 @@ try {
     if (isset($_GET['assign']) && is_numeric($_GET['assign'])) {
         $kiosk_id = intval($_GET['assign']);
         
+        // First, remove from any other group
+        $stmt = $conn->prepare("DELETE FROM kiosk_group_assignments WHERE kiosk_id = ?");
+        $stmt->bind_param("i", $kiosk_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Then add to current group
         $stmt = $conn->prepare("INSERT IGNORE INTO kiosk_group_assignments (kiosk_id, group_id) VALUES (?, ?)");
         $stmt->bind_param("ii", $kiosk_id, $group_id);
         
@@ -96,8 +103,10 @@ try {
     }
     $stmt->close();
     
-    // Available kiosks (not in group)
-    $query = "SELECT k.* FROM kiosks k
+    // Available kiosks (not in any group or in different groups)
+    $query = "SELECT k.*, kg.id as group_in, kg.name as group_name FROM kiosks k
+              LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
+              LEFT JOIN kiosk_groups kg ON kga.group_id = kg.id
               WHERE k.company_id = ? 
               AND k.id NOT IN (
                   SELECT kiosk_id FROM kiosk_group_assignments WHERE group_id = ?
@@ -214,6 +223,26 @@ try {
             background: #f0f0f0;
         }
         
+        .kiosk-item.in-other-group {
+            background: #ffe6e6;
+            border-color: #ffcccc;
+        }
+        
+        .kiosk-item.in-other-group:hover {
+            background: #ffcccc;
+        }
+        
+        .group-badge {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+        
         .kiosk-info {
             display: flex;
             flex-direction: column;
@@ -324,14 +353,21 @@ try {
                     <?php else: ?>
                         <div class="kiosk-list">
                             <?php foreach ($available_kiosks as $kiosk): ?>
-                                <div class="kiosk-item">
+                                <div class="kiosk-item <?php echo ($kiosk['group_in'] ? 'in-other-group' : ''); ?>">
                                     <div class="kiosk-info">
                                         <div class="kiosk-name"><?php echo htmlspecialchars($kiosk['hostname']); ?></div>
                                         <div class="kiosk-detail">
                                             📍 <?php echo htmlspecialchars($kiosk['location'] ?? '—'); ?>
                                         </div>
+                                        <?php if ($kiosk['group_in']): ?>
+                                            <div class="group-badge">
+                                                ⚠️ Jelenleg: <?php echo htmlspecialchars($kiosk['group_name']); ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
-                                    <a href="?id=<?php echo $group_id; ?>&assign=<?php echo $kiosk['id']; ?>" class="btn btn-add">+</a>
+                                    <a href="?id=<?php echo $group_id; ?>&assign=<?php echo $kiosk['id']; ?>" class="btn btn-add">
+                                        <?php echo ($kiosk['group_in'] ? '↔️ Áthelyez' : '➕ Hozzáad'); ?>
+                                    </a>
                                 </div>
                             <?php endforeach; ?>
                         </div>

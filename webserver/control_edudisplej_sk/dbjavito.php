@@ -199,6 +199,24 @@ try {
                 'ml_module_fk' => "FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE"
             ]
         ],
+        'group_modules' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'group_id' => "int(11) NOT NULL",
+                'module_sequence' => "int(11) NOT NULL",
+                'module_id' => "int(11) NOT NULL",
+                'duration_seconds' => "int(11) DEFAULT 10",
+                'settings' => "text DEFAULT NULL",
+                'is_active' => "tinyint(1) DEFAULT 1",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'gm_group_fk' => "FOREIGN KEY (group_id) REFERENCES kiosk_groups(id) ON DELETE CASCADE",
+                'gm_module_fk' => "FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE"
+            ]
+        ],
         'kiosk_group_modules' => [
             'columns' => [
                 'id' => "int(11) NOT NULL AUTO_INCREMENT",

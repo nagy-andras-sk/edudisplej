@@ -9,7 +9,7 @@ require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
 
 // Validate API authentication for device requests
-validate_api_token();
+$api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -56,6 +56,17 @@ try {
     
     if ($result->num_rows > 0) {
         $kiosk = $result->fetch_assoc();
+
+        // Enforce company ownership
+        if (!empty($kiosk['company_id'])) {
+            api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+        } elseif (!empty($api_company['id']) && !api_is_admin_session($api_company)) {
+            $assign_stmt = $conn->prepare("UPDATE kiosks SET company_id = ? WHERE id = ?");
+            $assign_stmt->bind_param("ii", $api_company['id'], $kiosk['id']);
+            $assign_stmt->execute();
+            $assign_stmt->close();
+            $kiosk['company_id'] = $api_company['id'];
+        }
         $response['success'] = true;
         $response['kiosk_id'] = $kiosk['id'];
         $response['device_id'] = $kiosk['device_id'];
@@ -69,12 +80,12 @@ try {
         
         // Add token if exists (for future use)
         if ($kiosk['company_id']) {
-            $token_stmt = $conn->prepare("SELECT token FROM companies WHERE id = ?");
+            $token_stmt = $conn->prepare("SELECT api_token FROM companies WHERE id = ?");
             $token_stmt->bind_param("i", $kiosk['company_id']);
             $token_stmt->execute();
             $token_result = $token_stmt->get_result();
             if ($token_row = $token_result->fetch_assoc()) {
-                $response['token'] = $token_row['token'] ?? '';
+                $response['token'] = $token_row['api_token'] ?? '';
             }
             $token_stmt->close();
         }

@@ -31,6 +31,9 @@ if (DEBUG_MODE) {
 
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/auth.php';
+$api_company = validate_api_token();
+
 // Response structure
 $response = [
     'success' => false,
@@ -217,6 +220,18 @@ try {
         add_debug('operation', 'update_existing');
         $kiosk = $result->fetch_assoc();
         add_debug('existing_kiosk_id', $kiosk['id']);
+
+        // Enforce company ownership
+        if (!empty($kiosk['company_id'])) {
+            api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+        } elseif (!empty($api_company['id']) && !api_is_admin_session($api_company)) {
+            // Attach kiosk to token company if not assigned yet
+            $assign_stmt = $conn->prepare("UPDATE kiosks SET company_id = ? WHERE id = ?");
+            $assign_stmt->bind_param("ii", $api_company['id'], $kiosk['id']);
+            $assign_stmt->execute();
+            $assign_stmt->close();
+            $kiosk['company_id'] = $api_company['id'];
+        }
         
         $update_stmt = $conn->prepare("UPDATE kiosks SET last_seen = NOW(), public_ip = ?, hw_info = ?, hostname = ?, status = 'online' WHERE id = ?");
         
@@ -271,7 +286,9 @@ try {
         $response['device_id'] = $kiosk['device_id'];
         $response['is_configured'] = $is_fully_configured;
         $response['company_assigned'] = $has_company;
+        $response['company_id'] = $kiosk['company_id'] ?? null;
         $response['company_name'] = $kiosk['company_name'] ?? 'Unknown';
+        $response['group_id'] = $kiosk['group_id'] ?? null;
         $response['group_name'] = $kiosk['group_name'] ?? 'Unknown';
         $response['has_loop'] = $has_loop;
         
@@ -284,7 +301,7 @@ try {
         $device_id = generateDeviceId($mac);
         add_debug('generated_device_id', $device_id);
         
-        $insert_stmt = $conn->prepare("INSERT INTO kiosks (mac, device_id, hostname, hw_info, public_ip, status, is_configured, last_seen) VALUES (?, ?, ?, ?, ?, ?, 0, NOW())");
+        $insert_stmt = $conn->prepare("INSERT INTO kiosks (mac, device_id, hostname, hw_info, public_ip, status, is_configured, last_seen, company_id) VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), ?)");
         
         if (!$insert_stmt) {
             $response['message'] = 'Insert query preparation failed: ' . $conn->error;
@@ -294,7 +311,8 @@ try {
         }
         
         $status_value = 'unconfigured';
-        $insert_stmt->bind_param("ssssss", $mac, $device_id, $hostname, $hw_info, $public_ip, $status_value);
+        $company_id_for_insert = (!empty($api_company['id']) && !api_is_admin_session($api_company)) ? (int)$api_company['id'] : null;
+        $insert_stmt->bind_param("ssssssi", $mac, $device_id, $hostname, $hw_info, $public_ip, $status_value, $company_id_for_insert);
         
         if (!$insert_stmt->execute()) {
             $is_status_truncated = (
@@ -337,7 +355,9 @@ try {
         $response['device_id'] = $device_id;
         $response['is_configured'] = false;
         $response['company_assigned'] = false;
+        $response['company_id'] = $company_id_for_insert;
         $response['company_name'] = 'Unknown';
+        $response['group_id'] = null;
         $response['group_name'] = 'Unknown';
         
         add_debug('result', 'New kiosk registered successfully');

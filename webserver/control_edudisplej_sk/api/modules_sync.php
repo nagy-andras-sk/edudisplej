@@ -1,10 +1,12 @@
 <?php
+$start_time = microtime(true);
 header('Content-Type: application/json');
 require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
+require_once '../logging.php';
 
 // Validate API authentication for device requests
-validate_api_token();
+$api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => '', 'modules' => []];
 
@@ -47,6 +49,17 @@ try {
     }
     
     $kiosk = $result->fetch_assoc();
+
+    // Enforce company ownership
+    if (!empty($kiosk['company_id'])) {
+        api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+    } elseif (!empty($api_company['id']) && !api_is_admin_session($api_company)) {
+        $assign_stmt = $conn->prepare("UPDATE kiosks SET company_id = ? WHERE id = ?");
+        $assign_stmt->bind_param("ii", $api_company['id'], $kiosk['id']);
+        $assign_stmt->execute();
+        $assign_stmt->close();
+        $kiosk['company_id'] = $api_company['id'];
+    }
     $stmt->close();
     
     // Update last_seen
@@ -98,6 +111,10 @@ try {
     $group_result = $group_stmt->get_result();
     $group_row = $group_result->fetch_assoc();
     $group_stmt->close();
+
+    if ($group_row && !empty($group_row['group_id'])) {
+        api_require_group_company($conn, $api_company, (int)$group_row['group_id']);
+    }
     
     $server_timestamp = null;
     $needs_update = true;
@@ -230,6 +247,22 @@ try {
     $response['message'] = 'Server error';
     error_log($e->getMessage());
 }
+
+// Log API request
+$execution_time = microtime(true) - $start_time;
+$status_code = $response['success'] ? 200 : 400;
+log_api_request(
+    $kiosk['company_id'] ?? null,
+    $kiosk['id'] ?? null,
+    '/api/modules_sync.php',
+    'POST',
+    $status_code,
+    $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+    $_SERVER['HTTP_USER_AGENT'] ?? null,
+    null,
+    null,
+    $execution_time
+);
 
 echo json_encode($response);
 ?>

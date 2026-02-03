@@ -9,7 +9,7 @@ require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
 
 // Validate API authentication for device requests
-validate_api_token();
+$api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -29,6 +29,22 @@ try {
     
     $conn = getDbConnection();
     
+    // Verify kiosk and enforce company ownership
+    $kiosk_lookup = $conn->prepare("SELECT id, company_id FROM kiosks WHERE mac = ? LIMIT 1");
+    $kiosk_lookup->bind_param("s", $mac);
+    $kiosk_lookup->execute();
+    $kiosk_result = $kiosk_lookup->get_result();
+    $kiosk_row = $kiosk_result->fetch_assoc();
+    $kiosk_lookup->close();
+
+    if (!$kiosk_row) {
+        $response['message'] = 'Kiosk not found';
+        echo json_encode($response);
+        exit;
+    }
+
+    api_require_company_match($api_company, $kiosk_row['company_id'], 'Unauthorized');
+
     // Use custom filename if provided, otherwise generate default
     if (!empty($custom_filename)) {
         $filename = $custom_filename;
@@ -74,17 +90,11 @@ try {
         $response['message'] = 'Screenshot uploaded successfully';
         
         // Log screenshot upload
-        $stmt = $conn->prepare("SELECT id FROM kiosks WHERE mac = ?");
-        $stmt->bind_param("s", $mac);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($row = $result->fetch_assoc()) {
-            $log_stmt = $conn->prepare("INSERT INTO sync_logs (kiosk_id, action, details) VALUES (?, 'screenshot', ?)");
-            $details = json_encode(['filename' => $filename, 'timestamp' => date('Y-m-d H:i:s')]);
-            $log_stmt->bind_param("is", $row['id'], $details);
-            $log_stmt->execute();
-            $log_stmt->close();
-        }
+        $log_stmt = $conn->prepare("INSERT INTO sync_logs (kiosk_id, action, details) VALUES (?, 'screenshot', ?)");
+        $details = json_encode(['filename' => $filename, 'timestamp' => date('Y-m-d H:i:s')]);
+        $log_stmt->bind_param("is", $kiosk_row['id'], $details);
+        $log_stmt->execute();
+        $log_stmt->close();
     } else {
         $response['message'] = 'Screenshot upload failed';
     }

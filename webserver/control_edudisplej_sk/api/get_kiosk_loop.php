@@ -4,8 +4,10 @@
  * Returns the loop configuration for a specific kiosk
  * Based on the group(s) the kiosk belongs to
  */
+$start_time = microtime(true);
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../logging.php';
 
 header('Content-Type: application/json');
 
@@ -105,10 +107,41 @@ try {
         $response['loop_updated_at'] = $group_updated_at ?? date('Y-m-d H:i:s');
     }
     
+    // Log API request
+    $execution_time = microtime(true) - $start_time;
+    log_api_request(
+        $company_id ?? null,
+        $kiosk_id,
+        '/api/get_kiosk_loop.php',
+        'GET',
+        200,
+        $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+        $_SERVER['HTTP_USER_AGENT'] ?? null,
+        null,
+        null,
+        $execution_time
+    );
+    
     echo json_encode($response);
     
 } catch (Exception $e) {
     error_log($e->getMessage());
+    
+    // Log failed request
+    $execution_time = microtime(true) - $start_time;
+    log_api_request(
+        $company_id ?? null,
+        $kiosk_id ?? null,
+        '/api/get_kiosk_loop.php',
+        'GET',
+        500,
+        $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+        $_SERVER['HTTP_USER_AGENT'] ?? null,
+        null,
+        null,
+        $execution_time
+    );
+    
     echo json_encode(['success' => false, 'message' => 'Adatbázis hiba']);
 }
 ?>

@@ -19,6 +19,7 @@ HEALTH_CHECK_API="${API_BASE_URL}/api/health/report.php"
 CONFIG_DIR="/opt/edudisplej"
 DATA_DIR="${CONFIG_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
+TOKEN_FILE="${CONFIG_DIR}/lic/token"
 HEALTH_STATUS_FILE="${CONFIG_DIR}/health_status.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/health.log"
@@ -49,6 +50,28 @@ log_error() {
 
 log_success() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
+}
+
+get_api_token() {
+    if [ -f "$TOKEN_FILE" ]; then
+        tr -d '\n\r' < "$TOKEN_FILE"
+        return 0
+    fi
+    return 1
+}
+
+is_auth_error() {
+    local response="$1"
+    echo "$response" | grep -qi '"message"[[:space:]]*:[[:space:]]*"Invalid API token"\|"Authentication required"\|"Unauthorized"\|"Company license is inactive"\|"No valid license key"'
+}
+
+reset_to_unconfigured() {
+    log_error "Authorization failed - switching to unconfigured mode"
+    rm -rf "/opt/edudisplej/localweb/modules" 2>/dev/null || true
+    mkdir -p "/opt/edudisplej/localweb/modules" 2>/dev/null || true
+    if systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
+        systemctl restart edudisplej-kiosk.service 2>/dev/null || true
+    fi
 }
 
 # Get system health information
@@ -156,7 +179,9 @@ check_network_health() {
     fi
     
     # Check API connectivity
-    if curl -sf --max-time 5 --connect-timeout 3 "${API_BASE_URL}/api/health.php" >/dev/null 2>&1; then
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return; }
+    if curl -sf --max-time 5 --connect-timeout 3 -H "Authorization: Bearer $token" "${API_BASE_URL}/api/health.php" >/dev/null 2>&1; then
         api_ok="true"
     fi
     
@@ -294,12 +319,21 @@ send_health_report() {
         return 1
     fi
     
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     local response=$(curl -s -X POST \
+        -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d @"$HEALTH_STATUS_FILE" \
         --max-time 10 \
         --connect-timeout 5 \
         "$HEALTH_CHECK_API" 2>/dev/null || echo "{\"success\": false}")
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
     
     if echo "$response" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
         log_success "Health report sent successfully"

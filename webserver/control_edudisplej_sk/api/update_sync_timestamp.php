@@ -10,7 +10,7 @@ require_once 'auth.php';
 header('Content-Type: application/json');
 
 // Validate API authentication for device requests
-validate_api_token();
+$api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -29,6 +29,22 @@ try {
     
     $conn = getDbConnection();
     
+    // Verify kiosk and enforce company ownership
+    $kiosk_lookup = $conn->prepare("SELECT id, company_id FROM kiosks WHERE mac = ? LIMIT 1");
+    $kiosk_lookup->bind_param("s", $mac);
+    $kiosk_lookup->execute();
+    $kiosk_result = $kiosk_lookup->get_result();
+    $kiosk_row = $kiosk_result->fetch_assoc();
+    $kiosk_lookup->close();
+
+    if (!$kiosk_row) {
+        $response['message'] = 'Kiosk not found';
+        echo json_encode($response);
+        exit;
+    }
+
+    api_require_company_match($api_company, $kiosk_row['company_id'], 'Unauthorized');
+
     // Update last_sync timestamp
     if ($loop_last_update) {
         $stmt = $conn->prepare("UPDATE kiosks SET last_sync = ?, loop_last_update = ? WHERE mac = ?");

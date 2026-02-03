@@ -13,6 +13,7 @@ MODULES_DIR="${LOCAL_WEB_DIR}/modules"
 CONFIG_FILE="${CONFIG_DIR}/kiosk.conf"
 LOOP_FILE="${MODULES_DIR}/loop.json"
 LOOP_PLAYER="${LOCAL_WEB_DIR}/loop_player.html"
+TOKEN_FILE="${CONFIG_DIR}/lic/token"
 
 # Logging - all output to stderr to avoid interfering with function return values
 log() {
@@ -25,6 +26,29 @@ log_error() {
 
 log_success() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] SUCCESS: $*" >&2
+}
+
+# Token handling
+get_api_token() {
+    if [ -f "$TOKEN_FILE" ]; then
+        tr -d '\n\r' < "$TOKEN_FILE"
+        return 0
+    fi
+    return 1
+}
+
+is_auth_error() {
+    local response="$1"
+    echo "$response" | grep -qi '"message"[[:space:]]*:[[:space:]]*"Invalid API token"\|"Authentication required"\|"Unauthorized"\|"Company license is inactive"\|"No valid license key"'
+}
+
+reset_to_unconfigured() {
+    log_error "Authorization failed - switching to unconfigured mode"
+    rm -rf "${MODULES_DIR}" 2>/dev/null || true
+    mkdir -p "${MODULES_DIR}" 2>/dev/null || true
+    rm -f "${LOOP_FILE}" 2>/dev/null || true
+    create_unconfigured_page
+    return 1
 }
 
 # Create directories
@@ -54,9 +78,18 @@ get_loop_config() {
     
     log "Fetching loop configuration..."
     
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     local response=$(curl -s -X POST "${API_BASE_URL}/api/kiosk_loop.php" \
+        -H "Authorization: Bearer $token" \
         -d "device_id=${device_id}" \
         --max-time 30)
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
     
     # Check if successful
     if echo "$response" | grep -q '"success":true'; then
@@ -94,9 +127,18 @@ download_module() {
     mkdir -p "$module_dir"
     
     # Request module files
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     local response=$(curl -s -X POST "${API_BASE_URL}/api/download_module.php" \
+        -H "Authorization: Bearer $token" \
         -d "device_id=${device_id}&module_name=${module_name}" \
         --max-time 60)
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
     
     # Check if successful
     if ! echo "$response" | grep -q '"success":true'; then
@@ -197,6 +239,35 @@ EOF
         log_error "jq is required for JSON parsing"
         return 1
     fi
+}
+
+# Create unconfigured page
+create_unconfigured_page() {
+    local unconfigured_page="${LOCAL_WEB_DIR}/unconfigured.html"
+    cat > "$unconfigured_page" <<'UNCONFIG_EOF'
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduDisplej - Unconfigured</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #0f172a; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .card { text-align: center; max-width: 720px; padding: 40px; background: rgba(255,255,255,0.06); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        h1 { margin-bottom: 12px; font-size: 28px; }
+        p { opacity: 0.9; line-height: 1.5; }
+        .small { margin-top: 16px; font-size: 13px; opacity: 0.7; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Ez a kijelző még nincs konfigurálva</h1>
+        <p>Kérjük, rendeld hozzá a kijelzőt a vezérlőpultban.</p>
+        <p class="small">EduDisplej • control.edudisplej.sk</p>
+    </div>
+</body>
+</html>
+UNCONFIG_EOF
 }
 
 # Create loop player HTML
@@ -308,6 +379,7 @@ $loop_json
                     await this.loadLoopConfig();
                     
                     if (!this.loopConfig || !this.loopConfig.loop || this.loopConfig.loop.length === 0) {
+                        this.redirectToUnconfigured('No modules configured in loop');
                         throw new Error('No modules configured in loop');
                     }
                     
@@ -321,6 +393,11 @@ $loop_json
                 } catch (error) {
                     this.showError('Failed to initialize loop', error);
                 }
+            }
+
+            redirectToUnconfigured(reason) {
+                this.log('Redirecting to unconfigured page: ' + reason);
+                window.location.href = 'unconfigured.html';
             }
             
             startUpdateChecker() {
@@ -386,6 +463,7 @@ $loop_json
                     }
                     
                     if (!response.ok) {
+                        this.redirectToUnconfigured('Loop config not available');
                         throw new Error('HTTP ' + response.status + ': ' + response.statusText);
                     }
                     
@@ -398,16 +476,19 @@ $loop_json
                     
                     // Validate loop configuration
                     if (!this.loopConfig || !this.loopConfig.loop) {
+                        this.redirectToUnconfigured('Invalid loop configuration');
                         throw new Error('Invalid loop configuration format - missing "loop" or "loop_config" field');
                     }
                     
                     if (!Array.isArray(this.loopConfig.loop) || this.loopConfig.loop.length === 0) {
+                        this.redirectToUnconfigured('Empty loop configuration');
                         throw new Error('Loop configuration is empty or not an array');
                     }
                     
                     this.log('Using loop configuration from file');
                     return this.loopConfig;
                 } catch (error) {
+                    this.redirectToUnconfigured('Cannot load loop.json');
                     throw new Error('Cannot load loop.json: ' + error.message);
                 }
             }
@@ -620,7 +701,8 @@ main() {
         }
     done
     
-    # Create loop player
+    # Create unconfigured page and loop player
+    create_unconfigured_page
     create_loop_player
     
     log "=========================================="

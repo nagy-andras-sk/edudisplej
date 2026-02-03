@@ -27,6 +27,13 @@ LIC_DIR="${TARGET_DIR}/lic"
 INIT_BASE="https://install.edudisplej.sk/init"
 SERVICE_FILE="/etc/systemd/system/edudisplej-kiosk.service"
 
+if [ -z "$API_TOKEN" ]; then
+    echo "[!] CHYBA - ERROR: Chyba API token. Pouzi: --token=<API_TOKEN>"
+    exit 1
+fi
+
+AUTH_HEADER=( -H "Authorization: Bearer ${API_TOKEN}" )
+
 # Chybove spravy - Error handling
 cleanup_on_error() {
     local exit_code=$?
@@ -180,7 +187,7 @@ fi
 # Nacitanie zoznamu suborov - Loading file list
 echo "[*] Nacitavame zoznam suborov - Loading file list..."
 
-FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles" 2>/dev/null | tr -d '\r')"
+FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getfiles&token=${API_TOKEN}" 2>/dev/null | tr -d '\r')"
 CURL_EXIT_CODE=$?
 
 if [ $CURL_EXIT_CODE -ne 0 ]; then
@@ -227,7 +234,8 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
     
     for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
         if curl -sL --max-time 60 --connect-timeout 10 \
-            "${INIT_BASE}/download.php?streamfile=${NAME}" \
+            "${AUTH_HEADER[@]}" \
+            "${INIT_BASE}/download.php?streamfile=${NAME}&token=${API_TOKEN}" \
             -o "${INIT_DIR}/${NAME}" 2>&1; then
             
             ACTUAL_SIZE=$(stat -c%s "${INIT_DIR}/${NAME}" 2>/dev/null || echo "0")

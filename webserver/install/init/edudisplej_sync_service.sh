@@ -26,6 +26,7 @@ SYNC_INTERVAL=300  # 5 minutes
 CONFIG_DIR="/opt/edudisplej"
 DATA_DIR="${CONFIG_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
+TOKEN_FILE="${CONFIG_DIR}/lic/token"
 LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
 LOOP_FILE="${LOCAL_WEB_DIR}/modules/loop.json"
 DOWNLOAD_INFO="${LOCAL_WEB_DIR}/modules/.download_info.json"
@@ -39,6 +40,70 @@ DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment
 
 # Create directories
 mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
+
+# Read API token from license file
+get_api_token() {
+    if [ -f "$TOKEN_FILE" ]; then
+        tr -d '\n\r' < "$TOKEN_FILE"
+        return 0
+    fi
+    return 1
+}
+
+# Reset kiosk to unconfigured mode on auth failure
+reset_to_unconfigured() {
+    log_error "🔒 Authorization failed. Resetting to unconfigured mode..."
+
+    # Remove modules and loop configuration
+    rm -rf "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
+    mkdir -p "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
+    rm -f "${LOOP_FILE}" 2>/dev/null || true
+
+    # Create unconfigured page if missing
+    local unconfigured_page="${LOCAL_WEB_DIR}/unconfigured.html"
+    if [ ! -f "$unconfigured_page" ]; then
+        cat > "$unconfigured_page" <<'EOF'
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduDisplej - Unconfigured</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #0f172a; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .card { text-align: center; max-width: 720px; padding: 40px; background: rgba(255,255,255,0.06); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        h1 { margin-bottom: 12px; font-size: 28px; }
+        p { opacity: 0.9; line-height: 1.5; }
+        .small { margin-top: 16px; font-size: 13px; opacity: 0.7; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Ez a kijelző még nincs konfigurálva</h1>
+        <p>Kérjük, rendeld hozzá a kijelzőt a vezérlőpultban.</p>
+        <p class="small">EduDisplej • control.edudisplej.sk</p>
+    </div>
+</body>
+</html>
+EOF
+    fi
+
+    # Reset config fields
+    update_config_field "company_id" "null" || true
+    update_config_field "company_name" "" || true
+    update_config_field "token" "" || true
+
+    # Restart kiosk display
+    if systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
+        systemctl restart edudisplej-kiosk.service 2>/dev/null || true
+    fi
+}
+
+# Check for authorization failure in API response
+is_auth_error() {
+    local response="$1"
+    echo "$response" | grep -qi '"message"[[:space:]]*:[[:space:]]*"Invalid API token"\|"Authentication required"\|"Unauthorized"\|"Company license is inactive"\|"No valid license key"'
+}
 
 # Logging functions (fallback if common.sh not available)
 if ! command -v print_info &> /dev/null; then
@@ -160,6 +225,7 @@ init_config_file() {
 {
     "company_name": "",
     "company_id": null,
+    "kiosk_id": null,
     "device_id": "",
     "token": "",
     "sync_interval": 300,
@@ -252,9 +318,18 @@ sync_hw_data() {
         log_debug "No local last_update found, sending tech info (v:$version, res:$screen_resolution, status:$screen_status)"
     fi
     
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     response=$(curl -s -X POST "$HW_SYNC_API" \
+        -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "$request_data")
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
     
     if echo "$response" | grep -q '"success":true'; then
         local new_interval
@@ -333,10 +408,19 @@ check_loop_updates() {
     # Query server for group loop configuration with security check
     # API verifies device belongs to company before responding
     local response
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     response=$(curl -s -X POST "$CHECK_GROUP_LOOP_UPDATE_API" \
+        -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "{\"device_id\":\"${device_id}\"}" \
         --max-time 30)
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
     
     # Check for authorization errors first
     if echo "$response" | grep -q '"message":"Unauthorized"'; then
@@ -456,10 +540,19 @@ capture_and_upload_screenshot() {
     
     # Upload screenshot
     local screenshot_api="${API_BASE_URL}/api/screenshot_sync.php"
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     local upload_response=$(curl -s -X POST "$screenshot_api" \
+        -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "{\"mac\":\"$mac\",\"filename\":\"$filename\",\"screenshot\":\"data:image/png;base64,$base64_data\"}" \
         --max-time 30 --connect-timeout 10 2>&1)
+
+    if is_auth_error "$upload_response"; then
+        reset_to_unconfigured
+        return 1
+    fi
     
     if echo "$upload_response" | grep -q '"success":true'; then
         log_success "📸 Screenshot uploaded successfully: $filename"
@@ -499,8 +592,12 @@ register_and_sync() {
     # Make API call with detailed logging
     log "Calling registration API..."
     
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     http_code=$(curl -s -w "%{http_code}" \
         -X POST "$REGISTRATION_API" \
+        -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "$request_body" \
         --max-time 30 \
@@ -549,6 +646,10 @@ register_and_sync() {
     fi
     
     # Parse JSON response
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
     log "Parsing API response..."
     
     # Check for debug information and display it
@@ -656,7 +757,11 @@ EOF
             fi
             timestamp_data="${timestamp_data}}"
             
+            local token
+            token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
             curl -s -X POST "$timestamp_update_api" \
+                -H "Authorization: Bearer $token" \
                 -H "Content-Type: application/json" \
                 -d "$timestamp_data" \
                 --max-time 10 >/dev/null 2>&1 || log_debug "Failed to update sync timestamp"
@@ -722,6 +827,7 @@ EOF
     
     # Update centralized config.json
     update_config_field "device_id" "$device_id"
+    update_config_field "kiosk_id" "$kiosk_id"
     update_config_field "company_name" "$company_name"
     update_config_field "last_sync" "$(date '+%Y-%m-%d %H:%M:%S')"
 }
@@ -830,10 +936,19 @@ collect_and_upload_logs() {
     local mac=$(get_mac_address)
     local request_body="{\"mac\":\"$mac\",\"device_id\":\"$device_id\",\"logs\":$logs_json}"
     
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     local response=$(curl -s -X POST "${API_BASE_URL}/api/log_sync.php" \
+        -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "$request_body" \
         --max-time 30)
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
     
     if echo "$response" | grep -q '"success":true'; then
         local logs_inserted=$(json_get "$response" "logs_inserted")
@@ -855,7 +970,12 @@ check_service_updates() {
     
     # Query server for current versions
     local response
-    response=$(curl -s -X GET "$VERSION_CHECK_API" --max-time 10 2>/dev/null || echo '{"success":false}')
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
+    response=$(curl -s -X GET "$VERSION_CHECK_API" \
+        -H "Authorization: Bearer $token" \
+        --max-time 10 2>/dev/null || echo '{"success":false}')
     
     if ! echo "$response" | grep -q '"success":true'; then
         log_debug "Version check failed or unavailable"
@@ -876,7 +996,9 @@ check_service_updates() {
         
         # Download updated service
         local temp_file="/tmp/edudisplej_sync_service.sh.new"
-        if curl -s -o "$temp_file" "${API_BASE_URL%/api*}/install/init/edudisplej_sync_service.sh" --max-time 30; then
+        if curl -s -o "$temp_file" "${API_BASE_URL%/api*}/install/init/edudisplej_sync_service.sh?token=${token}" \
+            -H "Authorization: Bearer $token" \
+            --max-time 30; then
             # Verify it's a valid script
             if head -1 "$temp_file" | grep -q "^#!/bin/bash"; then
                 # Backup current version

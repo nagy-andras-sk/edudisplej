@@ -5,6 +5,9 @@
  */
 
 header('Content-Type: application/json');
+require_once 'auth.php';
+
+validate_api_token();
 
 $response = [
     'success' => false,

@@ -1,6 +1,59 @@
 <?php
 $baseDir = __DIR__;
 
+require_once __DIR__ . '/../../control_edudisplej_sk/dbkonfiguracia.php';
+
+function require_download_auth() {
+    $headers = getallheaders();
+    $auth_header = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    $token_from_query = $_GET['token'] ?? '';
+    $token_from_header = $headers['X-API-Token'] ?? $headers['x-api-token'] ?? '';
+
+    $token = '';
+    if (preg_match('/Bearer\s+(.+)$/i', $auth_header, $matches)) {
+        $token = trim($matches[1]);
+    } elseif (!empty($token_from_header)) {
+        $token = trim($token_from_header);
+    } elseif (!empty($token_from_query)) {
+        $token = trim($token_from_query);
+    }
+
+    if (empty($token)) {
+        http_response_code(401);
+        echo "Authentication required.";
+        exit;
+    }
+
+    try {
+        $conn = getDbConnection();
+        $stmt = $conn->prepare("SELECT id, license_key, is_active FROM companies WHERE api_token = ?");
+        $stmt->bind_param("s", $token);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $company = $result->fetch_assoc();
+        $stmt->close();
+        closeDbConnection($conn);
+
+        if (!$company) {
+            http_response_code(401);
+            echo "Invalid token.";
+            exit;
+        }
+
+        if (!$company['is_active'] || empty($company['license_key'])) {
+            http_response_code(403);
+            echo "License inactive.";
+            exit;
+        }
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo "Authentication error.";
+        exit;
+    }
+}
+
+require_download_auth();
+
 if (isset($_GET['getstructure'])) {
     $structureFile = $baseDir . '/structure.json';
     

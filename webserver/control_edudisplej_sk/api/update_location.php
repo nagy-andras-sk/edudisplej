@@ -7,11 +7,12 @@
 session_start();
 header('Content-Type: application/json');
 require_once '../dbkonfiguracia.php';
+require_once 'auth.php';
 
-// Check if user is logged in and is admin
+// Check if user is logged in and is admin, otherwise require token
+$api_company = null;
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-    exit();
+    $api_company = validate_api_token();
 }
 
 $response = ['success' => false, 'message' => ''];
@@ -30,6 +31,17 @@ try {
     
     $conn = getDbConnection();
     
+    // Enforce company ownership if using token
+    if ($api_company && !api_is_admin_session($api_company)) {
+        $check_stmt = $conn->prepare("SELECT company_id FROM kiosks WHERE id = ?");
+        $check_stmt->bind_param("i", $kiosk_id);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        $check_row = $check_result->fetch_assoc();
+        $check_stmt->close();
+        api_require_company_match($api_company, $check_row['company_id'] ?? null, 'Unauthorized');
+    }
+
     // Update kiosk location
     $stmt = $conn->prepare("UPDATE kiosks SET location = ? WHERE id = ?");
     $stmt->bind_param("si", $location, $kiosk_id);

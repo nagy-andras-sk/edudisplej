@@ -5,6 +5,10 @@
  */
 
 header('Content-Type: application/json');
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
+
+$api_company = validate_api_token();
 
 try {
     $conn = getDbConnection();
@@ -27,7 +31,7 @@ try {
     }
     
     // Find kiosk by device_id or kiosk_id
-    $stmt = $conn->prepare("SELECT id FROM kiosks WHERE device_id = ? OR id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE device_id = ? OR id = ? LIMIT 1");
     $stmt->bind_param("si", $device_id, $kiosk_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -38,6 +42,8 @@ try {
     
     $kiosk = $result->fetch_assoc();
     $kiosk_id = $kiosk['id'];
+
+    api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
     
     // Determine overall status
     $overall_status = $data['status'] ?? 'unknown';

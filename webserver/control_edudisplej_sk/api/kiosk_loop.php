@@ -5,6 +5,9 @@
  * No session required - uses device_id authentication
  */
 require_once '../dbkonfiguracia.php';
+require_once 'auth.php';
+
+$api_company = validate_api_token();
 
 header('Content-Type: application/json');
 
@@ -36,7 +39,11 @@ try {
     
     $kiosk = $result->fetch_assoc();
     $kiosk_id = $kiosk['id'];
+    $company_id = $kiosk['company_id'];
     $stmt->close();
+
+    // Enforce company ownership
+    api_require_company_match($api_company, $company_id, 'Unauthorized');
     
     // Get kiosk's loop configuration
     // First check if kiosk has specific modules assigned
@@ -97,6 +104,10 @@ try {
             ];
         }
         $stmt->close();
+
+        if ($group_id) {
+            api_require_group_company($conn, $api_company, $group_id);
+        }
     }
     
     // Determine loop last update based on source

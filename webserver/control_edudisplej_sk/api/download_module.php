@@ -5,6 +5,9 @@
  * No session required - uses device_id authentication
  */
 require_once '../dbkonfiguracia.php';
+require_once 'auth.php';
+
+$api_company = validate_api_token();
 
 header('Content-Type: application/json');
 
@@ -44,6 +47,13 @@ try {
     $kiosk_id = $kiosk['id'];
     $group_id = $kiosk['group_id'];
     $stmt->close();
+
+    // Enforce company ownership
+    api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+
+    if (!empty($group_id)) {
+        api_require_group_company($conn, $api_company, (int)$group_id);
+    }
     
     // Check if module is authorized for this kiosk
     // Either through group assignment or direct kiosk assignment

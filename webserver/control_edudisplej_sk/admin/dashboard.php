@@ -854,6 +854,14 @@ try {
                 <small style="color: #999;">Activity will appear here once API endpoints are called</small>
             </div>
             <?php endif; ?>
+            
+            <?php if (count($recent_activity) > 0): ?>
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="api_logs.php" class="btn btn-primary" style="display: inline-block;">
+                    📊 View Full API Logs & Advanced Filters
+                </a>
+            </div>
+            <?php endif; ?>
         </div>
         
         <!-- Management Panel -->
@@ -871,8 +879,12 @@ try {
                     <div style="font-size: 36px; margin-bottom: 10px;">👥</div>
                     <strong>Users</strong><br>
                     <small style="opacity: 0.8;">User management & 2FA</small>
-                </a>
-                
+                </a>                
+                <a href="api_logs.php" class="btn btn-primary" style="padding: 30px; text-align: center; display: block;">
+                    <div style="font-size: 36px; margin-bottom: 10px;">📈</div>
+                    <strong>API Activity Logs</strong><br>
+                    <small style="opacity: 0.8;">Monitor API requests</small>
+                </a>                
                 <a href="dashboard.php" class="btn btn-primary" style="padding: 30px; text-align: center; display: block;">
                     <div style="font-size: 36px; margin-bottom: 10px;">🖥️</div>
                     <strong>Kiosks</strong><br>

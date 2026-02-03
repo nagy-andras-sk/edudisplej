@@ -5,21 +5,20 @@
  */
 
 header('Content-Type: application/json');
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
 
 try {
     // This must be called by a kiosk with valid API token
-    $auth = validate_api_token();
-    if (!$auth['valid']) {
-        throw new Exception('Invalid API token');
-    }
-    
-    $kiosk_id = $auth['kiosk_id'];
+    $api_company = validate_api_token();
     $conn = getDbConnection();
     
     // Get result data
     $data = json_decode(file_get_contents('php://input'), true);
     
     $command_id = intval($data['command_id'] ?? 0);
+    $device_id = $data['device_id'] ?? '';
+    $kiosk_id = intval($data['kiosk_id'] ?? 0);
     $status = $data['status'] ?? '';  // executed, failed, timeout
     $output = $data['output'] ?? '';
     $error = $data['error'] ?? '';
@@ -32,6 +31,24 @@ try {
         throw new Exception('Invalid status');
     }
     
+    // Resolve kiosk by device_id or kiosk_id and enforce company ownership
+    if (empty($device_id) && $kiosk_id <= 0) {
+        throw new Exception('Missing device_id or kiosk_id');
+    }
+
+    $lookup = $conn->prepare("SELECT id, company_id FROM kiosks WHERE device_id = ? OR id = ? LIMIT 1");
+    $lookup->bind_param("si", $device_id, $kiosk_id);
+    $lookup->execute();
+    $lookup_result = $lookup->get_result();
+    if ($lookup_result->num_rows === 0) {
+        throw new Exception('Kiosk not found');
+    }
+    $kiosk = $lookup_result->fetch_assoc();
+    $lookup->close();
+
+    api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+    $kiosk_id = (int)$kiosk['id'];
+
     // Verify command belongs to this kiosk
     $stmt = $conn->prepare("
         SELECT id FROM kiosk_command_queue 

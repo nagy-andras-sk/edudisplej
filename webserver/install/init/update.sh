@@ -9,6 +9,7 @@ INIT_DIR="${TARGET_DIR}/init"
 LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 INIT_BASE="https://install.edudisplej.sk/init"
 BACKUP_DIR="${TARGET_DIR}.backup.$(date +%s)"
+TOKEN_FILE="${TARGET_DIR}/lic/token"
 
 # Kontrola root opravneni / Root jogok ellenorzese
 echo "[*] Kontrola opravneni root..."
@@ -41,6 +42,19 @@ echo "=========================================="
 echo "EduDisplej - Aktualizacia / Frissites"
 echo "=========================================="
 echo ""
+
+if [ ! -f "$TOKEN_FILE" ]; then
+    echo "[!] CHYBA: Chyba API token (${TOKEN_FILE})"
+    exit 1
+fi
+
+API_TOKEN=$(tr -d '\n\r' < "$TOKEN_FILE")
+if [ -z "$API_TOKEN" ]; then
+    echo "[!] CHYBA: Prazdny API token"
+    exit 1
+fi
+
+AUTH_HEADER=( -H "Authorization: Bearer ${API_TOKEN}" )
 echo "[*] Vytvaranie zalohy..."
 echo "    Zaloha: $BACKUP_DIR"
 
@@ -50,12 +64,12 @@ cp -r "$TARGET_DIR" "$BACKUP_DIR"
 # Kontrola ci server podporuje structure.json / Ellenorzes hogy a szerver tamogatja-e a structure.json-t
 echo "[*] Kontrolujem dostupnost structure.json..."
 STRUCTURE_JSON=""
-if curl -sf --max-time 10 --connect-timeout 5 "${INIT_BASE}/download.php?getstructure" >/dev/null 2>&1; then
+if curl -sf --max-time 10 --connect-timeout 5 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" >/dev/null 2>&1; then
     echo "[*] Pouzivam novu metodu (structure.json)..."
     USE_STRUCTURE=true
     
     # Stiahnuť structure.json / Structure.json letoltese
-    STRUCTURE_JSON="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getstructure" 2>/dev/null | tr -d '\r')"
+    STRUCTURE_JSON="$(curl -s --max-time 30 --connect-timeout 10 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" 2>/dev/null | tr -d '\r')"
     CURL_EXIT_CODE=$?
     
     if [ $CURL_EXIT_CODE -ne 0 ] || [ -z "$STRUCTURE_JSON" ]; then
@@ -153,7 +167,8 @@ except:
         
         for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
             if curl -sL --max-time 60 --connect-timeout 10 \
-                "${INIT_BASE}/download.php?streamfile=${SOURCE}" \
+                "${AUTH_HEADER[@]}" \
+                "${INIT_BASE}/download.php?streamfile=${SOURCE}&token=${API_TOKEN}" \
                 -o "$TEMP_FILE" 2>&1; then
                 
                 # Kontrola ci sa subor stiahol / Ellenorzes hogy letoltodott-e
@@ -208,7 +223,7 @@ else
     # Stara metoda: pouzivat getfiles / Regi modszer: getfiles hasznalata
     echo "[*] Nacitavame zoznam suborov..."
     
-    FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getfiles" 2>/dev/null | tr -d '\r')"
+    FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getfiles&token=${API_TOKEN}" 2>/dev/null | tr -d '\r')"
     CURL_EXIT_CODE=$?
     
     if [ $CURL_EXIT_CODE -ne 0 ]; then
@@ -257,7 +272,8 @@ else
         
         for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
             if curl -sL --max-time 60 --connect-timeout 10 \
-                "${INIT_BASE}/download.php?streamfile=${NAME}" \
+                "${AUTH_HEADER[@]}" \
+                "${INIT_BASE}/download.php?streamfile=${NAME}&token=${API_TOKEN}" \
                 -o "${INIT_DIR}/${NAME}" 2>&1; then
                 
                 ACTUAL_SIZE=$(stat -c%s "${INIT_DIR}/${NAME}" 2>/dev/null || echo "0")

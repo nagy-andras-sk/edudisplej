@@ -6,16 +6,35 @@
  */
 
 header('Content-Type: application/json');
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
 
 try {
-    // This must be called by a kiosk with valid API token
-    $auth = validate_api_token();
-    if (!$auth['valid']) {
-        throw new Exception('Invalid API token');
+    // Validate token
+    $api_company = validate_api_token();
+
+    $device_id = $_GET['device_id'] ?? '';
+    $kiosk_id = intval($_GET['kiosk_id'] ?? 0);
+
+    if (empty($device_id) && $kiosk_id <= 0) {
+        throw new Exception('Missing device_id or kiosk_id');
     }
-    
-    $kiosk_id = $auth['kiosk_id'];
+
     $conn = getDbConnection();
+
+    // Resolve kiosk by device_id or id and enforce company ownership
+    $lookup = $conn->prepare("SELECT id, company_id FROM kiosks WHERE device_id = ? OR id = ? LIMIT 1");
+    $lookup->bind_param("si", $device_id, $kiosk_id);
+    $lookup->execute();
+    $lookup_result = $lookup->get_result();
+    if ($lookup_result->num_rows === 0) {
+        throw new Exception('Kiosk not found');
+    }
+    $kiosk = $lookup_result->fetch_assoc();
+    $lookup->close();
+
+    api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+    $kiosk_id = (int)$kiosk['id'];
     
     // Get pending commands for this kiosk
     $stmt = $conn->prepare("

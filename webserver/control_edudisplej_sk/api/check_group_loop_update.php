@@ -6,6 +6,9 @@
  * No session required - uses device_id authentication
  */
 require_once '../dbkonfiguracia.php';
+require_once 'auth.php';
+
+$api_company = validate_api_token();
 
 header('Content-Type: application/json');
 
@@ -62,6 +65,9 @@ try {
     $company_id = $kiosk['company_id'];
     $company_name = $kiosk['company_name'];
     $stmt->close();
+
+    // Enforce company ownership
+    api_require_company_match($api_company, $company_id, 'Unauthorized');
     
     // SECURITY: Verify device belongs to a company
     if (empty($company_id) || $company_id === null) {

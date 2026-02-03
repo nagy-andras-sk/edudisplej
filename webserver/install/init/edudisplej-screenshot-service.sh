@@ -14,6 +14,7 @@ CONFIG_DIR="/opt/edudisplej"
 DATA_DIR="${CONFIG_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
 TEMP_DIR="/tmp/edudisplej-screenshots"
+TOKEN_FILE="${CONFIG_DIR}/lic/token"
 SCREENSHOT_INTERVAL=15  # Default 15 seconds
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 SCREENSHOT_API="${API_BASE_URL}/api/screenshot_sync.php"
@@ -34,6 +35,28 @@ log_error() {
 log_debug() {
     if [ "${DEBUG:-false}" = "true" ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*"
+    fi
+}
+
+get_api_token() {
+    if [ -f "$TOKEN_FILE" ]; then
+        tr -d '\n\r' < "$TOKEN_FILE"
+        return 0
+    fi
+    return 1
+}
+
+is_auth_error() {
+    local response="$1"
+    echo "$response" | grep -qi '"message"[[:space:]]*:[[:space:]]*"Invalid API token"\|"Authentication required"\|"Unauthorized"\|"Company license is inactive"\|"No valid license key"'
+}
+
+reset_to_unconfigured() {
+    log_error "Authorization failed - switching to unconfigured mode"
+    rm -rf "/opt/edudisplej/localweb/modules" 2>/dev/null || true
+    mkdir -p "/opt/edudisplej/localweb/modules" 2>/dev/null || true
+    if systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
+        systemctl restart edudisplej-kiosk.service 2>/dev/null || true
     fi
 }
 
@@ -124,10 +147,20 @@ upload_screenshot() {
     log_debug "Sending to API: $SCREENSHOT_API"
     
     # Upload to API with better error handling
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
     local response=$(curl -s -X POST "$SCREENSHOT_API" \
+        -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "$request_data" \
         --max-time 30 --connect-timeout 10 2>&1)
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        rm -f "$screenshot_file"
+        return 1
+    fi
     
     local curl_code=$?
     if [ $curl_code -ne 0 ]; then

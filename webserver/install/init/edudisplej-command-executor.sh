@@ -49,6 +49,20 @@ log_success() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
 }
 
+is_auth_error() {
+    local response="$1"
+    echo "$response" | grep -qi '"message"[[:space:]]*:[[:space:]]*"Invalid API token"\|"Authentication required"\|"Unauthorized"\|"Company license is inactive"\|"No valid license key"'
+}
+
+reset_to_unconfigured() {
+    log_error "Authorization failed - switching to unconfigured mode"
+    rm -rf "/opt/edudisplej/localweb/modules" 2>/dev/null || true
+    mkdir -p "/opt/edudisplej/localweb/modules" 2>/dev/null || true
+    if systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
+        systemctl restart edudisplej-kiosk.service 2>/dev/null || true
+    fi
+}
+
 # Get API token
 get_api_token() {
     if [ -f "$TOKEN_FILE" ]; then
@@ -58,15 +72,40 @@ get_api_token() {
     fi
 }
 
+get_device_id() {
+    if [ -f "$CONFIG_FILE" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            jq -r '.device_id // empty' "$CONFIG_FILE" 2>/dev/null
+        else
+            grep -o '"device_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | head -1 | cut -d'"' -f4
+        fi
+    fi
+}
+
+get_kiosk_id() {
+    if [ -f "$CONFIG_FILE" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            jq -r '.kiosk_id // empty' "$CONFIG_FILE" 2>/dev/null
+        else
+            grep -o '"kiosk_id"[[:space:]]*:[[:space:]]*[0-9]*' "$CONFIG_FILE" | head -1 | cut -d: -f2
+        fi
+    fi
+}
+
 # Get pending commands
 fetch_commands() {
     local token="$1"
+    local device_id="$2"
     
     log_debug "Fetching pending commands..."
     
     local response=$(curl -s -H "Authorization: Bearer $token" \
         --max-time 10 --connect-timeout 5 \
-        "$GET_COMMANDS_API" 2>/dev/null || echo "{\"success\": false}")
+        "${GET_COMMANDS_API}?device_id=${device_id}" 2>/dev/null || echo "{\"success\": false}")
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+    fi
     
     echo "$response"
 }
@@ -163,10 +202,14 @@ report_command_result() {
     local status="$3"
     local output="$4"
     local error="$5"
+    local device_id="$6"
+    local kiosk_id="$7"
     
     local payload=$(cat <<EOF
 {
     "command_id": $command_id,
+    "device_id": "${device_id}",
+    "kiosk_id": ${kiosk_id:-0},
     "status": "$status",
     "output": $(echo -n "$output" | jq -Rs .),
     "error": $(echo -n "$error" | jq -Rs .)
@@ -183,6 +226,11 @@ EOF
         --max-time 10 --connect-timeout 5 \
         "$COMMAND_RESULT_API" 2>/dev/null || echo "{\"success\": false}")
     
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
+
     if echo "$response" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
         log_success "Command result reported: $command_id"
         return 0
@@ -203,9 +251,20 @@ main() {
         sleep 60
         return 1
     }
+
+    local device_id
+    device_id=$(get_device_id)
+    if [ -z "$device_id" ]; then
+        log_error "Device ID not found - service cannot operate"
+        sleep 60
+        return 1
+    fi
+
+    local kiosk_id
+    kiosk_id=$(get_kiosk_id)
     
     # Check for pending commands
-    local response=$(fetch_commands "$token")
+    local response=$(fetch_commands "$token" "$device_id")
     
     if ! echo "$response" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
         log_debug "No commands available or API error"
@@ -234,7 +293,7 @@ main() {
         IFS='|' read -r r_id r_status r_output r_error <<< "$result"
         
         # Report result
-        report_command_result "$token" "$r_id" "$r_status" "$r_output" "$r_error"
+        report_command_result "$token" "$r_id" "$r_status" "$r_output" "$r_error" "$device_id" "$kiosk_id"
         
     done <<< "$commands"
 }

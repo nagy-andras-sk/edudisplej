@@ -5,9 +5,17 @@
  * Queues and executes commands on remote kiosk
  */
 
+session_start();
 header('Content-Type: application/json');
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
 
 try {
+    $api_company = null;
+    if (!isset($_SESSION['user_id']) || empty($_SESSION['isadmin'])) {
+        $api_company = validate_api_token();
+    }
+
     $conn = getDbConnection();
     
     // Get command data
@@ -50,7 +58,7 @@ try {
     }
     
     // Verify kiosk exists
-    $stmt = $conn->prepare("SELECT id, device_id, status FROM kiosks WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, device_id, status, company_id FROM kiosks WHERE id = ?");
     $stmt->bind_param("i", $kiosk_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -60,6 +68,10 @@ try {
     }
     
     $kiosk = $result->fetch_assoc();
+
+    if ($api_company && !api_is_admin_session($api_company)) {
+        api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+    }
     
     // Create command queue entry
     $status = 'pending';

@@ -11,7 +11,7 @@ require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
 
 // Validate API authentication for device requests
-validate_api_token();
+$api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => ''];
 
@@ -38,7 +38,7 @@ try {
     $conn = getDbConnection();
     
     // Find kiosk by MAC or device_id
-    $stmt = $conn->prepare("SELECT id FROM kiosks WHERE mac = ? OR device_id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE mac = ? OR device_id = ? LIMIT 1");
     $stmt->bind_param("ss", $mac, $device_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -50,6 +50,7 @@ try {
     }
     
     $kiosk = $result->fetch_assoc();
+    api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
     $kiosk_id = $kiosk['id'];
     
     // Create logs table if it doesn't exist

@@ -35,158 +35,172 @@ function validate_api_token() {
         
         if (!empty($mac)) {
             // Device authentication - validate MAC format
-            if (strlen($mac) >= 6) {
-                // Look up device token from database
+            /**
+             * API Authentication Middleware
+             * Validates bearer tokens and license keys for API requests
+             */
+
+            function validate_api_token() {
+                $response = [
+                    'success' => false,
+                    'message' => 'Authentication required'
+                ];
+
+                // Allow admin/session-authenticated access (for control panel APIs)
+                if (session_status() === PHP_SESSION_NONE) {
+                    session_start();
+                }
+
+                if (!empty($_SESSION['user_id'])) {
+                    $company_id = $_SESSION['company_id'] ?? null;
+                    $company_name = $_SESSION['company_name'] ?? null;
+                    $license_key = $_SESSION['license_key'] ?? null;
+                    $is_admin = !empty($_SESSION['isadmin']);
+
+                    $_SESSION['api_company_id'] = $company_id;
+                    $_SESSION['api_company_name'] = $company_name;
+                    $_SESSION['api_license_key'] = $license_key;
+                    $_SESSION['api_is_admin'] = $is_admin;
+
+                    return [
+                        'id' => $company_id,
+                        'name' => $company_name,
+                        'license_key' => $license_key,
+                        'is_admin' => $is_admin,
+                        'auth_type' => 'session'
+                    ];
+                }
+
+                // Check for Authorization header
+                $headers = getallheaders();
+                $auth_header = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+                $token_from_query = $_GET['token'] ?? '';
+                $token_from_header = $headers['X-API-Token'] ?? $headers['x-api-token'] ?? '';
+
+                // Extract token from Authorization header (Bearer token)
+                $token = '';
+                if (preg_match('/Bearer\s+(.+)$/i', $auth_header, $matches)) {
+                    $token = trim($matches[1]);
+                } elseif (!empty($token_from_header)) {
+                    $token = trim($token_from_header);
+                } elseif (!empty($token_from_query)) {
+                    $token = trim($token_from_query);
+                }
+
+                // If no token, deny access
+                if (empty($token)) {
+                    header('HTTP/1.1 401 Unauthorized');
+                    header('Content-Type: application/json');
+                    echo json_encode($response);
+                    exit;
+                }
+
+                // Validate token against database
                 require_once __DIR__ . '/../dbkonfiguracia.php';
+
                 try {
                     $conn = getDbConnection();
-                    $stmt = $conn->prepare("
-                        SELECT c.api_token, c.license_key, c.is_active 
-                        FROM kiosks k 
-                        JOIN companies c ON k.company_id = c.id 
-                        WHERE k.mac = ? AND c.api_token IS NOT NULL
-                    ");
-                    $stmt->bind_param("s", $mac);
+
+                    // Check if token exists in companies table and verify license
+                    $stmt = $conn->prepare("SELECT id, name, license_key, is_active FROM companies WHERE api_token = ?");
+                    $stmt->bind_param("s", $token);
                     $stmt->execute();
                     $result = $stmt->get_result();
-                    
-                    if ($result->num_rows > 0) {
-                        $row = $result->fetch_assoc();
-                        
-                        // Check if company is active
-                        if (!$row['is_active']) {
-                            $stmt->close();
-                            $conn->close();
-                            
-                            header('HTTP/1.1 403 Forbidden');
-                            header('Content-Type: application/json');
-                            $response['message'] = 'Company license is inactive';
-                            echo json_encode($response);
-                            exit;
-                        }
-                        
-                        $token = $row['api_token'];
+
+                    if ($result->num_rows === 0) {
+                        $stmt->close();
+                        $conn->close();
+
+                        header('HTTP/1.1 401 Unauthorized');
+                        header('Content-Type: application/json');
+                        $response['message'] = 'Invalid API token';
+                        echo json_encode($response);
+                        exit;
                     }
+
+                    $company = $result->fetch_assoc();
                     $stmt->close();
+
+                    // Verify company is active
+                    if (!$company['is_active']) {
+                        $conn->close();
+
+                        header('HTTP/1.1 403 Forbidden');
+                        header('Content-Type: application/json');
+                        $response['message'] = 'Company license is inactive';
+                        echo json_encode($response);
+                        exit;
+                    }
+
+                    // Verify license key exists
+                    if (empty($company['license_key'])) {
+                        $conn->close();
+
+                        header('HTTP/1.1 403 Forbidden');
+                        header('Content-Type: application/json');
+                        $response['message'] = 'No valid license key';
+                        echo json_encode($response);
+                        exit;
+                    }
+
                     $conn->close();
+
+                    // Token is valid, store company info for use in API
+                    $_SESSION['api_company_id'] = $company['id'];
+                    $_SESSION['api_company_name'] = $company['name'];
+                    $_SESSION['api_license_key'] = $company['license_key'];
+                    $_SESSION['api_is_admin'] = false;
+
+                    return [
+                        'id' => $company['id'],
+                        'name' => $company['name'],
+                        'license_key' => $company['license_key'],
+                        'is_admin' => false,
+                        'auth_type' => 'token'
+                    ];
+
                 } catch (Exception $e) {
-                    // Allow without token for device registration
-                    return true;
+                    header('HTTP/1.1 500 Internal Server Error');
+                    header('Content-Type: application/json');
+                    $response['message'] = 'Authentication error: ' . $e->getMessage();
+                    echo json_encode($response);
+                    exit;
                 }
             }
-        }
-    }
-    
-    // If still no token, deny access for protected endpoints
-    if (empty($token)) {
-        // Allow registration endpoint without token (for new devices)
-        $script_name = basename($_SERVER['SCRIPT_NAME']);
-        if ($script_name === 'registration.php') {
-            return true;
-        }
-        
-        header('HTTP/1.1 401 Unauthorized');
-        header('Content-Type: application/json');
-        echo json_encode($response);
-        exit;
-    }
-    
-    // Validate token against database
-    require_once __DIR__ . '/../dbkonfiguracia.php';
-    
-    try {
-        $conn = getDbConnection();
-        
-        // Check if token exists in companies table and verify license
-        $stmt = $conn->prepare("SELECT id, name, license_key, is_active FROM companies WHERE api_token = ?");
-        $stmt->bind_param("s", $token);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows === 0) {
-            $stmt->close();
-            $conn->close();
-            
-            header('HTTP/1.1 401 Unauthorized');
-            header('Content-Type: application/json');
-            $response['message'] = 'Invalid API token';
-            echo json_encode($response);
-            exit;
-        }
-        
-        $company = $result->fetch_assoc();
-        $stmt->close();
-        
-        // Verify company is active
-        if (!$company['is_active']) {
-            $conn->close();
-            
-            header('HTTP/1.1 403 Forbidden');
-            header('Content-Type: application/json');
-            $response['message'] = 'Company license is inactive';
-            echo json_encode($response);
-            exit;
-        }
-        
-        // Verify license key exists
-        if (empty($company['license_key'])) {
-            $conn->close();
-            
-            header('HTTP/1.1 403 Forbidden');
-            header('Content-Type: application/json');
-            $response['message'] = 'No valid license key';
-            echo json_encode($response);
-            exit;
-        }
-        
-        $conn->close();
-        
-        // Token is valid, store company info for use in API
-        $_SESSION['api_company_id'] = $company['id'];
-        $_SESSION['api_company_name'] = $company['name'];
-        $_SESSION['api_license_key'] = $company['license_key'];
-        
-        return true;
-        
-    } catch (Exception $e) {
-        header('HTTP/1.1 500 Internal Server Error');
-        header('Content-Type: application/json');
-        $response['message'] = 'Authentication error: ' . $e->getMessage();
-        echo json_encode($response);
-        exit;
-    }
-}
 
-/**
- * Verify OTP code for two-factor authentication
- * Uses TOTP (Time-based One-Time Password) algorithm as per RFC 6238
- * Compatible with Google Authenticator, Authy, Microsoft Authenticator, etc.
- * 
- * @param string $secret The user's OTP secret (Base32 encoded)
- * @param string $code The 6-digit code entered by user
- * @return bool True if valid
- */
-function verify_otp_code($secret, $code) {
-    // Time-based OTP using RFC 6238 (TOTP)
-    // Uses 30-second time steps and SHA1 hashing (standard for authenticator apps)
-    $time = floor(time() / 30); // 30-second window
-    
-    // Check current window and ±1 window for clock drift tolerance
-    for ($i = -1; $i <= 1; $i++) {
-        $calc_code = generate_otp_code($secret, $time + $i);
-        if (hash_equals($calc_code, $code)) {
-            return true;
-        }
-    }
-    
-    return false;
-}
+            function api_is_admin_session(array $company): bool {
+                return !empty($company['is_admin']);
+            }
 
-/**
- * Generate OTP code for given time
- * @param string $secret Base32 encoded secret
- * @param int $time Time counter
- * @return string 6-digit code
+            function api_require_company_match(array $company, $target_company_id, string $message = 'Unauthorized'): void {
+                if (api_is_admin_session($company)) {
+                    return;
+                }
+                if (empty($target_company_id) || (int)$company['id'] !== (int)$target_company_id) {
+                    header('HTTP/1.1 403 Forbidden');
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => $message]);
+                    exit;
+                }
+            }
+
+            function api_require_group_company(mysqli $conn, array $company, int $group_id): void {
+                if ($group_id <= 0 || api_is_admin_session($company)) {
+                    return;
+                }
+                $stmt = $conn->prepare("SELECT company_id FROM kiosk_groups WHERE id = ?");
+                $stmt->bind_param("i", $group_id);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $row = $result->fetch_assoc();
+                $stmt->close();
+                if (!$row || (int)$row['company_id'] !== (int)$company['id']) {
+                    header('HTTP/1.1 403 Forbidden');
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+                    exit;
+                }
+            }
  */
 function generate_otp_code($secret, $time) {
     $secret = base32_decode($secret);
