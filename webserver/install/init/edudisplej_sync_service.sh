@@ -20,6 +20,7 @@ REGISTRATION_API="${API_BASE_URL}/api/registration.php"
 MODULES_API="${API_BASE_URL}/api/modules_sync.php"
 HW_SYNC_API="${API_BASE_URL}/api/hw_data_sync.php"
 KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
+CHECK_GROUP_LOOP_UPDATE_API="${API_BASE_URL}/api/check_group_loop_update.php"
 VERSION_CHECK_API="${API_BASE_URL}/api/check_versions.php"
 SYNC_INTERVAL=300  # 5 minutes
 CONFIG_DIR="/opt/edudisplej"
@@ -313,7 +314,8 @@ sync_hw_data() {
 }
 
 # Check loop changes and update modules if needed
-# This compares local loop.json last_update with server's created_at/updated_at
+# This checks kiosk_group_modules updated_at in the group and company where device belongs
+# Enhanced with security: API only responds if device truly belongs to company
 check_loop_updates() {
     local device_id="$1"
     [ -z "$device_id" ] && return 0
@@ -328,61 +330,80 @@ check_loop_updates() {
     
     log_debug "Local loop last_update: ${local_last_update:-none}"
     
-    # Query server for loop configuration
+    # Query server for group loop configuration with security check
+    # API verifies device belongs to company before responding
     local response
-    response=$(curl -s -X POST "$KIOSK_LOOP_API" -d "device_id=${device_id}" --max-time 30)
+    response=$(curl -s -X POST "$CHECK_GROUP_LOOP_UPDATE_API" \
+        -H "Content-Type: application/json" \
+        -d "{\"device_id\":\"${device_id}\"}" \
+        --max-time 30)
+    
+    # Check for authorization errors first
+    if echo "$response" | grep -q '"message":"Unauthorized"'; then
+        log_error "⚠️ Loop check UNAUTHORIZED: Device does not belong to any company or group access denied"
+        return 1
+    fi
+    
     if ! echo "$response" | grep -q '"success":true'; then
         log_error "Loop check failed: $response"
         return 1
     fi
     
-    # Get server's loop update timestamp (created_at or updated_at from kiosk_group_modules)
+    # Extract response data
+    local config_source
+    config_source=$(json_get "$response" "config_source")
     local server_updated_at
     server_updated_at=$(json_get "$response" "loop_updated_at")
+    local company_name
+    company_name=$(json_get "$response" "company_name")
+    local group_id
+    group_id=$(json_get "$response" "group_id")
     
-    log_debug "Server loop updated_at: ${server_updated_at:-none}"
+    log "📋 Loop version check: Company='$company_name', Source='$config_source', Group='${group_id:-none}'"
+    log_debug "Server loop updated_at: ${server_updated_at:-none} (from $config_source)"
     
     # Compare timestamps: if no local timestamp, or server is newer, update
     local needs_update=false
     
     if [ -z "$local_last_update" ]; then
-        log "No local loop found - downloading from server..."
+        log "🔄 No local loop found - downloading initial configuration from server..."
         needs_update=true
     elif [ -z "$server_updated_at" ]; then
         log_debug "Server has no update timestamp - skipping comparison"
     else
         # Compare timestamps (works with both datetime strings and unix timestamps)
         if [[ "$server_updated_at" > "$local_last_update" ]]; then
-            log "Server loop is newer (server: $server_updated_at, local: $local_last_update)"
+            log "⬆️ Server loop is newer - update required (server: $server_updated_at, local: $local_last_update)"
             needs_update=true
         else
-            log_debug "Loop configuration is up-to-date"
+            log_debug "✓ Loop configuration is up-to-date"
         fi
     fi
     
     # Download modules if update is needed
     if [ "$needs_update" = "true" ]; then
-        log "Downloading latest loop configuration and modules..."
+        log "📥 Downloading latest loop configuration and modules from kiosk_group_modules..."
         if [ -x "$DOWNLOAD_SCRIPT" ]; then
             if bash "$DOWNLOAD_SCRIPT"; then
-                log_success "Loop and modules updated successfully"
+                log_success "✅ Loop and modules updated successfully"
+                update_config_field "last_update" "$(date '+%Y-%m-%d %H:%M:%S')"
                 
                 # Restart browser to apply new loop configuration
-                log "Restarting kiosk display to apply new configuration..."
+                log "🔄 Restarting kiosk display to apply new configuration..."
                 if systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
                     if systemctl restart edudisplej-kiosk.service 2>/dev/null; then
-                        log_success "✓ Kiosk display restarted successfully"
+                        log_success "✅ Kiosk display restarted successfully"
                     else
-                        log_error "Failed to restart kiosk display service"
+                        log_error "❌ Failed to restart kiosk display service"
                     fi
                 else
-                    log "Kiosk display service not active - skipping restart"
+                    log "⚠️ Kiosk display service not active - skipping restart"
                 fi
             else
-                log_error "Module update failed"
+                log_error "❌ Module update failed"
             fi
         else
-            log_error "Download script not found: $DOWNLOAD_SCRIPT"
+            log_error "❌ Download script not found: $DOWNLOAD_SCRIPT"
         fi
     fi
 }

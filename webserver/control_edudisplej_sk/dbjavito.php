@@ -237,6 +237,72 @@ try {
                 'km_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE",
                 'km_module_fk' => "FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE"
             ]
+        ],
+        // Health monitoring and command execution tables
+        'kiosk_health' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'kiosk_id' => "int(11) NOT NULL",
+                'status' => "varchar(50) NOT NULL DEFAULT 'unknown'",
+                'system_data' => "json DEFAULT NULL",
+                'services_data' => "json DEFAULT NULL",
+                'network_data' => "json DEFAULT NULL",
+                'sync_data' => "json DEFAULT NULL",
+                'timestamp' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'kh_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE"
+            ]
+        ],
+        'kiosk_health_logs' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'kiosk_id' => "int(11) NOT NULL",
+                'status' => "varchar(50) NOT NULL",
+                'details' => "json DEFAULT NULL",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'khl_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE"
+            ]
+        ],
+        'kiosk_command_queue' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'kiosk_id' => "int(11) NOT NULL",
+                'command_type' => "varchar(50) NOT NULL",
+                'command' => "text NOT NULL",
+                'status' => "varchar(50) NOT NULL DEFAULT 'pending'",
+                'output' => "longtext DEFAULT NULL",
+                'error' => "longtext DEFAULT NULL",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()",
+                'executed_at' => "timestamp NULL DEFAULT NULL"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'kcq_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE"
+            ]
+        ],
+        'kiosk_command_logs' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'kiosk_id' => "int(11) NOT NULL",
+                'command_id' => "int(11) NOT NULL",
+                'action' => "varchar(50) NOT NULL",
+                'details' => "json DEFAULT NULL",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'kcl_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE",
+                'kcl_command_fk' => "FOREIGN KEY (command_id) REFERENCES kiosk_command_queue(id) ON DELETE CASCADE"
+            ]
         ]
     ];
     
@@ -468,6 +534,31 @@ try {
                 }
                 $fix_stmt->close();
             }
+        }
+    }
+    
+    // Create indexes for health monitoring and command execution tables
+    logResult("Creating indexes for new tables...", 'info');
+    
+    $indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_health_timestamp ON kiosk_health(timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_health_status ON kiosk_health(status)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_health_kiosk ON kiosk_health(kiosk_id)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_health_logs_kiosk ON kiosk_health_logs(kiosk_id)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_health_logs_created ON kiosk_health_logs(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_command_queue_status ON kiosk_command_queue(status)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_command_queue_kiosk ON kiosk_command_queue(kiosk_id)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_command_queue_created ON kiosk_command_queue(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_command_logs_kiosk ON kiosk_command_logs(kiosk_id)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_command_logs_command ON kiosk_command_logs(command_id)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_command_logs_created ON kiosk_command_logs(created_at)"
+    ];
+    
+    foreach ($indexes as $index_sql) {
+        if ($conn->query($index_sql)) {
+            logResult("Index created: " . substr($index_sql, 0, 50) . "...", 'success');
+        } else {
+            logError("Failed to create index: " . $conn->error);
         }
     }
     

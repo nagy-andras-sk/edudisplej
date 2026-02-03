@@ -1,0 +1,20 @@
+[Unit]
+Description=EduDisplej Command Executor Service
+Documentation=https://edudisplej.sk
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/edudisplej
+ExecStart=/opt/edudisplej/init/edudisplej-command-executor.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment="EDUDISPLEJ_DEBUG=false"
+
+[Install]
+WantedBy=multi-user.target
