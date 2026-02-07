@@ -592,6 +592,29 @@ try {
             <div class="preview-panel">
                 <h2>📺 Élő Előnézet</h2>
                 
+                <!-- Resolution Selector -->
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 13px;">
+                        Felbontás szerinti előnézet:
+                    </label>
+                    <select id="resolutionSelector" onchange="updatePreviewResolution()" style="
+                        width: 100%;
+                        padding: 8px 12px;
+                        border: 2px solid #1a3a52;
+                        border-radius: 5px;
+                        font-size: 13px;
+                        background: white;
+                        cursor: pointer;
+                        font-weight: 500;
+                    ">
+                        <option value="1920x1080">1920x1080 (16:9 Full HD)</option>
+                        <option value="1280x720">1280x720 (16:9 HD)</option>
+                        <option value="1024x768">1024x768 (4:3 XGA)</option>
+                        <option value="1600x900">1600x900 (16:9 HD+)</option>
+                        <option value="1366x768">1366x768 (16:9 WXGA)</option>
+                    </select>
+                </div>
+                
                 <div class="preview-screen" id="previewScreen">
                     <div class="preview-empty" id="previewEmpty">
                         <p>🎬 Nincs loop</p>
@@ -1374,6 +1397,90 @@ try {
         
         // Load loop on page load
         loadLoop();
+        
+        // Load group display resolutions and populate the selector
+        function loadGroupResolutions() {
+            fetch(`../api/get_group_kiosks.php?group_id=${groupId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.kiosks && data.kiosks.length > 0) {
+                        const selector = document.getElementById('resolutionSelector');
+                        const resolutions = new Set();
+                        
+                        // Collect unique resolutions from kiosks
+                        data.kiosks.forEach(kiosk => {
+                            if (kiosk.screen_resolution) {
+                                resolutions.add(kiosk.screen_resolution);
+                            }
+                        });
+                        
+                        // Add group-specific resolutions to the top if they exist
+                        if (resolutions.size > 0) {
+                            selector.innerHTML = ''; // Clear existing options
+                            
+                            // Add group-specific resolutions
+                            Array.from(resolutions).forEach(res => {
+                                const [width, height] = res.split('x').map(Number);
+                                let aspectRatio = '';
+                                if (width && height) {
+                                    const gcd = (a, b) => b ? gcd(b, a % b) : a;
+                                    const divisor = gcd(width, height);
+                                    const ratioW = width / divisor;
+                                    const ratioH = height / divisor;
+                                    aspectRatio = ` (${ratioW}:${ratioH})`;
+                                }
+                                const option = document.createElement('option');
+                                option.value = res;
+                                option.textContent = `${res}${aspectRatio} - Csoport kijelző`;
+                                selector.appendChild(option);
+                            });
+                            
+                            // Add separator
+                            const separator = document.createElement('option');
+                            separator.disabled = true;
+                            separator.textContent = '──────────────────';
+                            selector.appendChild(separator);
+                        }
+                        
+                        // Add standard resolutions
+                        const standardResolutions = [
+                            { value: '1920x1080', label: '1920x1080 (16:9 Full HD)' },
+                            { value: '1280x720', label: '1280x720 (16:9 HD)' },
+                            { value: '1024x768', label: '1024x768 (4:3 XGA)' },
+                            { value: '1600x900', label: '1600x900 (16:9 HD+)' },
+                            { value: '1366x768', label: '1366x768 (16:9 WXGA)' }
+                        ];
+                        
+                        standardResolutions.forEach(res => {
+                            const option = document.createElement('option');
+                            option.value = res.value;
+                            option.textContent = res.label;
+                            selector.appendChild(option);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading group resolutions:', err);
+                });
+        }
+        
+        // Update preview resolution
+        function updatePreviewResolution() {
+            const selector = document.getElementById('resolutionSelector');
+            const resolution = selector.value;
+            const [width, height] = resolution.split('x').map(Number);
+            
+            if (width && height) {
+                const previewScreen = document.getElementById('previewScreen');
+                const aspectRatio = height / width;
+                previewScreen.style.aspectRatio = `${width} / ${height}`;
+                
+                console.log(`Preview resolution updated to ${resolution} (${width}:${height})`);
+            }
+        }
+        
+        // Load resolutions on page load
+        loadGroupResolutions();
     </script>
 
 <?php include '../admin/footer.php'; ?>
