@@ -203,9 +203,9 @@ closeDbConnection($conn);
                                 <td>
                                     <div style="display: flex; gap: 5px; align-items: center;">
                                         <!-- Primary action: Customize -->
-                                        <a href="group_loop.php?id=<?php echo $group['id']; ?>" class="action-btn" style="background: #1a3a52; color: white; padding: 8px 16px; font-weight: bold;">⚙️ Testreszabás</a>
+                                        <a href="group_loop?id=<?php echo $group['id']; ?>" class="action-btn" style="background: #1a3a52; color: white; padding: 8px 16px; font-weight: bold;">⚙️ Testreszabás</a>
                                         <!-- Secondary actions -->
-                                        <a href="group_kiosks.php?id=<?php echo $group['id']; ?>" class="action-btn action-btn-small" style="background: #6c757d;">🖥️ Kijelzők</a>
+                                        <a href="group_kiosks?id=<?php echo $group['id']; ?>" class="action-btn action-btn-small" style="background: #6c757d;">🖥️ Kijelzők</a>
                                         <a href="?delete=<?php echo $group['id']; ?>" class="action-btn action-btn-small" style="background: #dc3545;" onclick="return confirm('Biztosan törölted ezt a csoportot?');">🗑️</a>
                                     </div>
                                 </td>

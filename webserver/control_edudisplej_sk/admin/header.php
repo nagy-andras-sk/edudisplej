@@ -165,14 +165,14 @@
             <div class="header-links">
                 <!-- Dashboard navigation for company users -->
                 <?php if (!$is_admin_user && strpos($_SERVER['PHP_SELF'], 'dashboard') !== false): ?>
-                    <a href="index.php" class="header-link">🖥️ Kijelzők</a>
-                    <a href="groups.php" class="header-link">📁 Csoportok</a>
-                    <a href="group_modules.php" class="header-link">🎬 Modulok</a>
-                    <a href="profile.php" class="header-link">🏢 Profil</a>
+                    <a href="index" class="header-link">🖥️ Kijelzők</a>
+                    <a href="groups" class="header-link">📁 Csoportok</a>
+                    <a href="group_modules" class="header-link">🎬 Modulok</a>
+                    <a href="profile" class="header-link">🏢 Profil</a>
                 <?php endif; ?>
                 
                 <?php if ($is_admin_user && strpos($_SERVER['PHP_SELF'], 'dashboard') !== false): ?>
-                    <a href="../admin/index.php" class="header-link">🔐 Admin</a>
+                    <a href="../admin/index" class="header-link">🔐 Admin</a>
                 <?php endif; ?>
                 
                 <a href="<?php echo isset($logout_url) ? htmlspecialchars($logout_url) : '../login.php?logout=1'; ?>" class="header-link logout">🚪 Kilépés</a>

@@ -48,7 +48,7 @@ try {
     
     // Check permissions
     if (!$group || (!$is_admin && $group['company_id'] != $company_id)) {
-        header('Location: groups.php');
+        header('Location: groups');
         exit();
     }
     
