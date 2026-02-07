@@ -48,7 +48,13 @@ try {
         $error = 'You are not assigned to any company. Please contact an administrator.';
     } else if ($company_id) {
         // Get company kiosks with group information
+        // Calculate status dynamically: offline if last_seen is more than 30 minutes ago
         $query = "SELECT k.*, 
+                  CASE 
+                      WHEN k.last_seen IS NULL THEN 'offline'
+                      WHEN TIMESTAMPDIFF(MINUTE, k.last_seen, NOW()) > 30 THEN 'offline'
+                      ELSE 'online'
+                  END as status,
                   GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as group_names,
                   GROUP_CONCAT(DISTINCT g.id SEPARATOR ',') as group_ids
                   FROM kiosks k 
@@ -231,10 +237,6 @@ $logout_url = '../login.php?logout=1';
                                     <!-- Tech Info -->
                                     <div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 5px; font-size: 11px; color: #666;">
                                         <div style="display: grid; grid-template-columns: auto 1fr; gap: 5px; margin-bottom: 8px;">
-                                            <?php if (!empty($kiosk['version'])): ?>
-                                                <span style="font-weight: 600;">📦 Verzió:</span>
-                                                <span id="version-<?php echo $kiosk['id']; ?>"><?php echo htmlspecialchars($kiosk['version']); ?></span>
-                                            <?php endif; ?>
                                             <?php if (!empty($kiosk['screen_resolution'])): ?>
                                                 <span style="font-weight: 600;">🖥️ Felbontás:</span>
                                                 <span id="resolution-<?php echo $kiosk['id']; ?>"><?php echo htmlspecialchars($kiosk['screen_resolution']); ?></span>
@@ -255,11 +257,11 @@ $logout_url = '../login.php?logout=1';
                                         <div style="border-top: 1px solid #ddd; padding-top: 5px; display: grid; grid-template-columns: auto 1fr; gap: 5px;">
                                             <span style="font-weight: 600;">⏱️ Szinkronizálás:</span>
                                             <span id="last-sync-<?php echo $kiosk['id']; ?>" style="color: #666;">
-                                                <?php echo (!empty($kiosk['last_sync']) && $kiosk['last_sync'] !== 'NULL') ? date('H:i', strtotime($kiosk['last_sync'])) : '-'; ?>
+                                                <?php echo (!empty($kiosk['last_sync']) && $kiosk['last_sync'] !== 'NULL') ? date('Y-m-d H:i:s', strtotime($kiosk['last_sync'])) : '-'; ?>
                                             </span>
                                             <span style="font-weight: 600;">🔄 Loop verzió:</span>
                                             <span id="loop-version-<?php echo $kiosk['id']; ?>" style="color: #666;">
-                                                <?php echo (!empty($kiosk['loop_last_update']) && $kiosk['loop_last_update'] !== 'NULL') ? date('H:i', strtotime($kiosk['loop_last_update'])) : '-'; ?>
+                                                <?php echo (!empty($kiosk['loop_last_update']) && $kiosk['loop_last_update'] !== 'NULL') ? date('Y-m-d H:i:s', strtotime($kiosk['loop_last_update'])) : '-'; ?>
                                             </span>
                                         </div>
                                     </div>
@@ -332,16 +334,23 @@ $logout_url = '../login.php?logout=1';
                 const diffSecs = Math.floor((diffMs % 60000) / 1000);
                 
                 let timeStr = '';
-                if (diffMins > 0) {
-                    timeStr = `${diffMins} perc${diffSecs > 0 ? ` ${diffSecs}s` : ''} előtt`;
-                } else {
-                    timeStr = `${diffSecs}s előtt`;
-                }
                 
-                // If more than 120 minutes, show as red OFFLINE
+                // If more than 120 minutes (2 hours), show full timestamp (date, time)
                 if (diffMins > 120) {
-                    el.innerHTML = `<span style="color: #d32f2f; font-weight: bold;">OFFLINE (${timeStr})</span>`;
+                    const year = lastDate.getFullYear();
+                    const month = String(lastDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(lastDate.getDate()).padStart(2, '0');
+                    const hours = String(lastDate.getHours()).padStart(2, '0');
+                    const minutes = String(lastDate.getMinutes()).padStart(2, '0');
+                    timeStr = `${year}-${month}-${day} ${hours}:${minutes}`;
+                    el.innerHTML = `<span style="color: #d32f2f; font-weight: bold;">${timeStr}</span>`;
                 } else {
+                    // Show relative time for recent syncs
+                    if (diffMins > 0) {
+                        timeStr = `${diffMins} perc${diffSecs > 0 ? ` ${diffSecs}s` : ''} előtt`;
+                    } else {
+                        timeStr = `${diffSecs}s előtt`;
+                    }
                     el.innerHTML = timeStr;
                 }
             });

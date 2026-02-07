@@ -146,31 +146,13 @@ closeDbConnection($conn);
             <div class="success">✓ <?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
         
-        <!-- Create Group Form -->
-        <div class="card">
-            <h2 style="margin-bottom: 15px;">Új Csoport Létrehozása</h2>
-            <form method="POST" action="">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <div class="form-group">
-                        <label for="group_name">Csoport neve *</label>
-                        <input type="text" id="group_name" name="group_name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="description">Leírás</label>
-                        <input type="text" id="description" name="description" placeholder="pl. Emelet 1, Épület A">
-                    </div>
-                </div>
-                <button type="submit" name="create_group" class="btn">+ Csoport Létrehozása</button>
-            </form>
-        </div>
-        
         <!-- Groups Table -->
         <div class="card">
             <h2 style="margin-bottom: 15px;">Csoportok (<?php echo count($groups); ?>)</h2>
             
             <?php if (empty($groups)): ?>
                 <div style="text-align: center; padding: 40px; color: #999;">
-                    <p>Nincsenek csoportok. Hozz létre egy új csoportot az fenti formban.</p>
+                    <p>Nincsenek csoportok. Hozz létre egy új csoportot az alábbi formban.</p>
                 </div>
             <?php else: ?>
                 <table>
@@ -219,10 +201,12 @@ closeDbConnection($conn);
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <div style="display: flex; gap: 5px;">
-                                        <a href="group_kiosks.php?id=<?php echo $group['id']; ?>" class="action-btn action-btn-small">🖥️ Kijelzők</a>
-                                        <a href="group_loop.php?id=<?php echo $group['id']; ?>" class="action-btn action-btn-small">⚙️ Testreszabás</a>
-                                        <a href="?delete=<?php echo $group['id']; ?>" class="action-btn action-btn-small" style="color: #d32f2f;" onclick="return confirm('Biztosan törölted ezt a csoportot?');">🗑️ Törlés</a>
+                                    <div style="display: flex; gap: 5px; align-items: center;">
+                                        <!-- Primary action: Customize -->
+                                        <a href="group_loop.php?id=<?php echo $group['id']; ?>" class="action-btn" style="background: #1a3a52; color: white; padding: 8px 16px; font-weight: bold;">⚙️ Testreszabás</a>
+                                        <!-- Secondary actions -->
+                                        <a href="group_kiosks.php?id=<?php echo $group['id']; ?>" class="action-btn action-btn-small" style="background: #6c757d;">🖥️ Kijelzők</a>
+                                        <a href="?delete=<?php echo $group['id']; ?>" class="action-btn action-btn-small" style="background: #dc3545;" onclick="return confirm('Biztosan törölted ezt a csoportot?');">🗑️</a>
                                     </div>
                                 </td>
                             </tr>
@@ -230,6 +214,24 @@ closeDbConnection($conn);
                     </tbody>
                 </table>
             <?php endif; ?>
+        </div>
+        
+        <!-- Create Group Form - moved to bottom -->
+        <div class="card" style="margin-top: 20px;">
+            <h2 style="margin-bottom: 15px;">Új Csoport Létrehozása</h2>
+            <form method="POST" action="">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label for="group_name">Csoport neve *</label>
+                        <input type="text" id="group_name" name="group_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Leírás</label>
+                        <input type="text" id="description" name="description" placeholder="pl. Emelet 1, Épület A">
+                    </div>
+                </div>
+                <button type="submit" name="create_group" class="btn">+ Csoport Létrehozása</button>
+            </form>
         </div>
     </div>
     
