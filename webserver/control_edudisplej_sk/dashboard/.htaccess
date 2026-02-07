@@ -1,0 +1,13 @@
+# Enable URL Rewriting for Dashboard
+RewriteEngine On
+RewriteBase /dashboard/
+
+# Redirect dashboard URLs without .php extension
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+
+# Remove .php extension from URLs
+RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s/dashboard/([^.]+)\.php [NC]
+RewriteRule ^ /dashboard/%1 [R=301,L]

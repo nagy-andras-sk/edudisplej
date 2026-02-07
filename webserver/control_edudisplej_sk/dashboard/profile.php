@@ -98,97 +98,29 @@ $logout_url = '../login.php?logout=1';
         <?php endif; ?>
         
         <?php if ($company_id): ?>
-            <!-- COMPANY INFO -->
+            <!-- COMPANY INFO - Simplified Table Format -->
             <div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #eee;">
                 <h2 style="margin-top: 0;">🏢 Cég Adatai</h2>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                    <div>
-                        <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #1e40af;">Cégnév</label>
-                        <p style="margin: 0; padding: 10px; background: #f9f9f9; border-radius: 3px; border-left: 4px solid #1e40af;">
-                            <?php echo htmlspecialchars($company_data['name'] ?? 'N/A'); ?>
-                        </p>
-                    </div>
-                    <div>
-                        <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #1e40af;">Regisztrációs időpont</label>
-                        <p style="margin: 0; padding: 10px; background: #f9f9f9; border-radius: 3px; border-left: 4px solid #1e40af;">
-                            <?php echo $company_data['created_at'] ? date('Y-m-d H:i', strtotime($company_data['created_at'])) : 'N/A'; ?>
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- API TOKEN AND INSTALLATION -->
-            <div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #eee;">
-                <h2 style="margin-top: 0;">🔑 API Token és Telepítés</h2>
-                
-                <?php
-                $api_token = $company_data['api_token'] ?? null;
-                $install_command = $api_token ? "curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token={$api_token}" : '';
-                ?>
-                
-                <?php if ($api_token): ?>
-                    <!-- Token Display -->
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">API Token (Licenszkulcs):</label>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="text" value="<?php echo htmlspecialchars($api_token); ?>" id="tokenInput" readonly style="
-                                flex: 1;
-                                padding: 10px;
-                                border: 1px solid #ccc;
-                                border-radius: 5px;
-                                font-family: monospace;
-                                font-size: 12px;
-                            " />
-                            <button onclick="copyToClipboard(event, 'tokenInput')" style="
-                                background: #4caf50;
-                                color: white;
-                                border: none;
-                                padding: 10px 20px;
-                                border-radius: 5px;
-                                cursor: pointer;
-                            ">📋 Másolás</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Install Command Display -->
-                    <div style="margin-bottom: 20px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Telepítő Parancs:</label>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="text" value="<?php echo htmlspecialchars($install_command); ?>" id="installInput" readonly style="
-                                flex: 1;
-                                padding: 10px;
-                                border: 1px solid #ccc;
-                                border-radius: 5px;
-                                font-family: monospace;
-                                font-size: 11px;
-                            " />
-                            <button onclick="copyToClipboard(event, 'installInput')" style="
-                                background: #4caf50;
-                                color: white;
-                                border: none;
-                                padding: 10px 20px;
-                                border-radius: 5px;
-                                cursor: pointer;
-                            ">📋 Másolás</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Warning Box -->
-                    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">
-                        <strong>⚠️ Fontos:</strong>
-                        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-                            <li>Ez a token biztosítja az API hozzáférést a cég eszközeihez</li>
-                            <li>Tartsa biztonságban és ne ossza meg illetéktelen személyekkel</li>
-                            <li>Használja a telepítő parancsot új eszközök beállításához</li>
-                        </ul>
-                    </div>
-                <?php else: ?>
-                    <!-- No Token Message -->
-                    <div style="text-align: center; padding: 30px; color: #999; background: #f9f9f9; border-radius: 3px; border: 1px dashed #ddd;">
-                        <p style="margin: 0 0 15px 0;">📭 Még nincs API token generálva</p>
-                        <p style="margin: 0; font-size: 14px;">Kérjen API token generálást a rendszer adminisztrátortól.</p>
-                    </div>
-                <?php endif; ?>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 12px; font-weight: bold; width: 30%;">Cégnév</td>
+                        <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['name'] ?? 'N/A'); ?></td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 12px; font-weight: bold;">Regisztrációs időpont</td>
+                        <td style="padding: 12px;"><?php echo $company_data['created_at'] ? date('Y-m-d H:i', strtotime($company_data['created_at'])) : 'N/A'; ?></td>
+                    </tr>
+                    <?php if (!empty($company_data['api_token'])): ?>
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 12px; font-weight: bold;">API Token</td>
+                        <td style="padding: 12px;">
+                            <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px;"><?php echo htmlspecialchars($company_data['api_token']); ?></code>
+                            <button onclick="copyToClipboard(event, 'token-value')" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
+                            <input type="hidden" id="token-value" value="<?php echo htmlspecialchars($company_data['api_token']); ?>">
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
             </div>
             
             <!-- LICENSES -->

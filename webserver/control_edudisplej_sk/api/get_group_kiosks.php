@@ -35,7 +35,7 @@ try {
     }
     
     // Get kiosks in this group
-    $stmt = $conn->prepare("SELECT k.id, k.hostname, k.friendly_name, k.status, k.location, k.last_seen 
+    $stmt = $conn->prepare("SELECT k.id, k.hostname, k.friendly_name, k.status, k.location, k.last_seen, k.screen_resolution 
                             FROM kiosks k
                             JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
                             WHERE kga.group_id = ?
