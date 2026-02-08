@@ -2,6 +2,10 @@
 RewriteEngine On
 RewriteBase /
 
+# Normalize /Dashboard (case variants) to /dashboard
+RewriteRule ^Dashboard/?$ /dashboard/ [R=301,L,NC]
+RewriteRule ^Dashboard/(.*)$ /dashboard/$1 [R=301,L,NC]
+
 # Redirect dashboard URLs without .php extension
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

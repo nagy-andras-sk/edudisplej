@@ -31,9 +31,14 @@ if (empty($new_name)) {
 
 try {
     $conn = getDbConnection();
+
+    $default_check = $conn->query("SHOW COLUMNS FROM kiosk_groups LIKE 'is_default'");
+    if ($default_check && $default_check->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_groups ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0");
+    }
     
     // Check permissions
-    $stmt = $conn->prepare("SELECT company_id FROM kiosk_groups WHERE id = ?");
+    $stmt = $conn->prepare("SELECT company_id, is_default, name FROM kiosk_groups WHERE id = ?");
     $stmt->bind_param("i", $group_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -42,6 +47,11 @@ try {
     
     if (!$group || (!$is_admin && $group['company_id'] != $company_id)) {
         echo json_encode(['success' => false, 'message' => 'Hozzáférés megtagadva']);
+        exit();
+    }
+
+    if (!empty($group['is_default']) || strtolower($group['name']) === 'default') {
+        echo json_encode(['success' => false, 'message' => 'Az alapertelmezett csoport nem nevezheto at']);
         exit();
     }
     

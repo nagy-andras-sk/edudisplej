@@ -69,6 +69,7 @@ try {
                 'username' => "varchar(255) NOT NULL",
                 'password' => "varchar(255) NOT NULL",
                 'email' => "varchar(255) DEFAULT NULL",
+                'lang' => "varchar(5) NOT NULL DEFAULT 'sk'",
                 'isadmin' => "tinyint(1) NOT NULL DEFAULT 0",
                 'is_super_admin' => "tinyint(1) NOT NULL DEFAULT 0",
                 'role' => "enum('super_admin','admin','content_editor','viewer') DEFAULT 'viewer'",
@@ -137,7 +138,9 @@ try {
                 'id' => "int(11) NOT NULL AUTO_INCREMENT",
                 'name' => "varchar(255) NOT NULL",
                 'company_id' => "int(11) DEFAULT NULL",
-                'description' => "text DEFAULT NULL"
+                'description' => "text DEFAULT NULL",
+                'priority' => "int(11) NOT NULL DEFAULT 0",
+                'is_default' => "tinyint(1) NOT NULL DEFAULT 0"
             ],
             'primary_key' => 'id',
             'unique_keys' => [],

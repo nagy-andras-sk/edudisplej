@@ -20,9 +20,14 @@ $group_id = intval($_REQUEST['group_id'] ?? 0);
 
 try {
     $conn = getDbConnection();
+
+    $default_check = $conn->query("SHOW COLUMNS FROM kiosk_groups LIKE 'is_default'");
+    if ($default_check && $default_check->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_groups ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0");
+    }
     
     // Check permissions
-    $stmt = $conn->prepare("SELECT company_id FROM kiosk_groups WHERE id = ?");
+    $stmt = $conn->prepare("SELECT company_id, is_default, name FROM kiosk_groups WHERE id = ?");
     $stmt->bind_param("i", $group_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -33,6 +38,8 @@ try {
         echo json_encode(['success' => false, 'message' => 'Hozzáférés megtagadva']);
         exit();
     }
+
+    $is_default_group = (!empty($group['is_default']) || strtolower($group['name']) === 'default');
     
     // GET - Retrieve loop configuration
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -71,6 +78,27 @@ try {
         if (!is_array($loops)) {
             echo json_encode(['success' => false, 'message' => 'Hibás loop konfiguráció']);
             exit();
+        }
+
+        if ($is_default_group) {
+            $clock_stmt = $conn->prepare("SELECT id FROM modules WHERE module_key = 'clock' LIMIT 1");
+            $clock_stmt->execute();
+            $clock_result = $clock_stmt->get_result();
+            $clock_module = $clock_result->fetch_assoc();
+            $clock_stmt->close();
+
+            if (!$clock_module) {
+                echo json_encode(['success' => false, 'message' => 'Az ora modul nem elerheto']);
+                exit();
+            }
+
+            $clock_module_id = (int)$clock_module['id'];
+            $valid_default = (count($loops) === 1 && intval($loops[0]['module_id'] ?? 0) === $clock_module_id);
+
+            if (!$valid_default) {
+                echo json_encode(['success' => false, 'message' => 'Az alapertelmezett csoport csak ora modullal hasznalhato']);
+                exit();
+            }
         }
         
         // Start transaction

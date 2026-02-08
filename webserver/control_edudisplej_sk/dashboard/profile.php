@@ -115,8 +115,14 @@ $logout_url = '../login.php?logout=1';
                         <td style="padding: 12px; font-weight: bold;">API Token</td>
                         <td style="padding: 12px;">
                             <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px;"><?php echo htmlspecialchars($company_data['api_token']); ?></code>
-                            <button onclick="copyToClipboard(event, 'token-value')" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
-                            <input type="hidden" id="token-value" value="<?php echo htmlspecialchars($company_data['api_token']); ?>">
+                            <button data-copy="<?php echo htmlspecialchars($company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
+                            <div style="margin-top: 10px;">
+                                <strong style="display: inline-block; margin-right: 8px;">Install parancs:</strong>
+                                <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px; display: inline-block;">
+                                    <?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>
+                                </code>
+                                <button data-copy="<?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
+                            </div>
                         </td>
                     </tr>
                     <?php endif; ?>
@@ -244,21 +250,47 @@ $logout_url = '../login.php?logout=1';
     </div>
     
     <script>
-        function copyToClipboard(event, elementId) {
-            const input = document.getElementById(elementId);
-            input.select();
-            document.execCommand('copy');
-            
-            // Show feedback
-            const button = event.target;
-            const originalText = button.textContent;
-            button.textContent = '✅ Másolva!';
-            button.style.background = '#4caf50';
-            
-            setTimeout(() => {
-                button.textContent = originalText;
+        function copyToClipboard(event) {
+            const button = event.currentTarget;
+            const textToCopy = button.getAttribute('data-copy') || '';
+            if (!textToCopy) {
+                return;
+            }
+
+            const showSuccess = () => {
+                const originalText = button.textContent;
+                button.textContent = '✅ Másolva!';
                 button.style.background = '#4caf50';
-            }, 2000);
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '#4caf50';
+                }, 2000);
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy)
+                    .then(showSuccess)
+                    .catch(() => {
+                        fallbackCopyText(textToCopy);
+                        showSuccess();
+                    });
+                return;
+            }
+
+            fallbackCopyText(textToCopy);
+            showSuccess();
+        }
+
+        function fallbackCopyText(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
         }
         
         function openAddUserForm() {

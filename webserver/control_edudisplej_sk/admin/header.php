@@ -3,13 +3,16 @@
  * Common Header/Navigation Component
  * Simple, compact design
  */
+require_once dirname(__DIR__) . '/i18n.php';
+
+$current_lang = edudisplej_apply_language_preferences();
 ?>
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="<?php echo htmlspecialchars($current_lang); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduDisplej Control</title>
+    <title><?php echo htmlspecialchars(t('app.title')); ?></title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="stylesheet" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? 'style.css' : '../admin/style.css'; ?>">
     <style>
@@ -63,6 +66,23 @@
         .header-links {
             display: flex;
             gap: 10px;
+        }
+
+        .lang-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .lang-selector select {
+            padding: 4px 6px;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 12px;
         }
         
         .header-link {
@@ -162,23 +182,39 @@
                 <?php endif; ?>
             </div>
             
+            <div class="lang-selector">
+                <span><?php echo htmlspecialchars(t('lang.label')); ?></span>
+                <select onchange="changeLanguage(this.value)">
+                    <option value="hu" <?php echo $current_lang === 'hu' ? 'selected' : ''; ?>><?php echo htmlspecialchars(t('lang.hu')); ?></option>
+                    <option value="en" <?php echo $current_lang === 'en' ? 'selected' : ''; ?>><?php echo htmlspecialchars(t('lang.en')); ?></option>
+                    <option value="sk" <?php echo $current_lang === 'sk' ? 'selected' : ''; ?>><?php echo htmlspecialchars(t('lang.sk')); ?></option>
+                </select>
+            </div>
+
             <div class="header-links">
                 <!-- Dashboard navigation for company users -->
                 <?php if (!$is_admin_user && strpos($_SERVER['PHP_SELF'], 'dashboard') !== false): ?>
-                    <a href="index" class="header-link">🖥️ Kijelzők</a>
-                    <a href="groups" class="header-link">📁 Csoportok</a>
-                    <a href="group_modules" class="header-link">🎬 Modulok</a>
-                    <a href="profile" class="header-link">🏢 Profil</a>
+                    <a href="index.php" class="header-link">🖥️ <?php echo htmlspecialchars(t('nav.kiosks')); ?></a>
+                    <a href="groups.php" class="header-link">📁 <?php echo htmlspecialchars(t('nav.groups')); ?></a>
+                    <a href="group_modules.php" class="header-link">🎬 <?php echo htmlspecialchars(t('nav.modules')); ?></a>
+                    <a href="profile.php" class="header-link">🏢 <?php echo htmlspecialchars(t('nav.profile')); ?></a>
                 <?php endif; ?>
                 
                 <?php if ($is_admin_user && strpos($_SERVER['PHP_SELF'], 'dashboard') !== false): ?>
-                    <a href="../admin/index" class="header-link">🔐 Admin</a>
+                    <a href="../admin/index.php" class="header-link">🔐 <?php echo htmlspecialchars(t('nav.admin')); ?></a>
                 <?php endif; ?>
                 
-                <a href="<?php echo isset($logout_url) ? htmlspecialchars($logout_url) : '../login.php?logout=1'; ?>" class="header-link logout">🚪 Kilépés</a>
+                <a href="<?php echo isset($logout_url) ? htmlspecialchars($logout_url) : '../login.php?logout=1'; ?>" class="header-link logout">🚪 <?php echo htmlspecialchars(t('nav.logout')); ?></a>
             </div>
         </div>
     </div>
+    <script>
+        function changeLanguage(lang) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('lang', lang);
+            window.location.href = url.toString();
+        }
+    </script>
     
     <div class="container">
 

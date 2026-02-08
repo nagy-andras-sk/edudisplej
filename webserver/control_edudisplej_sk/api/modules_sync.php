@@ -10,6 +10,17 @@ $api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => '', 'modules' => []];
 
+function parse_unix_timestamp($value) {
+    if (!$value) {
+        return null;
+    }
+    if (is_numeric($value)) {
+        return (int)$value;
+    }
+    $ts = strtotime($value);
+    return $ts ? $ts : null;
+}
+
 try {
     $data = json_decode(file_get_contents('php://input'), true);
     
@@ -32,10 +43,10 @@ try {
             echo json_encode($response);
             exit;
         }
-        $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval FROM kiosks WHERE id = ?");
+        $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval, loop_last_update FROM kiosks WHERE id = ?");
         $stmt->bind_param("i", $kiosk_id);
     } else {
-        $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval FROM kiosks WHERE mac = ?");
+        $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval, loop_last_update FROM kiosks WHERE mac = ?");
         $stmt->bind_param("s", $mac);
     }
     
@@ -118,28 +129,46 @@ try {
     
     $server_timestamp = null;
     $needs_update = true;
-    
+
+    $stored_last_update = $kiosk['loop_last_update'] ?? null;
+    $stored_ts = parse_unix_timestamp($stored_last_update);
+    $client_ts = parse_unix_timestamp($last_loop_update);
+
+    if ($client_ts && (!$stored_ts || $client_ts > $stored_ts)) {
+        $stored_ts = $client_ts;
+        $stored_last_update = date('Y-m-d H:i:s', $client_ts);
+        $update_loop_stmt = $conn->prepare("UPDATE kiosks SET loop_last_update = ? WHERE id = ?");
+        $update_loop_stmt->bind_param("si", $stored_last_update, $kiosk['id']);
+        $update_loop_stmt->execute();
+        $update_loop_stmt->close();
+    }
+
     if ($group_row) {
         $server_timestamp = $group_row['latest_update'];
-        
-        // Compare timestamps to determine if update is needed
-        if ($last_loop_update && $server_timestamp) {
-            // Validate timestamp format using DateTime
-            try {
-                $client_dt = new DateTime($last_loop_update);
-                $server_dt = new DateTime($server_timestamp);
-                
-                $client_time = $client_dt->getTimestamp();
-                $server_time = $server_dt->getTimestamp();
-                
-                // Only send update if server timestamp is newer
-                if ($server_time <= $client_time) {
-                    $needs_update = false;
-                }
-            } catch (Exception $e) {
-                // Invalid timestamp format, force update to be safe
-                error_log('Invalid timestamp in modules_sync: ' . $e->getMessage());
+        $server_ts = parse_unix_timestamp($server_timestamp);
+
+        if ($server_ts) {
+            if (!$stored_ts) {
                 $needs_update = true;
+            } elseif ($server_ts <= $stored_ts) {
+                $needs_update = false;
+            }
+        }
+    } else {
+        $ts_stmt = $conn->prepare("SELECT MAX(updated_at) as latest_update, MAX(created_at) as created_at FROM kiosk_modules WHERE kiosk_id = ? AND is_active = 1");
+        $ts_stmt->bind_param("i", $kiosk['id']);
+        $ts_stmt->execute();
+        $ts_result = $ts_stmt->get_result();
+        $ts_row = $ts_result->fetch_assoc();
+        $ts_stmt->close();
+
+        $server_timestamp = $ts_row['latest_update'] ?? $ts_row['created_at'] ?? null;
+        $server_ts = parse_unix_timestamp($server_timestamp);
+        if ($server_ts) {
+            if (!$stored_ts) {
+                $needs_update = true;
+            } elseif ($server_ts <= $stored_ts) {
+                $needs_update = false;
             }
         }
     }

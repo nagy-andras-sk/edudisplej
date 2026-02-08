@@ -13,117 +13,58 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$group_id = intval($_GET['id'] ?? 0);
+$focus_group_id = intval($_GET['id'] ?? 0);
 $user_id = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
 $error = '';
 $success = '';
+$groups = [];
+$kiosks_by_group = [];
+$unassigned_kiosks = [];
 
-$group = null;
-
-try {
-    $conn = getDbConnection();
-    
-    // Get group info
-    $stmt = $conn->prepare("SELECT * FROM kiosk_groups WHERE id = ?");
-    $stmt->bind_param("i", $group_id);
-    $stmt->execute();
-    $group = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    
-    // Check permissions
-    if (!$group || (!$is_admin && $group['company_id'] != $company_id)) {
-        header('Location: groups.php');
-        exit();
-    }
-    
-    // Handle kiosk assignment
-    if (isset($_GET['assign']) && is_numeric($_GET['assign'])) {
-        $kiosk_id = intval($_GET['assign']);
-        
-        // First, remove from any other group
-        $stmt = $conn->prepare("DELETE FROM kiosk_group_assignments WHERE kiosk_id = ?");
-        $stmt->bind_param("i", $kiosk_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Then add to current group
-        $stmt = $conn->prepare("INSERT IGNORE INTO kiosk_group_assignments (kiosk_id, group_id) VALUES (?, ?)");
-        $stmt->bind_param("ii", $kiosk_id, $group_id);
-        
-        if ($stmt->execute()) {
-            $success = 'Kijelző sikeresen hozzáadva a csoporthoz';
-        } else {
-            $error = 'A kijelző hozzáadása sikertelen';
-        }
-        $stmt->close();
-    }
-    
-    // Handle kiosk removal
-    if (isset($_GET['remove']) && is_numeric($_GET['remove'])) {
-        $kiosk_id = intval($_GET['remove']);
-        
-        $stmt = $conn->prepare("DELETE FROM kiosk_group_assignments WHERE kiosk_id = ? AND group_id = ?");
-        $stmt->bind_param("ii", $kiosk_id, $group_id);
-        
-        if ($stmt->execute()) {
-            $success = 'Kijelző sikeresen eltávolítva a csoportból';
-        } else {
-            $error = 'Az eltávolítás sikertelen';
-        }
-        $stmt->close();
-    }
-    
-    closeDbConnection($conn);
-    
-} catch (Exception $e) {
-    $error = 'Adatbázis hiba';
-    error_log($e->getMessage());
+if (!$company_id) {
+    header('Location: groups.php');
+    exit();
 }
 
-// Get kiosks in group and available kiosks
-$kiosks_in_group = [];
-$available_kiosks = [];
-
 try {
     $conn = getDbConnection();
-    
-    // Kiosks in group
-    $query = "SELECT k.* FROM kiosks k
-              INNER JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
-              WHERE kga.group_id = ?
-              ORDER BY k.hostname";
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("i", $group_id);
+
+    $stmt = $conn->prepare("SELECT id, name, description, priority, is_default FROM kiosk_groups WHERE company_id = ? ORDER BY priority DESC, name");
+    $stmt->bind_param("i", $company_id);
     $stmt->execute();
     $result = $stmt->get_result();
+
     while ($row = $result->fetch_assoc()) {
-        $kiosks_in_group[] = $row;
+        $groups[] = $row;
+        $kiosks_by_group[$row['id']] = [];
     }
     $stmt->close();
-    
-    // Available kiosks (not in any group or in different groups)
-    $query = "SELECT k.*, kg.id as group_in, kg.name as group_name FROM kiosks k
-              LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
-              LEFT JOIN kiosk_groups kg ON kga.group_id = kg.id
-              WHERE k.company_id = ? 
-              AND k.id NOT IN (
-                  SELECT kiosk_id FROM kiosk_group_assignments WHERE group_id = ?
-              )
-              ORDER BY k.hostname";
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("ii", $company_id, $group_id);
+
+    $stmt = $conn->prepare("SELECT k.id, k.hostname, k.friendly_name, k.status, k.location, kga.group_id
+                            FROM kiosks k
+                            LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
+                            WHERE k.company_id = ?
+                            ORDER BY k.hostname");
+    $stmt->bind_param("i", $company_id);
     $stmt->execute();
     $result = $stmt->get_result();
+
     while ($row = $result->fetch_assoc()) {
-        $available_kiosks[] = $row;
+        $group_id = $row['group_id'];
+        if ($group_id && isset($kiosks_by_group[$group_id])) {
+            $kiosks_by_group[$group_id][] = $row;
+        } else {
+            $unassigned_kiosks[] = $row;
+        }
     }
     $stmt->close();
-    
+
     closeDbConnection($conn);
-    
+
 } catch (Exception $e) {
+    $error = 'Adatbázis hiba';
     error_log($e->getMessage());
 }
 ?>
@@ -192,10 +133,10 @@ try {
             margin-bottom: 20px;
         }
         
-        .two-column {
+        .groups-board {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
         }
         
         .column h3 {
@@ -207,9 +148,15 @@ try {
             display: flex;
             flex-direction: column;
             gap: 10px;
+            min-height: 60px;
         }
-        
-        .kiosk-item {
+
+        .kiosk-list.drop-target {
+            outline: 2px dashed #1a3a52;
+            background: #f0f7ff;
+        }
+
+        .kiosk-card {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -217,30 +164,39 @@ try {
             background: #f9f9f9;
             border: 1px solid #eee;
             border-radius: 3px;
+            cursor: grab;
         }
-        
-        .kiosk-item:hover {
+
+        .kiosk-card.dragging {
+            opacity: 0.5;
+        }
+
+        .kiosk-card:hover {
             background: #f0f0f0;
         }
-        
-        .kiosk-item.in-other-group {
-            background: #ffe6e6;
-            border-color: #ffcccc;
+
+        .group-header {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
         }
-        
-        .kiosk-item.in-other-group:hover {
-            background: #ffcccc;
+
+        .group-title {
+            font-weight: 700;
+            color: #1a3a52;
+            font-size: 16px;
         }
-        
-        .group-badge {
-            display: inline-block;
-            background: #dc3545;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 11px;
+
+        .group-meta {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .group-count {
+            font-size: 12px;
+            color: #0f5132;
             font-weight: 600;
-            margin-top: 5px;
         }
         
         .kiosk-info {
@@ -257,34 +213,6 @@ try {
             font-size: 12px;
             color: #666;
             margin-top: 3px;
-        }
-        
-        .btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-        
-        .btn-add {
-            background: #28a745;
-            color: white;
-        }
-        
-        .btn-add:hover {
-            background: #218838;
-        }
-        
-        .btn-remove {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .btn-remove:hover {
-            background: #c82333;
         }
         
         .no-data {
@@ -312,70 +240,174 @@ try {
             <div class="success">✓ <?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>
         
-        <?php if ($group): ?>
+        <div class="card">
+            <h2 style="margin-bottom: 10px;">Kijelzők csoportok szerint</h2>
+            <p style="color: #666; font-size: 13px; margin-bottom: 10px;">Húzd a kijelzőket a csoportok között a hozzárendeléshez.</p>
+        </div>
+
+        <?php if (empty($groups)): ?>
             <div class="card">
-                <h2 style="margin-bottom: 10px;"><?php echo htmlspecialchars($group['name']); ?></h2>
-                <p style="color: #666; font-size: 13px;">
-                    <?php echo htmlspecialchars($group['description'] ?? 'Nincs leírás'); ?>
-                </p>
+                <div class="no-data">Nincsenek csoportok</div>
             </div>
-            
-            <div class="two-column">
-                <!-- Kiosks in Group -->
-                <div class="card">
-                    <h3>🖥️ A csoportban lévő kijelzők (<?php echo count($kiosks_in_group); ?>)</h3>
-                    
-                    <?php if (empty($kiosks_in_group)): ?>
-                        <div class="no-data">Nincsenek kijelzők ebben a csoportban</div>
-                    <?php else: ?>
-                        <div class="kiosk-list">
-                            <?php foreach ($kiosks_in_group as $kiosk): ?>
-                                <div class="kiosk-item">
-                                    <div class="kiosk-info">
-                                        <div class="kiosk-name"><?php echo htmlspecialchars($kiosk['hostname']); ?></div>
-                                        <div class="kiosk-detail">
-                                            📍 <?php echo htmlspecialchars($kiosk['location'] ?? '—'); ?>
+        <?php else: ?>
+            <div class="groups-board">
+                <?php foreach ($groups as $group): ?>
+                    <div class="card group-column" data-group-id="<?php echo $group['id']; ?>">
+                        <div class="group-header">
+                            <div class="group-title">
+                                <?php echo htmlspecialchars($group['name']); ?>
+                                <?php if (!empty($group['is_default'])): ?>
+                                    <span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-left: 6px;">Alapértelmezett</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="group-meta">Prioritás: <?php echo (int)$group['priority']; ?></div>
+                            <div class="group-count" id="group-count-<?php echo $group['id']; ?>">Kijelzők: <?php echo count($kiosks_by_group[$group['id']] ?? []); ?></div>
+                        </div>
+                        <div class="kiosk-list" data-group-id="<?php echo $group['id']; ?>">
+                            <?php if (empty($kiosks_by_group[$group['id']])): ?>
+                                <div class="no-data">Nincs kijelző</div>
+                            <?php else: ?>
+                                <?php foreach ($kiosks_by_group[$group['id']] as $kiosk): ?>
+                                    <div class="kiosk-card" draggable="true" data-kiosk-id="<?php echo $kiosk['id']; ?>" data-group-id="<?php echo $group['id']; ?>">
+                                        <div class="kiosk-info">
+                                            <div class="kiosk-name"><?php echo htmlspecialchars($kiosk['hostname'] ?? $kiosk['friendly_name'] ?? 'N/A'); ?></div>
+                                            <div class="kiosk-detail">📍 <?php echo htmlspecialchars($kiosk['location'] ?? '—'); ?></div>
                                         </div>
                                     </div>
-                                    <a href="?id=<?php echo $group_id; ?>&remove=<?php echo $kiosk['id']; ?>" class="btn btn-remove" onclick="return confirm('Eltávolítod ezt a kijelzőt?');">✕</a>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+
+                <?php if (!empty($unassigned_kiosks)): ?>
+                    <div class="card group-column" data-group-id="0">
+                        <div class="group-header">
+                            <div class="group-title">Nincs csoport</div>
+                            <div class="group-meta">Húzd át egy csoportba</div>
+                            <div class="group-count" id="group-count-0">Kijelzők: <?php echo count($unassigned_kiosks); ?></div>
+                        </div>
+                        <div class="kiosk-list" data-group-id="0">
+                            <?php foreach ($unassigned_kiosks as $kiosk): ?>
+                                <div class="kiosk-card" draggable="true" data-kiosk-id="<?php echo $kiosk['id']; ?>" data-group-id="0">
+                                    <div class="kiosk-info">
+                                        <div class="kiosk-name"><?php echo htmlspecialchars($kiosk['hostname'] ?? $kiosk['friendly_name'] ?? 'N/A'); ?></div>
+                                        <div class="kiosk-detail">📍 <?php echo htmlspecialchars($kiosk['location'] ?? '—'); ?></div>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                    <?php endif; ?>
-                </div>
-                
-                <!-- Available Kiosks -->
-                <div class="card">
-                    <h3>+ Elérhető kijelzők (<?php echo count($available_kiosks); ?>)</h3>
-                    
-                    <?php if (empty($available_kiosks)): ?>
-                        <div class="no-data">Nincsenek elérhető kijelzők</div>
-                    <?php else: ?>
-                        <div class="kiosk-list">
-                            <?php foreach ($available_kiosks as $kiosk): ?>
-                                <div class="kiosk-item <?php echo ($kiosk['group_in'] ? 'in-other-group' : ''); ?>">
-                                    <div class="kiosk-info">
-                                        <div class="kiosk-name"><?php echo htmlspecialchars($kiosk['hostname']); ?></div>
-                                        <div class="kiosk-detail">
-                                            📍 <?php echo htmlspecialchars($kiosk['location'] ?? '—'); ?>
-                                        </div>
-                                        <?php if ($kiosk['group_in']): ?>
-                                            <div class="group-badge">
-                                                ⚠️ Jelenleg: <?php echo htmlspecialchars($kiosk['group_name']); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <a href="?id=<?php echo $group_id; ?>&assign=<?php echo $kiosk['id']; ?>" class="btn btn-add">
-                                        <?php echo ($kiosk['group_in'] ? '↔️ Áthelyez' : '➕ Hozzáad'); ?>
-                                    </a>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
+    <script>
+        let draggedCard = null;
+
+        function updateCounts() {
+            document.querySelectorAll('.kiosk-list').forEach(list => {
+                const groupId = list.getAttribute('data-group-id');
+                const countLabel = document.getElementById('group-count-' + groupId);
+                if (countLabel) {
+                    const count = list.querySelectorAll('.kiosk-card').length;
+                    countLabel.textContent = 'Kijelzők: ' + count;
+                }
+            });
+        }
+
+        function assignKioskToGroup(kioskId, targetGroupId, card) {
+            if (targetGroupId === '0') {
+                return;
+            }
+
+            fetch(`../api/assign_kiosk_group.php?kiosk_id=${kioskId}&group_id=${targetGroupId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const previousList = card.closest('.kiosk-list');
+                        const targetList = document.querySelector(`.kiosk-list[data-group-id="${targetGroupId}"]`);
+                        if (targetList) {
+                            const emptyState = targetList.querySelector('.no-data');
+                            if (emptyState) {
+                                emptyState.remove();
+                            }
+                            card.dataset.groupId = targetGroupId;
+                            targetList.appendChild(card);
+                            if (previousList && previousList.querySelectorAll('.kiosk-card').length === 0) {
+                                if (!previousList.querySelector('.no-data')) {
+                                    const empty = document.createElement('div');
+                                    empty.className = 'no-data';
+                                    empty.textContent = 'Nincs kijelző';
+                                    previousList.appendChild(empty);
+                                }
+                            }
+                            updateCounts();
+                        }
+                    } else {
+                        alert('⚠️ ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('⚠️ Hiba történt: ' + error);
+                });
+        }
+
+        function initDragAndDrop() {
+            document.querySelectorAll('.kiosk-card').forEach(card => {
+                card.addEventListener('dragstart', () => {
+                    draggedCard = card;
+                    card.classList.add('dragging');
+                });
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                    draggedCard = null;
+                    document.querySelectorAll('.kiosk-list').forEach(list => list.classList.remove('drop-target'));
+                });
+            });
+
+            document.querySelectorAll('.kiosk-list').forEach(list => {
+                list.addEventListener('dragover', event => {
+                    if (!draggedCard) return;
+                    const targetGroupId = list.getAttribute('data-group-id');
+                    if (targetGroupId === '0') return;
+                    event.preventDefault();
+                    list.classList.add('drop-target');
+                });
+
+                list.addEventListener('dragleave', () => {
+                    list.classList.remove('drop-target');
+                });
+
+                list.addEventListener('drop', event => {
+                    if (!draggedCard) return;
+                    event.preventDefault();
+
+                    const targetGroupId = list.getAttribute('data-group-id');
+                    const currentGroupId = draggedCard.getAttribute('data-group-id');
+
+                    if (targetGroupId === currentGroupId || targetGroupId === '0') {
+                        list.classList.remove('drop-target');
+                        return;
+                    }
+
+                    assignKioskToGroup(draggedCard.getAttribute('data-kiosk-id'), targetGroupId, draggedCard);
+                    list.classList.remove('drop-target');
+                });
+            });
+        }
+
+        initDragAndDrop();
+        updateCounts();
+
+        const focusGroupId = <?php echo (int)$focus_group_id; ?>;
+        if (focusGroupId) {
+            const focusColumn = document.querySelector(`.group-column[data-group-id="${focusGroupId}"]`);
+            if (focusColumn) {
+                focusColumn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    </script>
 </body>
 </html>
 

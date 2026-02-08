@@ -32,7 +32,7 @@ if (isset($_GET['refresh_list'])) {
         $placeholders = implode(',', array_fill(0, count($kiosk_ids), '?'));
         
         $query = "
-            SELECT k.id, k.hostname, k.last_seen, k.status, k.screenshot_url,
+            SELECT k.id, k.hostname, k.last_seen, k.status, k.screenshot_url, k.screenshot_timestamp,
                    GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as group_names,
                    k.version, k.screen_resolution, k.screen_status,
                    k.last_sync, k.loop_last_update
@@ -118,6 +118,7 @@ try {
     $response['sync_interval'] = (int)$kiosk['sync_interval'];
     $response['screenshot_enabled'] = (bool)$kiosk['screenshot_enabled'];
     $response['screenshot_url'] = $kiosk['screenshot_url'] ?? null;
+    $response['screenshot_timestamp'] = $kiosk['screenshot_timestamp'] ? date('Y-m-d H:i:s', strtotime($kiosk['screenshot_timestamp'])) : null;
     
     // Add group information
     $response['group_names'] = $kiosk['group_names'] ?? null;

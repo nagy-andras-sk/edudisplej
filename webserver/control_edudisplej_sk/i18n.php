@@ -1,0 +1,411 @@
+<?php
+/**
+ * Simple i18n helper
+ * Stores user language in session + users.lang
+ */
+require_once __DIR__ . '/dbkonfiguracia.php';
+
+define('EDUDISPLEJ_DEFAULT_LANG', 'sk');
+
+$EDUDISPLEJ_SUPPORTED_LANGS = ['hu', 'en', 'sk'];
+
+$EDUDISPLEJ_TRANSLATIONS = [
+    'hu' => [
+        'app.title' => 'EduDisplej Control',
+        'nav.kiosks' => 'Kijelzok',
+        'nav.groups' => 'Csoportok',
+        'nav.modules' => 'Modulok',
+        'nav.profile' => 'Profil',
+        'nav.admin' => 'Admin',
+        'nav.logout' => 'Kilepes',
+        'lang.label' => 'Nyelv',
+        'lang.hu' => 'Magyar',
+        'lang.en' => 'Angol',
+        'lang.sk' => 'Szlovak',
+        'login.title' => 'Bejelentkezes - EduDisplej Control',
+        'login.heading' => 'Bejelentkezes',
+        'login.subheading' => 'Bejelentkezes a vezeto pulthoz',
+        'login.email' => 'Email',
+        'login.email_placeholder' => 'Add meg az emailed',
+        'login.password' => 'Jelszo',
+        'login.password_placeholder' => 'Add meg a jelszot',
+        'login.otp' => 'Kettos azonosito kod',
+        'login.otp_placeholder' => 'Add meg a 6 jegyu kodot',
+        'login.otp_help' => 'Ird be az alkalmazas altal generalt 6 jegyu kodot',
+        'login.remember' => 'Emlkezz ram',
+        'login.submit' => 'Bejelentkezes',
+        'login.no_account' => 'Nincs fiokod?',
+        'login.create_account' => 'Uj fiok letrehozasa',
+        'login.registered' => 'Sikeres regisztracio! Jelentkezz be a fiokoddal.',
+        'login.info_title' => 'Bejelentkezesi informacio',
+        'login.info_admin' => 'Az adminok az Admin feluletre lesznek iranyitva',
+        'login.info_user' => 'A felhasznalok a dashboardot fogjak elerni',
+        'login.info_last_login' => 'Az utolso bejelentkezes rogzitve lesz',
+        'login.otp_required' => 'Ketfaktoros kod kotelezo',
+        'login.error.required' => 'Email es jelszo kotelezo',
+        'login.error.auth_state' => 'Hibas hitelesitesi allapot. Probald ujra.',
+        'login.error.session_expired' => 'A munkamenet lejart. Probald ujra.',
+        'login.error.invalid_otp' => 'Hibas ketfaktoros kod',
+        'login.error.failed' => 'A bejelentkezes sikertelen. Probald ujra kesobb.',
+        'login.invalid' => 'Hibas email vagy jelszo',
+        'dashboard.title' => 'Sajat kijelzok',
+        'dashboard.total' => 'Osszes',
+        'dashboard.online' => 'Online',
+        'dashboard.offline' => 'Offline',
+        'dashboard.company_displays' => 'A ceghez rendelt osszes kijelzo',
+        'dashboard.all_groups' => 'Minden csoport',
+        'dashboard.none_assigned' => 'Nincs kijelzo hozzarendelve a cegjehez',
+        'dashboard.no_company' => 'Nem rendelt ceg vagy nincs hozzaferese az adatokhoz.',
+        'dashboard.header.id' => 'ID',
+        'dashboard.header.hostname' => 'Hostname',
+        'dashboard.header.status' => 'Statusz',
+        'dashboard.header.group' => 'Csoport',
+        'dashboard.header.preview' => 'Elonezet',
+        'dashboard.header.location' => 'Hely',
+        'dashboard.header.last_sync' => 'Utolso szinkronizalas',
+        'dashboard.header.loop' => 'Loop',
+        'dashboard.status.online' => 'Online',
+        'dashboard.status.offline' => 'Offline',
+        'dashboard.screenshot.none' => 'Nincs kep',
+        'dashboard.screenshot.no_fresh' => 'Nincs friss kep',
+        'dashboard.screenshot.time' => 'Kep ideje',
+        'dashboard.screenshot.time_unknown' => 'Kep ideje: ismeretlen',
+        'dashboard.sync.never' => 'Soha',
+        'dashboard.loop.loading' => 'Betoltes...',
+        'dashboard.loop.none' => 'Nincs loop',
+        'dashboard.loop.error' => 'Loop hiba',
+        'dashboard.loop.no_data' => 'Nincs elerheto loop adat',
+        'dashboard.loop.info_time' => 'Loop info ideje',
+        'dashboard.loop.modal_title' => 'Loop Konfiguracio',
+        'dashboard.loop.module_order' => 'Modul sorrend',
+        'dashboard.loop.total_duration' => 'Teljes loop idotartam',
+        'dashboard.loop.seconds' => 'masodperc',
+        'dashboard.loop.minutes_short' => 'perc',
+        'dashboard.loop.seconds_short' => 'mp',
+        'dashboard.toggle.list_view' => 'Lista Nezet',
+        'dashboard.toggle.realtime_view' => 'Realtime Nezet',
+        'dashboard.assign_group_missing' => 'Valassz csoportot',
+        'dashboard.error' => 'Hiba tortent',
+        'dashboard.loop.preview' => 'Loop',
+        'dashboard.modal.kiosk_details' => 'Kijelzo Reszletek',
+        'dashboard.modal.close' => 'Bezaras',
+        'dashboard.loop.play' => 'Lejatszas',
+        'dashboard.loop.pause' => 'Szunet',
+        'dashboard.loop.stop' => 'Stop',
+        'dashboard.loop.module' => 'Modul',
+        'dashboard.loop.cycle' => 'Ciklus',
+        'dashboard.error.no_company_assigned' => 'Nincs ceg hozzarendelve. Vedd fel a kapcsolatot az adminnal.',
+        'dashboard.sync_interval_confirm' => 'Biztosan beallitod a szinkronizalasi idokozot {seconds} masodpercre?',
+        'dashboard.sync_interval_updated' => 'Szinkronizalasi idokoz frissitve',
+        'dashboard.sync_interval_label' => 'Szinkronizalasi idokoz: {seconds} masodperc',
+        'dashboard.screenshot.enabled' => 'Bekapcsolva',
+        'dashboard.screenshot.disabled' => 'Kikapcsolva',
+        'dashboard.screenshot.waiting' => 'Meg nincs kepernyokep feltoltve. Varj a kovetkezo szinkronizalasig.',
+        'dashboard.screenshot.off' => 'A kepernyokep funkcio ki van kapcsolva. Kapcsold be a kepernyokepek fogadasahoz.',
+        'dashboard.screenshot.toggled' => 'Kepernyokep funkcio: {state}',
+        'dashboard.screenshot.unavailable' => 'Screenshot nem elerheto',
+        'dashboard.screen.on' => 'Bekapcsolva',
+        'dashboard.screen.off' => 'Kikapcsolva'
+    ],
+    'en' => [
+        'app.title' => 'EduDisplej Control',
+        'nav.kiosks' => 'Displays',
+        'nav.groups' => 'Groups',
+        'nav.modules' => 'Modules',
+        'nav.profile' => 'Profile',
+        'nav.admin' => 'Admin',
+        'nav.logout' => 'Log out',
+        'lang.label' => 'Language',
+        'lang.hu' => 'Hungarian',
+        'lang.en' => 'English',
+        'lang.sk' => 'Slovak',
+        'login.title' => 'Login - EduDisplej Control',
+        'login.heading' => 'Sign in',
+        'login.subheading' => 'Access the control panel',
+        'login.email' => 'Email',
+        'login.email_placeholder' => 'Enter your email',
+        'login.password' => 'Password',
+        'login.password_placeholder' => 'Enter your password',
+        'login.otp' => 'Two-factor code',
+        'login.otp_placeholder' => 'Enter the 6-digit code',
+        'login.otp_help' => 'Enter the 6-digit code from your authenticator app',
+        'login.remember' => 'Remember me',
+        'login.submit' => 'Sign in',
+        'login.no_account' => "Don't have an account?",
+        'login.create_account' => 'Create new account',
+        'login.registered' => 'Registration successful! Please log in with your credentials.',
+        'login.info_title' => 'Login Information',
+        'login.info_admin' => 'Admins will be redirected to the Admin Portal',
+        'login.info_user' => 'Regular users will access the Dashboard',
+        'login.info_last_login' => 'Your last login will be recorded',
+        'login.otp_required' => 'Two-factor code required',
+        'login.error.required' => 'Email and password are required',
+        'login.error.auth_state' => 'Invalid authentication state. Please try again.',
+        'login.error.session_expired' => 'Authentication session expired. Please try again.',
+        'login.error.invalid_otp' => 'Invalid two-factor authentication code',
+        'login.error.failed' => 'Login failed. Please try again later.',
+        'login.invalid' => 'Invalid email or password',
+        'dashboard.title' => 'My displays',
+        'dashboard.total' => 'Total',
+        'dashboard.online' => 'Online',
+        'dashboard.offline' => 'Offline',
+        'dashboard.company_displays' => 'All displays assigned to your company',
+        'dashboard.all_groups' => 'All groups',
+        'dashboard.none_assigned' => 'No displays assigned to your company',
+        'dashboard.no_company' => 'No company assigned or no access to data.',
+        'dashboard.header.id' => 'ID',
+        'dashboard.header.hostname' => 'Hostname',
+        'dashboard.header.status' => 'Status',
+        'dashboard.header.group' => 'Group',
+        'dashboard.header.preview' => 'Preview',
+        'dashboard.header.location' => 'Location',
+        'dashboard.header.last_sync' => 'Last sync',
+        'dashboard.header.loop' => 'Loop',
+        'dashboard.status.online' => 'Online',
+        'dashboard.status.offline' => 'Offline',
+        'dashboard.screenshot.none' => 'No image',
+        'dashboard.screenshot.no_fresh' => 'No fresh image',
+        'dashboard.screenshot.time' => 'Image time',
+        'dashboard.screenshot.time_unknown' => 'Image time: unknown',
+        'dashboard.sync.never' => 'Never',
+        'dashboard.loop.loading' => 'Loading...',
+        'dashboard.loop.none' => 'No loop',
+        'dashboard.loop.error' => 'Loop error',
+        'dashboard.loop.no_data' => 'No loop data available',
+        'dashboard.loop.info_time' => 'Loop info time',
+        'dashboard.loop.modal_title' => 'Loop configuration',
+        'dashboard.loop.module_order' => 'Module order',
+        'dashboard.loop.total_duration' => 'Total loop duration',
+        'dashboard.loop.seconds' => 'seconds',
+        'dashboard.loop.minutes_short' => 'min',
+        'dashboard.loop.seconds_short' => 'sec',
+        'dashboard.toggle.list_view' => 'List view',
+        'dashboard.toggle.realtime_view' => 'Realtime view',
+        'dashboard.assign_group_missing' => 'Select a group',
+        'dashboard.error' => 'An error occurred',
+        'dashboard.loop.preview' => 'Loop',
+        'dashboard.modal.kiosk_details' => 'Display details',
+        'dashboard.modal.close' => 'Close',
+        'dashboard.loop.play' => 'Play',
+        'dashboard.loop.pause' => 'Pause',
+        'dashboard.loop.stop' => 'Stop',
+        'dashboard.loop.module' => 'Module',
+        'dashboard.loop.cycle' => 'Cycle',
+        'dashboard.error.no_company_assigned' => 'No company assigned. Please contact an administrator.',
+        'dashboard.sync_interval_confirm' => 'Set sync interval to {seconds} seconds?',
+        'dashboard.sync_interval_updated' => 'Sync interval updated',
+        'dashboard.sync_interval_label' => 'Sync interval: {seconds} seconds',
+        'dashboard.screenshot.enabled' => 'Enabled',
+        'dashboard.screenshot.disabled' => 'Disabled',
+        'dashboard.screenshot.waiting' => 'No screenshot yet. Wait for the next sync.',
+        'dashboard.screenshot.off' => 'Screenshot feature is disabled. Turn it on to receive screenshots.',
+        'dashboard.screenshot.toggled' => 'Screenshot feature: {state}',
+        'dashboard.screenshot.unavailable' => 'Screenshot not available',
+        'dashboard.screen.on' => 'On',
+        'dashboard.screen.off' => 'Off'
+    ],
+    'sk' => [
+        'app.title' => 'EduDisplej Control',
+        'nav.kiosks' => 'Displeje',
+        'nav.groups' => 'Skupiny',
+        'nav.modules' => 'Moduly',
+        'nav.profile' => 'Profil',
+        'nav.admin' => 'Admin',
+        'nav.logout' => 'Odhlasit sa',
+        'lang.label' => 'Jazyk',
+        'lang.hu' => 'Madarsky',
+        'lang.en' => 'Anglicky',
+        'lang.sk' => 'Slovensky',
+        'login.title' => 'Prihlasenie - EduDisplej Control',
+        'login.heading' => 'Prihlasenie',
+        'login.subheading' => 'Vstup do ovladacieho panela',
+        'login.email' => 'Email',
+        'login.email_placeholder' => 'Zadaj svoj email',
+        'login.password' => 'Heslo',
+        'login.password_placeholder' => 'Zadaj svoje heslo',
+        'login.otp' => 'Dvojfaktorovy kod',
+        'login.otp_placeholder' => 'Zadaj 6-miestny kod',
+        'login.otp_help' => 'Zadaj 6-miestny kod z autentifikatora',
+        'login.remember' => 'Zapamatat si ma',
+        'login.submit' => 'Prihlasit sa',
+        'login.no_account' => 'Nemas ucet?',
+        'login.create_account' => 'Vytvorit novy ucet',
+        'login.registered' => 'Registracia bola uspesna. Prihlaste sa do uctu.',
+        'login.info_title' => 'Informacie o prihlaseni',
+        'login.info_admin' => 'Admini budu presmerovani do Admin portalu',
+        'login.info_user' => 'Bezni pouzivatelia budu mat pristup k dashboardu',
+        'login.info_last_login' => 'Posledne prihlasenie sa zaznamena',
+        'login.otp_required' => 'Dvojfaktorovy kod je povinny',
+        'login.error.required' => 'Email a heslo su povinne',
+        'login.error.auth_state' => 'Neplatny stav overenia. Skus znova.',
+        'login.error.session_expired' => 'Relacia vyprsala. Skus znova.',
+        'login.error.invalid_otp' => 'Neplatny dvojfaktorovy kod',
+        'login.error.failed' => 'Prihlasenie zlyhalo. Skus znova neskor.',
+        'login.invalid' => 'Neplatny email alebo heslo',
+        'dashboard.title' => 'Moje displeje',
+        'dashboard.total' => 'Spolu',
+        'dashboard.online' => 'Online',
+        'dashboard.offline' => 'Offline',
+        'dashboard.company_displays' => 'Vsetky displeje priradene k spolocnosti',
+        'dashboard.all_groups' => 'Vsetky skupiny',
+        'dashboard.none_assigned' => 'Nie su priradene ziadne displeje',
+        'dashboard.no_company' => 'Nie je priradena spolocnost alebo nemate pristup k datam.',
+        'dashboard.header.id' => 'ID',
+        'dashboard.header.hostname' => 'Hostname',
+        'dashboard.header.status' => 'Status',
+        'dashboard.header.group' => 'Skupina',
+        'dashboard.header.preview' => 'Nahlad',
+        'dashboard.header.location' => 'Umiestnenie',
+        'dashboard.header.last_sync' => 'Posledna synchronizacia',
+        'dashboard.header.loop' => 'Loop',
+        'dashboard.status.online' => 'Online',
+        'dashboard.status.offline' => 'Offline',
+        'dashboard.screenshot.none' => 'Ziadny obrazok',
+        'dashboard.screenshot.no_fresh' => 'Nema novy obrazok',
+        'dashboard.screenshot.time' => 'Cas obrazka',
+        'dashboard.screenshot.time_unknown' => 'Cas obrazka: neznamy',
+        'dashboard.sync.never' => 'Nikdy',
+        'dashboard.loop.loading' => 'Nacitavanie...',
+        'dashboard.loop.none' => 'Ziadny loop',
+        'dashboard.loop.error' => 'Chyba loop',
+        'dashboard.loop.no_data' => 'Ziadne loop data',
+        'dashboard.loop.info_time' => 'Cas loop info',
+        'dashboard.loop.modal_title' => 'Loop konfiguracia',
+        'dashboard.loop.module_order' => 'Poradie modulov',
+        'dashboard.loop.total_duration' => 'Celkova dlzka loop',
+        'dashboard.loop.seconds' => 'sekundy',
+        'dashboard.loop.minutes_short' => 'min',
+        'dashboard.loop.seconds_short' => 'sek',
+        'dashboard.toggle.list_view' => 'Zoznam',
+        'dashboard.toggle.realtime_view' => 'Realtime',
+        'dashboard.assign_group_missing' => 'Vyberte skupinu',
+        'dashboard.error' => 'Nastala chyba',
+        'dashboard.loop.preview' => 'Loop',
+        'dashboard.modal.kiosk_details' => 'Detaily displeja',
+        'dashboard.modal.close' => 'Zatvorit',
+        'dashboard.loop.play' => 'Spustit',
+        'dashboard.loop.pause' => 'Pauza',
+        'dashboard.loop.stop' => 'Stop',
+        'dashboard.loop.module' => 'Modul',
+        'dashboard.loop.cycle' => 'Cyklus',
+        'dashboard.error.no_company_assigned' => 'Nie je priradena spolocnost. Kontaktuj admina.',
+        'dashboard.sync_interval_confirm' => 'Nastavit synchronizaciu na {seconds} sekund?',
+        'dashboard.sync_interval_updated' => 'Synchronizacny interval aktualizovany',
+        'dashboard.sync_interval_label' => 'Synchronizacny interval: {seconds} sekund',
+        'dashboard.screenshot.enabled' => 'Zapnute',
+        'dashboard.screenshot.disabled' => 'Vypnute',
+        'dashboard.screenshot.waiting' => 'Ziadny screenshot. Pockaj na dalsiu synchronizaciu.',
+        'dashboard.screenshot.off' => 'Funkcia screenshotov je vypnuta. Zapni ju pre prijatie screenshotov.',
+        'dashboard.screenshot.toggled' => 'Screenshot funkcia: {state}',
+        'dashboard.screenshot.unavailable' => 'Screenshot nie je dostupny',
+        'dashboard.screen.on' => 'Zapnute',
+        'dashboard.screen.off' => 'Vypnute'
+    ]
+];
+
+function edudisplej_normalize_lang($lang) {
+    global $EDUDISPLEJ_SUPPORTED_LANGS;
+    $lang = strtolower(trim((string)$lang));
+    if (!$lang) {
+        return null;
+    }
+    return in_array($lang, $EDUDISPLEJ_SUPPORTED_LANGS, true) ? $lang : null;
+}
+
+function edudisplej_get_user_lang($user_id) {
+    if (!$user_id) {
+        return null;
+    }
+    try {
+        $conn = getDbConnection();
+        $stmt = $conn->prepare("SELECT lang FROM users WHERE id = ? LIMIT 1");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        closeDbConnection($conn);
+        return edudisplej_normalize_lang($row['lang'] ?? '');
+    } catch (Exception $e) {
+        error_log('Lang fetch error: ' . $e->getMessage());
+        return null;
+    }
+}
+
+function edudisplej_set_user_lang($user_id, $lang) {
+    if (!$user_id || !$lang) {
+        return;
+    }
+    try {
+        $conn = getDbConnection();
+        $stmt = $conn->prepare("UPDATE users SET lang = ? WHERE id = ?");
+        $stmt->bind_param("si", $lang, $user_id);
+        $stmt->execute();
+        $stmt->close();
+        closeDbConnection($conn);
+    } catch (Exception $e) {
+        error_log('Lang update error: ' . $e->getMessage());
+    }
+}
+
+function edudisplej_set_lang($lang, $persist = true) {
+    $normalized = edudisplej_normalize_lang($lang);
+    if (!$normalized) {
+        return;
+    }
+    $_SESSION['lang'] = $normalized;
+    setcookie('edudisplej_lang', $normalized, time() + (365 * 24 * 60 * 60), '/', '', !empty($_SERVER['HTTPS']), true);
+    if ($persist && isset($_SESSION['user_id'])) {
+        edudisplej_set_user_lang((int)$_SESSION['user_id'], $normalized);
+    }
+}
+
+function edudisplej_get_lang() {
+    if (isset($_SESSION['lang'])) {
+        return $_SESSION['lang'];
+    }
+    $cookie_lang = edudisplej_normalize_lang($_COOKIE['edudisplej_lang'] ?? '');
+    if ($cookie_lang) {
+        $_SESSION['lang'] = $cookie_lang;
+        return $cookie_lang;
+    }
+    if (isset($_SESSION['user_id'])) {
+        $db_lang = edudisplej_get_user_lang((int)$_SESSION['user_id']);
+        if ($db_lang) {
+            $_SESSION['lang'] = $db_lang;
+            return $db_lang;
+        }
+    }
+    $_SESSION['lang'] = EDUDISPLEJ_DEFAULT_LANG;
+    return EDUDISPLEJ_DEFAULT_LANG;
+}
+
+function edudisplej_apply_language_preferences() {
+    $requested = edudisplej_normalize_lang($_GET['lang'] ?? '');
+    if ($requested) {
+        edudisplej_set_lang($requested, true);
+        return $requested;
+    }
+    return edudisplej_get_lang();
+}
+
+function t($key, $vars = []) {
+    global $EDUDISPLEJ_TRANSLATIONS;
+    $lang = edudisplej_get_lang();
+    $value = $EDUDISPLEJ_TRANSLATIONS[$lang][$key]
+        ?? $EDUDISPLEJ_TRANSLATIONS['en'][$key]
+        ?? $key;
+    if (!empty($vars)) {
+        foreach ($vars as $name => $val) {
+            $value = str_replace('{' . $name . '}', (string)$val, $value);
+        }
+    }
+    return $value;
+}
+
+function edudisplej_i18n_catalog($lang = null) {
+    global $EDUDISPLEJ_TRANSLATIONS;
+    $lang = $lang ? edudisplej_normalize_lang($lang) : edudisplej_get_lang();
+    return $EDUDISPLEJ_TRANSLATIONS[$lang] ?? $EDUDISPLEJ_TRANSLATIONS['en'];
+}
+?>

@@ -6,6 +6,9 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
+
+$current_lang = edudisplej_apply_language_preferences();
 
 $error = '';
 $success = '';
@@ -25,6 +28,11 @@ $kiosks = [];
 
 try {
     $conn = getDbConnection();
+
+    $priority_check = $conn->query("SHOW COLUMNS FROM kiosk_groups LIKE 'priority'");
+    if ($priority_check && $priority_check->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_groups ADD COLUMN priority INT(11) NOT NULL DEFAULT 0");
+    }
     
     // Get user and company info
     $stmt = $conn->prepare("SELECT u.*, c.name as company_name FROM users u LEFT JOIN companies c ON u.company_id = c.id WHERE u.id = ?");
@@ -45,7 +53,7 @@ try {
     
     // Non-admin users must have a company assigned
     if (!$is_admin && !$company_id) {
-        $error = 'You are not assigned to any company. Please contact an administrator.';
+        $error = t('dashboard.error.no_company_assigned');
     } else if ($company_id) {
         // Get company kiosks with group information
         // Calculate status dynamically: offline if last_seen is more than 30 minutes ago
@@ -74,11 +82,11 @@ try {
         $stmt->close();
         
         // Get all groups for filtering
-        $groups_query = "SELECT DISTINCT g.id, g.name FROM kiosk_groups g 
+        $groups_query = "SELECT DISTINCT g.id, g.name, g.priority FROM kiosk_groups g 
                         INNER JOIN kiosk_group_assignments kga ON g.id = kga.group_id
                         INNER JOIN kiosks k ON kga.kiosk_id = k.id
                         WHERE k.company_id = ?
-                        ORDER BY g.name";
+                ORDER BY g.priority DESC, g.name";
         $groups_stmt = $conn->prepare($groups_query);
         $groups_stmt->bind_param("i", $company_id);
         $groups_stmt->execute();
@@ -99,85 +107,206 @@ try {
 }
 
 $logout_url = '../login.php?logout=1';
+$no_image_text = rawurlencode(t('dashboard.screenshot.none'));
+$no_image_svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='78'%3E%3Crect fill='%23f5f5f5' width='140' height='78'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%23999' font-size='12' dy='.3em'%3E{$no_image_text}%3C/text%3E%3C/svg%3E";
 ?>
 <?php include '../admin/header.php'; ?>
+    <style>
+        .minimal-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            color: #333;
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
+        .summary-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #f7f9fb;
+            border: 1px solid #e1e5ea;
+            border-radius: 14px;
+            padding: 4px 10px;
+            cursor: pointer;
+        }
+
+        .summary-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-total { background: #607d8b; }
+        .dot-online { background: #2e7d32; }
+        .dot-offline { background: #c62828; }
+        .dot-groups { background: #1565c0; }
+
+        .minimal-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .minimal-table th,
+        .minimal-table td {
+            border-bottom: 1px solid #e6e9ed;
+            padding: 10px 8px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .minimal-table th {
+            background: #fafbfc;
+            font-weight: 600;
+            color: #444;
+        }
+
+        .compact-btn {
+            background: #1a3a52;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .compact-select {
+            padding: 6px 8px;
+            border: 1px solid #d9dde2;
+            border-radius: 4px;
+            font-size: 12px;
+            min-width: 160px;
+        }
+
+        .preview-card {
+            position: relative;
+            width: 140px;
+            height: 78px;
+            border: 1px solid #e1e5ea;
+            border-radius: 4px;
+            background: #f5f5f5;
+            overflow: hidden;
+        }
+
+        .preview-card .screenshot-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .preview-card .screenshot-loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(0,0,0,0.03),
+                rgba(0,0,0,0.03) 10px,
+                rgba(0,0,0,0.06) 10px,
+                rgba(0,0,0,0.06) 20px
+            );
+            color: #666;
+            font-size: 11px;
+            text-align: center;
+            padding: 6px;
+        }
+
+        .preview-card .screenshot-timestamp {
+            position: absolute;
+            bottom: 3px;
+            right: 4px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+
+        .loop-mini {
+            margin-top: 6px;
+            background: #f7f9fb;
+            border: 1px solid #e1e5ea;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #444;
+            padding: 4px 6px;
+            min-height: 26px;
+            display: flex;
+            align-items: center;
+        }
+
+        .loop-info {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #666;
+        }
+    </style>
         
         <?php if ($error): ?>
             <div class="error">⚠️ <?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
         
         <?php if ($company_id): ?>
-            <div class="stats">
-                <div class="stat-card">
-                    <h3>🖥️ Össz Kijelzők</h3>
-                    <div class="number"><?php echo count($kiosks); ?></div>
-                </div>
-                <div class="stat-card">
-                    <h3>🟢 Online</h3>
-                    <div class="number"><?php echo count(array_filter($kiosks, fn($k) => $k['status'] == 'online')); ?></div>
-                </div>
-                <div class="stat-card">
-                    <h3>🔴 Offline</h3>
-                    <div class="number"><?php echo count(array_filter($kiosks, fn($k) => $k['status'] == 'offline')); ?></div>
-                </div>
+            <div class="minimal-summary">
+                <span class="summary-item" data-filter="all" onclick="applyStatusFilter('all')"><span class="summary-dot dot-total"></span><?php echo htmlspecialchars(t('dashboard.total')); ?></span>
+                <span class="summary-item" data-filter="online" onclick="applyStatusFilter('online')"><span class="summary-dot dot-online"></span><?php echo htmlspecialchars(t('dashboard.online')); ?>: <?php echo count(array_filter($kiosks, fn($k) => $k['status'] == 'online')); ?></span>
+                <span class="summary-item" data-filter="offline" onclick="applyStatusFilter('offline')"><span class="summary-dot dot-offline"></span><?php echo htmlspecialchars(t('dashboard.offline')); ?>: <?php echo count(array_filter($kiosks, fn($k) => $k['status'] == 'offline')); ?></span>
             </div>
             
-            <h2>Saját Kijelzők</h2>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 15px; flex-wrap: wrap;">
-                <p style="color: #666; margin: 0;">A cégjéhez rendelt összes kijelző</p>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <!-- Group Filter -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; flex-wrap: wrap;">
+                <div style="color: #666; font-size: 13px;"><?php echo htmlspecialchars(t('dashboard.company_displays')); ?></div>
+                <div style="display: flex; gap: 8px; align-items: center;">
                     <?php if (!empty($groups)): ?>
-                    <select id="groupFilter" onchange="filterByGroup()" style="
-                        padding: 10px;
-                        border: 1px solid #ddd;
-                        border-radius: 5px;
-                        font-size: 14px;
-                        cursor: pointer;
-                    ">
-                        <option value="">Minden csoport</option>
+                    <select id="groupFilter" onchange="filterByGroup()" class="compact-select">
+                        <option value=""><?php echo htmlspecialchars(t('dashboard.all_groups')); ?></option>
                         <?php foreach ($groups as $group): ?>
                             <option value="<?php echo $group['id']; ?>"><?php echo htmlspecialchars($group['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                     <?php endif; ?>
-                    
-                    <button id="toggleViewBtn" onclick="toggleView()" style="
-                        background: #1a3a52;
-                        color: white;
-                        border: none;
-                        padding: 10px 20px;
-                        border-radius: 5px;
-                        cursor: pointer;
-                        font-size: 14px;
-                        transition: background 0.2s;
-                    " onmouseover="this.style.background='#0f2537'" onmouseout="this.style.background='#1a3a52'">
-                        📸 Realtime Nézet
-                    </button>
                 </div>
             </div>
             
             <?php if (empty($kiosks)): ?>
                 <div style="text-align: center; padding: 40px; color: #999; background: white; border-radius: 10px;">
-                    Nincs kijelző hozzárendelve a cégjéhez
+                    <?php echo htmlspecialchars(t('dashboard.none_assigned')); ?>
                 </div>
             <?php else: ?>
                 <!-- List View -->
                 <div id="listView" style="overflow-x: auto;">
-                    <table style="width: 100%;">
+                    <table class="minimal-table">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Hostname</th>
-                                <th>Státusz</th>
-                                <th>Hely</th>
-                                <th>Utolsó szinkronizálás</th>
-                                <th>Loop</th>
+                                <th><?php echo htmlspecialchars(t('dashboard.header.id')); ?></th>
+                                <th><?php echo htmlspecialchars(t('dashboard.header.hostname')); ?></th>
+                                <th><?php echo htmlspecialchars(t('dashboard.header.status')); ?></th>
+                                <th><?php echo htmlspecialchars(t('dashboard.header.group')); ?></th>
+                                <th><?php echo htmlspecialchars(t('dashboard.header.preview')); ?></th>
+                                <th><?php echo htmlspecialchars(t('dashboard.header.location')); ?></th>
+                                <th><?php echo htmlspecialchars(t('dashboard.header.last_sync')); ?></th>
+                                <th><?php echo htmlspecialchars(t('dashboard.header.loop')); ?></th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($kiosks as $kiosk): ?>
-                                <tr>
+                                <?php
+                                    $group_ids = array_filter(explode(',', $kiosk['group_ids'] ?? ''));
+                                    $selected_group_id = $group_ids[0] ?? '';
+                                ?>
+                                <tr data-status="<?php echo htmlspecialchars($kiosk['status']); ?>" data-group-ids="<?php echo htmlspecialchars($kiosk['group_ids'] ?? ''); ?>">
                                     <td><small><?php echo $kiosk['id']; ?></small></td>
                                     <td>
                                         <strong style="cursor: pointer; color: #1a3a52;" onclick="openKioskDetail(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>')">
@@ -186,135 +315,63 @@ $logout_url = '../login.php?logout=1';
                                     </td>
                                     <td>
                                         <span class="status-badge status-<?php echo $kiosk['status']; ?>">
-                                            <?php echo $kiosk['status'] == 'online' ? '🟢 Online' : '🔴 Offline'; ?>
+                                            <?php echo $kiosk['status'] == 'online' ? '🟢 ' . htmlspecialchars(t('dashboard.status.online')) : '🔴 ' . htmlspecialchars(t('dashboard.status.offline')); ?>
                                         </span>
+                                    </td>
+                                    <td>
+                                        <select class="compact-select" onchange="assignGroup(<?php echo $kiosk['id']; ?>, this.value)">
+                                            <option value="">-</option>
+                                            <?php foreach ($groups as $group): ?>
+                                                <option value="<?php echo $group['id']; ?>" <?php echo ((string)$group['id'] === (string)$selected_group_id) ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($group['name']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div class="preview-card" data-kiosk-id="<?php echo $kiosk['id']; ?>" data-screenshot-url="<?php echo htmlspecialchars($kiosk['screenshot_url'] ?? ''); ?>" data-screenshot-timestamp="<?php echo htmlspecialchars($kiosk['screenshot_timestamp'] ?? ''); ?>">
+                                            <img class="screenshot-img" src="<?php echo !empty($kiosk['screenshot_url']) ? '../' . $kiosk['screenshot_url'] : $no_image_svg; ?>" alt="Preview" />
+                                            <div class="screenshot-loader"><?php echo htmlspecialchars(t('dashboard.screenshot.no_fresh')); ?></div>
+                                            <div class="screenshot-timestamp"><span id="screenshot-time-<?php echo $kiosk['id']; ?>">-</span></div>
+                                        </div>
                                     </td>
                                     <td><?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?></td>
                                     <td><small id="sync-time-<?php echo $kiosk['id']; ?>" data-last-seen="<?php echo htmlspecialchars($kiosk['last_seen']); ?>"></small></td>
                                     <td>
-                                        <button onclick="viewKioskLoop(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A', ENT_QUOTES); ?>')" 
-                                                style="background: #1a3a52; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;">
-                                            🔄 Loop
+                                        <button class="compact-btn" onclick="viewKioskLoop(<?php echo $kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A', ENT_QUOTES); ?>', '<?php echo htmlspecialchars($kiosk['screen_resolution'] ?? '', ENT_QUOTES); ?>', '<?php echo htmlspecialchars($selected_group_id, ENT_QUOTES); ?>')">
+                                            <?php echo htmlspecialchars(t('dashboard.loop.preview')); ?>
                                         </button>
+                                        <div class="loop-mini" id="loop-preview-<?php echo $kiosk['id']; ?>"><?php echo htmlspecialchars(t('dashboard.loop.loading')); ?></div>
+                                        <div class="loop-info" id="loop-info-<?php echo $kiosk['id']; ?>" data-loop-last-update="<?php echo htmlspecialchars($kiosk['loop_last_update'] ?? ''); ?>"></div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-                
-                <!-- Realtime Screenshot View -->
-                <div id="realtimeView" style="display: none;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
-                        <?php foreach ($kiosks as $kiosk): ?>
-                            <div class="screenshot-card" 
-                                 data-kiosk-id="<?php echo $kiosk['id']; ?>"
-                                 data-group-ids="<?php echo htmlspecialchars($kiosk['group_ids'] ?? ''); ?>"
-                                 style="
-                                background: white;
-                                border-radius: 10px;
-                                padding: 15px;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                                transition: transform 0.2s;
-                            " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
-                                <div style="margin-bottom: 10px;">
-                                    <h3 style="margin: 0 0 5px 0; font-size: 16px; color: #1a3a52;">
-                                        <?php echo htmlspecialchars($kiosk['hostname'] ?? 'N/A'); ?>
-                                    </h3>
-                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                                        <span class="status-badge status-<?php echo $kiosk['status']; ?>">
-                                            <?php echo $kiosk['status'] == 'online' ? '🟢' : '🔴'; ?>
-                                        </span>
-                                        <?php if (!empty($kiosk['group_names'])): ?>
-                                            <span style="background: #e3f2fd; color: #1976d2; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600;">
-                                                📁 <?php echo htmlspecialchars($kiosk['group_names']); ?>
-                                            </span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <small style="color: #999; display: block;">
-                                        <?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?>
-                                    </small>
-                                    <!-- Tech Info -->
-                                    <div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 5px; font-size: 11px; color: #666;">
-                                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 5px; margin-bottom: 8px;">
-                                            <?php if (!empty($kiosk['screen_resolution'])): ?>
-                                                <span style="font-weight: 600;">🖥️ Felbontás:</span>
-                                                <span id="resolution-<?php echo $kiosk['id']; ?>"><?php echo htmlspecialchars($kiosk['screen_resolution']); ?></span>
-                                            <?php endif; ?>
-                                            <?php if (!empty($kiosk['screen_status'])): ?>
-                                                <span style="font-weight: 600;">💡 Képernyő:</span>
-                                                <span id="screen-status-<?php echo $kiosk['id']; ?>">
-                                                    <?php 
-                                                        $status = $kiosk['screen_status'];
-                                                        if ($status == 'on') echo '✅ Bekapcsolva';
-                                                        elseif ($status == 'off') echo '❌ Kikapcsolva';
-                                                        else echo '❓ ' . htmlspecialchars($status);
-                                                    ?>
-                                                </span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <!-- Sync timestamps -->
-                                        <div style="border-top: 1px solid #ddd; padding-top: 5px; display: grid; grid-template-columns: auto 1fr; gap: 5px;">
-                                            <span style="font-weight: 600;">⏱️ Szinkronizálás:</span>
-                                            <span id="last-sync-<?php echo $kiosk['id']; ?>" style="color: #666;">
-                                                <?php echo (!empty($kiosk['last_sync']) && $kiosk['last_sync'] !== 'NULL') ? date('Y-m-d H:i:s', strtotime($kiosk['last_sync'])) : '-'; ?>
-                                            </span>
-                                            <span style="font-weight: 600;">🔄 Loop verzió:</span>
-                                            <span id="loop-version-<?php echo $kiosk['id']; ?>" style="color: #666;">
-                                                <?php echo (!empty($kiosk['loop_last_update']) && $kiosk['loop_last_update'] !== 'NULL') ? date('Y-m-d H:i:s', strtotime($kiosk['loop_last_update'])) : '-'; ?>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="screenshot-container" style="
-                                    position: relative;
-                                    width: 100%;
-                                    padding-top: 56.25%; /* 16:9 aspect ratio */
-                                    background: #f5f5f5;
-                                    border-radius: 5px;
-                                    overflow: hidden;
-                                ">
-                                    <img class="screenshot-img" 
-                                         src="<?php echo !empty($kiosk['screenshot_url']) ? '../' . $kiosk['screenshot_url'] : 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\'%3E%3Crect fill=\'%23f5f5f5\' width=\'400\' height=\'300\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%23999\' font-size=\'18\' dy=\'.3em\'%3ENo screenshot%3C/text%3E%3C/svg%3E'; ?>" 
-                                         alt="Screenshot"
-                                         style="
-                                            position: absolute;
-                                            top: 0;
-                                            left: 0;
-                                            width: 100%;
-                                            height: 100%;
-                                            object-fit: contain;
-                                         "
-                                    />
-                                    <div class="screenshot-timestamp" style="
-                                        position: absolute;
-                                        bottom: 5px;
-                                        right: 5px;
-                                        background: rgba(0,0,0,0.7);
-                                        color: white;
-                                        padding: 3px 8px;
-                                        border-radius: 3px;
-                                        font-size: 11px;
-                                    ">
-                                        <span id="screenshot-time-<?php echo $kiosk['id']; ?>">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
-                        <span id="autoRefreshIndicator">Auto-refresh: <span id="refreshCountdown">15</span>s</span>
-                    </div>
-                </div>
             <?php endif; ?>
         <?php else: ?>
             <div style="text-align: center; padding: 40px; color: #999;">
-                <p>Nem rendelt cég vagy nincs hozzáférése az adatokhoz.</p>
+                <p><?php echo htmlspecialchars(t('dashboard.no_company')); ?></p>
             </div>
         <?php endif; ?>
     </div>
     
     <script>
+        const I18N = <?php echo json_encode(edudisplej_i18n_catalog($current_lang), JSON_UNESCAPED_UNICODE); ?>;
+        const CURRENT_LANG = '<?php echo htmlspecialchars($current_lang, ENT_QUOTES); ?>';
+        const LOCALE_MAP = { hu: 'hu-HU', en: 'en-US', sk: 'sk-SK' };
+        const CURRENT_LOCALE = LOCALE_MAP[CURRENT_LANG] || 'en-US';
+        const RELATIVE_TIME = new Intl.RelativeTimeFormat(CURRENT_LOCALE, { numeric: 'auto' });
+
+        function tjs(key, vars = {}) {
+            let value = I18N[key] || key;
+            Object.keys(vars).forEach(name => {
+                value = value.replace(`{${name}}`, String(vars[name]));
+            });
+            return value;
+        }
+
         // Store the initial load time
         let pageLoadTime = new Date();
         
@@ -323,7 +380,7 @@ $logout_url = '../login.php?logout=1';
             document.querySelectorAll('[id^="sync-time-"]').forEach(el => {
                 const lastSeen = el.getAttribute('data-last-seen');
                 if (!lastSeen || lastSeen === 'NULL' || lastSeen === '') {
-                    el.innerHTML = '<span style="color: #999;">Soha</span>';
+                    el.innerHTML = `<span style="color: #999;">${tjs('dashboard.sync.never')}</span>`;
                     return;
                 }
                 
@@ -345,14 +402,23 @@ $logout_url = '../login.php?logout=1';
                     timeStr = `${year}-${month}-${day} ${hours}:${minutes}`;
                     el.innerHTML = `<span style="color: #d32f2f; font-weight: bold;">${timeStr}</span>`;
                 } else {
-                    // Show relative time for recent syncs
                     if (diffMins > 0) {
-                        timeStr = `${diffMins} perc${diffSecs > 0 ? ` ${diffSecs}s` : ''} előtt`;
+                        el.innerHTML = RELATIVE_TIME.format(-diffMins, 'minute');
                     } else {
-                        timeStr = `${diffSecs}s előtt`;
+                        el.innerHTML = RELATIVE_TIME.format(-diffSecs, 'second');
                     }
-                    el.innerHTML = timeStr;
                 }
+            });
+        }
+
+        function updateLoopInfo() {
+            document.querySelectorAll('[id^="loop-info-"]').forEach(el => {
+                const loopLastUpdate = el.getAttribute('data-loop-last-update');
+                if (!loopLastUpdate || loopLastUpdate === 'NULL' || loopLastUpdate === '') {
+                    el.textContent = `${tjs('dashboard.loop.info_time')}: -`;
+                    return;
+                }
+                el.textContent = `${tjs('dashboard.loop.info_time')}: ${formatTimestamp(loopLastUpdate)}`;
             });
         }
         
@@ -371,9 +437,24 @@ $logout_url = '../login.php?logout=1';
                                 // Update the data attribute with fresh value from server
                                 el.setAttribute('data-last-seen', kiosk.last_seen);
                             }
+                            const loopInfoEl = document.getElementById('loop-info-' + kiosk.id);
+                            if (loopInfoEl && kiosk.loop_last_update) {
+                                loopInfoEl.setAttribute('data-loop-last-update', kiosk.loop_last_update);
+                            }
+                            const previewCard = document.querySelector(`.preview-card[data-kiosk-id="${kiosk.id}"]`);
+                            if (previewCard) {
+                                if (kiosk.screenshot_url) {
+                                    previewCard.setAttribute('data-screenshot-url', kiosk.screenshot_url);
+                                }
+                                if (kiosk.screenshot_timestamp) {
+                                    previewCard.setAttribute('data-screenshot-timestamp', kiosk.screenshot_timestamp);
+                                }
+                                renderScreenshotState(previewCard, kiosk.screenshot_url, kiosk.screenshot_timestamp);
+                            }
                         });
                         // Update the display after refreshing data
                         updateSyncTimes();
+                        updateLoopInfo();
                     }
                 })
                 .catch(err => {
@@ -381,18 +462,38 @@ $logout_url = '../login.php?logout=1';
                 });
             <?php endif; ?>
         }
+
+        function assignGroup(kioskId, groupId) {
+            if (!groupId) {
+                alert(`⚠️ ${tjs('dashboard.assign_group_missing')}`);
+                return;
+            }
+
+            fetch(`../api/assign_kiosk_group.php?kiosk_id=${kioskId}&group_id=${groupId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert('⚠️ ' + data.message);
+                    }
+                })
+                .catch(err => {
+                    alert(`⚠️ ${tjs('dashboard.error')}: ${err}`);
+                });
+        }
         
         // Initial display
         updateSyncTimes();
+        updateLoopInfo();
         
         // Refresh data from server every 30 seconds
         setInterval(refreshKioskData, 30000);
         
         // Update display every 5 seconds (shows time elapsed)
         setInterval(updateSyncTimes, 5000);
+        setInterval(updateLoopInfo, 15000);
         
         function updateSyncInterval(kioskId, newInterval) {
-            if (!confirm(`Biztosan beállítja a szinkronizálási időközt ${newInterval} másodpercre?`)) {
+            if (!confirm(tjs('dashboard.sync_interval_confirm', { seconds: newInterval }))) {
                 location.reload();
                 return;
             }
@@ -405,14 +506,14 @@ $logout_url = '../login.php?logout=1';
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('✅ Szinkronizálási időköz frissítve');
+                    alert(`✅ ${tjs('dashboard.sync_interval_updated')}`);
                 } else {
-                    alert('⚠️ Hiba: ' + data.message);
+                    alert(`⚠️ ${tjs('dashboard.error')}: ${data.message}`);
                     location.reload();
                 }
             })
             .catch(err => {
-                alert('⚠️ Hiba történt: ' + err);
+                alert(`⚠️ ${tjs('dashboard.error')}: ${err}`);
                 location.reload();
             });
         }
@@ -434,15 +535,15 @@ $logout_url = '../login.php?logout=1';
                     // Update the toggle label
                     const checkbox = document.getElementById('screenshot-toggle-' + kioskId);
                     const label = checkbox.parentElement.querySelector('span');
-                    label.textContent = enabled ? '✅ Bekapcsolva' : '⭕ Kikapcsolva';
+                    label.textContent = enabled ? `✅ ${tjs('dashboard.screenshot.enabled')}` : `⭕ ${tjs('dashboard.screenshot.disabled')}`;
                     label.style.color = enabled ? '#2e7d32' : '#999';
                     
                     // Update screenshot container
                     const container = document.getElementById('screenshot-container-' + kioskId);
                     if (enabled) {
-                        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Még nincs képernyőkép feltöltve. Várjon a következő szinkronizálásig.</p>';
+                        container.innerHTML = `<p style="text-align: center; color: #999; padding: 20px;">${tjs('dashboard.screenshot.waiting')}</p>`;
                     } else {
-                        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">A képernyőkép funkció ki van kapcsolva. Kapcsolja be a képernyőképek fogadásához.</p>';
+                        container.innerHTML = `<p style="text-align: center; color: #999; padding: 20px;">${tjs('dashboard.screenshot.off')}</p>`;
                     }
                     
                     // Update sync interval dropdown
@@ -451,14 +552,14 @@ $logout_url = '../login.php?logout=1';
                         selector.value = targetInterval;
                     }
                     
-                    alert(`✅ Képernyőkép funkció ${enabled ? 'bekapcsolva' : 'kikapcsolva'}\nSzinkronizálási időköz: ${targetInterval} másodperc`);
+                    alert(`✅ ${tjs('dashboard.screenshot.toggled', { state: enabled ? tjs('dashboard.screenshot.enabled') : tjs('dashboard.screenshot.disabled') })}\n${tjs('dashboard.sync_interval_label', { seconds: targetInterval })}`);
                 } else {
-                    alert('⚠️ Hiba: ' + data.message);
+                    alert(`⚠️ ${tjs('dashboard.error')}: ${data.message}`);
                     location.reload();
                 }
             })
             .catch(err => {
-                alert('⚠️ Hiba történt: ' + err);
+                alert(`⚠️ ${tjs('dashboard.error')}: ${err}`);
                 location.reload();
             });
         }
@@ -470,13 +571,13 @@ $logout_url = '../login.php?logout=1';
                 .then(data => {
                     if (data.success && data.screenshot_url) {
                         const container = document.getElementById('screenshot-container-' + kioskId);
-                        container.innerHTML = '<img src="../' + data.screenshot_url + '?t=' + Date.now() + '" alt="Screenshot" style="width: 100%; max-width: 600px; border: 2px solid #ddd; border-radius: 5px; display: block; margin: 0 auto;" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'block\';"><p style="display: none; text-align: center; color: #999; padding: 20px;">Screenshot nem elérhető</p>';
+                        container.innerHTML = '<img src="../' + data.screenshot_url + '?t=' + Date.now() + '" alt="Screenshot" style="width: 100%; max-width: 600px; border: 2px solid #ddd; border-radius: 5px; display: block; margin: 0 auto;" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'block\';"><p style="display: none; text-align: center; color: #999; padding: 20px;">' + tjs('dashboard.screenshot.unavailable') + '</p>';
                     } else {
-                        alert('⚠️ Nincs elérhető képernyőkép');
+                        alert(`⚠️ ${tjs('dashboard.screenshot.unavailable')}`);
                     }
                 })
                 .catch(err => {
-                    alert('⚠️ Hiba történt: ' + err);
+                    alert(`⚠️ ${tjs('dashboard.error')}: ${err}`);
                 });
         }
         
@@ -534,156 +635,45 @@ $logout_url = '../login.php?logout=1';
                     </div>
                     
                     <div id="kiosk-detail-content" style="color: #666;">
-                        <p style="text-align: center; padding: 40px;">Betöltés...</p>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            // Load kiosk details via AJAX
-            fetch(`../api/kiosk_details.php?id=${kioskId}`)
-                .then(response => response.json())
-                .then(data => {
-                    const content = document.getElementById('kiosk-detail-content');
-                    if (data.success) {
-                        content.innerHTML = `
-                            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-                                <h3 style="margin-top: 0;">ℹ️ Alapadatok</h3>
-                                <table style="width: 100%; font-size: 13px;">
-                                    <tr><td style="font-weight: bold; width: 30%;">MAC Cím:</td><td><code>${data.mac}</code></td></tr>
-                                    <tr><td style="font-weight: bold;">Státusz:</td><td>${data.status === 'online' ? '🟢 Online' : '🔴 Offline'}</td></tr>
-                                    <tr><td style="font-weight: bold;">Hely:</td><td>${data.location || '-'}</td></tr>
-                                    <tr><td style="font-weight: bold;">Utolsó szinkronizálás:</td><td>${data.last_seen || 'Soha'}</td></tr>
-                                    <tr>
-                                        <td style="font-weight: bold;">Szinkronizálás gyakorisága:</td>
-                                        <td>
-                                            <select id="sync-interval-selector-${kioskId}" onchange="updateSyncInterval(${kioskId}, this.value)" style="padding: 5px; border-radius: 3px; border: 1px solid #ccc;">
-                                                <option value="10" ${data.sync_interval === 10 ? 'selected' : ''}>10 másodperc</option>
-                                                <option value="15" ${data.sync_interval === 15 ? 'selected' : ''}>15 másodperc</option>
-                                                <option value="30" ${data.sync_interval === 30 ? 'selected' : ''}>30 másodperc</option>
-                                                <option value="60" ${data.sync_interval === 60 ? 'selected' : ''}>1 perc</option>
-                                                <option value="120" ${data.sync_interval === 120 ? 'selected' : ''}>2 perc (120s)</option>
-                                                <option value="300" ${data.sync_interval === 300 ? 'selected' : ''}>5 perc (300s)</option>
-                                                <option value="600" ${data.sync_interval === 600 ? 'selected' : ''}>10 perc (600s)</option>
-                                            </select>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-                            
-                            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <h3 style="margin: 0;">📸 Képernyőkép</h3>
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
-                                            <input type="checkbox" id="screenshot-toggle-${kioskId}" ${data.screenshot_enabled ? 'checked' : ''} 
-                                                onchange="toggleScreenshot(${kioskId}, this.checked)" 
-                                                style="margin-right: 5px; cursor: pointer;">
-                                            <span style="font-weight: bold; color: ${data.screenshot_enabled ? '#2e7d32' : '#999'};">
-                                                ${data.screenshot_enabled ? '✅ Bekapcsolva' : '⭕ Kikapcsolva'}
-                                            </span>
-                                        </label>
-                                        ${data.screenshot_enabled && data.screenshot_url ? 
-                                            '<button onclick="refreshScreenshot(' + kioskId + ')" style="background: #1a3a52; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;">🔄 Frissítés</button>' 
-                                            : ''}
-                                    </div>
-                                </div>
-                                <div id="screenshot-container-${kioskId}" style="margin-top: 10px;">
-                                    ${data.screenshot_enabled ? 
-                                        (data.screenshot_url ? 
-                                            '<img src="../' + data.screenshot_url + '?t=' + Date.now() + '" alt="Screenshot" style="width: 100%; max-width: 600px; border: 2px solid #ddd; border-radius: 5px; display: block; margin: 0 auto;" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'block\';"><p style="display: none; text-align: center; color: #999; padding: 20px;">Screenshot nem elérhető</p>' 
-                                            : '<p style="text-align: center; color: #999; padding: 20px;">Még nincs képernyőkép feltöltve. Várjon a következő szinkronizálásig.</p>'
-                                        ) 
-                                        : '<p style="text-align: center; color: #999; padding: 20px;">A képernyőkép funkció ki van kapcsolva. Kapcsolja be a képernyőképek fogadásához.</p>'
-                                    }
-                                </div>
-                            </div>
-                            
-                            ${data.hw_info ? `
-                            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-                                <h3 style="margin-top: 0;">🖥️ Hardware Adatok</h3>
-                                <table style="width: 100%; font-size: 13px;">
-                                    ${data.hw_info.cpu ? `<tr><td style="font-weight: bold;">CPU:</td><td>${data.hw_info.cpu}</td></tr>` : ''}
-                                    ${data.hw_info.ram ? `<tr><td style="font-weight: bold;">RAM:</td><td>${data.hw_info.ram}</td></tr>` : ''}
-                                    ${data.hw_info.disk ? `<tr><td style="font-weight: bold;">Tárhely:</td><td>${data.hw_info.disk}</td></tr>` : ''}
-                                    ${data.hw_info.uptime ? `<tr><td style="font-weight: bold;">Üzemidő:</td><td>${data.hw_info.uptime}</td></tr>` : ''}
-                                </table>
-                            </div>
-                            ` : ''}
-                            
-                            ${data.modules && data.modules.length > 0 ? `
-                            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
-                                <h3 style="margin-top: 0;">🎬 Modulok Loop Sorrendje</h3>
-                                <div id="modules-loop" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px;">
-                                    ${data.modules.map(m => `<div style="background: white; padding: 10px; border-radius: 3px; border-left: 4px solid #1a3a52; text-align: center; font-size: 12px;">${m}</div>`).join('')}
-                                </div>
-                            </div>
-                            ` : ''}
-                        `;
-                    } else {
-                        content.innerHTML = `<p style="color: #d32f2f;">Hiba: ${data.message}</p>`;
-                    }
-                })
-                .catch(err => {
-                    if (document.getElementById('kiosk-detail-content')) {
-                        document.getElementById('kiosk-detail-content').innerHTML = `<p style="color: #d32f2f;">Hiba: ${err}</p>`;
-                    }
-                });
-        }
-        
-        function viewKioskLoop(kioskId, hostname) {
-            // Get kiosk's group(s) first
-            fetch(`../api/get_kiosk_loop.php?kiosk_id=${kioskId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const loops = data.loops;
-                        let html = '';
-                        
-                        if (loops.length === 0) {
-                            html += '<p style="text-align: center; color: #999; padding: 20px;">Nincs beállított loop ehhez a kijelzőhöz</p>';
-                        } else {
-                            // Preview section with speed controls - simplified with larger player box
-                            html += `
-                            <div style="margin-bottom: 20px; background: #f8f9fa; border-radius: 8px; padding: 20px;">
-                                <h3 style="margin-top: 0; margin-bottom: 15px; text-align: center;">🎬 Előnézet Lejátszó</h3>
-                                
-                                <!-- Main player display -->
-                                <div id="preview-display" style="
-                                    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-                                    color: white;
-                                    padding: 60px 20px;
-                                    border-radius: 12px;
-                                    text-align: center;
-                                    font-size: 28px;
-                                    font-weight: bold;
-                                    min-height: 250px;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    flex-direction: column;
-                                    gap: 15px;
-                                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                                    margin-bottom: 15px;
-                                ">
-                                    <div>▶️ Automatikus lejátszás...</div>
-                                    <div style="font-size: 14px; opacity: 0.7; font-weight: normal;">Az előnézet automatikusan elindul</div>
-                                </div>
-                                
-                                <!-- Progress bar -->
-                                <div id="preview-progress" style="
-                                    margin-bottom: 15px;
-                                    padding: 10px;
+                        let currentStatusFilter = 'all';
+
+                        function filterByGroup() {
+                            applyFilters();
+                        }
+
+                        function applyStatusFilter(status) {
+                            if (currentStatusFilter === status) {
+                                currentStatusFilter = 'all';
+                            } else {
+                                currentStatusFilter = status;
+                            }
+                            applyFilters();
+                        }
+
+                        function applyFilters() {
+                            const selectedGroupId = (document.getElementById('groupFilter') || {}).value || '';
+                            const rows = document.querySelectorAll('#listView tbody tr');
+
+                            rows.forEach(row => {
+                                const rowStatus = row.getAttribute('data-status');
+                                const groupIds = (row.getAttribute('data-group-ids') || '').split(',').filter(id => id);
+
+                                const statusMatch = currentStatusFilter === 'all' || rowStatus === currentStatusFilter;
+                                const groupMatch = !selectedGroupId || groupIds.includes(selectedGroupId);
+
+                                row.style.display = (statusMatch && groupMatch) ? '' : 'none';
+                            });
+                        }
+                                    margin-bottom: 12px;
+                                    padding: 8px;
                                     background: white;
                                     border-radius: 8px;
-                                    font-size: 14px;
+                                    font-size: 13px;
                                     color: #666;
                                     text-align: center;
                                     font-weight: 500;
-                                ">Betöltés...</div>
-                                
-                                <!-- Control buttons - smaller, below the player -->
+                                ">${tjs('dashboard.loop.loading')}</div>
+
                                 <div style="display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap;">
                                     <button onclick="playLoopPreview(${kioskId}, 1)" style="
                                         background: #4caf50;
@@ -742,7 +732,7 @@ $logout_url = '../login.php?logout=1';
                             
                             // Loop configuration list
                             html += '<div style="max-height: 400px; overflow-y: auto;">';
-                            html += '<h3 style="margin-top: 0;">📋 Modul Sorrend</h3>';
+                            html += `<h3 style="margin-top: 0;">📋 ${tjs('dashboard.loop.module_order')}</h3>`;
                             html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
                             loops.forEach((loop, index) => {
                                 html += `<div class="loop-item-${index}" style="
@@ -774,7 +764,7 @@ $logout_url = '../login.php?logout=1';
                                         text-align: center;
                                     ">
                                         <div style="font-size: 18px; font-weight: bold;">${loop.duration_seconds}</div>
-                                        <div style="font-size: 11px; opacity: 0.9;">sec</div>
+                                        <div style="font-size: 11px; opacity: 0.9;">${tjs('dashboard.loop.seconds_short')}</div>
                                     </div>
                                 </div>`;
                             });
@@ -783,12 +773,12 @@ $logout_url = '../login.php?logout=1';
                             // Add total duration
                             const totalDuration = loops.reduce((sum, loop) => sum + parseInt(loop.duration_seconds), 0);
                             html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
-                                <strong>Teljes loop időtartam:</strong> ${totalDuration} másodperc (${Math.floor(totalDuration / 60)} perc ${totalDuration % 60} mp)
+                                <strong>${tjs('dashboard.loop.total_duration')}:</strong> ${totalDuration} ${tjs('dashboard.loop.seconds')} (${Math.floor(totalDuration / 60)} ${tjs('dashboard.loop.minutes_short')} ${totalDuration % 60} ${tjs('dashboard.loop.seconds_short')})
                             </div>`;
                             html += '</div>';
                         }
                         
-                        showModal('🔄 Loop Konfiguráció - ' + hostname, html);
+                        showModal(`🔄 ${tjs('dashboard.loop.modal_title')} - ${hostname}`, html);
                         
                         // Store loop data for preview
                         window.currentLoopData = loops;
@@ -804,7 +794,7 @@ $logout_url = '../login.php?logout=1';
                     }
                 })
                 .catch(error => {
-                    alert('⚠️ Hiba történt: ' + error);
+                    alert(`⚠️ ${tjs('dashboard.error')}: ${error}`);
                 });
         }
         
@@ -863,6 +853,16 @@ $logout_url = '../login.php?logout=1';
             
             document.body.appendChild(modal);
         }
+
+        function getAspectRatio(resolution) {
+            if (!resolution) return '16 / 9';
+            const parts = resolution.toLowerCase().split('x');
+            if (parts.length !== 2) return '16 / 9';
+            const w = parseFloat(parts[0]);
+            const h = parseFloat(parts[1]);
+            if (!w || !h) return '16 / 9';
+            return `${w} / ${h}`;
+        }
         
         // Toggle between list and realtime view
         let currentView = 'list';
@@ -877,13 +877,13 @@ $logout_url = '../login.php?logout=1';
             if (currentView === 'list') {
                 listView.style.display = 'none';
                 realtimeView.style.display = 'block';
-                toggleBtn.textContent = '📋 Lista Nézet';
+                toggleBtn.textContent = `📋 ${tjs('dashboard.toggle.list_view')}`;
                 currentView = 'realtime';
                 startRealtimeRefresh();
             } else {
                 listView.style.display = 'block';
                 realtimeView.style.display = 'none';
-                toggleBtn.textContent = '📸 Realtime Nézet';
+                toggleBtn.textContent = `📸 ${tjs('dashboard.toggle.realtime_view')}`;
                 currentView = 'list';
                 stopRealtimeRefresh();
             }
@@ -944,6 +944,65 @@ $logout_url = '../login.php?logout=1';
             });
         }
         
+        const FRESHNESS_WINDOW_MS = 3 * 60 * 1000;
+        
+        function parseTimestamp(ts) {
+            if (!ts || ts === 'NULL') return null;
+            const parsed = new Date(ts);
+            if (Number.isNaN(parsed.getTime())) return null;
+            return parsed;
+        }
+        
+        function formatTimestamp(ts) {
+            const parsed = parseTimestamp(ts);
+            if (!parsed) return '-';
+            return parsed.toLocaleString(CURRENT_LOCALE, {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        function isFreshScreenshot(ts) {
+            const parsed = parseTimestamp(ts);
+            if (!parsed) return false;
+            return (Date.now() - parsed.getTime()) <= FRESHNESS_WINDOW_MS;
+        }
+        
+        function renderScreenshotState(card, screenshotUrl, screenshotTimestamp) {
+            const img = card.querySelector('.screenshot-img');
+            const loader = card.querySelector('.screenshot-loader');
+            const timestampEl = card.querySelector('.screenshot-timestamp span');
+            const hasTimestamp = !!parseTimestamp(screenshotTimestamp);
+            
+            if (timestampEl) {
+                if (hasTimestamp) {
+                    timestampEl.textContent = `${tjs('dashboard.screenshot.time')}: ${formatTimestamp(screenshotTimestamp)}`;
+                } else if (screenshotUrl) {
+                    timestampEl.textContent = tjs('dashboard.screenshot.time_unknown');
+                } else {
+                    timestampEl.textContent = `${tjs('dashboard.screenshot.time')}: -`;
+                }
+            }
+            
+            const isFresh = isFreshScreenshot(screenshotTimestamp);
+            const hasImage = !!screenshotUrl;
+            
+            if ((isFresh && hasImage) || (hasImage && !hasTimestamp)) {
+                const newSrc = '../' + screenshotUrl + '?t=' + new Date().getTime();
+                if (img && img.src !== newSrc) {
+                    img.src = newSrc;
+                }
+                if (img) img.style.display = 'block';
+                if (loader) loader.style.display = 'none';
+            } else {
+                if (img) img.style.display = 'none';
+                if (loader) loader.style.display = 'flex';
+            }
+        }
+        
         function refreshScreenshots() {
             // Get all screenshot cards
             const cards = document.querySelectorAll('.screenshot-card');
@@ -956,21 +1015,10 @@ $logout_url = '../login.php?logout=1';
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            const img = card.querySelector('.screenshot-img');
-                            const timestampEl = document.getElementById(`screenshot-time-${kioskId}`);
-                            
-                            // Update screenshot if URL changed
-                            if (data.screenshot_url) {
-                                const newSrc = '../' + data.screenshot_url + '?t=' + new Date().getTime();
-                                if (img.src !== newSrc) {
-                                    img.src = newSrc;
-                                }
-                                
-                                // Update timestamp
-                                if (timestampEl) {
-                                    const now = new Date();
-                                    timestampEl.textContent = now.toLocaleTimeString('hu-HU');
-                                }
+                            const screenshotTimestamp = data.screenshot_timestamp || card.getAttribute('data-screenshot-timestamp');
+                            renderScreenshotState(card, data.screenshot_url, screenshotTimestamp);
+                            if (screenshotTimestamp) {
+                                card.setAttribute('data-screenshot-timestamp', screenshotTimestamp);
                             }
                             
                             // Update tech info
@@ -988,9 +1036,9 @@ $logout_url = '../login.php?logout=1';
                                 const statusEl = document.getElementById(`screen-status-${kioskId}`);
                                 if (statusEl) {
                                     let statusText = '';
-                                    if (data.screen_status == 'on') statusText = '✅ Bekapcsolva';
-                                    else if (data.screen_status == 'off') statusText = '❌ Kikapcsolva';
-                                    else statusText = '❓ ' + data.screen_status;
+                                    if (data.screen_status == 'on') statusText = `✅ ${tjs('dashboard.screen.on')}`;
+                                    else if (data.screen_status == 'off') statusText = `❌ ${tjs('dashboard.screen.off')}`;
+                                    else statusText = `❓ ${data.screen_status}`;
                                     statusEl.textContent = statusText;
                                 }
                             }
@@ -1000,7 +1048,7 @@ $logout_url = '../login.php?logout=1';
                                 const syncEl = document.getElementById(`last-sync-${kioskId}`);
                                 if (syncEl) {
                                     const syncTime = new Date(data.last_sync);
-                                    syncEl.textContent = syncTime.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+                                    syncEl.textContent = syncTime.toLocaleTimeString(CURRENT_LOCALE, { hour: '2-digit', minute: '2-digit' });
                                 }
                             }
                             
@@ -1008,7 +1056,12 @@ $logout_url = '../login.php?logout=1';
                                 const loopEl = document.getElementById(`loop-version-${kioskId}`);
                                 if (loopEl) {
                                     const loopTime = new Date(data.loop_last_update);
-                                    loopEl.textContent = loopTime.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+                                    loopEl.textContent = loopTime.toLocaleTimeString(CURRENT_LOCALE, { hour: '2-digit', minute: '2-digit' });
+                                }
+                                const loopInfoEl = document.getElementById(`loop-info-${kioskId}`);
+                                if (loopInfoEl) {
+                                    loopInfoEl.setAttribute('data-loop-last-update', data.loop_last_update);
+                                    updateLoopInfo();
                                 }
                             }
                         }
@@ -1017,6 +1070,47 @@ $logout_url = '../login.php?logout=1';
             });
         }
         
+        function initListPreviews() {
+            document.querySelectorAll('.preview-card').forEach(card => {
+                const screenshotUrl = card.getAttribute('data-screenshot-url');
+                const screenshotTimestamp = card.getAttribute('data-screenshot-timestamp');
+                renderScreenshotState(card, screenshotUrl, screenshotTimestamp);
+            });
+        }
+
+        function initLoopPreviews() {
+            const kiosks = [<?php echo implode(',', array_column($kiosks, 'id')); ?>];
+            kiosks.forEach(kioskId => {
+                const target = document.getElementById('loop-preview-' + kioskId);
+                if (!target) return;
+
+                fetch(`../api/get_kiosk_loop.php?kiosk_id=${kioskId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success || !Array.isArray(data.loops) || data.loops.length === 0) {
+                            target.textContent = tjs('dashboard.loop.none');
+                            return;
+                        }
+
+                        let index = 0;
+                        const loops = data.loops;
+
+                        const showNext = () => {
+                            const loop = loops[index];
+                            target.textContent = loop.module_name || tjs('dashboard.loop.module');
+                            index = (index + 1) % loops.length;
+                            const duration = Math.min(Math.max(parseInt(loop.duration_seconds || '3', 10), 2), 10) * 1000;
+                            setTimeout(showNext, duration);
+                        };
+
+                        showNext();
+                    })
+                    .catch(() => {
+                        target.textContent = tjs('dashboard.loop.error');
+                    });
+            });
+        }
+
         // Loop preview functions
         let previewInterval = null;
         let previewTimeout = null;
@@ -1025,7 +1119,7 @@ $logout_url = '../login.php?logout=1';
             stopLoopPreview(); // Stop any existing preview
             
             if (!window.currentLoopData || window.currentLoopData.length === 0) {
-                alert('Nincs elérhető loop adat');
+                alert(tjs('dashboard.loop.no_data'));
                 return;
             }
             
@@ -1147,6 +1241,10 @@ $logout_url = '../login.php?logout=1';
                 previewProgress.textContent = '';
             }
         }
+
+        initListPreviews();
+        initLoopPreviews();
+        applyFilters();
     </script>
 
 <?php include '../admin/footer.php'; ?>

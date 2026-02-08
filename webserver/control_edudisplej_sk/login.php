@@ -8,6 +8,9 @@
 session_start();
 require_once 'dbkonfiguracia.php';
 require_once 'logging.php';
+require_once 'i18n.php';
+
+$current_lang = edudisplej_apply_language_preferences();
 
 $error = '';
 $success = '';
@@ -38,13 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     $remember = isset($_POST['remember']) ? true : false;
     
     if (empty($email) || empty($password)) {
-        $error = 'Email and password are required';
+        $error = t('login.error.required');
     } else {
         try {
             $conn = getDbConnection();
             
             // Get user with OTP settings
-            $stmt = $conn->prepare("SELECT id, username, email, password, isadmin, company_id, otp_enabled, otp_secret, otp_verified FROM users WHERE email = ?");
+            $stmt = $conn->prepare("SELECT id, username, email, password, isadmin, company_id, otp_enabled, otp_secret, otp_verified, lang FROM users WHERE email = ?");
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -67,11 +70,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                             ]));
                             $_SESSION['otp_pending_token'] = $temp_token;
                             $_SESSION['otp_pending'] = true;
-                            $error = 'Two-factor authentication code required';
+                            $error = t('login.otp_required');
                         } else {
                             // Verify we have a pending token
                             if (!isset($_SESSION['otp_pending_token'])) {
-                                $error = 'Invalid authentication state. Please try again.';
+                                $error = t('login.error.auth_state');
                             } else {
                                 // Decrypt and verify pending token
                                 require_once 'security_config.php';
@@ -82,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                     $token_data['user_id'] != $user['id'] || 
                                     $token_data['email'] !== $email ||
                                     (time() - $token_data['timestamp']) > 300) {
-                                    $error = 'Authentication session expired. Please try again.';
+                                    $error = t('login.error.session_expired');
                                     unset($_SESSION['otp_pending_token']);
                                     unset($_SESSION['otp_pending']);
                                 } else {
@@ -97,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                         $_SESSION['username'] = $user['username'];
                                         $_SESSION['isadmin'] = (bool)$user['isadmin'];
                                         $_SESSION['company_id'] = $user['company_id'];
+                                        edudisplej_set_lang($user['lang'] ?? EDUDISPLEJ_DEFAULT_LANG, false);
                                 
                                         // Remember me functionality (optional)
                                         if ($remember) {
@@ -121,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                         }
                                         exit();
                                     } else {
-                                        $error = 'Invalid two-factor authentication code';
+                                        $error = t('login.error.invalid_otp');
                                         $log_username = $user['username'] ?: ($user['email'] ?? $email);
                                         log_security_event('failed_otp', $user['id'], $log_username, get_client_ip(), get_user_agent(), ['reason' => 'invalid_otp_code']);
                                     }
@@ -134,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         $_SESSION['username'] = $user['username'];
                         $_SESSION['isadmin'] = (bool)$user['isadmin'];
                         $_SESSION['company_id'] = $user['company_id'];
+                        edudisplej_set_lang($user['lang'] ?? EDUDISPLEJ_DEFAULT_LANG, false);
                         
                         // Remember me functionality (optional)
                         if ($remember) {
@@ -159,13 +164,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         exit();
                     }
                 } else {
-                    $error = 'Invalid email or password';
+                    $error = t('login.invalid');
                     // Log failed login attempt
                     $log_username = $user['username'] ?: ($user['email'] ?? $email);
                     log_security_event('failed_login', null, $log_username, get_client_ip(), get_user_agent(), ['reason' => 'invalid_password']);
                 }
             } else {
-                $error = 'Invalid email or password';
+                $error = t('login.invalid');
                 // Log failed login attempt
                 log_security_event('failed_login', null, $email, get_client_ip(), get_user_agent(), ['reason' => 'user_not_found']);
             }
@@ -173,18 +178,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             $stmt->close();
             closeDbConnection($conn);
         } catch (Exception $e) {
-            $error = 'Login failed. Please try again later.';
+            $error = t('login.error.failed');
             error_log('Login error: ' . $e->getMessage());
         }
     }
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?php echo htmlspecialchars($current_lang); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - EduDisplej Control</title>
+    <title><?php echo htmlspecialchars(t('login.title')); ?></title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style>
         * {
@@ -206,6 +211,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         .login-container {
             background: white;
             padding: 50px 40px;
+                    .lang-selector {
+                        display: flex;
+                        justify-content: flex-end;
+                        margin-bottom: 20px;
+                        font-size: 12px;
+                    }
+
+                    .lang-selector select {
+                        padding: 6px 8px;
+                        border: 1px solid #d9dde2;
+                        border-radius: 4px;
+                        font-size: 12px;
+                    }
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             max-width: 450px;
@@ -235,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             margin-bottom: 10px;
         }
         
-        .login-header p {
+        .login-header h1 {
             color: #666;
             font-size: 14px;
         }
@@ -373,10 +391,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 </head>
 <body>
     <div class="login-container">
+        <div class="lang-selector">
+            <label for="langSelect" style="margin-right: 8px;"><?php echo htmlspecialchars(t('lang.label')); ?></label>
+            <select id="langSelect" onchange="changeLanguage(this.value)">
+                <option value="hu" <?php echo $current_lang === 'hu' ? 'selected' : ''; ?>><?php echo htmlspecialchars(t('lang.hu')); ?></option>
+                <option value="en" <?php echo $current_lang === 'en' ? 'selected' : ''; ?>><?php echo htmlspecialchars(t('lang.en')); ?></option>
+                <option value="sk" <?php echo $current_lang === 'sk' ? 'selected' : ''; ?>><?php echo htmlspecialchars(t('lang.sk')); ?></option>
+            </select>
+        </div>
         <div class="login-header">
             <div class="logo">🖥️</div>
-            <h1>EduDisplej Control</h1>
-            <p>Central Login Portal</p>
+            <h1><?php echo htmlspecialchars(t('app.title')); ?></h1>
+            <p><?php echo htmlspecialchars(t('login.subheading')); ?></p>
         </div>
         
         <?php if ($error): ?>
@@ -387,18 +413,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         
         <?php if (isset($_GET['registered'])): ?>
             <div class="success">
-                ✓ Registration successful! Please log in with your credentials.
+                ✓ <?php echo htmlspecialchars(t('login.registered')); ?>
             </div>
         <?php endif; ?>
         
         <form method="POST" action="" autocomplete="off">
             <div class="form-group">
-                <label for="email">Email</label>
+                <label for="email"><?php echo htmlspecialchars(t('login.email')); ?></label>
                 <input 
                     type="email" 
                     id="email" 
                     name="email" 
-                    placeholder="Enter your email"
+                    placeholder="<?php echo htmlspecialchars(t('login.email_placeholder')); ?>"
                     required 
                     autofocus
                     autocomplete="email"
@@ -406,12 +432,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             </div>
             
             <div class="form-group">
-                <label for="password">Password</label>
+                <label for="password"><?php echo htmlspecialchars(t('login.password')); ?></label>
                 <input 
                     type="password" 
                     id="password" 
                     name="password" 
-                    placeholder="Enter your password"
+                    placeholder="<?php echo htmlspecialchars(t('login.password_placeholder')); ?>"
                     required
                     autocomplete="current-password"
                 >
@@ -419,12 +445,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             
             <?php if (isset($_SESSION['otp_pending']) && $_SESSION['otp_pending']): ?>
             <div class="form-group" style="background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-                <label for="otp_code">Two-Factor Authentication Code</label>
+                <label for="otp_code"><?php echo htmlspecialchars(t('login.otp')); ?></label>
                 <input 
                     type="text" 
                     id="otp_code" 
                     name="otp_code" 
-                    placeholder="Enter 6-digit code"
+                    placeholder="<?php echo htmlspecialchars(t('login.otp_placeholder')); ?>"
                     pattern="\d{6}"
                     maxlength="6"
                     required
@@ -432,31 +458,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                     style="text-align: center; letter-spacing: 5px; font-size: 18px;"
                 >
                 <p style="font-size: 12px; color: #856404; margin-top: 8px;">
-                    Enter the 6-digit code from your authenticator app
+                    <?php echo htmlspecialchars(t('login.otp_help')); ?>
                 </p>
             </div>
             <?php endif; ?>
             
             <div class="form-group checkbox">
                 <input type="checkbox" id="remember" name="remember">
-                <label for="remember">Remember me</label>
+                <label for="remember"><?php echo htmlspecialchars(t('login.remember')); ?></label>
             </div>
             
-            <button type="submit" name="login" class="btn-submit">Sign In</button>
+            <button type="submit" name="login" class="btn-submit"><?php echo htmlspecialchars(t('login.submit')); ?></button>
         </form>
         
         <div class="form-footer">
-            <p>Don't have an account?</p>
-            <a href="userregistration.php">Create new account</a>
+            <p><?php echo htmlspecialchars(t('login.no_account')); ?></p>
+            <a href="userregistration.php"><?php echo htmlspecialchars(t('login.create_account')); ?></a>
         </div>
         
         <div class="info-box">
-            <strong>Login Information:</strong><br>
-            • Admins will be redirected to the Admin Portal<br>
-            • Regular users will access the Dashboard<br>
-            • Your last login will be recorded
+            <strong><?php echo htmlspecialchars(t('login.info_title')); ?></strong><br>
+            • <?php echo htmlspecialchars(t('login.info_admin')); ?><br>
+            • <?php echo htmlspecialchars(t('login.info_user')); ?><br>
+            • <?php echo htmlspecialchars(t('login.info_last_login')); ?>
         </div>
     </div>
+    <script>
+        function changeLanguage(lang) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('lang', lang);
+            window.location.href = url.toString();
+        }
+    </script>
 </body>
 </html>
 

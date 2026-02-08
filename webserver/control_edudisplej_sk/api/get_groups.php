@@ -27,8 +27,18 @@ if (!$company_id) {
 
 try {
     $conn = getDbConnection();
+
+    $priority_check = $conn->query("SHOW COLUMNS FROM kiosk_groups LIKE 'priority'");
+    if ($priority_check && $priority_check->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_groups ADD COLUMN priority INT(11) NOT NULL DEFAULT 0");
+    }
+
+    $default_check = $conn->query("SHOW COLUMNS FROM kiosk_groups LIKE 'is_default'");
+    if ($default_check && $default_check->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_groups ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0");
+    }
     
-    $stmt = $conn->prepare("SELECT id, name FROM kiosk_groups WHERE company_id = ? ORDER BY name");
+    $stmt = $conn->prepare("SELECT id, name, priority, is_default FROM kiosk_groups WHERE company_id = ? ORDER BY priority DESC, name");
     $stmt->bind_param("i", $company_id);
     $stmt->execute();
     $result = $stmt->get_result();

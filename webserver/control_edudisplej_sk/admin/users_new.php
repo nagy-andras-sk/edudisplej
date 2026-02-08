@@ -479,7 +479,7 @@ try {
 <body>
     <div class="header">
         <h1>👥 User Management</h1>
-        <a href="dashboard_new.php" class="header-btn">← Back to Dashboard</a>
+        <a href="dashboard.php" class="header-btn">← Back to Dashboard</a>
     </div>
     
     <div class="container">

@@ -13,6 +13,17 @@ $api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => ''];
 
+function parse_unix_timestamp($value) {
+    if (!$value) {
+        return null;
+    }
+    if (is_numeric($value)) {
+        return (int)$value;
+    }
+    $ts = strtotime($value);
+    return $ts ? $ts : null;
+}
+
 try {
     // Get request data
     $data = json_decode(file_get_contents('php://input'), true);
@@ -44,8 +55,9 @@ try {
     // Get kiosk data with company information
     $stmt = $conn->prepare("
         SELECT k.id, k.device_id, k.sync_interval, k.screenshot_requested, 
-               COALESCE(k.screenshot_enabled, 0) as screenshot_enabled,
-               k.company_id, c.name as company_name
+             COALESCE(k.screenshot_enabled, 0) as screenshot_enabled,
+             k.company_id, c.name as company_name,
+             k.loop_last_update
         FROM kiosks k
         LEFT JOIN companies c ON k.company_id = c.id
         WHERE k.mac = ?
@@ -93,7 +105,20 @@ try {
         // Check if configuration has been updated on server side
         $need_update = false;
         $update_reason = '';
-        
+
+        $stored_last_update = $kiosk['loop_last_update'] ?? null;
+        $stored_ts = parse_unix_timestamp($stored_last_update);
+        $client_ts = parse_unix_timestamp($client_last_update);
+
+        if ($client_ts && (!$stored_ts || $client_ts > $stored_ts)) {
+            $stored_ts = $client_ts;
+            $stored_last_update = date('Y-m-d H:i:s', $client_ts);
+            $update_loop_stmt = $conn->prepare("UPDATE kiosks SET loop_last_update = ? WHERE id = ?");
+            $update_loop_stmt->bind_param("si", $stored_last_update, $kiosk['id']);
+            $update_loop_stmt->execute();
+            $update_loop_stmt->close();
+        }
+
         // Check if kiosk belongs to any group
         $group_stmt = $conn->prepare("SELECT group_id FROM kiosk_group_assignments WHERE kiosk_id = ? LIMIT 1");
         $group_stmt->bind_param("i", $kiosk['id']);
@@ -101,40 +126,39 @@ try {
         $group_result = $group_stmt->get_result();
         $group_row = $group_result->fetch_assoc();
         $group_stmt->close();
-        
+
+        $server_ts = null;
         if ($group_row) {
-            // Get latest update time from kiosk_group_modules
-            // Try with updated_at first, fall back to checking if records exist
-            $update_stmt = $conn->prepare("SELECT MAX(updated_at) as last_server_update, COUNT(*) as config_count FROM kiosk_group_modules WHERE group_id = ?");
+            $update_stmt = $conn->prepare("SELECT MAX(updated_at) as last_server_update, MAX(created_at) as created_at, COUNT(*) as config_count FROM kiosk_group_modules WHERE group_id = ? AND is_active = 1");
             $update_stmt->bind_param("i", $group_row['group_id']);
             $update_stmt->execute();
             $update_result = $update_stmt->get_result();
             $update_row = $update_result->fetch_assoc();
             $update_stmt->close();
-            
+
             if ($update_row && $update_row['config_count'] > 0) {
-                // If updated_at is available, use it for comparison
-                if ($update_row['last_server_update']) {
-                    $server_timestamp = strtotime($update_row['last_server_update']);
-                    
-                    // Compare with client's last_update timestamp if provided
-                    if ($client_last_update) {
-                        $client_timestamp = is_numeric($client_last_update) ? $client_last_update : strtotime($client_last_update);
-                        
-                        if ($server_timestamp > $client_timestamp) {
-                            $need_update = true;
-                            $update_reason = 'Group configuration updated';
-                        }
-                    } else {
-                        // No client timestamp provided, suggest update
-                        $need_update = true;
-                        $update_reason = 'No client timestamp provided';
-                    }
-                } else if (!$client_last_update) {
-                    // updated_at column doesn't exist yet, but config exists and client has no timestamp
-                    $need_update = true;
-                    $update_reason = 'Initial configuration sync required';
-                }
+                $server_ts = parse_unix_timestamp($update_row['last_server_update'] ?? $update_row['created_at']);
+            }
+        } else {
+            $update_stmt = $conn->prepare("SELECT MAX(updated_at) as last_server_update, MAX(created_at) as created_at, COUNT(*) as config_count FROM kiosk_modules WHERE kiosk_id = ? AND is_active = 1");
+            $update_stmt->bind_param("i", $kiosk['id']);
+            $update_stmt->execute();
+            $update_result = $update_stmt->get_result();
+            $update_row = $update_result->fetch_assoc();
+            $update_stmt->close();
+
+            if ($update_row && $update_row['config_count'] > 0) {
+                $server_ts = parse_unix_timestamp($update_row['last_server_update'] ?? $update_row['created_at']);
+            }
+        }
+
+        if ($server_ts) {
+            if (!$stored_ts) {
+                $need_update = true;
+                $update_reason = 'No local loop timestamp';
+            } elseif ($server_ts > $stored_ts) {
+                $need_update = true;
+                $update_reason = 'Server loop updated';
             }
         }
         
