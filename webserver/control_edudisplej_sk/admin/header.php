@@ -15,155 +15,6 @@ $current_lang = edudisplej_apply_language_preferences();
     <title><?php echo htmlspecialchars(t('app.title')); ?></title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="stylesheet" href="<?php echo strpos($_SERVER['PHP_SELF'], 'admin') !== false ? 'style.css' : '../admin/style.css'; ?>">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-        }
-        
-        /* HEADER - Simple navbar */
-        .header {
-            background: #0a1929;
-            color: white;
-            padding: 12px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-        
-        .header h1 {
-            font-size: 24px;
-            font-weight: 700;
-            margin: 0;
-            letter-spacing: 1px;
-        }
-        
-        .header-nav {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .header-user {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            font-size: 13px;
-            color: rgba(255,255,255,0.8);
-        }
-        
-        .header-user strong {
-            color: white;
-        }
-        
-        .header-links {
-            display: flex;
-            gap: 10px;
-        }
-
-        .lang-selector {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            color: rgba(255,255,255,0.8);
-        }
-
-        .lang-selector select {
-            padding: 4px 6px;
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 4px;
-            background: rgba(255,255,255,0.15);
-            color: #fff;
-            font-size: 12px;
-        }
-        
-        .header-link {
-            padding: 6px 12px;
-            background: rgba(255,255,255,0.15);
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-            transition: all 0.2s;
-            border: none;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .header-link:hover {
-            background: rgba(255,255,255,0.25);
-        }
-        
-        .header-link.logout {
-            background: rgba(239, 83, 80, 0.2);
-        }
-        
-        .header-link.logout:hover {
-            background: #ef5350;
-        }
-        
-        .container {
-            padding: 25px 30px;
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-        
-        /* TABLE STYLES */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            overflow: hidden;
-        }
-        
-        table thead {
-            background: #f9f9f9;
-            border-bottom: 2px solid #ddd;
-        }
-        
-        table thead th {
-            padding: 12px 15px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 13px;
-            color: #333;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        table tbody tr {
-            border-bottom: 1px solid #eee;
-            transition: background 0.2s;
-        }
-        
-        table tbody tr:hover {
-            background: #f9f9f9;
-        }
-        
-        table tbody td {
-            padding: 12px 15px;
-            font-size: 13px;
-            color: #555;
-        }
-        
-        table tbody tr:last-child {
-            border-bottom: none;
-        }
-    </style>
 </head>
 <body>
     <!-- COMPACT HEADER -->
@@ -208,6 +59,17 @@ $current_lang = edudisplej_apply_language_preferences();
             </div>
         </div>
     </div>
+    <?php if ($is_admin_user): ?>
+        <div class="admin-nav">
+            <a href="dashboard.php">Dashboard</a>
+            <a href="companies.php">Cégek</a>
+            <a href="users.php">Felhasználók</a>
+            <a href="kiosk_health.php">Kiosk Health</a>
+            <a href="module_licenses.php">Licenszek</a>
+            <a href="api_logs.php">API Logok</a>
+            <a href="security_logs.php">Security Logok</a>
+        </div>
+    <?php endif; ?>
     <script>
         function changeLanguage(lang) {
             const url = new URL(window.location.href);

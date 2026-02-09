@@ -1,35 +1,31 @@
 <?php
 /**
- * Kiosk Details and Screenshot Viewer
- * EduDisplej Control Panel
+ * Kiosk Details - Minimal
  */
 
 session_start();
 require_once '../dbkonfiguracia.php';
 
-// Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: index.php');
     exit();
 }
 
-$kiosk_id = intval($_GET['id'] ?? 0);
+$kiosk_id = (int)($_GET['id'] ?? 0);
 $kiosk = null;
 $logs = [];
 
 if ($kiosk_id > 0) {
     try {
         $conn = getDbConnection();
-        
-        // Get kiosk details
+
         $stmt = $conn->prepare("SELECT k.*, c.name as company_name FROM kiosks k LEFT JOIN companies c ON k.company_id = c.id WHERE k.id = ?");
         $stmt->bind_param("i", $kiosk_id);
         $stmt->execute();
         $result = $stmt->get_result();
         $kiosk = $result->fetch_assoc();
         $stmt->close();
-        
-        // Get sync logs
+
         if ($kiosk) {
             $stmt = $conn->prepare("SELECT * FROM sync_logs WHERE kiosk_id = ? ORDER BY timestamp DESC LIMIT 20");
             $stmt->bind_param("i", $kiosk_id);
@@ -40,7 +36,7 @@ if ($kiosk_id > 0) {
             }
             $stmt->close();
         }
-        
+
         closeDbConnection($conn);
     } catch (Exception $e) {
         error_log($e->getMessage());
@@ -48,166 +44,87 @@ if ($kiosk_id > 0) {
 }
 
 if (!$kiosk) {
-    header('Location: index.php');
+    header('Location: dashboard.php');
     exit();
 }
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kiosk Details - <?php echo htmlspecialchars($kiosk['hostname'] ?? 'Kiosk #' . $kiosk['id']); ?></title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        .card {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        
-        .card h2 {
-            margin-bottom: 20px;
-            color: #333;
-        }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: 200px 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .info-label {
-            font-weight: 600;
-            color: #666;
-        }
-        
-        .info-value {
-            color: #333;
-        }
-        
-        .screenshot-container {
-            text-align: center;
-            padding: 20px;
-            background: #f9f9f9;
-            border-radius: 5px;
-        }
-        
-        .screenshot-container img {
-            max-width: 100%;
-            height: auto;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .no-screenshot {
-            color: #999;
-            font-style: italic;
-            padding: 40px;
-        }
-        
-        code {
-            background: #f4f4f4;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-        }
-    </style>
-</head>
-<body>
-    <div class="navbar">
-        <h1>🖥️ Kiosk Details</h1>
-        <a href="index.php">← Back to Dashboard</a>
-    </div>
-    
-    <div class="container">
-        <div class="card">
-            <h2><?php echo htmlspecialchars($kiosk['hostname'] ?? 'Kiosk #' . $kiosk['id']); ?></h2>
-            
-            <div class="info-grid">
-                <div class="info-label">Status:</div>
-                <div class="info-value">
-                    <span class="status-badge status-<?php echo $kiosk['status']; ?>">
-                        <?php echo ucfirst($kiosk['status']); ?>
-                    </span>
-                </div>
-                
-                <div class="info-label">Device ID:</div>
-                <div class="info-value"><code><?php echo htmlspecialchars($kiosk['device_id'] ?? 'Not assigned'); ?></code></div>
-                
-                <div class="info-label">MAC Address:</div>
-                <div class="info-value"><code><?php echo htmlspecialchars($kiosk['mac']); ?></code></div>
-                
-                <div class="info-label">Public IP:</div>
-                <div class="info-value"><?php echo htmlspecialchars($kiosk['public_ip'] ?? 'Unknown'); ?></div>
-                
-                <div class="info-label">Company:</div>
-                <div class="info-value"><?php echo htmlspecialchars($kiosk['company_name'] ?? 'Unassigned'); ?></div>
-                
-                <div class="info-label">Location:</div>
-                <div class="info-value"><?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?></div>
-                
-                <div class="info-label">Installed:</div>
-                <div class="info-value"><?php echo date('Y-m-d H:i', strtotime($kiosk['installed'])); ?></div>
-                
-                <div class="info-label">Last Seen:</div>
-                <div class="info-value"><?php echo $kiosk['last_seen'] ? date('Y-m-d H:i', strtotime($kiosk['last_seen'])) : 'Never'; ?></div>
-                
-                <div class="info-label">Sync Interval:</div>
-                <div class="info-value"><?php echo $kiosk['sync_interval']; ?> seconds</div>
-                
-                <div class="info-label">Comment:</div>
-                <div class="info-value"><?php echo htmlspecialchars($kiosk['comment'] ?? '-'); ?></div>
-            </div>
-            
-            <?php if ($kiosk['hw_info']): ?>
-                <h3>Hardware Information</h3>
-                <pre style="background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto;"><?php echo htmlspecialchars(json_encode(json_decode($kiosk['hw_info']), JSON_PRETTY_PRINT)); ?></pre>
-            <?php endif; ?>
-        </div>
-        
-        <div class="card">
-            <h2>Screenshot</h2>
-            <div class="screenshot-container">
-                <?php if ($kiosk['screenshot_url'] && file_exists($kiosk['screenshot_url'])): ?>
-                    <img src="<?php echo htmlspecialchars($kiosk['screenshot_url']); ?>" alt="Kiosk Screenshot">
-                    <p style="margin-top: 10px; color: #666;">
-                        <small>Last updated: <?php echo date('Y-m-d H:i', filemtime($kiosk['screenshot_url'])); ?></small>
-                    </p>
-                <?php else: ?>
-                    <div class="no-screenshot">No screenshot available</div>
-                <?php endif; ?>
-            </div>
-        </div>
-        
-        <?php if (!empty($logs)): ?>
-            <div class="card">
-                <h2>Recent Activity</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Action</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($logs as $log): ?>
-                            <tr>
-                                <td><?php echo date('Y-m-d H:i:s', strtotime($log['timestamp'])); ?></td>
-                                <td><?php echo htmlspecialchars($log['action']); ?></td>
-                                <td><code><?php echo htmlspecialchars(substr($log['details'] ?? '', 0, 100)); ?></code></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
-    </div>
-</body>
-</html>
 
+include 'header.php';
+?>
+
+<div class="panel">
+    <div class="page-title">Kiosk reszletek</div>
+    <div class="muted"><?php echo htmlspecialchars($kiosk['hostname'] ?? 'Kiosk'); ?></div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Alap adatok</div>
+    <div class="table-wrap">
+        <table>
+            <tbody>
+                <tr><th>ID</th><td><?php echo (int)$kiosk['id']; ?></td></tr>
+                <tr><th>Hostname</th><td><?php echo htmlspecialchars($kiosk['hostname'] ?? '-'); ?></td></tr>
+                <tr><th>Device ID</th><td class="mono"><?php echo htmlspecialchars($kiosk['device_id'] ?? '-'); ?></td></tr>
+                <tr><th>MAC</th><td class="mono"><?php echo htmlspecialchars($kiosk['mac'] ?? '-'); ?></td></tr>
+                <tr><th>Public IP</th><td><?php echo htmlspecialchars($kiosk['public_ip'] ?? '-'); ?></td></tr>
+                <tr><th>Company</th><td><?php echo htmlspecialchars($kiosk['company_name'] ?? '-'); ?></td></tr>
+                <tr><th>Location</th><td><?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?></td></tr>
+                <tr><th>Installed</th><td><?php echo $kiosk['installed'] ? date('Y-m-d H:i:s', strtotime($kiosk['installed'])) : '-'; ?></td></tr>
+                <tr><th>Last seen</th><td><?php echo $kiosk['last_seen'] ? date('Y-m-d H:i:s', strtotime($kiosk['last_seen'])) : '-'; ?></td></tr>
+                <tr><th>Sync interval</th><td><?php echo htmlspecialchars((string)$kiosk['sync_interval']); ?> sec</td></tr>
+                <tr><th>Status</th><td><?php echo htmlspecialchars($kiosk['status'] ?? '-'); ?></td></tr>
+                <tr><th>Comment</th><td><?php echo htmlspecialchars($kiosk['comment'] ?? '-'); ?></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Hardware info</div>
+    <?php if (!empty($kiosk['hw_info'])): ?>
+        <pre class="mono" style="white-space: pre-wrap;"><?php echo htmlspecialchars(json_encode(json_decode($kiosk['hw_info']), JSON_PRETTY_PRINT)); ?></pre>
+    <?php else: ?>
+        <div class="muted">Nincs adat.</div>
+    <?php endif; ?>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Screenshot</div>
+    <?php if (!empty($kiosk['screenshot_url']) && file_exists($kiosk['screenshot_url'])): ?>
+        <div>
+            <img src="<?php echo htmlspecialchars($kiosk['screenshot_url']); ?>" alt="Kiosk Screenshot" style="max-width: 100%; border: 1px solid #ccc;">
+        </div>
+        <div class="muted" style="margin-top: 6px;">
+            Last updated: <?php echo date('Y-m-d H:i', filemtime($kiosk['screenshot_url'])); ?>
+        </div>
+    <?php else: ?>
+        <div class="muted">Nincs screenshot.</div>
+    <?php endif; ?>
+</div>
+
+<?php if (!empty($logs)): ?>
+    <div class="panel">
+        <div class="panel-title">Recent sync logs</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($logs as $log): ?>
+                        <tr>
+                            <td class="nowrap"><?php echo date('Y-m-d H:i:s', strtotime($log['timestamp'])); ?></td>
+                            <td><?php echo htmlspecialchars($log['action'] ?? '-'); ?></td>
+                            <td class="mono"><?php echo htmlspecialchars(substr($log['details'] ?? '', 0, 200)); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php include 'footer.php'; ?>

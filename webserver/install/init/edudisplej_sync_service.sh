@@ -33,10 +33,17 @@ DOWNLOAD_INFO="${LOCAL_WEB_DIR}/modules/.download_info.json"
 DOWNLOAD_SCRIPT="${CONFIG_DIR}/init/edudisplej-download-modules.sh"
 CONFIG_MANAGER="${CONFIG_DIR}/init/edudisplej-config-manager.sh"
 STATUS_FILE="${CONFIG_DIR}/sync_status.json"
+SYNC_STATE_FILE="${CONFIG_DIR}/sync_state.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/sync.log"
 VERSION_FILE="${CONFIG_DIR}/local_versions.json"
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment variable
+
+# Sync state tracking
+LOOP_CHECK_SERVER_UPDATED_AT=""
+LOOP_CHECK_LOCAL_UPDATED_AT=""
+LOOP_CHECK_NEEDS_UPDATE="false"
+LAST_SCREENSHOT_STATUS="not_run"
 
 # Create directories
 mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
@@ -217,6 +224,39 @@ if ! command -v json_get &> /dev/null; then
     }
 fi
 
+json_escape() {
+    echo "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g; s/\r/\\r/g; s/\n/\\n/g'
+}
+
+timestamp_to_epoch() {
+    local ts="$1"
+    if [ -z "$ts" ]; then
+        echo "0"
+        return
+    fi
+
+    if date -d "$ts" +%s >/dev/null 2>&1; then
+        date -d "$ts" +%s
+    else
+        echo "0"
+    fi
+}
+
+is_server_newer() {
+    local server_ts="$1"
+    local local_ts="$2"
+    local server_epoch
+    local local_epoch
+    server_epoch=$(timestamp_to_epoch "$server_ts")
+    local_epoch=$(timestamp_to_epoch "$local_ts")
+
+    if [ "$server_epoch" -gt 0 ] && [ "$local_epoch" -gt 0 ]; then
+        [ "$server_epoch" -gt "$local_epoch" ]
+    else
+        [[ "$server_ts" > "$local_ts" ]]
+    fi
+}
+
 # Config.json management functions
 init_config_file() {
     if [ ! -f "$CONFIG_FILE" ]; then
@@ -231,6 +271,7 @@ init_config_file() {
     "sync_interval": 300,
     "last_update": "",
     "last_sync": "",
+    "screenshot_mode": "sync",
     "screenshot_enabled": false,
     "last_screenshot": "",
     "module_versions": {},
@@ -402,6 +443,10 @@ check_loop_updates() {
             local_last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
         fi
     fi
+
+    LOOP_CHECK_LOCAL_UPDATED_AT="$local_last_update"
+    LOOP_CHECK_SERVER_UPDATED_AT=""
+    LOOP_CHECK_NEEDS_UPDATE="false"
     
     log_debug "Local loop last_update: ${local_last_update:-none}"
     
@@ -442,6 +487,8 @@ check_loop_updates() {
     company_name=$(json_get "$response" "company_name")
     local group_id
     group_id=$(json_get "$response" "group_id")
+
+    LOOP_CHECK_SERVER_UPDATED_AT="$server_updated_at"
     
     log "📋 Loop version check: Company='$company_name', Source='$config_source', Group='${group_id:-none}'"
     log_debug "Server loop updated_at: ${server_updated_at:-none} (from $config_source)"
@@ -455,14 +502,16 @@ check_loop_updates() {
     elif [ -z "$server_updated_at" ]; then
         log_debug "Server has no update timestamp - skipping comparison"
     else
-        # Compare timestamps (works with both datetime strings and unix timestamps)
-        if [[ "$server_updated_at" > "$local_last_update" ]]; then
+        # Compare timestamps (prefers epoch comparison, falls back to string compare)
+        if is_server_newer "$server_updated_at" "$local_last_update"; then
             log "⬆️ Server loop is newer - update required (server: $server_updated_at, local: $local_last_update)"
             needs_update=true
         else
             log_debug "✓ Loop configuration is up-to-date"
         fi
     fi
+
+    LOOP_CHECK_NEEDS_UPDATE="$needs_update"
     
     # Download modules if update is needed
     if [ "$needs_update" = "true" ]; then
@@ -494,18 +543,12 @@ check_loop_updates() {
 
 # Screenshot capture and upload function
 capture_and_upload_screenshot() {
-    local screenshot_enabled=$(get_config_field "screenshot_enabled")
-    
-    # Return silently if screenshots are disabled
-    if [ "$screenshot_enabled" != "true" ]; then
-        log "📸 Screenshot: Disabled (screenshot_enabled=$screenshot_enabled)"
-        return 0
-    fi
-    
-    log "📸 Screenshot: Enabled - capturing..."
+    LAST_SCREENSHOT_STATUS="running"
+    log "📸 Screenshot: Capturing..."
     
     if ! command -v scrot >/dev/null 2>&1; then
         log_error "📸 Screenshot failed: 'scrot' not installed (run: apt-get install scrot)"
+        LAST_SCREENSHOT_STATUS="error"
         return 0
     fi
     
@@ -513,12 +556,14 @@ capture_and_upload_screenshot() {
     local temp_file="/tmp/edudisplej_screenshot_$$.png"
     if ! DISPLAY=:0 timeout 5 scrot "$temp_file" 2>/dev/null; then
         log_error "📸 Screenshot failed: Unable to capture screen (check DISPLAY=:0 and X server)"
+        LAST_SCREENSHOT_STATUS="error"
         rm -f "$temp_file"
         return 0
     fi
     
     if [ ! -f "$temp_file" ] || [ ! -s "$temp_file" ]; then
         log_error "📸 Screenshot failed: File empty or not created"
+        LAST_SCREENSHOT_STATUS="error"
         rm -f "$temp_file"
         return 0
     fi
@@ -532,6 +577,7 @@ capture_and_upload_screenshot() {
     local base64_data=$(base64 -w 0 "$temp_file" 2>/dev/null)
     if [ -z "$base64_data" ]; then
         log_error "📸 Screenshot failed: Unable to encode to base64"
+        LAST_SCREENSHOT_STATUS="error"
         rm -f "$temp_file"
         return 0
     fi
@@ -551,6 +597,7 @@ capture_and_upload_screenshot() {
 
     if is_auth_error "$upload_response"; then
         reset_to_unconfigured
+        LAST_SCREENSHOT_STATUS="error"
         return 1
     fi
     
@@ -559,8 +606,10 @@ capture_and_upload_screenshot() {
         # Update last_screenshot time in config
         local now=$(date '+%Y-%m-%d %H:%M:%S')
         update_config_field "last_screenshot" "$now"
+        LAST_SCREENSHOT_STATUS="success"
     else
         log_error "📸 Screenshot upload failed: $upload_response"
+        LAST_SCREENSHOT_STATUS="error"
     fi
     
     # Cleanup
@@ -785,6 +834,7 @@ EOF
         log_error "Full response: $response"
         
         write_error_status "$error_msg" "$response"
+        write_sync_state "error" "$error_msg"
         return 1
     fi
 }
@@ -862,6 +912,44 @@ write_error_status() {
 EOF
     fi
     log_debug "Error status written: $STATUS_FILE"
+}
+
+write_sync_state() {
+    local status="$1"
+    local error_msg="$2"
+
+    local loop_local=""
+    if [ -f "$LOOP_FILE" ] && command -v jq >/dev/null 2>&1; then
+        loop_local=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
+    fi
+
+    local sync_interval
+    sync_interval=$(get_config_field "sync_interval")
+    local screenshot_mode
+    screenshot_mode=$(get_config_field "screenshot_mode")
+    local screenshot_enabled
+    screenshot_enabled=$(get_config_field "screenshot_enabled")
+
+    local error_escaped
+    error_escaped=$(json_escape "$error_msg")
+
+    cat > "$SYNC_STATE_FILE" <<EOF
+{
+    "timestamp": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
+    "status": "${status}",
+    "error": "${error_escaped}",
+    "device_id": "$(get_config_field "device_id")",
+    "kiosk_id": "$(get_config_field "kiosk_id")",
+    "company_id": "$(get_config_field "company_id")",
+    "sync_interval": ${sync_interval:-0},
+    "loop_last_update_local": "${loop_local}",
+    "loop_last_update_server": "${LOOP_CHECK_SERVER_UPDATED_AT}",
+    "loop_needs_update": ${LOOP_CHECK_NEEDS_UPDATE},
+    "screenshot_mode": "${screenshot_mode}",
+    "screenshot_enabled": ${screenshot_enabled:-false},
+    "screenshot_status": "${LAST_SCREENSHOT_STATUS}"
+}
+EOF
 }
 
 # Sync modules
@@ -1080,6 +1168,11 @@ main() {
     log "Debug mode: $DEBUG"
     log "=========================================="
     echo ""
+
+    init_config_file
+    if [ -z "$(get_config_field "screenshot_mode")" ]; then
+        update_config_field "screenshot_mode" "sync"
+    fi
     
     # Run update check on service start
     check_and_update
@@ -1096,8 +1189,9 @@ main() {
         
         if register_and_sync; then
             log "Sync completed successfully"
-            # Take screenshot if enabled
+            # Take screenshot after sync
             capture_and_upload_screenshot
+            write_sync_state "success" ""
             log "Waiting $SYNC_INTERVAL seconds until next sync..."
         else
             log_error "Sync failed - retrying in 60 seconds..."

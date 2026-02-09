@@ -72,6 +72,18 @@ is_screenshot_enabled() {
         log_debug "Config file not found: $CONFIG_FILE"
         return 1
     fi
+
+    local mode=""
+    if command -v jq >/dev/null 2>&1; then
+        mode=$(jq -r '.screenshot_mode // empty' "$CONFIG_FILE" 2>/dev/null)
+    else
+        mode=$(grep -o '"screenshot_mode":"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4 | head -1)
+    fi
+
+    if [ "$mode" = "sync" ]; then
+        log_debug "Screenshot mode is 'sync' - handled by sync service"
+        return 1
+    fi
     
     if command -v jq >/dev/null 2>&1; then
         local enabled=$(jq -r '.screenshot_enabled // false' "$CONFIG_FILE" 2>/dev/null)

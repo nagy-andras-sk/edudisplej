@@ -11,6 +11,7 @@ CONFIG_DIR="/opt/edudisplej"
 LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
 MODULES_DIR="${LOCAL_WEB_DIR}/modules"
 CONFIG_FILE="${CONFIG_DIR}/kiosk.conf"
+CONFIG_JSON="${CONFIG_DIR}/data/config.json"
 LOOP_FILE="${MODULES_DIR}/loop.json"
 LOOP_PLAYER="${LOCAL_WEB_DIR}/loop_player.html"
 TOKEN_FILE="${CONFIG_DIR}/lic/token"
@@ -56,20 +57,28 @@ mkdir -p "$MODULES_DIR"
 
 # Load device ID from config
 load_device_id() {
-    if [ ! -f "$CONFIG_FILE" ]; then
-        log_error "Config file not found: $CONFIG_FILE"
+    local device_id=""
+
+    if [ -f "$CONFIG_FILE" ]; then
+        # Source config file
+        source "$CONFIG_FILE" 2>/dev/null || true
+        device_id="${DEVICE_ID:-}"
+    fi
+
+    if [ -z "$device_id" ] && [ -f "$CONFIG_JSON" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            device_id=$(jq -r '.device_id // empty' "$CONFIG_JSON" 2>/dev/null)
+        else
+            device_id=$(grep -o '"device_id":"[^"]*"' "$CONFIG_JSON" | cut -d'"' -f4 | head -1)
+        fi
+    fi
+
+    if [ -z "$device_id" ]; then
+        log_error "DEVICE_ID not found in config"
         return 1
     fi
-    
-    # Source config file
-    source "$CONFIG_FILE" 2>/dev/null || true
-    
-    if [ -z "${DEVICE_ID:-}" ]; then
-        log_error "DEVICE_ID not found in config file"
-        return 1
-    fi
-    
-    echo "$DEVICE_ID"
+
+    echo "$device_id"
 }
 
 # Get loop configuration
