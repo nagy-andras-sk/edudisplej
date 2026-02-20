@@ -255,7 +255,7 @@ function validate_request_signature(array $company, string $request_body, bool $
 
         // Build canonical string
         $method       = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'POST');
-        $uri_path     = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
+        $uri_path     = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
         $body_hash    = hash('sha256', $request_body);
         $canonical    = implode("\n", [$method, $uri_path, $timestamp, $nonce, $body_hash]);
 
