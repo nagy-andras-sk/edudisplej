@@ -18,6 +18,9 @@ fi
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 REGISTRATION_API="${API_BASE_URL}/api/registration.php"
 MODULES_API="${API_BASE_URL}/api/modules_sync.php"
+# Unified v1 sync endpoint (replaces hw_data_sync, screenshot_sync, log_sync)
+DEVICE_SYNC_API="${API_BASE_URL}/api/v1/device/sync.php"
+# Legacy endpoints kept for reference (deprecated)
 HW_SYNC_API="${API_BASE_URL}/api/hw_data_sync.php"
 KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
 CHECK_GROUP_LOOP_UPDATE_API="${API_BASE_URL}/api/check_group_loop_update.php"
@@ -362,7 +365,7 @@ sync_hw_data() {
     local token
     token=$(get_api_token) || { reset_to_unconfigured; return 1; }
 
-    response=$(curl -s -X POST "$HW_SYNC_API" \
+    response=$(curl -s -X POST "$DEVICE_SYNC_API" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "$request_data")

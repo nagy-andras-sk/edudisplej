@@ -6,6 +6,9 @@
  */
 
 require_once '../dbkonfiguracia.php';
+require_once 'auth.php';
+
+$api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => '', 'file_content' => null];
 

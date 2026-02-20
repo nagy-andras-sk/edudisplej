@@ -5,6 +5,10 @@
  */
 
 header('Content-Type: application/json');
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
+
+$api_company = validate_api_token();
 
 try {
     $conn = getDbConnection();
@@ -12,6 +16,11 @@ try {
     // Get optional filters
     $company_id = intval($_GET['company_id'] ?? 0);
     $status_filter = $_GET['status'] ?? '';
+
+    // Non-admins are restricted to their own company
+    if (!api_is_admin_session($api_company)) {
+        $company_id = (int)$api_company['id'];
+    }
     
     // Build query
     $query = "

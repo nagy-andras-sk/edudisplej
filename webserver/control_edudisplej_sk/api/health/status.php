@@ -5,6 +5,10 @@
  */
 
 header('Content-Type: application/json');
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
+
+$api_company = validate_api_token();
 
 try {
     $conn = getDbConnection();
@@ -17,7 +21,7 @@ try {
     }
     
     // Verify kiosk exists
-    $stmt = $conn->prepare("SELECT id, device_id, status FROM kiosks WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, device_id, status, company_id FROM kiosks WHERE id = ?");
     $stmt->bind_param("i", $kiosk_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -27,6 +31,7 @@ try {
     }
     
     $kiosk = $result->fetch_assoc();
+    api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
     
     // Get latest health data
     $stmt = $conn->prepare("

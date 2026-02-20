@@ -1,10 +1,15 @@
 <?php
 /**
  * API - Redirect/Router to new API structure
- * This file routes old API calls to the new endpoints
+ * This file routes old API calls to the new endpoints.
+ *
+ * Clients should migrate to the unified v1 endpoint:
+ *   POST /api/v1/device/sync.php
  */
 
 header('Content-Type: application/json');
+header('X-EDU-Deprecated: true');
+header('X-EDU-Successor: /api/v1/device/sync.php');
 
 // Get the action parameter
 $action = $_GET['action'] ?? '';
@@ -17,24 +22,20 @@ switch ($action) {
         break;
         
     case 'sync':
-        // Redirect to hw_data_sync endpoint
-        include 'api/hw_data_sync.php';
+    case 'heartbeat':
+        // Route to unified v1 sync endpoint
+        include 'api/v1/device/sync.php';
         break;
         
     case 'screenshot':
-        // Redirect to screenshot sync endpoint
+        // Legacy screenshot – include in the new sync payload when possible
         include 'api/screenshot_sync.php';
-        break;
-        
-    case 'heartbeat':
-        // Heartbeat is essentially hw_data_sync
-        include 'api/hw_data_sync.php';
         break;
         
     default:
         echo json_encode([
             'success' => false,
-            'message' => 'Invalid action. Please use the new API endpoints: /api/registration.php, /api/hw_data_sync.php, /api/screenshot_sync.php, /api/modules_sync.php'
+            'message' => 'Invalid action. Migrate to the new unified endpoint: /api/v1/device/sync.php'
         ]);
         break;
 }

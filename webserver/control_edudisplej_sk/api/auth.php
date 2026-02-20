@@ -40,12 +40,19 @@ function validate_api_token() {
     $token_from_header = $headers['X-API-Token'] ?? $headers['x-api-token'] ?? '';
 
     $token = '';
+    $token_source = '';
     if (preg_match('/Bearer\s+(.+)$/i', $auth_header, $matches)) {
         $token = trim($matches[1]);
+        $token_source = 'bearer';
     } elseif (!empty($token_from_header)) {
         $token = trim($token_from_header);
+        $token_source = 'x-api-token';
     } elseif (!empty($token_from_query)) {
         $token = trim($token_from_query);
+        $token_source = 'query';
+        // Deprecation warning: query-param tokens will be removed in a future version
+        header('X-EDU-Deprecation-Warning: token query parameter is deprecated; use Authorization: Bearer <token> header instead');
+        error_log('EDU-API: Deprecated token query parameter used from IP ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
     }
 
     if (empty($token)) {
@@ -153,6 +160,134 @@ function api_require_group_company(mysqli $conn, array $company, int $group_id):
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
     }
+}
+
+/**
+ * Validate optional request signing headers (X-EDU-Timestamp, X-EDU-Nonce, X-EDU-Signature).
+ *
+ * Signing scheme (HMAC-SHA256):
+ *   canonical_string = METHOD\nURI_PATH\nTIMESTAMP\nNONCE\nHEX(SHA256(request_body))
+ *   signature        = HMAC-SHA256(canonical_string, signing_secret)
+ *
+ * The signing_secret is stored in the `companies.signing_secret` column.
+ * Timestamp drift tolerance: ±300 seconds.
+ * Nonces are cached in the DB table `api_nonces` with a 10-minute TTL.
+ *
+ * @param array  $company       Company data returned by validate_api_token()
+ * @param string $request_body  Raw request body
+ * @param bool   $required      If true, missing headers cause a 401 response
+ * @return bool  True when signature is valid (or signing is not configured/required)
+ */
+function validate_request_signature(array $company, string $request_body, bool $required = false): bool {
+    $headers = getallheaders();
+    $timestamp = $headers['X-EDU-Timestamp'] ?? $headers['x-edu-timestamp'] ?? '';
+    $nonce     = $headers['X-EDU-Nonce']     ?? $headers['x-edu-nonce']     ?? '';
+    $signature = $headers['X-EDU-Signature'] ?? $headers['x-edu-signature'] ?? '';
+
+    // If no signing headers present, honour the $required flag
+    if ($timestamp === '' && $nonce === '' && $signature === '') {
+        if ($required) {
+            header('HTTP/1.1 401 Unauthorized');
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Request signing headers required']);
+            exit;
+        }
+        return true;
+    }
+
+    // Validate timestamp drift (±300 s)
+    $ts = (int)$timestamp;
+    if (abs(time() - $ts) > 300) {
+        header('HTTP/1.1 401 Unauthorized');
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Request timestamp out of range']);
+        exit;
+    }
+
+    // Validate nonce format
+    if (!preg_match('/^[a-zA-Z0-9_\-]{8,128}$/', $nonce)) {
+        header('HTTP/1.1 401 Unauthorized');
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Invalid nonce format']);
+        exit;
+    }
+
+    // Look up signing secret for company
+    require_once __DIR__ . '/../dbkonfiguracia.php';
+    try {
+        $conn = getDbConnection();
+
+        // Purge expired nonces
+        $conn->query("DELETE FROM api_nonces WHERE expires_at < NOW()");
+
+        // Check nonce replay
+        $ns = $conn->prepare("SELECT id FROM api_nonces WHERE nonce = ? AND company_id = ?");
+        $ns->bind_param("si", $nonce, $company['id']);
+        $ns->execute();
+        if ($ns->get_result()->num_rows > 0) {
+            $ns->close();
+            $conn->close();
+            header('HTTP/1.1 401 Unauthorized');
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Nonce already used']);
+            exit;
+        }
+        $ns->close();
+
+        // Get signing secret
+        $ss = $conn->prepare("SELECT signing_secret FROM companies WHERE id = ?");
+        $ss->bind_param("i", $company['id']);
+        $ss->execute();
+        $row = $ss->get_result()->fetch_assoc();
+        $ss->close();
+
+        if (empty($row['signing_secret'])) {
+            // Signing secret not configured – skip validation unless required
+            $conn->close();
+            if ($required) {
+                header('HTTP/1.1 401 Unauthorized');
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Request signing not configured for this company']);
+                exit;
+            }
+            return true;
+        }
+
+        // Build canonical string
+        $method       = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'POST');
+        $uri_path     = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
+        $body_hash    = hash('sha256', $request_body);
+        $canonical    = implode("\n", [$method, $uri_path, $timestamp, $nonce, $body_hash]);
+
+        $expected_sig = hash_hmac('sha256', $canonical, $row['signing_secret']);
+
+        if (!hash_equals($expected_sig, strtolower($signature))) {
+            $conn->close();
+            header('HTTP/1.1 401 Unauthorized');
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Invalid request signature']);
+            exit;
+        }
+
+        // Store nonce (TTL: 10 minutes)
+        $ni = $conn->prepare("INSERT IGNORE INTO api_nonces (nonce, company_id, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))");
+        $ni->bind_param("si", $nonce, $company['id']);
+        $ni->execute();
+        $ni->close();
+        $conn->close();
+
+    } catch (Exception $e) {
+        error_log('EDU-API signature validation error: ' . $e->getMessage());
+        // On DB error, fail open (don't block devices) unless required
+        if ($required) {
+            header('HTTP/1.1 500 Internal Server Error');
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Signature validation error']);
+            exit;
+        }
+    }
+
+    return true;
 }
 function generate_otp_code($secret, $time) {
     $secret = base32_decode($secret);

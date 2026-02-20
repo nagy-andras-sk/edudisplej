@@ -4,9 +4,13 @@
  * EduDisplej Control Panel
  * 
  * Receives logs from kiosk devices and stores them for troubleshooting
+ *
+ * @deprecated Use /api/v1/device/sync.php instead (include logs in the sync payload).
  */
 
 header('Content-Type: application/json');
+header('X-EDU-Deprecated: true');
+header('X-EDU-Successor: /api/v1/device/sync.php');
 require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
 
