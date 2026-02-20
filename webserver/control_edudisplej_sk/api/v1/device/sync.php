@@ -82,6 +82,8 @@ try {
     $stmt = $conn->prepare(
         "SELECT k.id, k.device_id, k.sync_interval, k.screenshot_requested,
                 COALESCE(k.screenshot_enabled, 0) as screenshot_enabled,
+                COALESCE(k.screenshot_interval_seconds, 3) as screenshot_interval_seconds,
+                k.screenshot_requested_until,
                 k.company_id, c.name as company_name, k.loop_last_update
            FROM kiosks k
            LEFT JOIN companies c ON k.company_id = c.id
@@ -288,15 +290,26 @@ try {
     // -----------------------------------------------------------------------
     // 7. Build response
     // -----------------------------------------------------------------------
-    $response['success']             = true;
-    $response['kiosk_id']            = $kiosk_id;
-    $response['device_id']           = $kiosk['device_id'];
-    $response['sync_interval']       = $kiosk['sync_interval'];
-    $response['screenshot_requested'] = (bool)$kiosk['screenshot_requested'];
-    $response['screenshot_enabled']  = (bool)$kiosk['screenshot_enabled'];
-    $response['company_id']          = $kiosk['company_id'];
-    $response['company_name']        = $kiosk['company_name'] ?? '';
-    $response['needs_update']        = $need_update;
+
+    // Derive screenshot_requested from TTL: true if requested_until is in the future
+    $screenshot_ttl_active = false;
+    if (!empty($kiosk['screenshot_requested_until'])) {
+        $until_ts = strtotime($kiosk['screenshot_requested_until']);
+        $screenshot_ttl_active = $until_ts !== false && $until_ts > time();
+    }
+    // Fallback: honour legacy boolean flag if TTL not set
+    $screenshot_requested = $screenshot_ttl_active || (bool)$kiosk['screenshot_requested'];
+
+    $response['success']                   = true;
+    $response['kiosk_id']                  = $kiosk_id;
+    $response['device_id']                 = $kiosk['device_id'];
+    $response['sync_interval']             = $kiosk['sync_interval'];
+    $response['screenshot_requested']      = $screenshot_requested;
+    $response['screenshot_enabled']        = (bool)$kiosk['screenshot_enabled'];
+    $response['screenshot_interval_seconds'] = (int)$kiosk['screenshot_interval_seconds'];
+    $response['company_id']                = $kiosk['company_id'];
+    $response['company_name']              = $kiosk['company_name'] ?? '';
+    $response['needs_update']              = $need_update;
     if ($need_update) {
         $response['update_reason'] = $update_reason;
         $response['update_action'] = 'restart';

@@ -459,8 +459,21 @@ $no_image_svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' wi
             modal.addEventListener('click', function(e) {
                 if (e.target === modal) {
                     modal.remove();
+                    stopScreenshotTTL(kioskId);
                 }
             });
+
+            // Signal server that we're watching this kiosk's screenshot (TTL-based)
+            requestScreenshotTTL(kioskId);
+
+            // Also stop TTL when the X button removes the modal via DOM mutation
+            const modalObserver = new MutationObserver(() => {
+                if (!document.getElementById('kiosk-detail-modal')) {
+                    stopScreenshotTTL(kioskId);
+                    modalObserver.disconnect();
+                }
+            });
+            modalObserver.observe(document.body, { childList: true, subtree: false });
             
             modal.innerHTML = `
                 <div style="
@@ -724,6 +737,48 @@ $no_image_svg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' wi
         // Toggle between list and realtime view
         let currentView = 'list';
         let realtimeRefreshInterval = null;
+
+        // --- Screenshot TTL / realtime view keepalive ---
+        let screenshotKeepaliveTimers = {};  // { kioskId: setIntervalId }
+
+        /**
+         * Signal the server that the user is watching this kiosk's screenshot.
+         * Extends the TTL every 45 s (server TTL is 60 s).
+         */
+        function requestScreenshotTTL(kioskId) {
+            if (!kioskId) return;
+            fetch('../api/screenshot_request.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kiosk_id: kioskId, ttl_seconds: 60 })
+            }).catch(() => {});
+
+            // Keepalive: extend TTL every 45 s while viewer is open
+            if (!screenshotKeepaliveTimers[kioskId]) {
+                screenshotKeepaliveTimers[kioskId] = setInterval(() => {
+                    fetch('../api/screenshot_request.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ kiosk_id: kioskId, ttl_seconds: 60 })
+                    }).catch(() => {});
+                }, 45000);
+            }
+        }
+
+        /** Clear screenshot TTL request for a kiosk when the viewer is closed. */
+        function stopScreenshotTTL(kioskId) {
+            if (!kioskId) return;
+            if (screenshotKeepaliveTimers[kioskId]) {
+                clearInterval(screenshotKeepaliveTimers[kioskId]);
+                delete screenshotKeepaliveTimers[kioskId];
+            }
+            fetch('../api/screenshot_request.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kiosk_id: kioskId, action: 'stop' })
+            }).catch(() => {});
+        }
+
         let countdownInterval = null;
         
         function toggleView() {

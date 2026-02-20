@@ -94,7 +94,8 @@ try {
                 'api_token' => "varchar(255) DEFAULT NULL",
                 'token_created_at' => "timestamp NULL DEFAULT NULL",
                 'is_active' => "tinyint(1) NOT NULL DEFAULT 1",
-                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()",
+                'signing_secret' => "varchar(256) DEFAULT NULL COMMENT 'HMAC-SHA256 signing secret for request signature validation'"
             ],
             'primary_key' => 'id',
             'unique_keys' => ['license_key', 'api_token'],
@@ -120,6 +121,8 @@ try {
                 'screenshot_enabled' => "tinyint(1) DEFAULT 0",
                 'screenshot_requested' => "tinyint(1) DEFAULT 0",
                 'screenshot_timestamp' => "timestamp NULL DEFAULT NULL",
+                'screenshot_requested_until' => "datetime DEFAULT NULL",
+                'screenshot_interval_seconds' => "int(11) DEFAULT 3",
                 'status' => "enum('online','offline','pending','unconfigured') DEFAULT 'unconfigured'",
                 'company_id' => "int(11) DEFAULT NULL",
                 'location' => "text DEFAULT NULL",
@@ -324,6 +327,18 @@ try {
                 'kcl_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE",
                 'kcl_command_fk' => "FOREIGN KEY (command_id) REFERENCES kiosk_command_queue(id) ON DELETE CASCADE"
             ]
+        ],
+        'api_nonces' => [
+            'columns' => [
+                'id' => "bigint(20) NOT NULL AUTO_INCREMENT",
+                'nonce' => "varchar(128) NOT NULL",
+                'company_id' => "int(11) NOT NULL",
+                'expires_at' => "datetime NOT NULL",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => ['nonce'],
+            'foreign_keys' => []
         ]
     ];
     

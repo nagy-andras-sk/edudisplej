@@ -37,6 +37,8 @@ DOWNLOAD_SCRIPT="${CONFIG_DIR}/init/edudisplej-download-modules.sh"
 CONFIG_MANAGER="${CONFIG_DIR}/init/edudisplej-config-manager.sh"
 STATUS_FILE="${CONFIG_DIR}/sync_status.json"
 SYNC_STATE_FILE="${CONFIG_DIR}/sync_state.json"
+# Latest sync response cached here; read by screenshot service for policy
+LAST_SYNC_RESPONSE="${CONFIG_DIR}/last_sync_response.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/sync.log"
 VERSION_FILE="${CONFIG_DIR}/local_versions.json"
@@ -376,6 +378,9 @@ sync_hw_data() {
     fi
     
     if echo "$response" | grep -q '"success":true'; then
+        # Cache the full sync response for other services (e.g. screenshot service)
+        echo "$response" > "$LAST_SYNC_RESPONSE" 2>/dev/null || true
+
         local new_interval
         new_interval=$(echo "$response" | grep -o '"sync_interval":[0-9]*' | cut -d: -f2)
         if [ -n "$new_interval" ]; then
