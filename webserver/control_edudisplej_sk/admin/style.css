@@ -542,6 +542,88 @@ tbody tr:hover td {
     color: #666;
 }
 
+.summary-item.active {
+    background: #e8f0fe;
+    border-color: var(--accent);
+}
+
+.kiosk-hostname-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.kiosk-hostname-link:hover {
+    text-decoration: underline;
+}
+
+.kiosk-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.kiosk-modal-box {
+    background: var(--panel);
+    border-radius: 6px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+    width: 90%;
+    max-width: 680px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.kiosk-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.kiosk-modal-title {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--ink);
+}
+
+.kiosk-modal-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0 4px;
+}
+
+.kiosk-modal-close:hover {
+    color: var(--ink);
+}
+
+.kiosk-modal-body {
+    padding: 18px;
+}
+
+.kiosk-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: start;
+}
+
+.kiosk-modal-screenshot {
+    width: 200px;
+    height: 112px;
+}
+
 /* =========================================================
    Breadcrumb
    ========================================================= */
