@@ -26,6 +26,7 @@ KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
 CHECK_GROUP_LOOP_UPDATE_API="${API_BASE_URL}/api/check_group_loop_update.php"
 VERSION_CHECK_API="${API_BASE_URL}/api/check_versions.php"
 SYNC_INTERVAL=300  # 5 minutes
+FAST_LOOP_INTERVAL=30  # 30 seconds in fast loop mode
 CONFIG_DIR="/opt/edudisplej"
 DATA_DIR="${CONFIG_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
@@ -1200,7 +1201,13 @@ main() {
             # Take screenshot after sync
             capture_and_upload_screenshot
             write_sync_state "success" ""
-            log "Waiting $SYNC_INTERVAL seconds until next sync..."
+            local sleep_secs="$SYNC_INTERVAL"
+            if [ -f "${CONFIG_DIR}/.fast_loop_enabled" ]; then
+                sleep_secs="$FAST_LOOP_INTERVAL"
+                log "Fast loop mode active - waiting ${FAST_LOOP_INTERVAL} seconds until next sync..."
+            else
+                log "Waiting ${SYNC_INTERVAL} seconds until next sync..."
+            fi
         else
             log_error "Sync failed - retrying in 60 seconds..."
             sleep 60
@@ -1208,7 +1215,7 @@ main() {
         fi
         
         echo ""
-        sleep "$SYNC_INTERVAL"
+        sleep "$sleep_secs"
     done
 }
 

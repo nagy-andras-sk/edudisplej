@@ -36,6 +36,7 @@ try {
     
     $response['success'] = true;
     $response['versions'] = $versions_data['services'] ?? [];
+    $response['latest_system_version'] = $versions_data['system_version'] ?? '1.0.0';
     $response['last_updated'] = $versions_data['last_updated'] ?? '';
     
     echo json_encode($response);

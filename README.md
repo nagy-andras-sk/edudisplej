@@ -46,6 +46,50 @@ To update manually / Pre manuálnu aktualizáciu:
 sudo /opt/edudisplej/init/update.sh
 ```
 
+### Remote Full Update (self-update) / Vzdialená aktualizácia
+
+From the control panel admin view (**Kiosk Details** page) you can trigger a **full remote self-update**:
+
+1. Open **Admin → Kiosk Details** for any kiosk.
+2. The **Verzió és frissítés** (Version & Update) section shows:
+   - The kiosk's currently running version (reported at each sync).
+   - The latest available version from the server (`versions.json`).
+   - A status indicator: *Naprakész* (up-to-date) or *Frissítés elérhető* (update available).
+3. If an update is available, click **⬆ Frissítés indítása** – this queues a `full_update` command via `api/kiosk/queue_full_update.php`.
+4. On the kiosk's next command-executor cycle (≤30 s) the `update.sh` script runs:
+   - Downloads all init scripts and service files from the server.
+   - Overwrites all systemd unit files with the latest versions.
+   - Removes obsolete units, runs `systemctl daemon-reload`, and restarts affected services.
+   - The process is idempotent – safe to run multiple times.
+5. Update progress is logged to `/opt/edudisplej/logs/full_update.log`.
+
+**Version tracking**: the kiosk reads its version from `/opt/edudisplej/VERSION` and reports it to the server at every sync. The server's canonical "latest" version is stored in `webserver/install/init/versions.json` under the `system_version` key.
+
+---
+
+## ⚡ Fast Loop / Gyors szinkron mód
+
+By default the sync cycle runs every **5 minutes** (`SYNC_INTERVAL=300`).
+
+**Fast loop mode** reduces the interval to **30 seconds** – useful when a user is actively watching the control panel (e.g. viewing live screenshots).
+
+### How to activate / Aktiváció
+
+From **Admin → Kiosk Details**, click **⚡ Fast loop BE** to enable or **⏸ Fast loop KI** to disable.  
+This queues an `enable_fast_loop` / `disable_fast_loop` command which creates or removes `/opt/edudisplej/.fast_loop_enabled` on the kiosk.
+
+Once the flag file is present, the sync service checks it after every cycle and sleeps for 30 s instead of the configured interval. Removing the flag restores the normal 5-minute interval on the next cycle.
+
+### Via API / API-n keresztül
+
+```http
+POST /api/kiosk/control_fast_loop.php
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"kiosk_id": 42, "enable": true}
+```
+
 ---
 
 ## 📺 How It Works / Ako to funguje
@@ -66,7 +110,8 @@ sudo /opt/edudisplej/init/update.sh
 - 📊 Real-time monitoring / Monitorovanie v reálnom čase
 - 📸 On-demand screenshots (only when someone is watching) / Screenshoty na vyžiadanie (len keď niekto sleduje)
 - 🔒 Bearer token + optional HMAC-SHA256 request signing / Bearer token + voliteľné HMAC-SHA256 podpisovanie požiadaviek
-- 🔄 Automatic updates / Automatické aktualizácie
+- 🔄 Automatic updates + remote self-update from control panel / Automatické aktualizácie + vzdialená aktualizácia z kontrolného panela
+- ⚡ Fast loop mode (30s sync) controllable from control panel / Rýchly synchrónny mód (30s) ovládateľný z kontrolného panela
 - 🔑 Module license management / Správa licencií modulov
 - 🏢 Multi-company support / Podpora viacerých spoločností
 - ⚙️ Per-kiosk module configuration / Konfigurácia modulov pre každý kiosk
@@ -166,6 +211,9 @@ tail -f /opt/edudisplej/logs/sync.log
 | `/api/health/report.php` | POST | Kiosk health reporting |
 | `/api/health/status.php` | GET | Health status for one kiosk |
 | `/api/health/list.php` | GET | Health status for all company kiosks |
+| `/api/kiosk/queue_full_update.php` | POST | Queue a full self-update for a kiosk |
+| `/api/kiosk/control_fast_loop.php` | POST | Enable/disable fast loop (30s sync) |
+| `/api/check_versions.php` | GET | Returns service versions + latest_system_version |
 
 ### Hostname Configuration / Konfigurácia názvu zariadenia
 

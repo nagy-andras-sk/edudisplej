@@ -154,6 +154,26 @@ execute_command() {
             fi
             ;;
         
+        full_update)
+            log "Starting full system self-update..."
+            UPDATE_LOG="${LOG_DIR}/full_update.log"
+            UPDATE_SCRIPT="${CONFIG_DIR}/init/update.sh"
+            if [ -x "$UPDATE_SCRIPT" ]; then
+                if sudo bash "$UPDATE_SCRIPT" >> "$UPDATE_LOG" 2>&1; then
+                    output="Full update completed successfully"
+                    log_success "$output"
+                else
+                    error="Full update script failed (see $UPDATE_LOG)"
+                    status="failed"
+                    log_error "$error"
+                fi
+            else
+                error="Update script not found or not executable: $UPDATE_SCRIPT"
+                status="failed"
+                log_error "$error"
+            fi
+            ;;
+
         restart_service)
             log "Restarting service: $command"
             if systemctl restart "$command" 2>&1; then
