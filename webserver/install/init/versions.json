@@ -1,4 +1,5 @@
 {
+  "system_version": "1.0.0",
   "services": {
     "edudisplej_sync_service.sh": "1.0.0",
     "edudisplej_terminal_display.sh": "1.0.0",
@@ -9,5 +10,5 @@
     "common.sh": "1.0.0",
     "kiosk.sh": "1.0.0"
   },
-  "last_updated": "2026-02-02T11:58:00Z"
+  "last_updated": "2026-02-21T06:52:00Z"
 }
