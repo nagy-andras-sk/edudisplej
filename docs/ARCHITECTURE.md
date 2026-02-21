@@ -1,6 +1,6 @@
 # EduDisplej – Architecture & API Reference
 
-> **Version:** 2025 Q2 | **Status:** Active development
+> **Version:** 2026 Q1 | **Status:** Active development
 
 ---
 
@@ -9,8 +9,8 @@
 1. [Repository Structure](#1-repository-structure)
 2. [Auth Model](#2-auth-model)
 3. [API Specification](#3-api-specification)
-4. [Request Signing (HMAC-SHA256)](#4-request-signing-hmac-sha256)
-5. [Screenshot Policy (TTL-based)](#5-screenshot-policy-ttl-based)
+4. [Screenshot Policy (TTL-based)](#4-screenshot-policy-ttl-based)
+5. [Request Signing (HMAC-SHA256)](#5-request-signing-hmac-sha256)
 6. [Threat Model & Security Notes](#6-threat-model--security-notes)
 7. [Kiosk Service Architecture](#7-kiosk-service-architecture)
 8. [UI Templating Rules](#8-ui-templating-rules)
@@ -88,49 +88,9 @@ edudisplej/
 
 ---
 
-## 3. New / Improved Architecture
+## 3. API Specification
 
-### 3.1 Auth Policy
-
-- **Device / kiosk endpoints:** `Authorization: Bearer <token>` header only (preferred).
-  - `?token=` query parameter: still accepted for backward compatibility but emits
-    `X-EDU-Deprecation-Warning` response header and a server-side error_log entry.
-    Will be **removed** in a future version.
-- **Admin / dashboard:** PHP session + `$_SESSION['isadmin']` check.
-- **Optional request signing:** `X-EDU-Timestamp` + `X-EDU-Nonce` + `X-EDU-Signature`
-  headers verified via HMAC-SHA256 (see Section 5).
-
-### 3.2 Unified Device Sync Endpoint
-
-`POST /api/v1/device/sync.php`
-
-Replaces **three** separate round-trips:
-
-| Old endpoint | New field in sync payload |
-|---|---|
-| `hw_data_sync.php` | Top-level `mac`, `hostname`, `hw_info`, `version`, … |
-| `screenshot_sync.php` | `screenshot` + `screenshot_filename` |
-| `log_sync.php` | `logs` array |
-
-The response includes all configuration the kiosk needs:
-- `sync_interval`
-- `screenshot_requested` / `screenshot_enabled`
-- `needs_update` + `update_action`
-- `company_id` / `company_name`
-
-### 3.3 Deprecation Headers
-
-All legacy endpoints now emit:
-```
-X-EDU-Deprecated: true
-X-EDU-Successor: /api/v1/device/sync.php
-```
-
----
-
-## 4. API Specification
-
-### 4.1 `POST /api/v1/device/sync.php` ★
+### 3.1 `POST /api/v1/device/sync.php` ★ (Unified Device Sync)
 
 **Headers (required):**
 ```
@@ -212,7 +172,7 @@ X-EDU-Signature: <hex_hmac_sha256>
 
 ---
 
-### 4.2 `POST /api/registration.php`
+### 3.2 `POST /api/registration.php`
 
 Registers a new kiosk. Requires a valid company Bearer token.
 
@@ -225,30 +185,131 @@ Registers a new kiosk. Requires a valid company Bearer token.
 }
 ```
 
-### 4.3 `POST /api/modules_sync.php`
+### 3.3 `POST /api/modules_sync.php`
 
 Returns the current module loop for the kiosk. Authenticated.
 
-### 4.4 `GET /api/get_module_file.php`
+### 3.4 `GET /api/get_module_file.php`
 
-Returns module HTML / JSON file content. **Now requires auth** (Bearer token or session).
+Returns module HTML / JSON file content. Requires auth (Bearer token or session).
 
 Query params: `module_key`, `file` (`live.html` | `configure.json`), `kiosk_id` (optional).
 
-### 4.5 `POST /api/health/report.php`
+### 3.5 `POST /api/health/report.php`
 
 Kiosk posts its system health data. Authenticated.
 
-### 4.6 `GET /api/health/status.php`
+### 3.6 `GET /api/health/status.php`
 
-Returns latest health record for a kiosk. **Now requires auth**.
+Returns latest health record for a kiosk. Requires auth + company ownership check.
 
 Query param: `kiosk_id`.
 
-### 4.7 `GET /api/health/list.php`
+### 3.7 `GET /api/health/list.php`
 
 Lists health status for all kiosks of the authenticated company.
-**Now requires auth.** Non-admin users can only see their own company's kiosks.
+Requires auth. Non-admin users can only see their own company's kiosks.
+
+### 3.8 `POST /api/screenshot_request.php`
+
+Sets / extends / clears the screenshot TTL for a kiosk. Requires session or Bearer token.  
+See [Section 4 – Screenshot Policy](#4-screenshot-policy-ttl-based) for full details.
+
+### 3.9 Deprecation Headers
+
+All legacy endpoints emit:
+```
+X-EDU-Deprecated: true
+X-EDU-Successor: /api/v1/device/sync.php
+```
+
+---
+
+## 4. Screenshot Policy (TTL-based)
+
+Screenshots are **only sent by the kiosk when someone is actively watching** – not continuously.
+
+### 4.1 How it works
+
+```
+Control Panel                    Server DB               Kiosk
+     │                               │                     │
+     │  Open kiosk detail modal      │                     │
+     │──POST /api/screenshot_request.php──────────────────►│
+     │       { kiosk_id, ttl=60 }    │                     │
+     │                     ┌─────────▼──────────┐          │
+     │                     │ screenshot_         │          │
+     │                     │ requested_until =   │          │
+     │                     │ NOW() + 60s         │          │
+     │                     └─────────────────────┘          │
+     │                               │                     │
+     │  (keepalive every 45 s)       │                     │
+     │──POST screenshot_request ────►│                     │
+     │                               │                     │
+     │                               │  POST /api/v1/device/sync.php
+     │                               │◄────────────────────│
+     │                     ┌─────────▼──────────┐          │
+     │                     │ screenshot_         │          │
+     │                     │ requested = TRUE    │──────────►
+     │                     │ (TTL not expired)   │ send screenshot
+     │                     └─────────────────────┘          │
+     │                               │                     │
+     │  Close modal                  │                     │
+     │──POST action=stop ───────────►│                     │
+     │                               │                     │
+     │  (or TTL expires after 60s)   │                     │
+     │                               │  POST sync          │
+     │                               │◄────────────────────│
+     │                     screenshot_requested = FALSE ────►
+     │                               │  kiosk stops sending│
+```
+
+### 4.2 Server-side API
+
+#### `POST /api/screenshot_request.php`
+
+Requires session auth (or Bearer token for same company).
+
+**Start / extend TTL:**
+```json
+{ "kiosk_id": 42, "ttl_seconds": 60 }
+```
+Response: `{ "success": true, "screenshot_requested_until": "2025-01-01 12:01:00", "ttl_seconds": 60 }`
+
+**Stop immediately:**
+```json
+{ "kiosk_id": 42, "action": "stop" }
+```
+
+#### `POST /api/v1/device/sync.php` – screenshot fields in response
+
+```json
+{
+  "screenshot_requested": true,
+  "screenshot_enabled": false,
+  "screenshot_interval_seconds": 3
+}
+```
+
+- `screenshot_requested`: `true` when `screenshot_requested_until > NOW()` (TTL active)
+- `screenshot_enabled`: persistent per-kiosk toggle
+- `screenshot_interval_seconds`: how often the kiosk should send screenshots (default 3 s)
+
+### 4.3 Kiosk-side behaviour
+
+`edudisplej-screenshot-service.sh` checks on every iteration:
+1. Reads `screenshot_requested` from `/opt/edudisplej/last_sync_response.json` (written by the sync service after each successful v1 sync)
+2. If `true` → captures and uploads screenshot, then sleeps `screenshot_interval_seconds`
+3. If `false` and `screenshot_enabled` (config) is also false → skips, sleeps default interval
+
+The sync service writes the full v1 sync response to `/opt/edudisplej/last_sync_response.json` after every successful call. This lets the screenshot service read the latest policy without an extra API call.
+
+### 4.4 Dashboard integration
+
+When `openKioskDetail(kioskId, hostname)` is called:
+- `requestScreenshotTTL(kioskId)` is called immediately (TTL = 60 s)
+- A keepalive runs every 45 s to extend TTL
+- When the modal is closed (click-outside or X button), `stopScreenshotTTL(kioskId)` clears the TTL
 
 ---
 
@@ -321,94 +382,6 @@ For kiosk-side signing, provision the secret via a secure out-of-band channel
 
 ---
 
-## 5. Screenshot Policy (TTL-based)
-
-Screenshots are **only sent by the kiosk when someone is actively watching** – not continuously.
-
-### 5.1 How it works
-
-```
-Control Panel                    Server DB               Kiosk
-     │                               │                     │
-     │  Open kiosk detail modal      │                     │
-     │──POST /api/screenshot_request.php──────────────────►│
-     │       { kiosk_id, ttl=60 }    │                     │
-     │                     ┌─────────▼──────────┐          │
-     │                     │ screenshot_         │          │
-     │                     │ requested_until =   │          │
-     │                     │ NOW() + 60s         │          │
-     │                     └─────────────────────┘          │
-     │                               │                     │
-     │  (keepalive every 45 s)       │                     │
-     │──POST screenshot_request ────►│                     │
-     │                               │                     │
-     │                               │  POST /api/v1/device/sync.php
-     │                               │◄────────────────────│
-     │                     ┌─────────▼──────────┐          │
-     │                     │ screenshot_         │          │
-     │                     │ requested = TRUE    │──────────►
-     │                     │ (TTL not expired)   │ send screenshot
-     │                     └─────────────────────┘          │
-     │                               │                     │
-     │  Close modal                  │                     │
-     │──POST action=stop ───────────►│                     │
-     │                               │                     │
-     │  (or TTL expires after 60s)   │                     │
-     │                               │  POST sync          │
-     │                               │◄────────────────────│
-     │                     screenshot_requested = FALSE ────►
-     │                               │  kiosk stops sending│
-```
-
-### 5.2 Server-side API
-
-#### `POST /api/screenshot_request.php`
-
-Requires session auth (or Bearer token for same company).
-
-**Start / extend TTL:**
-```json
-{ "kiosk_id": 42, "ttl_seconds": 60 }
-```
-Response: `{ "success": true, "screenshot_requested_until": "2025-01-01 12:01:00", "ttl_seconds": 60 }`
-
-**Stop immediately:**
-```json
-{ "kiosk_id": 42, "action": "stop" }
-```
-
-#### `POST /api/v1/device/sync.php` – screenshot fields in response
-
-```json
-{
-  "screenshot_requested": true,
-  "screenshot_enabled": false,
-  "screenshot_interval_seconds": 3
-}
-```
-
-- `screenshot_requested`: `true` when `screenshot_requested_until > NOW()` (TTL active)
-- `screenshot_enabled`: persistent per-kiosk toggle
-- `screenshot_interval_seconds`: how often the kiosk should send screenshots (default 3 s)
-
-### 5.3 Kiosk-side behaviour
-
-`edudisplej-screenshot-service.sh` checks on every iteration:
-1. Reads `screenshot_requested` from `/opt/edudisplej/last_sync_response.json` (written by the sync service after each successful v1 sync)
-2. If `true` → captures and uploads screenshot, then sleeps `screenshot_interval_seconds`
-3. If `false` and `screenshot_enabled` (config) is also false → skips, sleeps default interval
-
-The sync service writes the full v1 sync response to `/opt/edudisplej/last_sync_response.json` after every successful call. This lets the screenshot service read the latest policy without an extra API call.
-
-### 5.4 Dashboard integration
-
-When `openKioskDetail(kioskId, hostname)` is called:
-- `requestScreenshotTTL(kioskId)` is called immediately (TTL = 60 s)
-- A keepalive runs every 45 s to extend TTL
-- When the modal is closed (click-outside or X button), `stopScreenshotTTL(kioskId)` clears the TTL
-
----
-
 ## 6. Threat Model & Security Notes
 
 | Threat | Mitigation |
@@ -447,10 +420,11 @@ When `openKioskDetail(kioskId, hostname)` is called:
 
 ### 7.3 Screenshot Service
 
-- `edudisplej-screenshot-service.sh` runs independently, controlled by
-  `screenshot_enabled` field in `/opt/edudisplej/data/config.json`.
-- Screenshot interval: configurable via `SCREENSHOT_INTERVAL` env var (default 15 s).
-- **Only sends screenshots when `screenshot_enabled == true`** (server can toggle via sync response).
+- `edudisplej-screenshot-service.sh` runs independently.
+- On each iteration calls `is_screenshot_active()`:
+  1. Checks `screenshot_requested` in `/opt/edudisplej/last_sync_response.json` (TTL-derived, written by sync service after each v1 sync).
+  2. Falls back to `screenshot_enabled` in `config.json` if no sync response.
+- Screenshot interval: read from `screenshot_interval_seconds` in the last sync response (default 3 s when TTL is active; default 15 s otherwise via `SCREENSHOT_INTERVAL` env var).
 
 ### 7.4 Config File
 
@@ -531,28 +505,36 @@ ALTER TABLE companies
 
 ## 10. Migration Plan
 
-### Phase 1 – Auth hardening (this PR)
+### Phase 1 – Auth hardening ✅
 - ✅ `get_module_file.php` requires auth
 - ✅ `health/status.php` requires auth + company match
 - ✅ `health/list.php` requires auth + company scoping
+- ✅ `geolocation.php` requires session auth
 - ✅ `?token=` query parameter deprecated with warning header
 
-### Phase 2 – Unified endpoint rollout
-- ✅ `api/v1/device/sync.php` created
+### Phase 2 – Unified endpoint rollout ✅
+- ✅ `api/v1/device/sync.php` created (handles HW data, optional screenshot, optional logs)
 - ✅ `edudisplej_sync_service.sh` updated to use v1 endpoint
+- ✅ Sync response written to `last_sync_response.json` for other kiosk services
 - ✅ Legacy endpoints emit `X-EDU-Deprecated` response headers
-- [ ] Update `edudisplej-screenshot-service.sh` to pass screenshot in v1 sync payload
+- ✅ `edudisplej-screenshot-service.sh` respects `screenshot_requested` and `screenshot_interval_seconds` from v1 response
 - [ ] Update `edudisplej-health.sh` to pass health data in v1 sync payload
 - [ ] Remove legacy `hw_data_sync.php`, `screenshot_sync.php`, `log_sync.php` (future)
 
-### Phase 3 – Request signing rollout
+### Phase 3 – Screenshot policy ✅
+- ✅ `api/screenshot_request.php` created (TTL set/extend/stop)
+- ✅ DB columns: `kiosks.screenshot_requested_until`, `kiosks.screenshot_interval_seconds`
+- ✅ `v1/device/sync.php` derives `screenshot_requested` from TTL, returns `screenshot_interval_seconds`
+- ✅ Dashboard: `requestScreenshotTTL` / `stopScreenshotTTL` with 45s keepalive
+
+### Phase 4 – Request signing rollout
 - ✅ `validate_request_signature()` function implemented in `auth.php`
 - ✅ `api/v1/device/sync.php` calls it (soft, not required)
+- ✅ DB schema: `companies.signing_secret`, `api_nonces` table (see Section 9)
 - [ ] Provision `signing_secret` per company in the admin panel
 - [ ] Enable hard enforcement (`$required = true`) for production kiosks
-- [ ] Create `api_nonces` table in production DB (see Section 9)
 
-### Phase 4 – Query param removal
+### Phase 5 – Query param removal
 - After all kiosks have been verified to use Bearer header only
 - Remove `$token_from_query` fallback from `auth.php`
 
@@ -615,7 +597,32 @@ curl -s -X POST "https://control.edudisplej.sk/api/v1/device/sync.php" \
   -d "$BODY"
 ```
 
-### 11.5 Verify deprecated endpoints still work (backward compat)
+### 11.5 Test screenshot TTL API
+
+```bash
+# Request screenshot (dashboard opens kiosk modal)
+curl -s -X POST "https://control.edudisplej.sk/api/screenshot_request.php" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"kiosk_id": 42, "ttl_seconds": 60}'
+# Expect: {"success":true, "screenshot_requested_until": "...", "ttl_seconds": 60}
+
+# Sync response should now have screenshot_requested: true
+curl -s -X POST "https://control.edudisplej.sk/api/v1/device/sync.php" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"mac":"aabbccddeeff","hostname":"test-kiosk"}'
+# Expect: "screenshot_requested": true, "screenshot_interval_seconds": 3
+
+# Stop screenshot request
+curl -s -X POST "https://control.edudisplej.sk/api/screenshot_request.php" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"kiosk_id": 42, "action": "stop"}'
+# Expect: {"success":true, "screenshot_requested_until": null}
+```
+
+### 11.6 Verify deprecated endpoints still work (backward compat)
 
 ```bash
 curl -s -X POST "https://control.edudisplej.sk/api/hw_data_sync.php" \
