@@ -91,7 +91,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                 } else {
                                     // Verify OTP code
                                     require_once 'api/auth.php';
-                                    if (verify_otp_code($user['otp_secret'], $otp_code)) {
+                                    $otp_ok = verify_otp_code($user['otp_secret'], $otp_code);
+
+                                    // Backup code fallback if TOTP fails
+                                    if (!$otp_ok && !empty($user['backup_codes'])) {
+                                        $stored_hashes = json_decode($user['backup_codes'], true) ?? [];
+                                        if (verify_backup_code($otp_code, $stored_hashes)) {
+                                            // Remove used backup code
+                                            $used_hash = hash_backup_code($otp_code);
+                                            $remaining = array_values(array_filter($stored_hashes, fn($h) => !hash_equals($h, $used_hash)));
+                                            $new_json  = json_encode($remaining);
+                                            $upd = $conn->prepare("UPDATE users SET backup_codes = ? WHERE id = ?");
+                                            $upd->bind_param("si", $new_json, $user['id']);
+                                            $upd->execute();
+                                            $upd->close();
+                                            $otp_ok = true;
+                                        }
+                                    }
+
+                                    if ($otp_ok) {
                                         // OTP verified, complete login
                                         unset($_SESSION['otp_pending']);
                                         unset($_SESSION['otp_pending_token']);
@@ -472,6 +490,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         </form>
         
         <div class="form-footer">
+            <p><a href="password_reset.php" style="color:#1e40af;font-size:13px;">Elfelejtette jelszavát?</a></p>
             <p><?php echo htmlspecialchars(t('login.no_account')); ?></p>
             <a href="userregistration.php"><?php echo htmlspecialchars(t('login.create_account')); ?></a>
         </div>

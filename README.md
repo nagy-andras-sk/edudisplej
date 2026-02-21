@@ -113,8 +113,12 @@ Content-Type: application/json
 - 🔄 Automatic updates + remote self-update from control panel / Automatické aktualizácie + vzdialená aktualizácia z kontrolného panela
 - ⚡ Fast loop mode (30s sync) controllable from control panel / Rýchly synchrónny mód (30s) ovládateľný z kontrolného panela
 - 🔑 Module license management / Správa licencií modulov
+- 📜 Company license management with device limits / Správa licencií spoločností s limitom zariadení
 - 🏢 Multi-company support / Podpora viacerých spoločností
 - ⚙️ Per-kiosk module configuration / Konfigurácia modulov pre každý kiosk
+- 📧 Configurable SMTP + multilingual email templates / Konfigurovateľný SMTP + viacjazyčné e-mailové šablóny
+- 🔐 TOTP MFA with backup codes / TOTP MFA so záložnými kódmi
+- 🔄 Password reset via email / Obnovenie hesla e-mailom
 
 ---
 
@@ -225,6 +229,10 @@ Zariadenia sú automaticky pomenované: `edudisplej-XXXXXX` (posledných 6 znako
 ## 📚 Documentation / Dokumentácia
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** – Full architecture reference: repo structure, auth model, API spec, HMAC-SHA256 signing, screenshot TTL policy, kiosk service architecture, DB schema, migration plan, and manual test steps.
+- **[docs/email.md](docs/email.md)** – SMTP configuration, multilingual email templates, password reset flow.
+- **[docs/mfa.md](docs/mfa.md)** – TOTP MFA setup, backup codes, login flow.
+- **[docs/licensing.md](docs/licensing.md)** – Company license model, device slot management, expiry policy.
+- **[CHANGELOG.md](CHANGELOG.md)** – All notable changes.
 
 ---
 

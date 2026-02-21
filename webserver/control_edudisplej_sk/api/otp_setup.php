@@ -82,15 +82,21 @@ try {
             
             // Verify the code
             if (verify_otp_code($user['otp_secret'], $code)) {
-                // Enable OTP
-                $stmt = $conn->prepare("UPDATE users SET otp_enabled = 1, otp_verified = 1 WHERE id = ?");
-                $stmt->bind_param("i", $user_id);
+                // Generate backup codes
+                $plain_codes  = generate_backup_codes(10);
+                $hashed_codes = array_map('hash_backup_code', $plain_codes);
+                $backup_json  = json_encode($hashed_codes);
+
+                // Enable OTP and store hashed backup codes
+                $stmt = $conn->prepare("UPDATE users SET otp_enabled = 1, otp_verified = 1, backup_codes = ? WHERE id = ?");
+                $stmt->bind_param("si", $backup_json, $user_id);
                 $stmt->execute();
                 $stmt->close();
-                
+
                 echo json_encode([
-                    'success' => true,
-                    'message' => 'Two-factor authentication enabled'
+                    'success'      => true,
+                    'message'      => 'Two-factor authentication enabled',
+                    'backup_codes' => $plain_codes,
                 ]);
             } else {
                 echo json_encode([
@@ -147,6 +153,48 @@ try {
                 'success' => true,
                 'otp_enabled' => (bool)($user['otp_enabled'] ?? false),
                 'otp_verified' => (bool)($user['otp_verified'] ?? false)
+            ]);
+            break;
+
+        case 'regenerate_backup_codes':
+            // Requires password confirmation
+            $password = $_POST['password'] ?? '';
+
+            if (empty($password)) {
+                echo json_encode(['success' => false, 'message' => 'Password required']);
+                exit();
+            }
+
+            $stmt = $conn->prepare("SELECT password, otp_enabled FROM users WHERE id = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $user = $result->fetch_assoc();
+            $stmt->close();
+
+            if (!$user || !password_verify($password, $user['password'])) {
+                echo json_encode(['success' => false, 'message' => 'Invalid password']);
+                exit();
+            }
+
+            if (!$user['otp_enabled']) {
+                echo json_encode(['success' => false, 'message' => '2FA is not enabled']);
+                exit();
+            }
+
+            $plain_codes  = generate_backup_codes(10);
+            $hashed_codes = array_map('hash_backup_code', $plain_codes);
+            $backup_json  = json_encode($hashed_codes);
+
+            $stmt = $conn->prepare("UPDATE users SET backup_codes = ? WHERE id = ?");
+            $stmt->bind_param("si", $backup_json, $user_id);
+            $stmt->execute();
+            $stmt->close();
+
+            echo json_encode([
+                'success'      => true,
+                'message'      => 'Backup codes regenerated',
+                'backup_codes' => $plain_codes,
             ]);
             break;
             

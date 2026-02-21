@@ -346,6 +346,63 @@ function generate_otp_secret() {
     return $secret;
 }
 
+/**
+ * Verify a TOTP code against a Base32 secret with ±1 time window tolerance (RFC 6238).
+ *
+ * @param string $secret Base32-encoded TOTP secret
+ * @param string $code   6-digit code string from an authenticator app
+ * @return bool          True if the code is valid within the ±1 window
+ */
+function verify_otp_code($secret, $code) {
+    if (empty($secret) || !preg_match('/^\d{6}$/', $code)) {
+        return false;
+    }
+    $time_step = floor(time() / 30);
+    for ($i = -1; $i <= 1; $i++) {
+        if (hash_equals(generate_otp_code($secret, $time_step + $i), $code)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Generate cryptographically secure random backup codes.
+ *
+ * @param int   $count Number of codes to generate (default 10)
+ * @return string[]   Array of uppercase hexadecimal strings (8 chars each)
+ */
+function generate_backup_codes($count = 10) {
+    $codes = [];
+    for ($i = 0; $i < $count; $i++) {
+        $codes[] = strtoupper(bin2hex(random_bytes(4)));
+    }
+    return $codes;
+}
+
+/**
+ * Hash a plain-text backup code for database storage.
+ *
+ * @param string $code Plain-text backup code (case-insensitive)
+ * @return string      SHA-256 hex digest of the uppercase-trimmed code
+ */
+function hash_backup_code($code) {
+    return hash('sha256', strtoupper(trim($code)));
+}
+
+/**
+ * Verify a plain backup code against stored hashes
+ */
+function verify_backup_code($plain_code, array $hashed_codes) {
+    $hash = hash_backup_code($plain_code);
+    foreach ($hashed_codes as $stored) {
+        if (hash_equals($stored, $hash)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Auto-start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
