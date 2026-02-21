@@ -20,6 +20,9 @@ $admin_nav_pages = [
     'module_licenses.php' => ['href' => 'module_licenses.php', 'label' => 'Licenszek'],
     'api_logs.php'        => ['href' => 'api_logs.php',        'label' => 'API Logok'],
     'security_logs.php'   => ['href' => 'security_logs.php',   'label' => 'Security Logok'],
+    'email_settings.php'  => ['href' => 'email_settings.php',  'label' => 'Email Beállítások'],
+    'email_templates.php' => ['href' => 'email_templates.php', 'label' => 'Email Sablonok'],
+    'licenses.php'        => ['href' => 'licenses.php',        'label' => 'Licenszek'],
 ];
 
 // Dashboard nav page map

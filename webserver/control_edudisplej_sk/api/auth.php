@@ -346,6 +346,53 @@ function generate_otp_secret() {
     return $secret;
 }
 
+/**
+ * Verify a TOTP code against a secret (±1 time window tolerance)
+ */
+function verify_otp_code($secret, $code) {
+    if (empty($secret) || !preg_match('/^\d{6}$/', $code)) {
+        return false;
+    }
+    $time_step = floor(time() / 30);
+    for ($i = -1; $i <= 1; $i++) {
+        if (hash_equals(generate_otp_code($secret, $time_step + $i), $code)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Generate random backup codes
+ */
+function generate_backup_codes($count = 10) {
+    $codes = [];
+    for ($i = 0; $i < $count; $i++) {
+        $codes[] = strtoupper(bin2hex(random_bytes(4)));
+    }
+    return $codes;
+}
+
+/**
+ * Hash a backup code for storage
+ */
+function hash_backup_code($code) {
+    return hash('sha256', strtoupper(trim($code)));
+}
+
+/**
+ * Verify a plain backup code against stored hashes
+ */
+function verify_backup_code($plain_code, array $hashed_codes) {
+    $hash = hash_backup_code($plain_code);
+    foreach ($hashed_codes as $stored) {
+        if (hash_equals($stored, $hash)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Auto-start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
