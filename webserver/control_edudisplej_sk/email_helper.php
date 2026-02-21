@@ -8,7 +8,10 @@ require_once __DIR__ . '/dbkonfiguracia.php';
 require_once __DIR__ . '/security_config.php';
 
 /**
- * Load SMTP settings from system_settings table, decrypt password
+ * Load SMTP settings from the `system_settings` table and decrypt the password.
+ *
+ * @return array{host:string,port:int,encryption:string,user:string,pass:string,
+ *               from_name:string,from_email:string,reply_to:string,timeout:int}
  */
 function get_smtp_settings() {
     try {
@@ -44,7 +47,12 @@ function get_smtp_settings() {
 }
 
 /**
- * Load an email template by key and lang, with fallback to 'en'
+ * Load an email template by key and language with automatic fallback to 'en'.
+ *
+ * @param string $key  Template key (e.g. 'password_reset', 'mfa_enabled')
+ * @param string $lang Language code ('hu', 'en', 'sk').  Falls back to 'en' if not found.
+ * @return array{subject:string,body_html:string,body_text:string}|null
+ *         Template row or null if no template exists for the key in any language.
  */
 function get_email_template($key, $lang = 'hu') {
     try {
@@ -72,7 +80,13 @@ function get_email_template($key, $lang = 'hu') {
 }
 
 /**
- * Log email send result to email_logs
+ * Persist an email send attempt to the `email_logs` table.
+ *
+ * @param string|null $template_key Template key used (null for raw sends)
+ * @param string      $to_email     Recipient e-mail address
+ * @param string      $subject      Message subject
+ * @param string      $result       'success' or 'error'
+ * @param string|null $error_msg    Error detail (null on success)
  */
 function _log_email($template_key, $to_email, $subject, $result, $error_msg = null) {
     try {
@@ -88,7 +102,18 @@ function _log_email($template_key, $to_email, $subject, $result, $error_msg = nu
 }
 
 /**
- * Send email using a template, replacing {{var}} placeholders
+ * Send an email using a named template.
+ *
+ * Loads the template identified by `$template_key` (with language fallback),
+ * replaces all `{{variable}}` placeholders with values from `$variables`,
+ * and delivers the message via the configured SMTP server.
+ *
+ * @param string   $template_key Template key (e.g. 'password_reset')
+ * @param string   $to_email     Recipient e-mail address
+ * @param string   $to_name      Recipient display name
+ * @param array    $variables    Associative array for `{{key}}` substitution
+ * @param string   $lang         Preferred language code ('hu', 'en', 'sk')
+ * @return bool                  True on success, false on any failure
  */
 function send_email_from_template($template_key, $to_email, $to_name, $variables = [], $lang = 'hu') {
     $tpl = get_email_template($template_key, $lang);
@@ -117,8 +142,14 @@ function send_email_from_template($template_key, $to_email, $to_name, $variables
 }
 
 /**
- * Send a raw email directly
- * $to can be string (email) or ['email'=>..., 'name'=>...]
+ * Send a raw email without template processing.
+ *
+ * @param string|array $to          Recipient: plain e-mail string or ['email'=>..., 'name'=>...]
+ * @param string       $subject     Message subject
+ * @param string       $body_html   HTML body
+ * @param string       $body_text   Plain-text body (optional; used as multipart/alternative fallback)
+ * @param string|null  $template_key Template key for logging purposes (null for ad-hoc sends)
+ * @return bool                     True on success, false on any failure
  */
 function send_raw_email($to, $subject, $body_html, $body_text = '', $template_key = null) {
     $smtp = get_smtp_settings();
@@ -142,8 +173,23 @@ function send_raw_email($to, $subject, $body_html, $body_text = '', $template_ke
 }
 
 /**
- * Low-level SMTP send via fsockopen
- * Returns true on success, error string on failure
+ * Low-level SMTP delivery via PHP `fsockopen`.
+ *
+ * Supports three encryption modes:
+ *  - `none` – plain TCP connection
+ *  - `tls`  – plain TCP upgraded via STARTTLS (RFC 3207, typically port 587)
+ *  - `ssl`  – direct TLS from the start (typically port 465)
+ *
+ * AUTH LOGIN and AUTH PLAIN are both attempted; the method is chosen based on
+ * the server's EHLO capability advertisement.
+ *
+ * @param array  $smtp      SMTP configuration from get_smtp_settings()
+ * @param string $to_email  Recipient address
+ * @param string $to_name   Recipient display name (used in To: header)
+ * @param string $subject   Message subject
+ * @param string $body_html HTML message body
+ * @param string $body_text Optional plain-text alternative body
+ * @return true|string      true on success; an error description string on failure
  */
 function _smtp_send(array $smtp, $to_email, $to_name, $subject, $body_html, $body_text) {
     $host       = $smtp['host'];

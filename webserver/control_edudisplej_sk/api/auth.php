@@ -347,7 +347,11 @@ function generate_otp_secret() {
 }
 
 /**
- * Verify a TOTP code against a secret (±1 time window tolerance)
+ * Verify a TOTP code against a Base32 secret with ±1 time window tolerance (RFC 6238).
+ *
+ * @param string $secret Base32-encoded TOTP secret
+ * @param string $code   6-digit code string from an authenticator app
+ * @return bool          True if the code is valid within the ±1 window
  */
 function verify_otp_code($secret, $code) {
     if (empty($secret) || !preg_match('/^\d{6}$/', $code)) {
@@ -363,7 +367,10 @@ function verify_otp_code($secret, $code) {
 }
 
 /**
- * Generate random backup codes
+ * Generate cryptographically secure random backup codes.
+ *
+ * @param int   $count Number of codes to generate (default 10)
+ * @return string[]   Array of uppercase hexadecimal strings (8 chars each)
  */
 function generate_backup_codes($count = 10) {
     $codes = [];
@@ -374,7 +381,10 @@ function generate_backup_codes($count = 10) {
 }
 
 /**
- * Hash a backup code for storage
+ * Hash a plain-text backup code for database storage.
+ *
+ * @param string $code Plain-text backup code (case-insensitive)
+ * @return string      SHA-256 hex digest of the uppercase-trimmed code
  */
 function hash_backup_code($code) {
     return hash('sha256', strtoupper(trim($code)));
