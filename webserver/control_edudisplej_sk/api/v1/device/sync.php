@@ -17,6 +17,27 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../../dbkonfiguracia.php';
 require_once __DIR__ . '/../../auth.php';
 
+function v1_sanitize_screenshot_filename($filename) {
+    $name = basename((string)$filename);
+    $name = str_replace(['\\', '/'], '', $name);
+    $name = preg_replace('/[^A-Za-z0-9._-]/', '', $name);
+
+    if ($name === '' || !preg_match('/\.(png|jpe?g)$/i', $name)) {
+        return '';
+    }
+
+    return $name;
+}
+
+function v1_ensure_debug_mode_column(mysqli $conn): void {
+    $check = $conn->query("SHOW COLUMNS FROM kiosks LIKE 'debug_mode'");
+    if ($check && $check->num_rows > 0) {
+        return;
+    }
+
+    $conn->query("ALTER TABLE kiosks ADD COLUMN debug_mode TINYINT(1) NOT NULL DEFAULT 0");
+}
+
 $api_company = validate_api_token();
 
 // Read raw body once
@@ -40,6 +61,7 @@ function v1_parse_ts($value): ?int {
 
 try {
     $conn = getDbConnection();
+    v1_ensure_debug_mode_column($conn);
 
     // -----------------------------------------------------------------------
     // 1. Identify kiosk
@@ -82,6 +104,7 @@ try {
     $stmt = $conn->prepare(
         "SELECT k.id, k.device_id, k.sync_interval, k.screenshot_requested,
                 COALESCE(k.screenshot_enabled, 0) as screenshot_enabled,
+            COALESCE(k.debug_mode, 0) as debug_mode,
                 COALESCE(k.screenshot_interval_seconds, 3) as screenshot_interval_seconds,
                 k.screenshot_requested_until,
                 k.company_id, c.name as company_name, k.loop_last_update
@@ -121,6 +144,7 @@ try {
     $screenshot_data = $data['screenshot'] ?? '';
     if (!empty($screenshot_data)) {
         $custom_filename = $data['screenshot_filename'] ?? '';
+        $custom_filename = v1_sanitize_screenshot_filename($custom_filename);
         $filename = !empty($custom_filename)
             ? $custom_filename
             : 'screenshot_' . md5($mac . time()) . '.png';
@@ -143,7 +167,7 @@ try {
 
             $relative_path = 'screenshots/' . $filename;
             $upd = $conn->prepare(
-                "UPDATE kiosks SET screenshot_url = ?, screenshot_requested = 0 WHERE mac = ?"
+                "UPDATE kiosks SET screenshot_url = ?, screenshot_timestamp = NOW(), screenshot_requested = 0 WHERE mac = ?"
             );
             $upd->bind_param("ss", $relative_path, $mac);
             $upd->execute();
@@ -306,6 +330,7 @@ try {
     $response['sync_interval']             = $kiosk['sync_interval'];
     $response['screenshot_requested']      = $screenshot_requested;
     $response['screenshot_enabled']        = (bool)$kiosk['screenshot_enabled'];
+    $response['debug_mode']                = (bool)$kiosk['debug_mode'];
     $response['screenshot_interval_seconds'] = (int)$kiosk['screenshot_interval_seconds'];
     $response['company_id']                = $kiosk['company_id'];
     $response['company_name']              = $kiosk['company_name'] ?? '';

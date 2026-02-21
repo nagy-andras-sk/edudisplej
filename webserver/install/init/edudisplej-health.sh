@@ -81,6 +81,8 @@ get_system_health() {
     local memory_usage="0"
     local disk_usage="0"
     local uptime="0"
+    local rpi_model="unknown"
+    local os_version="unknown"
     
     # CPU temperature (Raspberry Pi specific)
     if [ -f "/sys/class/thermal/thermal_zone0/temp" ]; then
@@ -98,6 +100,16 @@ get_system_health() {
     
     # Uptime in seconds
     uptime=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo "0")
+
+    if [ -f "/proc/device-tree/model" ]; then
+        rpi_model=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "unknown")
+    fi
+
+    if command -v lsb_release >/dev/null 2>&1; then
+        os_version=$(lsb_release -ds 2>/dev/null | sed 's/^\"//;s/\"$//' || echo "unknown")
+    elif [ -f /etc/os-release ]; then
+        os_version=$(grep '^PRETTY_NAME=' /etc/os-release | head -1 | cut -d= -f2- | sed 's/^\"//;s/\"$//' || echo "unknown")
+    fi
     
     # Check if system is under stress
     local health_status="healthy"
@@ -118,6 +130,8 @@ get_system_health() {
     "memory_usage": $memory_usage,
     "disk_usage": $disk_usage,
     "uptime": $uptime,
+    "rpi_model": "${rpi_model}",
+    "os_version": "${os_version}",
     "status": "$health_status"
 }
 EOF
@@ -172,6 +186,9 @@ check_service_health() {
 check_network_health() {
     local internet_ok="false"
     local api_ok="false"
+    local ssid=""
+    local signal=""
+    local local_ip=""
     
     # Check internet connectivity
     if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
@@ -184,11 +201,24 @@ check_network_health() {
     if curl -sf --max-time 5 --connect-timeout 3 -H "Authorization: Bearer $token" "${API_BASE_URL}/api/health.php" >/dev/null 2>&1; then
         api_ok="true"
     fi
+
+    if command -v iwgetid >/dev/null 2>&1; then
+        ssid=$(iwgetid -r 2>/dev/null || echo "")
+    fi
+
+    if command -v iwconfig >/dev/null 2>&1; then
+        signal=$(iwconfig 2>/dev/null | grep -Eo 'Signal level=[^ ]+' | head -1 | cut -d= -f2 || echo "")
+    fi
+
+    local_ip=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
     
     cat << EOF
 {
     "internet": $internet_ok,
-    "api_server": $api_ok
+    "api_server": $api_ok,
+    "wifi_name": "${ssid}",
+    "wifi_signal": "${signal}",
+    "local_ip": "${local_ip}"
 }
 EOF
 }
@@ -199,12 +229,31 @@ check_kiosk_configuration() {
     local kiosk_id="null"
     local company_id="null"
     local device_id="null"
+    local mac=""
+    local hostname=""
+
+    hostname=$(hostname 2>/dev/null || echo "")
+    mac=$(ip link show 2>/dev/null | awk '/link\/ether/ {print $2; exit}' | tr -d ':' || echo "")
     
     if [ -f "$CONFIG_FILE" ]; then
         configured="true"
-        kiosk_id=$(grep -o '"kiosk_id":[0-9]*' "$CONFIG_FILE" | cut -d: -f2 || echo "null")
-        company_id=$(grep -o '"company_id":[0-9]*' "$CONFIG_FILE" | cut -d: -f2 || echo "null")
-        device_id=$(grep -o '"device_id":"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4 || echo "null")
+
+        if command -v jq >/dev/null 2>&1; then
+            kiosk_id=$(jq -r '.kiosk_id // "null"' "$CONFIG_FILE" 2>/dev/null || echo "null")
+            company_id=$(jq -r '.company_id // "null"' "$CONFIG_FILE" 2>/dev/null || echo "null")
+            device_id=$(jq -r '.device_id // "null"' "$CONFIG_FILE" 2>/dev/null || echo "null")
+        else
+            kiosk_id=$(sed -n 's/.*"kiosk_id"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' "$CONFIG_FILE" | head -1)
+            company_id=$(sed -n 's/.*"company_id"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' "$CONFIG_FILE" | head -1)
+            device_id=$(sed -n 's/.*"device_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$CONFIG_FILE" | head -1)
+            [ -z "$kiosk_id" ] && kiosk_id="null"
+            [ -z "$company_id" ] && company_id="null"
+            [ -z "$device_id" ] && device_id="null"
+        fi
+    fi
+
+    if [ "$device_id" = "" ] || [ "$device_id" = "null" ]; then
+        device_id="null"
     fi
     
     cat << EOF
@@ -212,7 +261,9 @@ check_kiosk_configuration() {
     "configured": $configured,
     "kiosk_id": $kiosk_id,
     "company_id": $company_id,
-    "device_id": "$device_id"
+    "device_id": "$device_id",
+    "mac": "${mac}",
+    "hostname": "${hostname}"
 }
 EOF
 }

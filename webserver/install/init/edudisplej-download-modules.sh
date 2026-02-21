@@ -352,6 +352,43 @@ create_loop_player() {
             overflow: auto;
             max-height: 300px;
         }
+
+        #debug-terminal {
+            position: fixed;
+            right: 12px;
+            bottom: 12px;
+            width: min(560px, 45vw);
+            height: min(300px, 36vh);
+            background: rgba(0, 0, 0, 0.88);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.55);
+            border-radius: 8px;
+            display: none;
+            z-index: 9000;
+            overflow: hidden;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+
+        #debug-terminal-header {
+            font-size: 11px;
+            letter-spacing: 0.02em;
+            padding: 7px 10px;
+            background: rgba(34, 197, 94, 0.12);
+            border-bottom: 1px solid rgba(34, 197, 94, 0.35);
+            color: #86efac;
+        }
+
+        #debug-terminal-body {
+            font-size: 11px;
+            line-height: 1.35;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow: auto;
+            height: calc(100% - 32px);
+            margin: 0;
+            padding: 8px 10px;
+        }
     </style>
 </head>
 <body>
@@ -363,6 +400,11 @@ create_loop_player() {
         <h2>⚠️ Hiba történt</h2>
         <p id="error-message"></p>
         <pre id="error-details"></pre>
+    </div>
+
+    <div id="debug-terminal">
+        <div id="debug-terminal-header">DEBUG TERMINAL • sync.log</div>
+        <pre id="debug-terminal-body"></pre>
     </div>
     
     <script id="loop-config" type="application/json">
@@ -377,6 +419,11 @@ $loop_json
                 this.timer = null;
                 this.frame = document.getElementById('module-frame');
                 this.errorDisplay = document.getElementById('error-display');
+                this.debugTerminal = document.getElementById('debug-terminal');
+                this.debugTerminalBody = document.getElementById('debug-terminal-body');
+                this.debugModeEnabled = false;
+                this.debugModeTimer = null;
+                this.debugLogTimer = null;
                 
                 this.init();
             }
@@ -397,6 +444,7 @@ $loop_json
                     
                     // Start periodic check for configuration updates
                     this.startUpdateChecker();
+                    this.startDebugMonitor();
                     
                     this.startLoop();
                 } catch (error) {
@@ -433,6 +481,68 @@ $loop_json
                         this.log('Update check failed: ' + error.message);
                     }
                 }, 30000); // Check every 30 seconds
+            }
+
+            startDebugMonitor() {
+                this.checkDebugModeAndUpdate().catch(() => {});
+
+                this.debugModeTimer = setInterval(() => {
+                    this.checkDebugModeAndUpdate().catch(() => {});
+                }, 4000);
+
+                this.debugLogTimer = setInterval(() => {
+                    if (!this.debugModeEnabled) return;
+                    this.updateDebugLogTail().catch(() => {});
+                }, 3000);
+            }
+
+            async checkDebugModeAndUpdate() {
+                let isEnabled = false;
+
+                try {
+                    let response = await fetch(new URL('last_sync_response.json', window.location.href), { cache: 'no-store' });
+                    if (!response.ok) {
+                        response = await fetch('file:///opt/edudisplej/last_sync_response.json', { cache: 'no-store' });
+                    }
+
+                    if (response.ok) {
+                        const syncData = await response.json();
+                        isEnabled = !!syncData.debug_mode;
+                    }
+                } catch (error) {
+                    isEnabled = false;
+                }
+
+                if (isEnabled === this.debugModeEnabled) {
+                    return;
+                }
+
+                this.debugModeEnabled = isEnabled;
+                this.debugTerminal.style.display = isEnabled ? 'block' : 'none';
+
+                if (isEnabled) {
+                    this.debugTerminalBody.textContent = '[debug] Debug mode enabled, loading sync logs...\n';
+                    await this.updateDebugLogTail();
+                } else {
+                    this.debugTerminalBody.textContent = '';
+                }
+            }
+
+            async updateDebugLogTail() {
+                let response = await fetch(new URL('logs/sync.log', window.location.href), { cache: 'no-store' });
+                if (!response.ok) {
+                    response = await fetch('file:///opt/edudisplej/logs/sync.log?ts=' + Date.now(), { cache: 'no-store' });
+                }
+
+                if (!response.ok) {
+                    throw new Error('Failed to read sync.log');
+                }
+
+                const content = await response.text();
+                const lines = content.split('\n').filter(line => line.trim().length > 0);
+                const tail = lines.slice(-22);
+                this.debugTerminalBody.textContent = tail.join('\n');
+                this.debugTerminalBody.scrollTop = this.debugTerminalBody.scrollHeight;
             }
             
             async loadLoopConfig() {
@@ -595,6 +705,13 @@ $loop_json
             log(message) {
                 const timestamp = new Date().toISOString();
                 console.log('[' + timestamp + '] [LoopPlayer] ' + message);
+
+                if (this.debugModeEnabled && this.debugTerminalBody) {
+                    const current = this.debugTerminalBody.textContent || '';
+                    const next = (current + '\n[' + timestamp + '] [loop] ' + message).split('\n').slice(-26).join('\n');
+                    this.debugTerminalBody.textContent = next;
+                    this.debugTerminalBody.scrollTop = this.debugTerminalBody.scrollHeight;
+                }
             }
             
             showError(message, error) {

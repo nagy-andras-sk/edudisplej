@@ -5,7 +5,9 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
 require_once '../security_config.php';
+require_once '../kiosk_status.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: ../login.php');
@@ -43,6 +45,7 @@ try {
     $offline_count = 0;
 
     while ($row = $result->fetch_assoc()) {
+        kiosk_apply_effective_status($row);
         $kiosks[] = $row;
         switch ($row['status']) {
             case 'online':
@@ -83,11 +86,6 @@ function format_last_reboot($uptime_seconds) {
 include 'header.php';
 ?>
 
-<div class="panel">
-    <div class="page-title">Kiosk Health</div>
-    <div class="muted">Allapot, terheles, halozat, sync adatok.</div>
-</div>
-
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
@@ -117,7 +115,7 @@ include 'header.php';
 </div>
 
 <div class="panel">
-    <div class="panel-title">Kioskok</div>
+    <div class="panel-title">Kiosks</div>
     <div class="table-wrap">
         <table>
             <thead>
@@ -125,8 +123,8 @@ include 'header.php';
                     <th>ID</th>
                     <th>Hostname</th>
                     <th>Device ID</th>
-                    <th>Ceg</th>
-                    <th>Statusz</th>
+                    <th>Institution</th>
+                    <th>Status</th>
                     <th>Health status</th>
                     <th>Last update</th>
                     <th>CPU temp</th>
@@ -134,13 +132,13 @@ include 'header.php';
                     <th>RAM %</th>
                     <th>Disk %</th>
                     <th>Last reboot</th>
-                    <th>Muvelet</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($kiosks)): ?>
                     <tr>
-                        <td colspan="13" class="muted">Nincs adat.</td>
+                        <td colspan="13" class="muted">No data.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($kiosks as $kiosk): ?>

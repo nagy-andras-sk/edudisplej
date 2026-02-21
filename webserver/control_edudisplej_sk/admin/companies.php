@@ -1,10 +1,11 @@
 <?php
 /**
- * Company Management - Minimal Table
+ * Institution Management - Minimal Table
  */
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: index.php');
@@ -38,9 +39,9 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
             $stmt = $conn->prepare("DELETE FROM companies WHERE id = ?");
             $stmt->bind_param("i", $company_id);
             if ($stmt->execute()) {
-                $success = 'Company deleted successfully';
+                $success = 'Institution deleted successfully';
             } else {
-                $error = 'Failed to delete company';
+                $error = 'Failed to delete institution';
             }
             $stmt->close();
         }
@@ -57,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_company'])) {
     $is_active = isset($_POST['is_active']) ? 1 : 0;
 
     if ($name === '') {
-        $error = 'Company name is required';
+        $error = 'Institution name is required';
     } else {
         try {
             $conn = getDbConnection();
@@ -65,18 +66,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_company'])) {
             if ($company_id > 0) {
                 $stmt = $conn->prepare("UPDATE companies SET name = ?, is_active = ? WHERE id = ?");
                 $stmt->bind_param("sii", $name, $is_active, $company_id);
-                $success = 'Company updated successfully';
+                $success = 'Institution updated successfully';
             } else {
                 $stmt = $conn->prepare("INSERT INTO companies (name, is_active) VALUES (?, ?)");
                 $stmt->bind_param("si", $name, $is_active);
-                $success = 'Company created successfully';
+                $success = 'Institution created successfully';
             }
 
             $stmt->execute();
             $stmt->close();
             closeDbConnection($conn);
         } catch (Exception $e) {
-            $error = 'Failed to save company';
+            $error = 'Failed to save institution';
         }
     }
 }
@@ -101,7 +102,7 @@ try {
 
     closeDbConnection($conn);
 } catch (Exception $e) {
-    $error = 'Failed to load companies';
+    $error = 'Failed to load institutions';
 }
 
 $edit_company = null;
@@ -117,11 +118,6 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
 include 'header.php';
 ?>
 
-<div class="panel">
-    <div class="page-title">Cegek</div>
-    <div class="muted">Ugyfel ceg adatok, kioskok, felhasznalok.</div>
-</div>
-
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
@@ -131,60 +127,60 @@ include 'header.php';
 <?php endif; ?>
 
 <div class="panel">
-    <div class="panel-title"><?php echo $edit_company ? 'Ceg szerkesztes' : 'Uj ceg'; ?></div>
+    <div class="panel-title"><?php echo $edit_company ? 'Edit institution' : 'New institution'; ?></div>
     <form method="post" class="form-row">
         <input type="hidden" name="company_id" value="<?php echo $edit_company ? (int)$edit_company['id'] : 0; ?>">
         <div class="form-field" style="min-width: 260px;">
-            <label for="company_name">Ceg neve</label>
+            <label for="company_name">Institution name</label>
             <input id="company_name" name="company_name" type="text" value="<?php echo htmlspecialchars($edit_company['name'] ?? ''); ?>" required>
         </div>
         <div class="form-field">
-            <label for="is_active">Aktiv</label>
+            <label for="is_active">Active</label>
             <select id="is_active" name="is_active">
-                <option value="1" <?php echo ($edit_company && (int)$edit_company['is_active'] === 1) || !$edit_company ? 'selected' : ''; ?>>Igen</option>
-                <option value="0" <?php echo $edit_company && (int)$edit_company['is_active'] === 0 ? 'selected' : ''; ?>>Nem</option>
+                <option value="1" <?php echo ($edit_company && (int)$edit_company['is_active'] === 1) || !$edit_company ? 'selected' : ''; ?>>Yes</option>
+                <option value="0" <?php echo $edit_company && (int)$edit_company['is_active'] === 0 ? 'selected' : ''; ?>>No</option>
             </select>
         </div>
         <div class="form-field">
-            <button type="submit" name="save_company" class="btn btn-primary">Ment</button>
+            <button type="submit" name="save_company" class="btn btn-primary">Save</button>
         </div>
         <?php if ($edit_company): ?>
             <div class="form-field">
-                <a class="btn btn-secondary" href="companies.php">Megse</a>
+                <a class="btn btn-secondary" href="companies.php">Cancel</a>
             </div>
         <?php endif; ?>
     </form>
 </div>
 
 <div class="panel">
-    <div class="panel-title">Ceg lista</div>
+    <div class="panel-title">Institution list</div>
     <div class="table-wrap">
         <table>
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Nev</th>
-                    <th>Aktiv</th>
-                    <th>Kioskok</th>
-                    <th>Felhasznalok</th>
+                    <th>Name</th>
+                    <th>Active</th>
+                    <th>Kiosks</th>
+                    <th>Users</th>
                     <th>License Key</th>
                     <th>API Token</th>
-                    <th>Token Letrehozva</th>
-                    <th>Letrehozva</th>
-                    <th>Muvelet</th>
+                    <th>Token created</th>
+                    <th>Created at</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($companies)): ?>
                     <tr>
-                        <td colspan="10" class="muted">Nincs ceg.</td>
+                        <td colspan="10" class="muted">No institutions.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($companies as $company): ?>
                         <tr>
                             <td><?php echo (int)$company['id']; ?></td>
                             <td><?php echo htmlspecialchars($company['name']); ?></td>
-                            <td><?php echo (int)$company['is_active'] === 1 ? 'Igen' : 'Nem'; ?></td>
+                            <td><?php echo (int)$company['is_active'] === 1 ? 'Yes' : 'No'; ?></td>
                             <td><?php echo (int)$company['kiosk_count']; ?></td>
                             <td><?php echo (int)$company['user_count']; ?></td>
                             <td class="mono"><?php echo htmlspecialchars($company['license_key'] ?? '-'); ?></td>
@@ -192,8 +188,8 @@ include 'header.php';
                             <td class="nowrap"><?php echo $company['token_created_at'] ? date('Y-m-d H:i:s', strtotime($company['token_created_at'])) : '-'; ?></td>
                             <td class="nowrap"><?php echo $company['created_at'] ? date('Y-m-d H:i:s', strtotime($company['created_at'])) : '-'; ?></td>
                             <td class="nowrap">
-                                <a class="btn btn-small" href="companies.php?edit=<?php echo (int)$company['id']; ?>">Szerkeszt</a>
-                                <a class="btn btn-small btn-danger" href="companies.php?delete=<?php echo (int)$company['id']; ?>" onclick="return confirm('Toroljuk a ceget?')">Torol</a>
+                                <a class="btn btn-small" href="companies.php?edit=<?php echo (int)$company['id']; ?>">Edit</a>
+                                <a class="btn btn-small btn-danger" href="companies.php?delete=<?php echo (int)$company['id']; ?>" onclick="return confirm('Delete institution?')">Delete</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>

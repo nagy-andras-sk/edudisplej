@@ -5,6 +5,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
 require_once '../email_helper.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
@@ -30,11 +31,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $body_text = $_POST['body_text']         ?? '';
 
         if (!in_array($tkey, $allowed_keys, true)) {
-            $error = 'Érvénytelen sablon kulcs.';
+            $error = 'Invalid template key.';
         } elseif (!in_array($lang, $allowed_langs, true)) {
-            $error = 'Érvénytelen nyelv.';
+            $error = 'Invalid language.';
         } elseif (empty($subject)) {
-            $error = 'A tárgy kötelező.';
+            $error = 'Subject is required.';
         } else {
             try {
                 $conn = getDbConnection();
@@ -43,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute();
                 $stmt->close();
                 closeDbConnection($conn);
-                $success = 'Sablon mentve.';
+                $success = 'Template saved.';
             } catch (Exception $e) {
                 $error = 'Hiba: ' . htmlspecialchars($e->getMessage());
             }
@@ -59,9 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute();
                 $stmt->close();
                 closeDbConnection($conn);
-                $success = 'Sablon törölve.';
+                $success = 'Template deleted.';
             } catch (Exception $e) {
-                $error = 'Törlési hiba: ' . htmlspecialchars($e->getMessage());
+                $error = 'Delete error: ' . htmlspecialchars($e->getMessage());
             }
         }
     } elseif ($action === 'test_send') {
@@ -83,9 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'reset_link' => 'https://example.com/reset',
                     'site_name'  => 'EduDisplej',
                 ], $lang);
-                $success = $ok ? 'Teszt email elküldve: ' . htmlspecialchars($admin_row['email']) : 'Küldés sikertelen.';
+                $success = $ok ? 'Test email sent: ' . htmlspecialchars($admin_row['email']) : 'Sending failed.';
             } else {
-                $error = 'Admin email nem található.';
+                $error = 'Admin email not found.';
             }
         } catch (Exception $e) {
             $error = 'Hiba: ' . htmlspecialchars($e->getMessage());
@@ -122,11 +123,11 @@ try {
     $error = 'DB hiba: ' . htmlspecialchars($e->getMessage());
 }
 
-$title = 'Email Sablonok';
+$title = 'Email Templates';
 require_once 'header.php';
 ?>
 
-<h2 class="page-title">Email Sablonok</h2>
+<h2 class="page-title">Email Templates</h2>
 
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
@@ -137,21 +138,21 @@ require_once 'header.php';
 
 <!-- Template list -->
 <div class="panel">
-    <div class="panel-title">Meglévő sablonok</div>
+    <div class="panel-title">Existing templates</div>
     <div class="table-wrap">
         <table>
             <thead>
                 <tr>
-                    <th>Kulcs</th>
-                    <th>Nyelv</th>
-                    <th>Tárgy</th>
-                    <th>Módosítva</th>
-                    <th>Műveletek</th>
+                    <th>Key</th>
+                    <th>Language</th>
+                    <th>Subject</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($all_templates)): ?>
-                    <tr><td colspan="5" class="muted">Nincs sablon.</td></tr>
+                    <tr><td colspan="5" class="muted">No templates.</td></tr>
                 <?php else: ?>
                     <?php foreach ($all_templates as $t): ?>
                         <tr>
@@ -160,21 +161,21 @@ require_once 'header.php';
                             <td><?php echo htmlspecialchars($t['subject']); ?></td>
                             <td class="nowrap muted"><?php echo htmlspecialchars($t['updated_at'] ?? '-'); ?></td>
                             <td class="nowrap">
-                                <a href="email_templates.php?edit_key=<?php echo urlencode($t['template_key']); ?>&edit_lang=<?php echo urlencode($t['lang']); ?>" class="btn btn-small btn-secondary">Szerkesztés</a>
-                                <form method="POST" action="email_templates.php" style="display:inline;" onsubmit="return confirm('Biztos törli?');">
+                                <a href="email_templates.php?edit_key=<?php echo urlencode($t['template_key']); ?>&edit_lang=<?php echo urlencode($t['lang']); ?>" class="btn btn-small btn-secondary">Edit</a>
+                                <form method="POST" action="email_templates.php" style="display:inline;" onsubmit="return confirm('Delete template?');">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="template_key" value="<?php echo htmlspecialchars($t['template_key']); ?>">
                                     <input type="hidden" name="lang" value="<?php echo htmlspecialchars($t['lang']); ?>">
-                                    <button type="submit" class="btn btn-small btn-danger">Törlés</button>
+                                    <button type="submit" class="btn btn-small btn-danger">Delete</button>
                                 </form>
                                 <form method="POST" action="email_templates.php" style="display:inline;">
                                     <input type="hidden" name="action" value="test_send">
                                     <input type="hidden" name="template_key" value="<?php echo htmlspecialchars($t['template_key']); ?>">
                                     <input type="hidden" name="lang" value="<?php echo htmlspecialchars($t['lang']); ?>">
-                                    <button type="submit" class="btn btn-small">Teszt küldés</button>
+                                    <button type="submit" class="btn btn-small">Send test</button>
                                 </form>
                                 <!-- Preview button -->
-                                <button class="btn btn-small" onclick="showPreview(<?php echo htmlspecialchars(json_encode($t['template_key'])); ?>, <?php echo htmlspecialchars(json_encode($t['lang'])); ?>)">Előnézet</button>
+                                <button class="btn btn-small" onclick="showPreview(<?php echo htmlspecialchars(json_encode($t['template_key'])); ?>, <?php echo htmlspecialchars(json_encode($t['lang'])); ?>)">Preview</button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -186,12 +187,12 @@ require_once 'header.php';
 
 <!-- Edit / Create form -->
 <div class="panel" style="margin-top:20px;">
-    <div class="panel-title"><?php echo $edit_template ? 'Sablon szerkesztése' : 'Új sablon'; ?></div>
+    <div class="panel-title"><?php echo $edit_template ? 'Edit template' : 'New template'; ?></div>
     <form method="POST" action="email_templates.php">
         <input type="hidden" name="action" value="save">
         <div class="form-row">
             <div class="form-field">
-                <label>Sablon kulcs</label>
+                <label>Template key</label>
                 <select name="template_key">
                     <?php foreach ($allowed_keys as $k): ?>
                         <option value="<?php echo htmlspecialchars($k); ?>" <?php echo (($edit_template['template_key'] ?? '') === $k) ? 'selected' : ''; ?>><?php echo htmlspecialchars($k); ?></option>
@@ -199,7 +200,7 @@ require_once 'header.php';
                 </select>
             </div>
             <div class="form-field">
-                <label>Nyelv</label>
+                <label>Language</label>
                 <select name="lang">
                     <?php foreach ($allowed_langs as $l): ?>
                         <option value="<?php echo htmlspecialchars($l); ?>" <?php echo (($edit_template['lang'] ?? 'hu') === $l) ? 'selected' : ''; ?>><?php echo strtoupper(htmlspecialchars($l)); ?></option>
@@ -208,20 +209,20 @@ require_once 'header.php';
             </div>
         </div>
         <div class="form-field">
-            <label>Tárgy</label>
+            <label>Subject</label>
             <input type="text" name="subject" value="<?php echo htmlspecialchars($edit_template['subject'] ?? ''); ?>" required>
         </div>
         <div class="form-field">
-            <label>HTML törzs <span class="muted">({{name}}, {{reset_link}}, {{site_name}} változók)</span></label>
+            <label>HTML body <span class="muted">({{name}}, {{reset_link}}, {{site_name}} variables)</span></label>
             <textarea name="body_html" rows="12" style="width:100%;font-family:monospace;font-size:13px;"><?php echo htmlspecialchars($edit_template['body_html'] ?? ''); ?></textarea>
         </div>
         <div class="form-field">
-            <label>Szöveges törzs <span class="muted">(opcionális)</span></label>
+            <label>Text body <span class="muted">(optional)</span></label>
             <textarea name="body_text" rows="5" style="width:100%;font-family:monospace;font-size:13px;"><?php echo htmlspecialchars($edit_template['body_text'] ?? ''); ?></textarea>
         </div>
-        <button type="submit" class="btn btn-primary">Mentés</button>
+        <button type="submit" class="btn btn-primary">Save</button>
         <?php if ($edit_template): ?>
-            <a href="email_templates.php" class="btn btn-secondary">Mégse</a>
+            <a href="email_templates.php" class="btn btn-secondary">Cancel</a>
         <?php endif; ?>
     </form>
 </div>
@@ -230,8 +231,8 @@ require_once 'header.php';
 <div id="previewModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
     <div style="background:#fff;width:90%;max-width:800px;height:80vh;border-radius:6px;display:flex;flex-direction:column;overflow:hidden;">
         <div style="padding:12px 16px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;">
-            <strong>Előnézet</strong>
-            <button onclick="document.getElementById('previewModal').style.display='none';" class="btn btn-small btn-danger">Bezárás</button>
+            <strong>Preview</strong>
+            <button onclick="document.getElementById('previewModal').style.display='none';" class="btn btn-small btn-danger">Close</button>
         </div>
         <iframe id="previewFrame" sandbox="allow-same-origin" style="flex:1;border:none;width:100%;"></iframe>
     </div>
@@ -247,10 +248,10 @@ function showPreview(key, lang) {
                 frame.srcdoc = data.html;
                 document.getElementById('previewModal').style.display = 'flex';
             } else {
-                alert('Hiba: ' + data.message);
+                alert('Error: ' + data.message);
             }
         })
-        .catch(() => alert('Hálózati hiba'));
+            .catch(() => alert('Network error'));
 }
 </script>
 

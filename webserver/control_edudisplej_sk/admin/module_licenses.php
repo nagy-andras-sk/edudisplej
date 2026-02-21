@@ -5,6 +5,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: index.php');
@@ -96,11 +97,6 @@ try {
 include 'header.php';
 ?>
 
-<div class="panel">
-    <div class="page-title">Module Licenszek</div>
-    <div class="muted">Ceg/modul hozzarendeles, mennyiseg.</div>
-</div>
-
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
@@ -110,12 +106,12 @@ include 'header.php';
 <?php endif; ?>
 
 <div class="panel">
-    <div class="panel-title">License beallitas</div>
+    <div class="panel-title">License settings</div>
     <form method="post" class="form-row">
         <div class="form-field">
-            <label for="company_id">Ceg</label>
+            <label for="company_id">Institution</label>
             <select id="company_id" name="company_id" required>
-                <option value="">Valassz</option>
+                <option value="">Select</option>
                 <?php foreach ($companies as $company): ?>
                     <option value="<?php echo (int)$company['id']; ?>"><?php echo htmlspecialchars($company['name']); ?></option>
                 <?php endforeach; ?>
@@ -124,24 +120,24 @@ include 'header.php';
         <div class="form-field">
             <label for="module_id">Modul</label>
             <select id="module_id" name="module_id" required>
-                <option value="">Valassz</option>
+                <option value="">Select</option>
                 <?php foreach ($modules as $module): ?>
                     <option value="<?php echo (int)$module['id']; ?>"><?php echo htmlspecialchars($module['name']); ?> (<?php echo htmlspecialchars($module['module_key']); ?>)</option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div class="form-field">
-            <label for="quantity">Mennyiseg</label>
+            <label for="quantity">Quantity</label>
             <input id="quantity" name="quantity" type="number" min="0" max="999" value="0">
         </div>
         <div class="form-field">
-            <button type="submit" name="update_license" class="btn btn-primary">Ment</button>
+            <button type="submit" name="update_license" class="btn btn-primary">Save</button>
         </div>
     </form>
 </div>
 
 <div class="panel">
-    <div class="panel-title">Aktiv licenszek</div>
+    <div class="panel-title">Active licenses</div>
     <div class="table-wrap">
         <table>
             <thead>
@@ -156,7 +152,7 @@ include 'header.php';
             <tbody>
                 <?php if (empty($licenses)): ?>
                     <tr>
-                        <td colspan="5" class="muted">Nincs license.</td>
+                        <td colspan="5" class="muted">No licenses.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($licenses as $license): ?>

@@ -77,6 +77,29 @@ a:hover {
     gap: 8px;
 }
 
+.header-lang {
+    color: #cfd5db;
+    font-size: 12px;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.header-lang-select {
+    padding: 6px 10px;
+    border: 1px solid #3a4c5d;
+    background: #172735;
+    color: #f3f3f3;
+    border-radius: 8px;
+    font-size: 12px;
+    min-width: 110px;
+}
+
+.header-lang-select:focus {
+    border-color: #5a7a99;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(90, 122, 153, 0.35);
+}
+
 .header-link {
     padding: 6px 10px;
     border: 1px solid #3a4c5d;
@@ -512,6 +535,10 @@ tbody tr:hover td {
     padding: 6px;
 }
 
+.preview-card.placeholder .screenshot-loader {
+    display: flex;
+}
+
 .preview-card .screenshot-timestamp {
     position: absolute;
     bottom: 3px;
@@ -694,5 +721,9 @@ tbody tr:hover td {
 
     .table-wrap {
         -webkit-overflow-scrolling: touch;
+    }
+
+    .header-lang {
+        display: none;
     }
 }

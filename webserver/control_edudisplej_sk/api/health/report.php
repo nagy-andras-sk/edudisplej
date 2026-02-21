@@ -22,25 +22,75 @@ try {
     }
     
     // Extract kiosk identification
-    $device_id = $data['kiosk']['device_id'] ?? null;
-    $kiosk_id = $data['kiosk']['kiosk_id'] ?? null;
+    $device_id_raw = trim((string)($data['kiosk']['device_id'] ?? ''));
+    $device_id = in_array(strtolower($device_id_raw), ['', 'null', 'unknown'], true) ? null : $device_id_raw;
+
+    $kiosk_id_raw = $data['kiosk']['kiosk_id'] ?? null;
+    $kiosk_id = (is_numeric($kiosk_id_raw) && (int)$kiosk_id_raw > 0) ? (int)$kiosk_id_raw : null;
+
+    $mac_raw = trim((string)($data['kiosk']['mac'] ?? ($data['mac'] ?? '')));
+    $mac = in_array(strtolower($mac_raw), ['', 'null', 'unknown'], true) ? null : $mac_raw;
+
+    $hostname_raw = trim((string)($data['kiosk']['hostname'] ?? ($data['hostname'] ?? '')));
+    $hostname = in_array(strtolower($hostname_raw), ['', 'null', 'unknown'], true) ? null : $hostname_raw;
+
     $timestamp = $data['timestamp'] ?? date('Y-m-d H:i:s');
     
-    if (!$device_id && !$kiosk_id) {
+    if (!$device_id && !$kiosk_id && !$mac && !$hostname) {
         throw new Exception('Missing kiosk identification');
     }
     
-    // Find kiosk by device_id or kiosk_id
-    $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE device_id = ? OR id = ? LIMIT 1");
-    $stmt->bind_param("si", $device_id, $kiosk_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows === 0) {
+    // Find kiosk by strongest identifiers first, then fallback
+    $kiosk = null;
+
+    if ($kiosk_id) {
+        $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE id = ? LIMIT 1");
+        $stmt->bind_param("i", $kiosk_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
+            $kiosk = $result->fetch_assoc();
+        }
+        $stmt->close();
+    }
+
+    if (!$kiosk && $device_id) {
+        $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE device_id = ? LIMIT 1");
+        $stmt->bind_param("s", $device_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
+            $kiosk = $result->fetch_assoc();
+        }
+        $stmt->close();
+    }
+
+    if (!$kiosk && $mac) {
+        $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE REPLACE(LOWER(mac), ':', '') = REPLACE(LOWER(?), ':', '') LIMIT 1");
+        $stmt->bind_param("s", $mac);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
+            $kiosk = $result->fetch_assoc();
+        }
+        $stmt->close();
+    }
+
+    if (!$kiosk && $hostname) {
+        $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE hostname = ? LIMIT 1");
+        $stmt->bind_param("s", $hostname);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
+            $kiosk = $result->fetch_assoc();
+        }
+        $stmt->close();
+    }
+
+    if (!$kiosk) {
         throw new Exception('Kiosk not found');
     }
-    
-    $kiosk = $result->fetch_assoc();
+
     $kiosk_id = $kiosk['id'];
 
     api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
@@ -64,7 +114,7 @@ try {
         sync_data = VALUES(sync_data),
         timestamp = NOW()
     ");
-    $stmt->bind_param("issss", $kiosk_id, $overall_status, $system_data, $services_data, $network_data, $sync_data);
+        $stmt->bind_param("isssss", $kiosk_id, $overall_status, $system_data, $services_data, $network_data, $sync_data);
     
     if (!$stmt->execute()) {
         throw new Exception('Failed to store health data');
@@ -75,7 +125,7 @@ try {
         'healthy' => 'online',
         'warning' => 'warning',
         'critical' => 'offline',
-        default => 'unknown'
+            default => 'pending'
     };
     
     $stmt = $conn->prepare("UPDATE kiosks SET status = ?, last_heartbeat = NOW() WHERE id = ?");

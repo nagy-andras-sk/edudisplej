@@ -6,6 +6,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../kiosk_status.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
@@ -29,6 +30,10 @@ try {
     $stmt->execute();
     $kiosk = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+
+    if ($kiosk) {
+        kiosk_apply_effective_status($kiosk);
+    }
     
     if (!$kiosk) {
         header('Location: index.php');

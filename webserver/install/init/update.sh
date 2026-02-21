@@ -510,6 +510,17 @@ echo ""
 echo "[*] Zaloha: $BACKUP_DIR"
 echo ""
 
+# Ensure hostname is configured correctly after update
+HOSTNAME_SCRIPT="${INIT_DIR}/edudisplej-hostname.sh"
+if [ -x "$HOSTNAME_SCRIPT" ]; then
+    echo "[*] Kontrolujem hostname konfiguraciu..."
+    if bash "$HOSTNAME_SCRIPT"; then
+        echo "[✓] Hostname konfiguracia overena"
+    else
+        echo "[!] VAROVANIE: Hostname konfiguracia zlyhala"
+    fi
+fi
+
 # Restart sluzieb / Szolgaltatasok ujrainditasa
 echo "[*] Restartujem sluzby / Szolgaltatasok ujrainditasa..."
 

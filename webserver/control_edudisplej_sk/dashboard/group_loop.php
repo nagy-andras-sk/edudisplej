@@ -6,6 +6,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -20,6 +21,7 @@ $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
 $error = '';
 $success = '';
 $company_name = '';
+$is_default_group = false;
 
 $group = null;
 
@@ -46,11 +48,14 @@ try {
     $group = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     
-    // Check permissions
-    if (!$group || (!$is_admin && $group['company_id'] != $company_id)) {
-        header('Location: groups');
+    // Check permissions: only groups of the current company are accessible
+    if (!$group || (int)($group['company_id'] ?? 0) !== (int)$company_id) {
+        http_response_code(403);
+        echo 'Access denied';
         exit();
     }
+
+    $is_default_group = (!empty($group['is_default']) || strtolower($group['name']) === 'default');
     
     closeDbConnection($conn);
     
@@ -59,10 +64,22 @@ try {
     error_log($e->getMessage());
 }
 
+$breadcrumb_group_name = trim((string)($group['name'] ?? ''));
+if ($breadcrumb_group_name === '') {
+    $breadcrumb_group_name = 'Csoport #' . (int)$group_id;
+}
+
+$breadcrumb_items = [
+    ['label' => '📁 ' . t('nav.groups'), 'href' => 'groups.php'],
+    ['label' => '👥 ' . $breadcrumb_group_name, 'href' => 'group_kiosks.php?id=' . (int)$group_id],
+    ['label' => '⚙️ Loop config', 'current' => true],
+];
+
 $logout_url = '../login.php?logout=1';
 
 // Get available modules for this company
 $available_modules = [];
+$unconfigured_module = null;
 try {
     $conn = getDbConnection();
     
@@ -77,8 +94,13 @@ try {
     $result = $stmt->get_result();
     
     while ($row = $result->fetch_assoc()) {
+        if (($row['module_key'] ?? '') === 'unconfigured') {
+            $unconfigured_module = $row;
+            continue;
+        }
+
         // Include module if it has license OR if it's a default/system module
-        if ($row['license_quantity'] > 0 || in_array($row['module_key'], ['clock', 'default-logo', 'unconfigured'])) {
+        if ($row['license_quantity'] > 0 || in_array($row['module_key'], ['clock', 'default-logo'])) {
             $available_modules[] = $row;
         }
     }
@@ -94,21 +116,65 @@ try {
     <style>
         .loop-page-header {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
+            padding: 10px 14px;
+            border-radius: 0;
             margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: none;
+            border: 1px solid #d4d9df;
         }
         
         .loop-page-header h1 {
             color: #333;
-            margin-bottom: 5px;
-            font-size: 24px;
+            margin: 0;
+            font-size: 15px;
+            display: inline;
         }
         
         .loop-page-header p {
             color: #666;
+            font-size: 13px;
+            margin: 0;
+            display: inline;
+        }
+
+        .loop-layout-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 0;
+            overflow: visible;
+            box-shadow: none;
+            border: 1px solid #cfd6dd;
+        }
+
+        .loop-layout-table th,
+        .loop-layout-table td {
+            border: 1px solid #cfd6dd;
+            vertical-align: top;
+        }
+
+        .loop-layout-table thead th {
+            background: #f8f9fb;
+            text-align: left;
+            padding: 12px 16px;
             font-size: 14px;
+            color: #1f2d3d;
+            font-weight: 600;
+        }
+
+        .layout-col-modules {
+            width: 24%;
+            padding: 14px;
+        }
+
+        .layout-col-config {
+            width: 41%;
+            padding: 14px;
+        }
+
+        .layout-col-preview {
+            width: 35%;
+            padding: 14px;
         }
         
         .content-grid {
@@ -118,17 +184,42 @@ try {
         }
         
         @media (max-width: 1200px) {
-            .content-grid {
-                grid-template-columns: 1fr;
+            .loop-layout-table,
+            .loop-layout-table thead,
+            .loop-layout-table tbody,
+            .loop-layout-table tr,
+            .loop-layout-table th,
+            .loop-layout-table td {
+                display: block;
+                width: 100%;
+            }
+
+            .loop-layout-table td,
+            .loop-layout-table th {
+                border-width: 0 0 1px 0;
+            }
+
+            .layout-col-modules,
+            .layout-col-config,
+            .layout-col-preview {
+                padding: 12px;
+            }
+
+            .preview-panel {
+                position: static;
+                top: auto;
+                max-height: none;
+                overflow: visible;
             }
         }
         
         .modules-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            max-height: 600px;
+            background: #fff;
+            padding: 14px;
+            border-radius: 0;
+            border: 1px solid #cfd6dd;
+            box-shadow: none;
+            max-height: 720px;
             overflow-y: auto;
         }
         
@@ -139,24 +230,23 @@ try {
         }
         
         .module-item {
-            background: #f8f9fa;
+            background: #f4f6f8;
             padding: 12px;
-            border-radius: 8px;
+            border-radius: 0;
             margin-bottom: 10px;
             cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid transparent;
+            transition: border-color 0.2s, background 0.2s;
+            border: 1px solid #c7ced6;
         }
         
         .module-item:hover {
-            background: #e9ecef;
-            transform: translateY(-2px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background: #e9edf1;
+            border-color: #2c3e50;
         }
         
         .module-item.selected {
-            border-color: #1a3a52;
-            background: #e7f3ff;
+            border-color: #2c3e50;
+            background: #dde3ea;
         }
         
         .module-name {
@@ -172,10 +262,11 @@ try {
         }
         
         .loop-builder {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            background: #fff;
+            padding: 14px;
+            border-radius: 0;
+            border: 1px solid #cfd6dd;
+            box-shadow: none;
         }
         
         .loop-builder h2 {
@@ -186,10 +277,10 @@ try {
         
         #loop-container {
             min-height: 300px;
-            border: 2px dashed #ccc;
-            border-radius: 8px;
+            border: 1px dashed #9aa6b2;
+            border-radius: 0;
             padding: 15px;
-            background: #f8f9fa;
+            background: #f4f6f8;
         }
         
         #loop-container.empty {
@@ -201,22 +292,24 @@ try {
         }
         
         .loop-item {
-            background: linear-gradient(135deg, #0f2537 0%, #1a4d2e 100%);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
+            background: #1f2f3f;
+            color: #fff;
+            padding: 10px 12px;
+            border-radius: 0;
+            margin-bottom: 8px;
             display: flex;
-            align-items: center;
-            gap: 15px;
+            align-items: flex-start;
+            gap: 10px;
             cursor: move;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            transition: all 0.2s;
+            box-shadow: none;
+            transition: background 0.2s;
+            border: 1px solid #172230;
         }
         
         .loop-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: none;
+            box-shadow: none;
+            background: #22384f;
         }
         
         .loop-item.dragging {
@@ -226,10 +319,11 @@ try {
         .loop-order {
             background: rgba(255,255,255,0.2);
             padding: 8px 12px;
-            border-radius: 5px;
+            border-radius: 0;
             font-weight: bold;
             min-width: 40px;
             text-align: center;
+            border: 1px solid rgba(255,255,255,0.25);
         }
         
         .loop-details {
@@ -245,20 +339,23 @@ try {
         .loop-module-desc {
             font-size: 12px;
             opacity: 0.9;
+            line-height: 1.35;
+            white-space: normal;
         }
         
         .loop-duration {
             background: rgba(255,255,255,0.2);
             padding: 8px;
-            border-radius: 5px;
+            border-radius: 0;
             min-width: 100px;
+            border: 1px solid rgba(255,255,255,0.2);
         }
         
         .loop-duration input {
             width: 60px;
             padding: 5px;
-            border: none;
-            border-radius: 4px;
+            border: 1px solid #d0d7df;
+            border-radius: 0;
             text-align: center;
             font-size: 16px;
             font-weight: bold;
@@ -278,10 +375,10 @@ try {
         
         .loop-btn {
             background: rgba(255,255,255,0.2);
-            border: none;
+            border: 1px solid rgba(255,255,255,0.25);
             color: white;
             padding: 8px 12px;
-            border-radius: 5px;
+            border-radius: 0;
             cursor: pointer;
             font-size: 14px;
             transition: background 0.2s;
@@ -300,8 +397,8 @@ try {
         
         .btn {
             padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
+            border: 1px solid transparent;
+            border-radius: 0;
             cursor: pointer;
             font-size: 14px;
             font-weight: bold;
@@ -317,8 +414,8 @@ try {
         
         .btn-success:hover {
             background: #218838;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+            transform: none;
+            box-shadow: none;
         }
         
         .btn-danger {
@@ -333,15 +430,16 @@ try {
         .total-duration {
             background: #e7f3ff;
             padding: 12px 20px;
-            border-radius: 8px;
+            border-radius: 0;
             color: #0066cc;
             font-weight: bold;
             margin-left: auto;
+            border: 1px solid #c2d8f2;
         }
         
         .alert {
             padding: 12px 20px;
-            border-radius: 8px;
+            border-radius: 0;
             margin-bottom: 20px;
         }
         
@@ -357,34 +455,36 @@ try {
         
         /* Live Preview Panel */
         .preview-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            position: sticky;
-            top: 20px;
-            max-height: calc(100vh - 40px);
+            background: #fff;
+            padding: 14px;
+            border-radius: 0;
+            border: 1px solid #cfd6dd;
+            box-shadow: none;
             display: flex;
             flex-direction: column;
+            position: sticky;
+            top: 10px;
+            max-height: calc(100vh - 20px);
+            overflow: auto;
         }
         
         .preview-panel h2 {
-            margin-bottom: 15px;
+            margin-bottom: 8px;
             color: #333;
-            font-size: 18px;
+            font-size: 16px;
         }
         
         .preview-screen {
-            flex: 1;
             background: #1a1a1a;
-            border-radius: 8px;
+            border-radius: 0;
             overflow: hidden;
             position: relative;
-            min-height: 400px;
+            min-height: 0;
             aspect-ratio: 16 / 9;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 320px;
+            height: 180px;
+            margin: 0 auto;
+            border: 1px solid #2a2a2a;
         }
         
         .preview-iframe {
@@ -400,23 +500,25 @@ try {
         .preview-empty {
             color: #666;
             text-align: center;
-            padding: 40px;
+            padding: 16px;
+            font-size: 12px;
         }
         
         .preview-controls {
-            margin-top: 15px;
+            margin-top: 10px;
             display: flex;
-            gap: 10px;
+            gap: 6px;
         }
         
         .preview-btn {
             flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
+            padding: 6px;
+            border: 1px solid rgba(0,0,0,0.2);
+            border-radius: 0;
             cursor: pointer;
             font-weight: bold;
             transition: all 0.2s;
+            font-size: 12px;
         }
         
         .preview-btn:disabled {
@@ -452,20 +554,20 @@ try {
         }
         
         .preview-navigation {
-            margin-top: 15px;
+            margin-top: 10px;
             display: flex;
-            gap: 10px;
+            gap: 6px;
             align-items: center;
         }
         
         .preview-nav-btn {
             flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
+            padding: 7px;
+            border: 1px solid #112638;
+            border-radius: 0;
             cursor: pointer;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 14px;
             transition: all 0.2s;
             background: #1a3a52;
             color: white;
@@ -473,7 +575,7 @@ try {
         
         .preview-nav-btn:hover:not(:disabled) {
             background: #0f2537;
-            transform: scale(1.05);
+            transform: none;
         }
         
         .preview-nav-btn:disabled {
@@ -482,49 +584,52 @@ try {
         }
         
         .preview-nav-info {
-            padding: 8px 16px;
+            padding: 6px 8px;
             background: #f8f9fa;
-            border-radius: 5px;
-            font-size: 13px;
+            border-radius: 0;
+            font-size: 12px;
             font-weight: bold;
             color: #333;
-            min-width: 80px;
+            min-width: 56px;
             text-align: center;
+            border: 1px solid #cfd6dd;
         }
         
         .preview-progress {
-            margin-top: 15px;
+            margin-top: 10px;
             background: #e9ecef;
-            border-radius: 8px;
+            border-radius: 0;
             overflow: hidden;
-            height: 30px;
+            height: 22px;
             position: relative;
+            border: 1px solid #cfd6dd;
         }
         
         .preview-progress-bar {
             height: 100%;
-            background: linear-gradient(90deg, #0f2537 0%, #1a4d2e 100%);
+            background: #1f3e56;
             transition: width 0.1s linear;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
         }
         
         .preview-info {
-            margin-top: 15px;
-            padding: 12px;
+            margin-top: 10px;
+            padding: 8px;
             background: #f8f9fa;
-            border-radius: 8px;
-            font-size: 13px;
+            border-radius: 0;
+            font-size: 12px;
+            border: 1px solid #cfd6dd;
         }
         
         .preview-info-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
         
         .preview-info-row:last-child {
@@ -548,48 +653,70 @@ try {
     <?php if ($success): ?>
         <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
     <?php endif; ?>
-    
-    <div class="loop-page-header">
-        <h1>⚙️ Loop Testreszabás</h1>
-        <p>Csoport: <strong><?php echo htmlspecialchars($group['name']); ?></strong></p>
-    </div>
-    
-    <div class="content-grid">
-            <!-- Available Modules Panel -->
-            <div class="modules-panel">
+
+    <table class="loop-layout-table">
+        <thead>
+            <tr>
+                <th colspan="3">
+                    ⚙️ Loop Testreszabás • Csoport:
+                    <strong id="group-name-display"><?php echo htmlspecialchars($group['name']); ?></strong>
+                    <?php if (!$is_default_group): ?>
+                        <button type="button" id="group-name-edit-btn" onclick="toggleGroupNameEdit(true)" style="margin-left:8px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="Átnevezés">✏️</button>
+                        <span id="group-name-edit-wrap" style="display:none;margin-left:8px;">
+                            <input type="text" id="rename-group-inline-input" value="<?php echo htmlspecialchars($group['name'] ?? '', ENT_QUOTES); ?>" style="min-width:220px;">
+                            <button type="button" onclick="renameCurrentGroup()" style="margin-left:6px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="Jóváhagyás">✅</button>
+                            <button type="button" onclick="toggleGroupNameEdit(false)" style="margin-left:2px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="Mégse">✖️</button>
+                        </span>
+                    <?php endif; ?>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="layout-col-modules">
+                    <div class="modules-panel">
                 <h2>📦 Elérhető Modulok</h2>
                 <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Kattints a modulra a hozzáadáshoz</p>
                 
-                <?php foreach ($available_modules as $module): ?>
-                    <div class="module-item" onclick="addModuleToLoop(<?php echo $module['id']; ?>, '<?php echo htmlspecialchars($module['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($module['description'] ?? '', ENT_QUOTES); ?>')">
-                        <div class="module-name"><?php echo htmlspecialchars($module['name']); ?></div>
-                        <div class="module-desc"><?php echo htmlspecialchars($module['description'] ?? ''); ?></div>
-                    </div>
-                <?php endforeach; ?>
-                
-                <?php if (empty($available_modules)): ?>
-                    <p style="text-align: center; color: #999; padding: 20px;">Nincsenek elérhető modulok</p>
+                <?php if (!$is_default_group): ?>
+                    <?php foreach ($available_modules as $module): ?>
+                        <div class="module-item" onclick="addModuleToLoop(<?php echo $module['id']; ?>, '<?php echo htmlspecialchars($module['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($module['description'] ?? '', ENT_QUOTES); ?>')">
+                            <div class="module-name"><?php echo htmlspecialchars($module['name']); ?></div>
+                            <div class="module-desc"><?php echo htmlspecialchars($module['description'] ?? ''); ?></div>
+                        </div>
+                    <?php endforeach; ?>
                 <?php endif; ?>
-            </div>
-            
-            <!-- Loop Builder -->
-            <div class="loop-builder">
+
+                <?php if ($unconfigured_module): ?>
+                    <div id="unconfiguredModuleItem" class="module-item" style="display: <?php echo $is_default_group ? 'block' : 'none'; ?>;" <?php if (!$is_default_group): ?>onclick="addModuleToLoop(<?php echo (int)$unconfigured_module['id']; ?>, '<?php echo htmlspecialchars($unconfigured_module['name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($unconfigured_module['description'] ?? '', ENT_QUOTES); ?>')"<?php endif; ?>>
+                        <div class="module-name"><?php echo htmlspecialchars($unconfigured_module['name']); ?></div>
+                        <div class="module-desc"><?php echo htmlspecialchars($unconfigured_module['description'] ?? 'Technikai modul – csak üres loop esetén.'); ?></div>
+                    </div>
+                <?php endif; ?>
+                
+                <p id="noModulesMessage" style="text-align: center; color: #999; padding: 20px; display: <?php echo ($is_default_group || empty($available_modules)) ? 'block' : 'none'; ?>;"><?php echo $is_default_group ? 'A default csoportnál csak az unconfigured modul engedélyezett.' : 'Nincsenek elérhető modulok'; ?></p>
+                    </div>
+                </td>
+
+                <td class="layout-col-config">
+                    <div class="loop-builder">
                 <h2>🔄 Loop Konfiguráció</h2>
-                <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Húzd és ejtsd az elemeket a sorrend megváltoztatásához</p>
+                <p style="font-size: 12px; color: #666; margin-bottom: 15px;"><?php echo $is_default_group ? 'A default csoport loopja rögzített, nem szerkeszthető.' : 'Húzd és ejtsd az elemeket a sorrend megváltoztatásához'; ?></p>
                 
                 <div id="loop-container" class="empty">
                     <p>Nincs elem a loop-ban. Kattints egy modulra a hozzáadáshoz.</p>
                 </div>
                 
                 <div class="control-panel">
-                    <button class="btn btn-success" onclick="saveLoop()">💾 Mentés</button>
-                    <button class="btn btn-danger" onclick="clearLoop()">🗑️ Összes törlése</button>
+                    <button class="btn btn-success" onclick="saveLoop()" <?php echo $is_default_group ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : ''; ?>>💾 Mentés</button>
+                    <button class="btn btn-danger" onclick="clearLoop()" <?php echo $is_default_group ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : ''; ?>>🗑️ Összes törlése</button>
                     <div class="total-duration" id="total-duration">Össz: 0 mp</div>
                 </div>
-            </div>
-            
-            <!-- Live Preview Panel -->
-            <div class="preview-panel">
+                    </div>
+                </td>
+
+                <td class="layout-col-preview">
+                    <div class="preview-panel">
                 <h2>📺 Élő Előnézet</h2>
                 
                 <!-- Resolution Selector -->
@@ -655,13 +782,36 @@ try {
                         <span class="preview-info-value" id="loopCount">0</span>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
     
     <script>
         let loopItems = [];
         const groupId = <?php echo $group_id; ?>;
+        const isDefaultGroup = <?php echo $is_default_group ? 'true' : 'false'; ?>;
+        const technicalModule = <?php echo json_encode($unconfigured_module ? [
+            'id' => (int)$unconfigured_module['id'],
+            'name' => $unconfigured_module['name'],
+            'description' => $unconfigured_module['description'] ?? ''
+        ] : null); ?>;
+
+        function getDefaultUnconfiguredItem() {
+            if (!technicalModule) {
+                return null;
+            }
+
+            return {
+                module_id: parseInt(technicalModule.id),
+                module_name: technicalModule.name,
+                description: technicalModule.description || 'Technikai modul – csak üres loop esetén.',
+                module_key: 'unconfigured',
+                duration_seconds: 60,
+                settings: {}
+            };
+        }
         
         // Preview variables
         let previewInterval = null;
@@ -671,6 +821,59 @@ try {
         let totalLoopStartTime = 0;
         let isPaused = false;
         let loopCycleCount = 0;
+
+        function isTechnicalLoopItem(item) {
+            if (!item) {
+                return false;
+            }
+
+            if ((item.module_key || '') === 'unconfigured') {
+                return true;
+            }
+
+            if (!technicalModule) {
+                return false;
+            }
+
+            return parseInt(item.module_id) === parseInt(technicalModule.id);
+        }
+
+        function hasRealModules(items = loopItems) {
+            return items.some(item => !isTechnicalLoopItem(item));
+        }
+
+        function normalizeLoopItems() {
+            if (!technicalModule) {
+                return;
+            }
+
+            const realItems = loopItems.filter(item => !isTechnicalLoopItem(item));
+
+            if (realItems.length > 0) {
+                loopItems = realItems;
+                return;
+            }
+
+            const existingTechnical = loopItems.find(item => isTechnicalLoopItem(item));
+
+            if (existingTechnical) {
+                loopItems = [{
+                    ...existingTechnical,
+                    module_key: 'unconfigured',
+                    duration_seconds: 60
+                }];
+                return;
+            }
+
+            loopItems = [{
+                module_id: parseInt(technicalModule.id),
+                module_name: technicalModule.name,
+                description: technicalModule.description || 'Technikai modul – csak üres loop esetén.',
+                module_key: 'unconfigured',
+                duration_seconds: 60,
+                settings: {}
+            }];
+        }
         
         // Calculate total loop duration
         function getTotalLoopDuration() {
@@ -689,11 +892,22 @@ try {
         
         // Load existing loop configuration
         function loadLoop() {
+            if (isDefaultGroup) {
+                const defaultItem = getDefaultUnconfiguredItem();
+                loopItems = defaultItem ? [defaultItem] : [];
+                renderLoop();
+                if (loopItems.length > 0) {
+                    setTimeout(() => startPreview(), 500);
+                }
+                return;
+            }
+
             fetch(`../api/group_loop_config.php?group_id=${groupId}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        loopItems = data.loops;
+                        loopItems = Array.isArray(data.loops) ? data.loops : [];
+                        normalizeLoopItems();
                         renderLoop();
                         
                         // Automatikus preview indítás ha van loop
@@ -706,23 +920,59 @@ try {
         }
         
         function addModuleToLoop(moduleId, moduleName, moduleDesc) {
+            if (isDefaultGroup) {
+                return;
+            }
+
+            const moduleKey = getModuleKeyById(moduleId);
+
+            if (moduleKey !== 'unconfigured') {
+                loopItems = loopItems.filter(item => !isTechnicalLoopItem(item));
+            } else if (loopItems.some(item => isTechnicalLoopItem(item))) {
+                return;
+            }
+
             loopItems.push({
                 module_id: moduleId,
                 module_name: moduleName,
                 description: moduleDesc,
-                duration_seconds: 10
+                module_key: moduleKey || null,
+                duration_seconds: moduleKey === 'unconfigured' ? 60 : 10
             });
+
+            normalizeLoopItems();
             renderLoop();
         }
         
         function removeFromLoop(index) {
+            if (isDefaultGroup) {
+                return;
+            }
+
             loopItems.splice(index, 1);
+            normalizeLoopItems();
             renderLoop();
         }
         
         function updateDuration(index, value) {
+            if (isDefaultGroup) {
+                return;
+            }
+
+            if (isTechnicalLoopItem(loopItems[index])) {
+                loopItems[index].duration_seconds = 60;
+                updateTotalDuration();
+                if (loopItems.length > 0) {
+                    startPreview();
+                }
+                return;
+            }
+
             loopItems[index].duration_seconds = parseInt(value) || 10;
             updateTotalDuration();
+            if (loopItems.length > 0) {
+                startPreview();
+            }
         }
         
         let draggedElement = null;
@@ -772,13 +1022,23 @@ try {
         }
         
         function clearLoop() {
+            if (isDefaultGroup) {
+                return;
+            }
+
             if (confirm('Biztosan törölni szeretnéd az összes elemet?')) {
                 loopItems = [];
+                normalizeLoopItems();
                 renderLoop();
             }
         }
         
         function saveLoop() {
+            if (isDefaultGroup) {
+                alert('⚠️ A default csoport loopja nem szerkeszthető.');
+                return;
+            }
+
             if (loopItems.length === 0) {
                 alert('⚠️ A loop üres! Adj hozzá legalább egy modult.');
                 return;
@@ -807,6 +1067,10 @@ try {
         
         // Module customization
         function customizeModule(index) {
+            if (isDefaultGroup) {
+                return;
+            }
+
             const item = loopItems[index];
             const moduleKey = item.module_key || getModuleKeyById(item.module_id);
             
@@ -817,10 +1081,36 @@ try {
             
             showCustomizationModal(item, index);
         }
+
+        function updateTechnicalModuleVisibility() {
+            const unconfiguredItem = document.getElementById('unconfiguredModuleItem');
+            const noModulesMessage = document.getElementById('noModulesMessage');
+            const normalModuleCount = document.querySelectorAll('.modules-panel .module-item:not(#unconfiguredModuleItem)').length;
+            const realModulesExist = hasRealModules();
+
+            if (isDefaultGroup) {
+                if (unconfiguredItem) {
+                    unconfiguredItem.style.display = 'block';
+                }
+                if (noModulesMessage) {
+                    noModulesMessage.style.display = 'block';
+                }
+                return;
+            }
+
+            if (unconfiguredItem) {
+                unconfiguredItem.style.display = realModulesExist ? 'none' : 'block';
+            }
+
+            if (noModulesMessage) {
+                const hasVisibleTechnical = !!unconfiguredItem && !realModulesExist;
+                noModulesMessage.style.display = (normalModuleCount === 0 && !hasVisibleTechnical) ? 'block' : 'none';
+            }
+        }
         
         function getModuleKeyById(moduleId) {
             // Try to find module key from available modules
-            const modules = <?php echo json_encode($available_modules); ?>;
+            const modules = <?php echo json_encode(array_merge($available_modules, $unconfigured_module ? [$unconfigured_module] : [])); ?>;
             const module = modules.find(m => m.id == moduleId);
             return module ? module.module_key : null;
         }
@@ -1085,6 +1375,10 @@ try {
         }
         
         function saveCustomization(index) {
+            if (isDefaultGroup) {
+                return;
+            }
+
             const item = loopItems[index];
             const moduleKey = item.module_key || getModuleKeyById(item.module_id);
             
@@ -1121,6 +1415,9 @@ try {
             });
             
             alert('✓ Beállítások mentve! Ne felejtsd el menteni a loop konfigurációt!');
+            if (loopItems.length > 0) {
+                startPreview();
+            }
         }
         
         // ===== LIVE PREVIEW FUNCTIONS =====
@@ -1339,10 +1636,46 @@ try {
             const queryString = params.toString();
             return queryString ? `${baseUrl}?${queryString}` : baseUrl;
         }
+
+        function formatLanguageCode(language) {
+            const code = String(language || 'hu').toLowerCase();
+            if (code === 'hu') return 'HU';
+            if (code === 'sk') return 'SK';
+            if (code === 'en') return 'EN';
+            return code.toUpperCase();
+        }
+
+        function getLoopItemSummary(item) {
+            if (!item) {
+                return '';
+            }
+
+            const moduleKey = item.module_key || getModuleKeyById(item.module_id);
+            const settings = item.settings || {};
+
+            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+                const type = settings.type === 'analog' ? 'Analóg' : 'Digitális';
+                const details = [type];
+
+                if ((settings.type || 'digital') !== 'analog') {
+                    details.push(settings.format === '12h' ? '12h' : '24h');
+                }
+
+                const language = formatLanguageCode(settings.language);
+                return `${details.join(' • ')}<br>Nyelv: ${language}`;
+            }
+
+            if (moduleKey === 'default-logo' && settings.text) {
+                return `${String(settings.text).slice(0, 24)}`;
+            }
+
+            return '';
+        }
         
         // Update preview when loop changes
         function renderLoop() {
             const container = document.getElementById('loop-container');
+            updateTechnicalModuleVisibility();
             
             if (loopItems.length === 0) {
                 container.className = 'empty';
@@ -1358,45 +1691,136 @@ try {
             loopItems.forEach((item, index) => {
                 const loopItem = document.createElement('div');
                 loopItem.className = 'loop-item';
-                loopItem.draggable = true;
+                loopItem.draggable = !isDefaultGroup;
                 loopItem.dataset.index = index;
+
+                const isTechnicalItem = isTechnicalLoopItem(item);
+                const durationValue = isTechnicalItem ? 60 : parseInt(item.duration_seconds || 10);
+                const durationInputHtml = (isDefaultGroup || isTechnicalItem)
+                    ? `<input type="number" value="${durationValue}" min="1" max="300" disabled>`
+                    : `<input type="number" value="${durationValue}" min="1" max="300" onchange="updateDuration(${index}, this.value)" onclick="event.stopPropagation()">`;
+
+                const actionButtonsHtml = isDefaultGroup
+                    ? `<button class="loop-btn" disabled title="A default csoport nem szerkeszthető">🔒</button>`
+                    : `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="Testreszabás">⚙️</button>
+                        <button class="loop-btn" onclick="removeFromLoop(${index}); event.stopPropagation();" title="Törlés">🗑️</button>`;
                 
                 loopItem.innerHTML = `
                     <div class="loop-order">${index + 1}</div>
                     <div class="loop-details">
                         <div class="loop-module-name">${item.module_name}</div>
-                        <div class="loop-module-desc">${item.description || ''}</div>
+                        <div class="loop-module-desc">${getLoopItemSummary(item)}</div>
                     </div>
                     <div class="loop-duration">
                         <label>Időtartam</label>
-                        <input type="number" 
-                               value="${item.duration_seconds}" 
-                               min="1" 
-                               max="300" 
-                               onchange="updateDuration(${index}, this.value)"
-                               onclick="event.stopPropagation()">
+                        ${durationInputHtml}
                         <span style="font-size: 11px; opacity: 0.9;">sec</span>
                     </div>
                     <div class="loop-actions">
-                        <button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="Testreszabás">⚙️</button>
-                        <button class="loop-btn" onclick="removeFromLoop(${index}); event.stopPropagation();" title="Törlés">🗑️</button>
+                        ${actionButtonsHtml}
                     </div>
                 `;
                 
                 // Drag and drop handlers
-                loopItem.addEventListener('dragstart', handleDragStart);
-                loopItem.addEventListener('dragover', handleDragOver);
-                loopItem.addEventListener('drop', handleDrop);
-                loopItem.addEventListener('dragend', handleDragEnd);
+                if (!isDefaultGroup) {
+                    loopItem.addEventListener('dragstart', handleDragStart);
+                    loopItem.addEventListener('dragover', handleDragOver);
+                    loopItem.addEventListener('drop', handleDrop);
+                    loopItem.addEventListener('dragend', handleDragEnd);
+                }
                 
                 container.appendChild(loopItem);
             });
             
             updateTotalDuration();
+            if (loopItems.length > 0) {
+                startPreview();
+            }
         }
         
         // Load loop on page load
         loadLoop();
+
+        function toggleGroupNameEdit(enable) {
+            const display = document.getElementById('group-name-display');
+            const editBtn = document.getElementById('group-name-edit-btn');
+            const editWrap = document.getElementById('group-name-edit-wrap');
+            const input = document.getElementById('rename-group-inline-input');
+
+            if (!display || !editBtn || !editWrap || !input) {
+                return;
+            }
+
+            if (enable) {
+                display.style.display = 'none';
+                editBtn.style.display = 'none';
+                editWrap.style.display = 'inline';
+                input.focus();
+                input.select();
+            } else {
+                display.style.display = 'inline';
+                editBtn.style.display = 'inline';
+                editWrap.style.display = 'none';
+                input.value = display.textContent || input.value;
+            }
+        }
+
+        document.addEventListener('keydown', function (event) {
+            const editWrap = document.getElementById('group-name-edit-wrap');
+            const input = document.getElementById('rename-group-inline-input');
+            if (!editWrap || !input || editWrap.style.display !== 'inline') {
+                return;
+            }
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                renameCurrentGroup();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                toggleGroupNameEdit(false);
+            }
+        });
+
+        function renameCurrentGroup() {
+            if (isDefaultGroup) {
+                return;
+            }
+
+            const input = document.getElementById('rename-group-inline-input');
+            if (!input) {
+                return;
+            }
+
+            const newName = String(input.value || '').trim();
+            if (!newName) {
+                alert('⚠️ Adj meg egy csoportnevet.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('group_id', String(groupId));
+            formData.append('new_name', newName);
+
+            fetch('../api/rename_group.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('⚠️ ' + (data.message || 'Átnevezési hiba'));
+                    return;
+                }
+                const display = document.getElementById('group-name-display');
+                if (display) {
+                    display.textContent = newName;
+                }
+                toggleGroupNameEdit(false);
+            })
+            .catch(() => {
+                alert('⚠️ Átnevezési hiba.');
+            });
+        }
         
         // Load group display resolutions and populate the selector
         function loadGroupResolutions() {
@@ -1458,10 +1882,55 @@ try {
                             selector.appendChild(option);
                         });
                     }
+
+                    updatePreviewResolution();
                 })
                 .catch(err => {
                     console.error('Error loading group resolutions:', err);
                 });
+        }
+
+        function fitPreviewScreen(width, height) {
+            const previewScreen = document.getElementById('previewScreen');
+            const previewPanel = document.querySelector('.preview-panel');
+            const previewCol = document.querySelector('.layout-col-preview');
+
+            if (!previewScreen || !previewPanel || !previewCol || !width || !height) {
+                return;
+            }
+
+            const panelStyle = window.getComputedStyle(previewPanel);
+            const panelPaddingX = (parseFloat(panelStyle.paddingLeft) || 0) + (parseFloat(panelStyle.paddingRight) || 0);
+
+            const maxWidth = Math.max(180, previewPanel.clientWidth - panelPaddingX - 4);
+
+            let occupiedHeight = 0;
+            Array.from(previewPanel.children).forEach((child) => {
+                if (child === previewScreen) {
+                    return;
+                }
+                const childStyle = window.getComputedStyle(child);
+                const marginTop = parseFloat(childStyle.marginTop) || 0;
+                const marginBottom = parseFloat(childStyle.marginBottom) || 0;
+                occupiedHeight += child.offsetHeight + marginTop + marginBottom;
+            });
+
+            const viewportMaxHeight = Math.max(260, window.innerHeight - 30);
+            const panelPaddingY = (parseFloat(panelStyle.paddingTop) || 0) + (parseFloat(panelStyle.paddingBottom) || 0);
+            const availableHeight = Math.max(120, viewportMaxHeight - panelPaddingY - occupiedHeight - 12);
+            const ratio = width / height;
+
+            let boxWidth = maxWidth;
+            let boxHeight = boxWidth / ratio;
+
+            if (boxHeight > availableHeight) {
+                boxHeight = availableHeight;
+                boxWidth = boxHeight * ratio;
+            }
+
+            previewScreen.style.width = `${Math.round(boxWidth)}px`;
+            previewScreen.style.height = `${Math.round(boxHeight)}px`;
+            previewScreen.style.aspectRatio = `${width} / ${height}`;
         }
         
         // Update preview resolution
@@ -1471,13 +1940,15 @@ try {
             const [width, height] = resolution.split('x').map(Number);
             
             if (width && height) {
-                const previewScreen = document.getElementById('previewScreen');
-                const aspectRatio = height / width;
-                previewScreen.style.aspectRatio = `${width} / ${height}`;
+                fitPreviewScreen(width, height);
                 
                 console.log(`Preview resolution updated to ${resolution} (${width}:${height})`);
             }
         }
+
+        window.addEventListener('resize', () => {
+            updatePreviewResolution();
+        });
         
         // Load resolutions on page load
         loadGroupResolutions();

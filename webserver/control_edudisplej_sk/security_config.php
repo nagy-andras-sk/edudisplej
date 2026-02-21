@@ -147,19 +147,36 @@ function check_rate_limit($identifier, $max_requests = 100, $time_window = 60) {
 
 /**
  * Log security event
- * @param string $event Event type
- * @param array $details Event details
+ * @param string $event_type Event type
+ * @param int|null $user_id User ID (optional)
+ * @param string $username Username (optional)
+ * @param string $ip_address IP address (optional)
+ * @param string|null $user_agent User agent (optional)
+ * @param array|null $details Event details
  */
-function log_security_event($event, $details = []) {
-    $log_entry = [
-        'timestamp' => date('Y-m-d H:i:s'),
-        'event' => $event,
-        'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-        'details' => $details
-    ];
-    
-    error_log('SECURITY: ' . json_encode($log_entry));
+if (!function_exists('log_security_event')) {
+    function log_security_event($event_type, $user_id = null, $username = '', $ip_address = '', $user_agent = null, $details = null) {
+        if ($details === null && is_array($user_id)) {
+            $details = $user_id;
+            $user_id = null;
+        }
+
+        if ($details === null) {
+            $details = [];
+        }
+
+        $log_entry = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'event' => $event_type,
+            'user_id' => $user_id,
+            'username' => $username,
+            'ip' => $ip_address !== '' ? $ip_address : ($_SERVER['REMOTE_ADDR'] ?? 'unknown'),
+            'user_agent' => $user_agent ?? ($_SERVER['HTTP_USER_AGENT'] ?? 'unknown'),
+            'details' => $details
+        ];
+
+        error_log('SECURITY: ' . json_encode($log_entry));
+    }
 }
 
 /**

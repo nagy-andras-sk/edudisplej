@@ -90,57 +90,59 @@ function log_api_request($company_id, $kiosk_id, $endpoint, $method, $status_cod
  * @param string $user_agent User agent (optional)
  * @param array $details Additional details (optional)
  */
-function log_security_event($event_type, $user_id, $username, $ip_address, $user_agent = null, $details = null) {
-    try {
-        require_once __DIR__ . '/dbkonfiguracia.php';
-        $conn = getDbConnection();
-        
-        // Check if table exists
-        $table_check = $conn->query("SHOW TABLES LIKE 'security_logs'");
-        if ($table_check->num_rows === 0) {
-            // Create table if it doesn't exist
-            $conn->query("
-                CREATE TABLE IF NOT EXISTS security_logs (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    event_type VARCHAR(50) NOT NULL,
-                    user_id INT NULL,
-                    username VARCHAR(100) NOT NULL,
-                    ip_address VARCHAR(45) NOT NULL,
-                    user_agent TEXT NULL,
-                    details TEXT NULL,
-                    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_event_type (event_type),
-                    INDEX idx_user (user_id),
-                    INDEX idx_timestamp (timestamp),
-                    INDEX idx_username (username),
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+if (!function_exists('log_security_event')) {
+    function log_security_event($event_type, $user_id, $username, $ip_address, $user_agent = null, $details = null) {
+        try {
+            require_once __DIR__ . '/dbkonfiguracia.php';
+            $conn = getDbConnection();
+            
+            // Check if table exists
+            $table_check = $conn->query("SHOW TABLES LIKE 'security_logs'");
+            if ($table_check->num_rows === 0) {
+                // Create table if it doesn't exist
+                $conn->query("
+                    CREATE TABLE IF NOT EXISTS security_logs (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        event_type VARCHAR(50) NOT NULL,
+                        user_id INT NULL,
+                        username VARCHAR(100) NOT NULL,
+                        ip_address VARCHAR(45) NOT NULL,
+                        user_agent TEXT NULL,
+                        details TEXT NULL,
+                        timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_event_type (event_type),
+                        INDEX idx_user (user_id),
+                        INDEX idx_timestamp (timestamp),
+                        INDEX idx_username (username),
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                ");
+            }
+            
+            $stmt = $conn->prepare("
+                INSERT INTO security_logs 
+                (event_type, user_id, username, ip_address, user_agent, details) 
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
+            
+            $details_json = $details ? json_encode($details) : null;
+            
+            $stmt->bind_param(
+                "sissss",
+                $event_type,
+                $user_id,
+                $username,
+                $ip_address,
+                $user_agent,
+                $details_json
+            );
+            
+            $stmt->execute();
+            $stmt->close();
+            closeDbConnection($conn);
+        } catch (Exception $e) {
+            error_log('Failed to log security event: ' . $e->getMessage());
         }
-        
-        $stmt = $conn->prepare("
-            INSERT INTO security_logs 
-            (event_type, user_id, username, ip_address, user_agent, details) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
-        
-        $details_json = $details ? json_encode($details) : null;
-        
-        $stmt->bind_param(
-            "sissss",
-            $event_type,
-            $user_id,
-            $username,
-            $ip_address,
-            $user_agent,
-            $details_json
-        );
-        
-        $stmt->execute();
-        $stmt->close();
-        closeDbConnection($conn);
-    } catch (Exception $e) {
-        error_log('Failed to log security event: ' . $e->getMessage());
     }
 }
 

@@ -166,15 +166,69 @@ fi
 if ! command -v get_hw_info &> /dev/null; then
     get_hw_info() {
         log_debug "Collecting hardware information..."
+
+        local cpu_model="Unknown"
+        local cpu_temp="N/A"
+        local cpu_usage="0"
+        local memory_usage="0"
+        local disk_usage="0"
+        local uptime_seconds="0"
+        local rpi_model="Unknown"
+        local os_version="Unknown"
+        local wifi_name=""
+        local wifi_signal=""
+        local local_ip=""
+
+        cpu_model=$(grep -m1 -E 'model name|Hardware|Processor|Model' /proc/cpuinfo 2>/dev/null | cut -d: -f2- | xargs || echo "Unknown")
+
+        if [ -f "/sys/class/thermal/thermal_zone0/temp" ]; then
+            cpu_temp=$(awk '{printf "%.1f", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "N/A")
+        fi
+
+        cpu_usage=$(awk '/^cpu /{u=($2+$4)*100/($2+$4+$5); printf "%.1f", u}' /proc/stat 2>/dev/null || echo "0")
+        memory_usage=$(free 2>/dev/null | awk '/^Mem:/ {printf "%.1f", ($3/$2)*100}' || echo "0")
+        disk_usage=$(df -h / 2>/dev/null | tail -1 | awk '{print $(NF-1)}' | tr -d '%' || echo "0")
+        uptime_seconds=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo "0")
+
+        if [ -f "/proc/device-tree/model" ]; then
+            rpi_model=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "Unknown")
+        fi
+
+        if command -v lsb_release >/dev/null 2>&1; then
+            os_version=$(lsb_release -ds 2>/dev/null || echo "Unknown")
+        elif [ -f /etc/os-release ]; then
+            os_version=$(grep '^PRETTY_NAME=' /etc/os-release | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//' || echo "Unknown")
+        fi
+
+        if command -v iwgetid >/dev/null 2>&1; then
+            wifi_name=$(iwgetid -r 2>/dev/null || echo "")
+        fi
+
+        if command -v iwconfig >/dev/null 2>&1; then
+            wifi_signal=$(iwconfig 2>/dev/null | grep -Eo 'Signal level=[^ ]+' | head -1 | cut -d= -f2 || echo "")
+        fi
+
+        local_ip=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+
         cat << EOF
 {
     "hostname": "$(hostname)",
     "os": "$(lsb_release -ds 2>/dev/null || echo 'Unknown')",
     "kernel": "$(uname -r)",
     "architecture": "$(uname -m)",
-    "cpu": "$(grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs || echo 'Unknown')",
+    "cpu": "${cpu_model}",
     "memory": "$(free -h | awk '/^Mem:/ {print $2}')",
-    "uptime": "$(uptime -p)"
+    "uptime": "$(uptime -p)",
+    "uptime_seconds": ${uptime_seconds},
+    "cpu_temp": "${cpu_temp}",
+    "cpu_usage": ${cpu_usage},
+    "memory_usage": ${memory_usage},
+    "disk_usage": ${disk_usage},
+    "rpi_model": "${rpi_model}",
+    "os_version": "${os_version}",
+    "wifi_name": "${wifi_name}",
+    "wifi_signal": "${wifi_signal}",
+    "local_ip": "${local_ip}"
 }
 EOF
     }
@@ -182,12 +236,22 @@ fi
 
 if ! command -v get_tech_info &> /dev/null; then
     get_tech_info() {
-        local version="unknown"
+        local version="$SERVICE_VERSION"
         local screen_resolution="unknown"
         local screen_status="unknown"
         
-        if [ -f "/opt/edudisplej/VERSION" ]; then
-            version=$(cat /opt/edudisplej/VERSION 2>/dev/null || echo "unknown")
+        if [ -f "/opt/edudisplej/VERSION" ] && [ -s "/opt/edudisplej/VERSION" ]; then
+            version=$(cat /opt/edudisplej/VERSION 2>/dev/null || echo "$SERVICE_VERSION")
+        elif [ -f "$VERSION_FILE" ]; then
+            if command -v jq >/dev/null 2>&1; then
+                local vf_version
+                vf_version=$(jq -r '."edudisplej_sync_service.sh" // empty' "$VERSION_FILE" 2>/dev/null || true)
+                [ -n "$vf_version" ] && version="$vf_version"
+            else
+                local vf_version
+                vf_version=$(sed -n 's/.*"edudisplej_sync_service\.sh"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$VERSION_FILE" | head -1)
+                [ -n "$vf_version" ] && version="$vf_version"
+            fi
         fi
         
         if command -v xrandr &>/dev/null; then
@@ -196,6 +260,12 @@ if ! command -v get_tech_info &> /dev/null; then
         elif command -v xdpyinfo &>/dev/null; then
             screen_resolution=$(DISPLAY=:0 xdpyinfo 2>/dev/null | grep dimensions | awk '{print $2}')
             [ -z "$screen_resolution" ] && screen_resolution="unknown"
+        fi
+
+        if [ "$screen_resolution" = "unknown" ] && [ -f /sys/class/graphics/fb0/virtual_size ]; then
+            local fb_res
+            fb_res=$(tr ',' 'x' < /sys/class/graphics/fb0/virtual_size 2>/dev/null || true)
+            [ -n "$fb_res" ] && screen_resolution="$fb_res"
         fi
         
         if command -v xset &>/dev/null; then
@@ -261,6 +331,39 @@ is_server_newer() {
     else
         [[ "$server_ts" > "$local_ts" ]]
     fi
+}
+
+force_full_loop_refresh() {
+    local reason="$1"
+
+    log "📥 Forced full refresh started: ${reason}"
+
+    # Always clear local modules/loop before re-download
+    rm -rf "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
+    mkdir -p "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
+
+    if [ ! -x "$DOWNLOAD_SCRIPT" ]; then
+        log_error "❌ Download script not found: $DOWNLOAD_SCRIPT"
+        return 1
+    fi
+
+    if ! bash "$DOWNLOAD_SCRIPT"; then
+        log_error "❌ Forced full refresh failed during download"
+        return 1
+    fi
+
+    log_success "✅ Forced full refresh download completed"
+    update_config_field "last_update" "$(date '+%Y-%m-%d %H:%M:%S')"
+
+    log "🔄 Restarting kiosk display service..."
+    if systemctl restart edudisplej-kiosk.service 2>/dev/null; then
+        log_success "✅ Kiosk display service restarted"
+    else
+        log_error "❌ Failed to restart kiosk display service"
+        return 1
+    fi
+
+    return 0
 }
 
 # Config.json management functions
@@ -416,19 +519,8 @@ sync_hw_data() {
         if [ "$needs_update" = "true" ]; then
             local update_reason=$(json_get "$response" "update_reason")
             log "⚠ Update needed: $update_reason"
-            
-            # Trigger module download
-            if [ -x "$DOWNLOAD_SCRIPT" ]; then
-                log "Downloading latest modules due to server update..."
-                if bash "$DOWNLOAD_SCRIPT"; then
-                    log_success "Modules updated successfully due to server change"
-                    update_config_field "last_update" "$(date '+%Y-%m-%d %H:%M:%S')"
-                else
-                    log_error "Module update failed"
-                fi
-            else
-                log_error "Download script not found: $DOWNLOAD_SCRIPT"
-            fi
+
+            force_full_loop_refresh "server reported version change (${update_reason:-unknown reason})" || true
         fi
         
         return 0
@@ -524,29 +616,7 @@ check_loop_updates() {
     
     # Download modules if update is needed
     if [ "$needs_update" = "true" ]; then
-        log "📥 Downloading latest loop configuration and modules from kiosk_group_modules..."
-        if [ -x "$DOWNLOAD_SCRIPT" ]; then
-            if bash "$DOWNLOAD_SCRIPT"; then
-                log_success "✅ Loop and modules updated successfully"
-                update_config_field "last_update" "$(date '+%Y-%m-%d %H:%M:%S')"
-                
-                # Restart browser to apply new loop configuration
-                log "🔄 Restarting kiosk display to apply new configuration..."
-                if systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
-                    if systemctl restart edudisplej-kiosk.service 2>/dev/null; then
-                        log_success "✅ Kiosk display restarted successfully"
-                    else
-                        log_error "❌ Failed to restart kiosk display service"
-                    fi
-                else
-                    log "⚠️ Kiosk display service not active - skipping restart"
-                fi
-            else
-                log_error "❌ Module update failed"
-            fi
-        else
-            log_error "❌ Download script not found: $DOWNLOAD_SCRIPT"
-        fi
+        force_full_loop_refresh "loop version changed (server: ${server_updated_at:-n/a}, local: ${local_last_update:-n/a})" || true
     fi
 }
 

@@ -17,11 +17,21 @@ ini_set('display_errors', 1);
 $results = [];
 $errors = [];
 
+if (!defined('EDUDISPLEJ_DBJAVITO_ECHO')) {
+    define('EDUDISPLEJ_DBJAVITO_ECHO', PHP_SAPI === 'cli');
+}
+
+if (!defined('EDUDISPLEJ_DBJAVITO_NO_HTML')) {
+    define('EDUDISPLEJ_DBJAVITO_NO_HTML', false);
+}
+
 function logResult($message, $type = 'info') {
     global $results;
     $results[] = ['type' => $type, 'message' => $message];
     // Console log
-    echo "[" . strtoupper($type) . "] " . $message . "\n";
+    if (EDUDISPLEJ_DBJAVITO_ECHO) {
+        echo "[" . strtoupper($type) . "] " . $message . "\n";
+    }
 }
 
 function logError($message) {
@@ -30,7 +40,89 @@ function logError($message) {
     logResult($message, 'error');
 }
 
+function isSafeCleanupTableName(string $tableName): bool {
+    $tableName = strtolower(trim($tableName));
+    if ($tableName === '') {
+        return false;
+    }
+
+    $patterns = [
+        '/^tmp_/',
+        '/^backup_/',
+        '/_backup$/',
+        '/_old$/',
+        '/_legacy$/',
+        '/^old_/'
+    ];
+
+    foreach ($patterns as $pattern) {
+        if (preg_match($pattern, $tableName)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function safeDeleteByQuery(mysqli $conn, string $sql, string $label): void {
+    if ($conn->query($sql)) {
+        $affected = (int)$conn->affected_rows;
+        if ($affected > 0) {
+            logResult("Cleanup: $label ($affected rows removed)", 'success');
+        } else {
+            logResult("Cleanup: $label (no rows)", 'info');
+        }
+    } else {
+        logError("Cleanup failed for '$label': " . $conn->error);
+    }
+}
+
+function cleanupModuleFilesystem(string $baseDir): void {
+    $modulesDir = realpath($baseDir . '/modules');
+    if ($modulesDir === false || !is_dir($modulesDir)) {
+        logResult('Cleanup: modules directory not found, skipping file cleanup', 'warning');
+        return;
+    }
+
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($modulesDir, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+
+    $removedFiles = 0;
+    $removedDirs = 0;
+
+    foreach ($iterator as $pathInfo) {
+        $path = $pathInfo->getPathname();
+
+        if ($pathInfo->isFile()) {
+            $name = $pathInfo->getFilename();
+            if (preg_match('/\.(bak|old|tmp|orig)$/i', $name) || preg_match('/^~\$/', $name)) {
+                if (@unlink($path)) {
+                    $removedFiles++;
+                    logResult('Cleanup: removed legacy file ' . str_replace('\\', '/', $path), 'success');
+                }
+            }
+        } elseif ($pathInfo->isDir()) {
+            $name = strtolower($pathInfo->getFilename());
+            if (in_array($name, ['old', 'backup', 'legacy', 'tmp'], true)) {
+                $files = @scandir($path);
+                if (is_array($files) && count($files) <= 2) {
+                    if (@rmdir($path)) {
+                        $removedDirs++;
+                        logResult('Cleanup: removed empty legacy folder ' . str_replace('\\', '/', $path), 'success');
+                    }
+                }
+            }
+        }
+    }
+
+    logResult("Cleanup: module filesystem summary - files removed: $removedFiles, folders removed: $removedDirs", 'info');
+}
+
 try {
+    @set_time_limit(240);
+
     $conn = getDbConnection();
     
     // Set charset explicitly
@@ -119,6 +211,7 @@ try {
                 'last_sync' => "datetime DEFAULT NULL",
                 'screenshot_url' => "text DEFAULT NULL",
                 'screenshot_enabled' => "tinyint(1) DEFAULT 0",
+                'debug_mode' => "tinyint(1) DEFAULT 0",
                 'screenshot_requested' => "tinyint(1) DEFAULT 0",
                 'screenshot_timestamp' => "timestamp NULL DEFAULT NULL",
                 'screenshot_requested_until' => "datetime DEFAULT NULL",
@@ -327,6 +420,66 @@ try {
                 'kcl_kiosk_fk' => "FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE",
                 'kcl_command_fk' => "FOREIGN KEY (command_id) REFERENCES kiosk_command_queue(id) ON DELETE CASCADE"
             ]
+        ],
+        'company_licenses' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'company_id' => "int(11) NOT NULL",
+                'valid_from' => "date NOT NULL",
+                'valid_until' => "date NOT NULL",
+                'device_limit' => "int(11) NOT NULL DEFAULT 10",
+                'status' => "varchar(20) NOT NULL DEFAULT 'active'",
+                'notes' => "text DEFAULT NULL",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()",
+                'updated_at' => "timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'company_licenses_company_fk' => "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            ]
+        ],
+        'system_settings' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'setting_key' => "varchar(100) NOT NULL",
+                'setting_value' => "longtext DEFAULT NULL",
+                'is_encrypted' => "tinyint(1) NOT NULL DEFAULT 0",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()",
+                'updated_at' => "timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => ['setting_key'],
+            'foreign_keys' => []
+        ],
+        'email_templates' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'template_key' => "varchar(100) NOT NULL",
+                'lang' => "varchar(5) NOT NULL DEFAULT 'en'",
+                'subject' => "varchar(255) NOT NULL",
+                'body_html' => "longtext DEFAULT NULL",
+                'body_text' => "longtext DEFAULT NULL",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()",
+                'updated_at' => "timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => ['template_key,lang'],
+            'foreign_keys' => []
+        ],
+        'email_logs' => [
+            'columns' => [
+                'id' => "int(11) NOT NULL AUTO_INCREMENT",
+                'template_key' => "varchar(100) DEFAULT NULL",
+                'to_email' => "varchar(255) NOT NULL",
+                'subject' => "varchar(255) NOT NULL",
+                'result' => "varchar(20) NOT NULL",
+                'error_message' => "text DEFAULT NULL",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
+            ],
+            'primary_key' => 'id',
+            'unique_keys' => [],
+            'foreign_keys' => []
         ],
         'api_nonces' => [
             'columns' => [
@@ -597,6 +750,110 @@ try {
             logError("Failed to create index: " . $conn->error);
         }
     }
+
+    // Cleanup phase: remove unused/orphaned remnants safely
+    logResult("Starting cleanup of unused remnants...", 'info');
+
+    // Remove unresolved orphan mappings where module reference cannot be restored
+    safeDeleteByQuery(
+        $conn,
+        "DELETE km FROM kiosk_modules km LEFT JOIN modules m ON km.module_id = m.id WHERE (km.module_id IS NULL OR km.module_id = 0 OR m.id IS NULL) AND (km.module_key IS NULL OR km.module_key = '' OR NOT EXISTS (SELECT 1 FROM modules mx WHERE mx.module_key = km.module_key))",
+        "kiosk_modules unresolved orphan entries"
+    );
+
+    safeDeleteByQuery(
+        $conn,
+        "DELETE kgm FROM kiosk_group_modules kgm LEFT JOIN modules m ON kgm.module_id = m.id WHERE (kgm.module_id IS NULL OR kgm.module_id = 0 OR m.id IS NULL) AND (kgm.module_key IS NULL OR kgm.module_key = '' OR NOT EXISTS (SELECT 1 FROM modules mx WHERE mx.module_key = kgm.module_key))",
+        "kiosk_group_modules unresolved orphan entries"
+    );
+
+    safeDeleteByQuery(
+        $conn,
+        "DELETE ml FROM module_licenses ml LEFT JOIN modules m ON ml.module_id = m.id LEFT JOIN companies c ON ml.company_id = c.id WHERE m.id IS NULL OR c.id IS NULL",
+        "module_licenses orphan entries"
+    );
+
+    safeDeleteByQuery(
+        $conn,
+        "DELETE kga FROM kiosk_group_assignments kga LEFT JOIN kiosks k ON kga.kiosk_id = k.id LEFT JOIN kiosk_groups kg ON kga.group_id = kg.id WHERE k.id IS NULL OR kg.id IS NULL",
+        "kiosk_group_assignments orphan entries"
+    );
+
+    // Remove expired nonces (security/maintenance)
+    safeDeleteByQuery(
+        $conn,
+        "DELETE FROM api_nonces WHERE expires_at < NOW()",
+        "expired api_nonces"
+    );
+
+    // Remove deprecated modules only if fully unused and no filesystem artifact exists
+    $deprecated_module_keys = ['namedays', 'split_clock_namedays'];
+    foreach ($deprecated_module_keys as $deprecated_key) {
+        $stmt = $conn->prepare("SELECT id FROM modules WHERE module_key = ? LIMIT 1");
+        $stmt->bind_param("s", $deprecated_key);
+        $stmt->execute();
+        $module_row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$module_row) {
+            continue;
+        }
+
+        $module_id = (int)$module_row['id'];
+        $usage_result = $conn->query("SELECT
+                (SELECT COUNT(*) FROM kiosk_modules WHERE module_id = $module_id) AS kiosk_usage,
+                (SELECT COUNT(*) FROM kiosk_group_modules WHERE module_id = $module_id) AS group_usage,
+                (SELECT COUNT(*) FROM module_licenses WHERE module_id = $module_id) AS license_usage");
+        $usage = $usage_result ? $usage_result->fetch_assoc() : null;
+
+        $total_usage = (int)($usage['kiosk_usage'] ?? 0) + (int)($usage['group_usage'] ?? 0) + (int)($usage['license_usage'] ?? 0);
+        if ($total_usage === 0) {
+            $del_stmt = $conn->prepare("DELETE FROM modules WHERE id = ?");
+            $del_stmt->bind_param("i", $module_id);
+            if ($del_stmt->execute()) {
+                logResult("Cleanup: removed unused deprecated module '$deprecated_key'", 'success');
+            } else {
+                logError("Cleanup failed for deprecated module '$deprecated_key': " . $conn->error);
+            }
+            $del_stmt->close();
+        } else {
+            logResult("Cleanup: deprecated module '$deprecated_key' kept (still used)", 'warning');
+        }
+    }
+
+    // Remove only clearly legacy/temporary empty tables
+    $existing_tables_result = $conn->query("SHOW TABLES");
+    $existing_tables = [];
+    while ($row = $existing_tables_result->fetch_array()) {
+        $existing_tables[] = (string)$row[0];
+    }
+
+    $expected_table_names = array_keys($expected_tables);
+    foreach ($existing_tables as $table_name) {
+        if (in_array($table_name, $expected_table_names, true)) {
+            continue;
+        }
+
+        if (!isSafeCleanupTableName($table_name)) {
+            continue;
+        }
+
+        $count_res = $conn->query("SELECT COUNT(*) AS cnt FROM `$table_name`");
+        $count_row = $count_res ? $count_res->fetch_assoc() : ['cnt' => null];
+        $cnt = isset($count_row['cnt']) ? (int)$count_row['cnt'] : -1;
+
+        if ($cnt === 0) {
+            if ($conn->query("DROP TABLE `$table_name`")) {
+                logResult("Cleanup: dropped empty legacy table '$table_name'", 'success');
+            } else {
+                logError("Cleanup failed to drop table '$table_name': " . $conn->error);
+            }
+        } elseif ($cnt > 0) {
+            logResult("Cleanup: legacy table '$table_name' kept (contains $cnt rows)", 'warning');
+        }
+    }
+
+    cleanupModuleFilesystem(__DIR__);
     
     closeDbConnection($conn);
     logResult("Database structure check completed", 'success');
@@ -604,6 +861,10 @@ try {
 } catch (Exception $e) {
     logError("Fatal error: " . $e->getMessage());
     echo "\nStack trace:\n" . $e->getTraceAsString() . "\n";
+}
+
+if (EDUDISPLEJ_DBJAVITO_NO_HTML || PHP_SAPI === 'cli') {
+    return;
 }
 
 ?>

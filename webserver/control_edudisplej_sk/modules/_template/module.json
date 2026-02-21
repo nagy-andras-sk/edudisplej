@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "module_key": "my-module",
+  "name": "My Module",
+  "description": "Short module description",
+  "renderer": "m_my-module.html",
+  "config": {
+    "defaults": "config/default_settings.json"
+  }
+}

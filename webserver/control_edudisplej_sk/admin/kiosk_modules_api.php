@@ -6,6 +6,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
 
 header('Content-Type: application/json');
 

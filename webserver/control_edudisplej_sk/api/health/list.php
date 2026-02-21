@@ -7,6 +7,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../dbkonfiguracia.php';
 require_once __DIR__ . '/../auth.php';
+require_once __DIR__ . '/../../kiosk_status.php';
 
 $api_company = validate_api_token();
 
@@ -25,7 +26,7 @@ try {
     // Build query
     $query = "
         SELECT 
-            k.id, k.device_id, k.name, k.status, 
+            k.id, k.device_id, k.name, k.status, k.last_sync, k.last_seen,
             k.company_id, c.name as company_name,
             h.status as health_status, h.system_data, h.services_data, h.network_data, h.sync_data, h.timestamp
         FROM kiosks k
@@ -45,13 +46,7 @@ try {
         $types .= "i";
     }
     
-    if (!empty($status_filter)) {
-        $query .= " AND k.status = ?";
-        $params[] = $status_filter;
-        $types .= "s";
-    }
-    
-    $query .= " ORDER BY k.status DESC, k.name ASC";
+    $query .= " ORDER BY k.name ASC";
     
     $stmt = $conn->prepare($query);
     
@@ -64,6 +59,12 @@ try {
     
     $kiosks = [];
     while ($row = $result->fetch_assoc()) {
+        kiosk_apply_effective_status($row);
+
+        if (!empty($status_filter) && $row['status'] !== $status_filter) {
+            continue;
+        }
+
         $kiosks[] = [
             'id' => $row['id'],
             'device_id' => $row['device_id'],

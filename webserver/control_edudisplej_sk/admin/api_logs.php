@@ -5,6 +5,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
 
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -150,11 +151,6 @@ $total_pages = max(1, (int)ceil($total_logs / $per_page));
 
 include 'header.php';
 ?>
-
-<div class="panel">
-    <div class="page-title">API Logok</div>
-    <div class="muted">Szuresekkel, lapozassal.</div>
-</div>
 
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>

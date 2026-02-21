@@ -5,6 +5,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
 require_once '../security_config.php';
 require_once '../logging.php';
 require_once '../email_helper.php';
@@ -64,27 +65,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             closeDbConnection($conn);
 
             log_security_event('settings_change', $_SESSION['user_id'], $_SESSION['username'] ?? '', $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', ['section' => 'email_settings']);
-            $success = 'Email beállítások mentve.';
+            $success = 'Email settings saved.';
         } catch (Exception $e) {
-            $error = 'Hiba a mentés során: ' . htmlspecialchars($e->getMessage());
+            $error = 'Save failed: ' . htmlspecialchars($e->getMessage());
         }
 
     } elseif ($action === 'test_email') {
         $test_to = trim($_POST['test_to'] ?? '');
         if (empty($test_to) || !filter_var($test_to, FILTER_VALIDATE_EMAIL)) {
-            $error = 'Érvénytelen email cím.';
+            $error = 'Invalid email address.';
         } else {
             $ok = send_raw_email(
                 ['email' => $test_to, 'name' => 'Test'],
                 'EduDisplej SMTP teszt',
-                '<p>Ez egy teszt email az EduDisplej rendszerből.</p>',
-                'Ez egy teszt email az EduDisplej rendszerből.',
+                '<p>This is a test email from EduDisplej.</p>',
+                'This is a test email from EduDisplej.',
                 null
             );
             if ($ok) {
-                $success = 'Teszt email sikeresen elküldve: ' . htmlspecialchars($test_to);
+                $success = 'Test email sent successfully: ' . htmlspecialchars($test_to);
             } else {
-                $error = 'Teszt email küldése sikertelen. Ellenőrizze az SMTP beállításokat és a naplókat.';
+                $error = 'Test email send failed. Check SMTP settings and logs.';
             }
         }
     }
@@ -93,11 +94,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Load current settings
 $settings = get_smtp_settings();
 
-$title = 'Email Beállítások';
+$title = 'Email Settings';
 require_once 'header.php';
 ?>
 
-<h2 class="page-title">Email Beállítások</h2>
+<h2 class="page-title">Email Settings</h2>
 
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
@@ -107,7 +108,7 @@ require_once 'header.php';
 <?php endif; ?>
 
 <div class="panel">
-    <div class="panel-title">SMTP Konfiguráció</div>
+    <div class="panel-title">SMTP Configuration</div>
     <form method="POST" action="email_settings.php">
         <input type="hidden" name="action" value="save">
         <div class="form-row">
@@ -122,59 +123,59 @@ require_once 'header.php';
         </div>
         <div class="form-row">
             <div class="form-field">
-                <label>Titkosítás</label>
+                <label>Encryption</label>
                 <select name="smtp_encryption">
                     <option value="tls"  <?php echo $settings['encryption'] === 'tls'  ? 'selected' : ''; ?>>TLS (STARTTLS, port 587)</option>
                     <option value="ssl"  <?php echo $settings['encryption'] === 'ssl'  ? 'selected' : ''; ?>>SSL (port 465)</option>
-                    <option value="none" <?php echo $settings['encryption'] === 'none' ? 'selected' : ''; ?>>Nincs</option>
+                    <option value="none" <?php echo $settings['encryption'] === 'none' ? 'selected' : ''; ?>>None</option>
                 </select>
             </div>
             <div class="form-field">
-                <label>Timeout (mp)</label>
+                <label>Timeout (sec)</label>
                 <input type="number" name="mail_timeout" value="<?php echo (int)$settings['timeout'] ?: 30; ?>" min="5" max="120">
             </div>
         </div>
         <div class="form-row">
             <div class="form-field">
-                <label>SMTP Felhasználó</label>
+                <label>SMTP Username</label>
                 <input type="text" name="smtp_user" value="<?php echo htmlspecialchars($settings['user']); ?>" autocomplete="off">
             </div>
             <div class="form-field">
-                <label>SMTP Jelszó <span class="muted">(üresen hagyva nem változik)</span></label>
+                <label>SMTP Password <span class="muted">(leave empty to keep current)</span></label>
                 <input type="password" name="smtp_pass" placeholder="••••••••" autocomplete="new-password">
             </div>
         </div>
         <div class="form-row">
             <div class="form-field">
-                <label>Feladó neve</label>
+                <label>From name</label>
                 <input type="text" name="from_name" value="<?php echo htmlspecialchars($settings['from_name']); ?>">
             </div>
             <div class="form-field">
-                <label>Feladó email</label>
+                <label>From email</label>
                 <input type="email" name="from_email" value="<?php echo htmlspecialchars($settings['from_email']); ?>">
             </div>
         </div>
         <div class="form-row">
             <div class="form-field">
-                <label>Reply-To <span class="muted">(opcionális)</span></label>
+                <label>Reply-To <span class="muted">(optional)</span></label>
                 <input type="email" name="reply_to" value="<?php echo htmlspecialchars($settings['reply_to']); ?>">
             </div>
         </div>
-        <button type="submit" class="btn btn-primary">Mentés</button>
+        <button type="submit" class="btn btn-primary">Save</button>
     </form>
 </div>
 
 <div class="panel" style="margin-top:20px;">
-    <div class="panel-title">Teszt Email Küldés</div>
+    <div class="panel-title">Test Email</div>
     <form method="POST" action="email_settings.php">
         <input type="hidden" name="action" value="test_email">
         <div class="form-row">
             <div class="form-field">
-                <label>Teszt email cím</label>
+                <label>Test email address</label>
                 <input type="email" name="test_to" placeholder="you@example.com" required>
             </div>
         </div>
-        <button type="submit" class="btn btn-secondary">Teszt Email Küldése</button>
+        <button type="submit" class="btn btn-secondary">Send Test Email</button>
     </form>
 </div>
 

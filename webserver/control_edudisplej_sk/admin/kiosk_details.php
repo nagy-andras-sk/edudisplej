@@ -5,6 +5,8 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
+require_once '../kiosk_status.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: index.php');
@@ -25,6 +27,10 @@ if ($kiosk_id > 0) {
         $result = $stmt->get_result();
         $kiosk = $result->fetch_assoc();
         $stmt->close();
+
+        if ($kiosk) {
+            kiosk_apply_effective_status($kiosk);
+        }
 
         if ($kiosk) {
             $stmt = $conn->prepare("SELECT * FROM sync_logs WHERE kiosk_id = ? ORDER BY timestamp DESC LIMIT 20");
@@ -79,11 +85,12 @@ include 'header.php';
                 <tr><th>Device ID</th><td class="mono"><?php echo htmlspecialchars($kiosk['device_id'] ?? '-'); ?></td></tr>
                 <tr><th>MAC</th><td class="mono"><?php echo htmlspecialchars($kiosk['mac'] ?? '-'); ?></td></tr>
                 <tr><th>Public IP</th><td><?php echo htmlspecialchars($kiosk['public_ip'] ?? '-'); ?></td></tr>
-                <tr><th>Company</th><td><?php echo htmlspecialchars($kiosk['company_name'] ?? '-'); ?></td></tr>
+                <tr><th>Institution</th><td><?php echo htmlspecialchars($kiosk['company_name'] ?? '-'); ?></td></tr>
                 <tr><th>Location</th><td><?php echo htmlspecialchars($kiosk['location'] ?? '-'); ?></td></tr>
                 <tr><th>Installed</th><td><?php echo $kiosk['installed'] ? date('Y-m-d H:i:s', strtotime($kiosk['installed'])) : '-'; ?></td></tr>
                 <tr><th>Last seen</th><td><?php echo $kiosk['last_seen'] ? date('Y-m-d H:i:s', strtotime($kiosk['last_seen'])) : '-'; ?></td></tr>
                 <tr><th>Sync interval</th><td><?php echo htmlspecialchars((string)$kiosk['sync_interval']); ?> sec</td></tr>
+                <tr><th>Debug mód</th><td><?php echo !empty($kiosk['debug_mode']) ? 'Bekapcsolva' : 'Kikapcsolva'; ?></td></tr>
                 <tr><th>Status</th><td><?php echo htmlspecialchars($kiosk['status'] ?? '-'); ?></td></tr>
                 <tr><th>Comment</th><td><?php echo htmlspecialchars($kiosk['comment'] ?? '-'); ?></td></tr>
             </tbody>
@@ -146,6 +153,25 @@ include 'header.php';
             ⏸ Fast loop KI
         </button>
         <span id="fast-loop-msg" style="margin-left:10px;font-size:13px;color:#555;"></span>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Debug mód (kijelzőnként)</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;">
+        Bekapcsolva a kijelző jobb alsó sarkában megjelenik egy debug terminál ablak,
+        ami a szinkron folyamat naplóit mutatja realtime frissítéssel.
+    </p>
+    <div>
+        <button id="btn-debug-on" onclick="setDebugMode(<?php echo (int)$kiosk['id']; ?>, true)"
+            style="background:#7c3aed;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;margin-right:8px;">
+            🐞 Debug BE
+        </button>
+        <button id="btn-debug-off" onclick="setDebugMode(<?php echo (int)$kiosk['id']; ?>, false)"
+            style="background:#6b7280;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">
+            🚫 Debug KI
+        </button>
+        <span id="debug-mode-msg" style="margin-left:10px;font-size:13px;color:#555;"></span>
     </div>
 </div>
 
@@ -248,6 +274,34 @@ function setFastLoop(kioskId, enable) {
         }
     })
     .catch(function(e) {
+        msg.textContent = '⚠ Hálózati hiba';
+        msg.style.color = '#b91c1c';
+    });
+}
+
+function setDebugMode(kioskId, enable) {
+    var msg = document.getElementById('debug-mode-msg');
+    msg.textContent = 'Küldés...';
+    msg.style.color = '#555';
+
+    fetch('../api/update_debug_mode.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({kiosk_id: kioskId, debug_mode: enable ? 1 : 0})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            msg.textContent = enable
+                ? '✓ Debug mód bekapcsolva (a panel a következő sync ciklusban megjelenik)'
+                : '✓ Debug mód kikapcsolva (a panel a következő sync ciklusban eltűnik)';
+            msg.style.color = '#166534';
+        } else {
+            msg.textContent = '⚠ Hiba: ' + (data.message || 'Ismeretlen hiba');
+            msg.style.color = '#b91c1c';
+        }
+    })
+    .catch(function() {
         msg.textContent = '⚠ Hálózati hiba';
         msg.style.color = '#b91c1c';
     });

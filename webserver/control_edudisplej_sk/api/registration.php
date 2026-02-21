@@ -50,6 +50,142 @@ function add_debug($key, $value) {
     error_log("[Registration API] [$key] " . (is_string($value) ? $value : json_encode($value)));
 }
 
+function ensure_default_group_for_company(mysqli $conn, int $company_id): ?array {
+    if ($company_id <= 0) {
+        return null;
+    }
+
+    $find_stmt = $conn->prepare("SELECT id, name FROM kiosk_groups WHERE company_id = ? AND is_default = 1 ORDER BY id ASC LIMIT 1");
+    if (!$find_stmt) {
+        return null;
+    }
+    $find_stmt->bind_param("i", $company_id);
+    $find_stmt->execute();
+    $existing = $find_stmt->get_result()->fetch_assoc();
+    $find_stmt->close();
+
+    if ($existing && !empty($existing['id'])) {
+        return [
+            'id' => (int)$existing['id'],
+            'name' => $existing['name'] ?? 'default',
+            'is_default' => true
+        ];
+    }
+
+    $insert_stmt = $conn->prepare("INSERT INTO kiosk_groups (name, company_id, description, priority, is_default) VALUES ('default', ?, 'Alapertelmezett csoport', 1, 1)");
+    if (!$insert_stmt) {
+        return null;
+    }
+    $insert_stmt->bind_param("i", $company_id);
+    $ok = $insert_stmt->execute();
+    $insert_stmt->close();
+
+    if (!$ok) {
+        return null;
+    }
+
+    return [
+        'id' => (int)$conn->insert_id,
+        'name' => 'default',
+        'is_default' => true
+    ];
+}
+
+function ensure_clock_module_for_group(mysqli $conn, int $group_id): void {
+    if ($group_id <= 0) {
+        return;
+    }
+
+    $module_stmt = $conn->prepare("SELECT id FROM modules WHERE module_key = 'clock' LIMIT 1");
+    if (!$module_stmt) {
+        return;
+    }
+    $module_stmt->execute();
+    $module = $module_stmt->get_result()->fetch_assoc();
+    $module_stmt->close();
+
+    if (!$module || empty($module['id'])) {
+        return;
+    }
+
+    $module_id = (int)$module['id'];
+
+    $exists_stmt = $conn->prepare("SELECT id FROM kiosk_group_modules WHERE group_id = ? AND module_id = ? LIMIT 1");
+    if (!$exists_stmt) {
+        return;
+    }
+    $exists_stmt->bind_param("ii", $group_id, $module_id);
+    $exists_stmt->execute();
+    $exists = $exists_stmt->get_result()->fetch_assoc();
+    $exists_stmt->close();
+
+    if ($exists) {
+        return;
+    }
+
+    $insert_loop_stmt = $conn->prepare("INSERT INTO kiosk_group_modules (group_id, module_id, module_key, display_order, duration_seconds, settings, is_active) VALUES (?, ?, 'clock', 0, 10, NULL, 1)");
+    if (!$insert_loop_stmt) {
+        return;
+    }
+    $insert_loop_stmt->bind_param("ii", $group_id, $module_id);
+    $insert_loop_stmt->execute();
+    $insert_loop_stmt->close();
+}
+
+function assign_highest_priority_group(mysqli $conn, int $kiosk_id, int $company_id): ?array {
+    if ($company_id <= 0) {
+        return null;
+    }
+
+    $group_stmt = $conn->prepare("SELECT id, name, is_default FROM kiosk_groups WHERE company_id = ? ORDER BY priority DESC, id ASC LIMIT 1");
+    if (!$group_stmt) {
+        return null;
+    }
+    $group_stmt->bind_param("i", $company_id);
+    $group_stmt->execute();
+    $group_result = $group_stmt->get_result();
+    $group_row = $group_result ? $group_result->fetch_assoc() : null;
+    $group_stmt->close();
+
+    $created_default = false;
+    if (!$group_row || empty($group_row['id'])) {
+        $group_row = ensure_default_group_for_company($conn, $company_id);
+        $created_default = (bool)($group_row['is_default'] ?? false);
+        if (!$group_row || empty($group_row['id'])) {
+            return null;
+        }
+    }
+
+    $delete_stmt = $conn->prepare("DELETE FROM kiosk_group_assignments WHERE kiosk_id = ?");
+    if ($delete_stmt) {
+        $delete_stmt->bind_param("i", $kiosk_id);
+        $delete_stmt->execute();
+        $delete_stmt->close();
+    }
+
+    $assign_stmt = $conn->prepare("INSERT INTO kiosk_group_assignments (kiosk_id, group_id) VALUES (?, ?)");
+    if (!$assign_stmt) {
+        return null;
+    }
+    $group_id = (int)$group_row['id'];
+    $assign_stmt->bind_param("ii", $kiosk_id, $group_id);
+    $ok = $assign_stmt->execute();
+    $assign_stmt->close();
+
+    if (!$ok) {
+        return null;
+    }
+
+    if ($created_default) {
+        ensure_clock_module_for_group($conn, $group_id);
+    }
+
+    return [
+        'id' => $group_id,
+        'name' => $group_row['name'] ?? null
+    ];
+}
+
 try {
     add_debug('timestamp', date('Y-m-d H:i:s'));
     add_debug('php_version', PHP_VERSION);
@@ -171,7 +307,7 @@ try {
     
     $table_check = $conn->query("SHOW TABLES LIKE 'kiosks'");
     if ($table_check && $table_check->num_rows === 0) {
-        $response['message'] = 'Database table "kiosks" does not exist - run migration (dbjavito.php)';
+        $response['message'] = 'Database table "kiosks" does not exist - run migration (dbjavito.php or cron/maintenance/run_maintenance.php)';
         add_debug('table_error', 'kiosks table not found in database');
         echo json_encode($response, JSON_PRETTY_PRINT);
         exit;
@@ -231,6 +367,15 @@ try {
             $assign_stmt->execute();
             $assign_stmt->close();
             $kiosk['company_id'] = $api_company['id'];
+        }
+
+        if (!empty($kiosk['company_id']) && empty($kiosk['group_id'])) {
+            $auto_group = assign_highest_priority_group($conn, (int)$kiosk['id'], (int)$kiosk['company_id']);
+            if ($auto_group) {
+                $kiosk['group_id'] = $auto_group['id'];
+                $kiosk['group_name'] = $auto_group['name'] ?? 'Unknown';
+                add_debug('auto_group_assigned_existing', $auto_group);
+            }
         }
         
         $update_stmt = $conn->prepare("UPDATE kiosks SET last_seen = NOW(), public_ip = ?, hw_info = ?, hostname = ?, status = 'online' WHERE id = ?");
@@ -348,17 +493,25 @@ try {
         add_debug('insert_id', $kiosk_id);
         
         $insert_stmt->close();
+
+        $auto_group = null;
+        if (!empty($company_id_for_insert)) {
+            $auto_group = assign_highest_priority_group($conn, (int)$kiosk_id, (int)$company_id_for_insert);
+            if ($auto_group) {
+                add_debug('auto_group_assigned_new', $auto_group);
+            }
+        }
         
         $response['success'] = true;
         $response['message'] = 'Kiosk registered successfully';
         $response['kiosk_id'] = $kiosk_id;
         $response['device_id'] = $device_id;
         $response['is_configured'] = false;
-        $response['company_assigned'] = false;
+        $response['company_assigned'] = !empty($company_id_for_insert);
         $response['company_id'] = $company_id_for_insert;
         $response['company_name'] = 'Unknown';
-        $response['group_id'] = null;
-        $response['group_name'] = 'Unknown';
+        $response['group_id'] = $auto_group['id'] ?? null;
+        $response['group_name'] = $auto_group['name'] ?? 'Unknown';
         
         add_debug('result', 'New kiosk registered successfully');
     }

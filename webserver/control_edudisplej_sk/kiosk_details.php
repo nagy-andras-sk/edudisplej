@@ -6,6 +6,7 @@
 
 session_start();
 require_once 'dbkonfiguracia.php';
+require_once 'kiosk_status.php';
 
 // Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
@@ -28,6 +29,10 @@ if ($kiosk_id > 0) {
         $result = $stmt->get_result();
         $kiosk = $result->fetch_assoc();
         $stmt->close();
+
+        if ($kiosk) {
+            kiosk_apply_effective_status($kiosk);
+        }
         
         // Get sync logs
         if ($kiosk) {

@@ -18,15 +18,33 @@ $company_id = null;
 $company_name = '';
 $company_data = [];
 $licenses = [];
+$enabled_licenses = [];
+$disabled_licenses = [];
 $company_users = [];
 $error = '';
 $success = '';
+$is_admin_user = !empty($_SESSION['isadmin']);
 
 try {
     $conn = getDbConnection();
+
+    // Ensure optional institution columns exist
+    $existing_company_columns = [];
+    $columns_result = $conn->query("SHOW COLUMNS FROM companies");
+    if ($columns_result) {
+        while ($column = $columns_result->fetch_assoc()) {
+            $existing_company_columns[$column['Field']] = true;
+        }
+    }
+    if (!isset($existing_company_columns['address'])) {
+        $conn->query("ALTER TABLE companies ADD COLUMN address VARCHAR(255) DEFAULT NULL AFTER name");
+    }
+    if (!isset($existing_company_columns['tax_number'])) {
+        $conn->query("ALTER TABLE companies ADD COLUMN tax_number VARCHAR(64) DEFAULT NULL AFTER address");
+    }
     
-    // Get user and company info
-    $stmt = $conn->prepare("SELECT u.*, c.* FROM users u LEFT JOIN companies c ON u.company_id = c.id WHERE u.id = ?");
+    // Get current user info
+    $stmt = $conn->prepare("SELECT id, company_id FROM users WHERE id = ? LIMIT 1");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -39,9 +57,35 @@ try {
         exit();
     }
     
-    $company_id = $user['company_id'];
-    $company_name = $user['name'] ?? 'Nincs cég';
-    $company_data = $user;
+    $company_id = (int)($user['company_id'] ?? 0);
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_institution']) && $is_admin_user && $company_id > 0) {
+        $institution_name = trim((string)($_POST['institution_name'] ?? ''));
+        $institution_address = trim((string)($_POST['institution_address'] ?? ''));
+        $tax_number = trim((string)($_POST['tax_number'] ?? ''));
+
+        if ($institution_name === '') {
+            $error = 'Az intézmény neve kötelező.';
+        } else {
+            $update_stmt = $conn->prepare("UPDATE companies SET name = ?, address = ?, tax_number = ? WHERE id = ?");
+            $update_stmt->bind_param("sssi", $institution_name, $institution_address, $tax_number, $company_id);
+            if ($update_stmt->execute()) {
+                $success = 'Intézmény adatai sikeresen frissítve.';
+            } else {
+                $error = 'Az intézmény adatainak mentése sikertelen.';
+            }
+            $update_stmt->close();
+        }
+    }
+
+    if ($company_id > 0) {
+        $stmt = $conn->prepare("SELECT id, name, address, tax_number, created_at, api_token FROM companies WHERE id = ? LIMIT 1");
+        $stmt->bind_param("i", $company_id);
+        $stmt->execute();
+        $company_data = $stmt->get_result()->fetch_assoc() ?: [];
+        $stmt->close();
+        $company_name = $company_data['name'] ?? 'Nincs intézmény';
+    }
     
     // Get company licenses
     if ($company_id) {
@@ -63,6 +107,22 @@ try {
             $licenses[] = $row;
         }
         $stmt->close();
+
+        $filtered_licenses = [];
+        foreach ($licenses as $row) {
+            $module_key = strtolower(trim((string)($row['module_key'] ?? '')));
+            $module_name = strtolower(trim((string)($row['name'] ?? '')));
+            $is_technical_unconfigured = strpos($module_key, 'unconfigured') !== false
+                || (strpos($module_name, 'unconfigured') !== false
+                    && (strpos($module_name, 'displej') !== false || strpos($module_name, 'display') !== false));
+            if ($is_technical_unconfigured) {
+                continue;
+            }
+            $filtered_licenses[] = $row;
+        }
+
+        $enabled_licenses = array_values(array_filter($filtered_licenses, fn($lic) => (int)($lic['total_licenses'] ?? 0) > 0));
+        $disabled_licenses = array_values(array_filter($filtered_licenses, fn($lic) => (int)($lic['total_licenses'] ?? 0) <= 0));
         
         // Get company users
         $stmt = $conn->prepare("SELECT id, username, email, isadmin, last_login FROM users WHERE company_id = ? ORDER BY username");
@@ -98,103 +158,13 @@ $logout_url = '../login.php?logout=1';
         <?php endif; ?>
         
         <?php if ($company_id): ?>
-            <!-- COMPANY INFO - Simplified Table Format -->
-            <div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #eee;">
-                <h2 style="margin-top: 0;">🏢 Cég Adatai</h2>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 12px; font-weight: bold; width: 30%;">Cégnév</td>
-                        <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['name'] ?? 'N/A'); ?></td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 12px; font-weight: bold;">Regisztrációs időpont</td>
-                        <td style="padding: 12px;"><?php echo $company_data['created_at'] ? date('Y-m-d H:i', strtotime($company_data['created_at'])) : 'N/A'; ?></td>
-                    </tr>
-                    <?php if (!empty($company_data['api_token'])): ?>
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 12px; font-weight: bold;">API Token</td>
-                        <td style="padding: 12px;">
-                            <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px;"><?php echo htmlspecialchars($company_data['api_token']); ?></code>
-                            <button data-copy="<?php echo htmlspecialchars($company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
-                            <div style="margin-top: 10px;">
-                                <strong style="display: inline-block; margin-right: 8px;">Install parancs:</strong>
-                                <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px; display: inline-block;">
-                                    <?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>
-                                </code>
-                                <button data-copy="<?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
-                            </div>
-                        </td>
-                    </tr>
-                    <?php endif; ?>
-                </table>
-            </div>
-            
-            <!-- LICENSES -->
-            <div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #eee;">
-                <h2 style="margin-top: 0;">📜 Licenszek Kezelése</h2>
-                <p style="color: #666;">A cégjéhez rendelt modulok és azok felhasználása</p>
-                
-                <?php if (empty($licenses)): ?>
-                    <div style="text-align: center; padding: 30px; color: #999; background: #f9f9f9; border-radius: 3px;">
-                        Nincsenek elérhető modulok
-                    </div>
-                <?php else: ?>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%;">
-                            <thead>
-                                <tr>
-                                    <th>Modul</th>
-                                    <th>Összesen</th>
-                                    <th>Felhasználva</th>
-                                    <th>Szabad</th>
-                                    <th>Kihasználtság</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($licenses as $lic): 
-                                    $total = $lic['total_licenses'];
-                                    $used = $lic['used_licenses'];
-                                    $free = max(0, $total - $used);
-                                    $percent = $total > 0 ? round(($used / $total) * 100) : 0;
-                                    $status_color = $percent > 80 ? '#ff9800' : ($percent === 100 ? '#d32f2f' : '#4caf50');
-                                ?>
-                                    <tr>
-                                        <td>
-                                            <strong><?php echo htmlspecialchars($lic['name']); ?></strong>
-                                            <br><small style="color: #999;"><?php echo htmlspecialchars($lic['module_key']); ?></small>
-                                        </td>
-                                        <td style="text-align: center;">
-                                            <strong><?php echo $total; ?></strong>
-                                        </td>
-                                        <td style="text-align: center;">
-                                            <strong><?php echo $used; ?></strong>
-                                        </td>
-                                        <td style="text-align: center;">
-                                            <strong><?php echo $free; ?></strong>
-                                        </td>
-                                        <td>
-                                            <div style="display: flex; align-items: center; gap: 10px;">
-                                                <div style="background: #eee; border-radius: 10px; width: 100px; height: 8px; overflow: hidden;">
-                                                    <div style="background: <?php echo $status_color; ?>; width: <?php echo $percent; ?>%; height: 100%;"></div>
-                                                </div>
-                                                <span style="color: <?php echo $status_color; ?>; font-weight: bold;"><?php echo $percent; ?>%</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-            
             <!-- USERS MANAGEMENT -->
-            <div style="background: white; padding: 20px; border-radius: 5px; border: 1px solid #eee;">
+            <div class="panel" style="padding: 20px; margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2 style="margin: 0;">👥 Felhasználók Kezelése</h2>
                     <button onclick="openAddUserForm()" style="background: #1e40af; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">➠ Új felhasználó</button>
                 </div>
-                <p style="color: #666; margin-bottom: 15px;">A cégjéhez tartozó felhasználók és azok jogosultságai</p>
+                <p style="color: #666; margin-bottom: 15px;">Az intézményhez tartozó felhasználók és jogosultságaik.</p>
                 
                 <?php if (empty($company_users)): ?>
                     <div style="text-align: center; padding: 30px; color: #999; background: #f9f9f9; border-radius: 3px;">
@@ -228,11 +198,11 @@ $logout_url = '../login.php?logout=1';
                                         </td>
                                         <td><?php echo $u['last_login'] ? date('Y-m-d H:i', strtotime($u['last_login'])) : 'Soha'; ?></td>
                                         <td>
-                                            <button onclick="editUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small">✏️ Szerkesztés</button>
                                             <?php if ($u['id'] !== $user_id): ?>
+                                                <button onclick="editUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small">✏️ Szerkesztés</button>
                                                 <button onclick="deleteUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small" style="color: #d32f2f;">🗑️ Törlés</button>
                                             <?php else: ?>
-                                                <small style="color: #999;">(Saját fiók)</small>
+                                                <small style="color: #999;">(Saját fiók: jelszó itt nem szerkeszthető)</small>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -242,8 +212,154 @@ $logout_url = '../login.php?logout=1';
                     </div>
                 <?php endif; ?>
             </div>
+
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+                <!-- INSTITUTION INFO -->
+                <div class="panel" style="padding: 20px; margin-bottom: 20px;">
+                    <h2 style="margin-top: 0;">🏢 Intézmény adatai</h2>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px; font-weight: bold; width: 30%;">Intézmény megnevezése</td>
+                            <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['name'] ?? 'N/A'); ?></td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px; font-weight: bold;">Cím</td>
+                            <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['address'] ?? '—'); ?></td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px; font-weight: bold;">Adószám</td>
+                            <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['tax_number'] ?? '—'); ?></td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px; font-weight: bold;">Regisztrációs időpont</td>
+                            <td style="padding: 12px;"><?php echo $company_data['created_at'] ? date('Y-m-d H:i', strtotime($company_data['created_at'])) : 'N/A'; ?></td>
+                        </tr>
+                        <?php if (!empty($company_data['api_token'])): ?>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px; font-weight: bold;">API Token</td>
+                            <td style="padding: 12px;">
+                                <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px;"><?php echo htmlspecialchars($company_data['api_token']); ?></code>
+                                <button data-copy="<?php echo htmlspecialchars($company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
+                                <div style="margin-top: 10px;">
+                                    <strong style="display: inline-block; margin-right: 8px;">Install parancs:</strong>
+                                    <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px; display: inline-block;">
+                                        <?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>
+                                    </code>
+                                    <button data-copy="<?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                    </table>
+
+                    <?php if ($is_admin_user): ?>
+                        <form method="POST" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                            <input type="hidden" name="update_institution" value="1">
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div>
+                                    <label for="institution_name" style="display:block; font-weight:600; margin-bottom:6px;">Intézmény megnevezése</label>
+                                    <input id="institution_name" name="institution_name" type="text" value="<?php echo htmlspecialchars($company_data['name'] ?? ''); ?>" required style="width:100%;">
+                                </div>
+                                <div>
+                                    <label for="institution_address" style="display:block; font-weight:600; margin-bottom:6px;">Cím</label>
+                                    <input id="institution_address" name="institution_address" type="text" value="<?php echo htmlspecialchars($company_data['address'] ?? ''); ?>" style="width:100%;">
+                                </div>
+                            </div>
+                            <div style="margin-top: 12px; max-width: 420px;">
+                                <label for="tax_number" style="display:block; font-weight:600; margin-bottom:6px;">Adószám</label>
+                                <input id="tax_number" name="tax_number" type="text" value="<?php echo htmlspecialchars($company_data['tax_number'] ?? ''); ?>" style="width:100%;">
+                            </div>
+                            <div style="margin-top: 12px;">
+                                <button type="submit" class="btn btn-primary">Intézmény adatok mentése</button>
+                            </div>
+                        </form>
+                    <?php else: ?>
+                        <p style="margin-top: 12px; color: #666;">Az intézmény adatait csak admin jogosultsággal lehet szerkeszteni.</p>
+                    <?php endif; ?>
+                </div>
+
+                <!-- LICENSES -->
+                <div class="panel" style="padding: 20px; margin-bottom: 20px;">
+                    <h2 style="margin-top: 0;">📜 Licenszek kezelése</h2>
+                    <p style="color: #666;">Felül a bekapcsolt modulok, alul a kikapcsoltak.</p>
+                    
+                    <?php if (empty($enabled_licenses) && empty($disabled_licenses)): ?>
+                        <div style="text-align: center; padding: 30px; color: #999; background: #f9f9f9; border-radius: 3px;">
+                            Nincsenek elérhető modulok
+                        </div>
+                    <?php else: ?>
+                        <h3 style="margin-top:0;">Bekapcsolt modulok</h3>
+                        <div style="overflow-x: auto; margin-bottom: 14px;">
+                            <table style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Modul</th>
+                                        <th>Összesen</th>
+                                        <th>Felhasználva</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($enabled_licenses)): ?>
+                                        <tr><td colspan="3" style="text-align:center; color:#999;">Nincs bekapcsolt modul.</td></tr>
+                                    <?php endif; ?>
+                                    <?php foreach ($enabled_licenses as $lic): 
+                                        $total = (int)($lic['total_licenses'] ?? 0);
+                                        $used = (int)($lic['used_licenses'] ?? 0);
+                                        $module_link = 'https://www.edudisplej.sk/modules/' . rawurlencode((string)($lic['module_key'] ?? ''));
+                                    ?>
+                                        <tr>
+                                            <td>
+                                                <a href="<?php echo htmlspecialchars($module_link); ?>" target="_blank" rel="noopener noreferrer">
+                                                    <strong><?php echo htmlspecialchars($lic['name']); ?></strong>
+                                                </a>
+                                                <br><small style="color: #999;"><?php echo htmlspecialchars($lic['module_key']); ?></small>
+                                            </td>
+                                            <td style="text-align: center;">
+                                                <strong><?php echo $total; ?></strong>
+                                            </td>
+                                            <td style="text-align: center;">
+                                                <strong><?php echo $used; ?></strong>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h3>Kikapcsolt modulok</h3>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Modul</th>
+                                        <th>Állapot</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($disabled_licenses)): ?>
+                                        <tr><td colspan="2" style="text-align:center; color:#999;">Nincs kikapcsolt modul.</td></tr>
+                                    <?php endif; ?>
+                                    <?php foreach ($disabled_licenses as $lic): 
+                                        $module_link = 'https://www.edudisplej.sk/modules/' . rawurlencode((string)($lic['module_key'] ?? ''));
+                                    ?>
+                                        <tr>
+                                            <td>
+                                                <a href="<?php echo htmlspecialchars($module_link); ?>" target="_blank" rel="noopener noreferrer">
+                                                    <strong><?php echo htmlspecialchars($lic['name']); ?></strong>
+                                                </a>
+                                                <br><small style="color:#999;"><?php echo htmlspecialchars($lic['module_key']); ?></small>
+                                            </td>
+                                            <td><span style="color:#999;">Kikapcsolva</span></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
         <?php else: ?>
-            <div style="text-align: center; padding: 40px; color: #999; background: white; border-radius: 5px;">
+            <div class="panel" style="text-align: center; padding: 40px; color: #999;">
                 <p>Nem rendelt cég vagy nincs hozzáférése az adatokhoz.</p>
             </div>
         <?php endif; ?>
@@ -422,6 +538,10 @@ $logout_url = '../login.php?logout=1';
         }
         
         function editUser(userId, username) {
+            if (Number(userId) === <?php echo (int)$user_id; ?>) {
+                alert('A saját jelszó itt nem módosítható.');
+                return;
+            }
             const password = prompt(`${username} új jelszava (hagyja üresen a jelenlegi megmaradásához):`);
             if (password === null) return;
             

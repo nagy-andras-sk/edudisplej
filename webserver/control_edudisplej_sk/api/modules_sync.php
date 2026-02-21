@@ -92,7 +92,7 @@ try {
             [
                 'module_key' => 'unconfigured',
                 'display_order' => 0,
-                'duration_seconds' => 300,
+                'duration_seconds' => 60,
                 'settings' => []
             ]
         ];
@@ -208,12 +208,16 @@ try {
             if (!empty($row['settings'])) {
                 $settings = json_decode($row['settings'], true) ?? [];
             }
+            $duration = (int)$row['duration_seconds'];
+            if (($row['module_key'] ?? '') === 'unconfigured') {
+                $duration = 60;
+            }
             
             $modules[] = [
                 'module_key' => $row['module_key'],
                 'name' => $row['name'],
                 'display_order' => (int)$row['display_order'],
-                'duration_seconds' => (int)$row['duration_seconds'],
+                'duration_seconds' => $duration,
                 'settings' => $settings
             ];
         }
@@ -241,12 +245,16 @@ try {
             if (!empty($row['settings'])) {
                 $settings = json_decode($row['settings'], true) ?? [];
             }
+            $duration = (int)$row['duration_seconds'];
+            if (($row['module_key'] ?? '') === 'unconfigured') {
+                $duration = 60;
+            }
             
             $modules[] = [
                 'module_key' => $row['module_key'],
                 'name' => $row['name'],
                 'display_order' => (int)$row['display_order'],
-                'duration_seconds' => (int)$row['duration_seconds'],
+                'duration_seconds' => $duration,
                 'settings' => $settings
             ];
         }

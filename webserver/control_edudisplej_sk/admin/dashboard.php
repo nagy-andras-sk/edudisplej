@@ -6,6 +6,8 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
+require_once '../kiosk_status.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: ../login.php');
@@ -86,6 +88,7 @@ try {
             k.last_sync,
             k.last_seen,
             k.version,
+            k.hw_info,
             k.screen_resolution,
             k.sync_interval,
             c.name AS company_name,
@@ -103,6 +106,7 @@ try {
 
     $result = $conn->query($query);
     while ($row = $result->fetch_assoc()) {
+        kiosk_apply_effective_status($row);
         $kiosks[] = $row;
     }
 
@@ -160,7 +164,7 @@ foreach ($kiosks as $kiosk) {
 
 $grouped = [];
 foreach ($filtered as $kiosk) {
-    $company = $kiosk['company_name'] ?? 'Hozzarendeletlen';
+    $company = $kiosk['company_name'] ?? 'Unassigned';
     if (!isset($grouped[$company])) {
         $grouped[$company] = [];
     }
@@ -170,22 +174,17 @@ foreach ($filtered as $kiosk) {
 include 'header.php';
 ?>
 
-<div class="panel">
-    <div class="page-title">Kijelzok - Technikai Attekintes</div>
-    <div class="muted">Minden kijelzo cegenkent csoportositva, tech adatokkal.</div>
-</div>
-
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
 
 <div class="panel">
-    <div class="panel-title">Szurok</div>
+    <div class="panel-title">Filters</div>
     <form method="get" class="toolbar">
         <div class="form-field">
-            <label for="company_id">Ceg</label>
+            <label for="company_id">Institution</label>
             <select id="company_id" name="company_id">
-                <option value="">Osszes</option>
+                <option value="">All</option>
                 <?php foreach ($companies as $company): ?>
                     <option value="<?php echo (int)$company['id']; ?>" <?php echo $filters['company_id'] === (int)$company['id'] ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars($company['name']); ?>
@@ -194,9 +193,9 @@ include 'header.php';
             </select>
         </div>
         <div class="form-field">
-            <label for="status">Statusz</label>
+            <label for="status">Status</label>
             <select id="status" name="status">
-                <option value="">Osszes</option>
+                <option value="">All</option>
                 <option value="online" <?php echo $filters['status'] === 'online' ? 'selected' : ''; ?>>Online</option>
                 <option value="warning" <?php echo $filters['status'] === 'warning' ? 'selected' : ''; ?>>Warning</option>
                 <option value="offline" <?php echo $filters['status'] === 'offline' ? 'selected' : ''; ?>>Offline</option>
@@ -204,7 +203,7 @@ include 'header.php';
             </select>
         </div>
         <div class="form-field" style="min-width: 220px;">
-            <label for="search">Kereses</label>
+            <label for="search">Search</label>
             <input id="search" name="search" type="text" value="<?php echo htmlspecialchars($filters['search']); ?>" placeholder="hostname, mac, device id">
         </div>
         <div class="form-field">
@@ -220,7 +219,7 @@ include 'header.php';
             <input id="min_disk" name="min_disk" type="number" step="0.1" value="<?php echo htmlspecialchars((string)$filters['min_disk']); ?>">
         </div>
         <div class="form-field">
-            <button type="submit" class="btn btn-primary">Szures</button>
+            <button type="submit" class="btn btn-primary">Filter</button>
         </div>
         <div class="form-field">
             <a class="btn btn-secondary" href="dashboard.php">Reset</a>
@@ -230,13 +229,13 @@ include 'header.php';
 
 <?php if (empty($grouped)): ?>
     <div class="panel">
-        <div class="muted">Nincs megjelenitheto kijelzo.</div>
+        <div class="muted">No displays to show.</div>
     </div>
 <?php endif; ?>
 
 <?php foreach ($grouped as $company_name => $company_kiosks): ?>
     <div class="panel">
-        <div class="panel-title">Ceg: <?php echo htmlspecialchars($company_name); ?> (<?php echo count($company_kiosks); ?>)</div>
+        <div class="panel-title">Institution: <?php echo htmlspecialchars($company_name); ?> (<?php echo count($company_kiosks); ?>)</div>
         <div class="table-wrap">
             <table>
                 <thead>
@@ -244,19 +243,19 @@ include 'header.php';
                         <th>ID</th>
                         <th>Hostname</th>
                         <th>Device ID</th>
-                        <th>Statusz</th>
-                        <th>Reszletek</th>
-                        <th>Loop datum</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                        <th>Loop timestamp</th>
                         <th>Last sync</th>
                         <th>Last seen</th>
-                        <th>Halozat nev</th>
-                        <th>Halozat ero</th>
+                        <th>Network name</th>
+                        <th>Network strength</th>
                         <th>CPU temp</th>
                         <th>CPU %</th>
                         <th>RAM %</th>
                         <th>Disk %</th>
-                        <th>RPI verzio</th>
-                        <th>Kijelzo meret</th>
+                        <th>RPI version</th>
+                        <th>Screen resolution</th>
                         <th>Last reboot</th>
                     </tr>
                 </thead>
@@ -265,6 +264,7 @@ include 'header.php';
                         <?php
                             $system = json_decode($kiosk['system_data'] ?? '{}', true) ?: [];
                             $network = json_decode($kiosk['network_data'] ?? '{}', true) ?: [];
+                            $hw_info = json_decode($kiosk['hw_info'] ?? '{}', true) ?: [];
                             $status = $kiosk['status'] ?? 'unknown';
                             $badge_class = 'info';
                             if ($status === 'online') {
@@ -275,7 +275,61 @@ include 'header.php';
                                 $badge_class = 'danger';
                             }
                             $network_name = pick_value($network, ['wifi_name', 'ssid', 'network_name']);
+                            if ($network_name === null) {
+                                $network_name = pick_value($hw_info, ['wifi_name', 'ssid', 'network_name']);
+                            }
+
                             $network_signal = pick_value($network, ['wifi_signal', 'signal', 'rssi']);
+                            if ($network_signal === null) {
+                                $network_signal = pick_value($hw_info, ['wifi_signal', 'signal', 'rssi']);
+                            }
+
+                            $cpu_temp_value = pick_value($system, ['cpu_temp', 'temperature', 'temp']);
+                            if ($cpu_temp_value === null) {
+                                $cpu_temp_value = pick_value($hw_info, ['cpu_temp', 'temperature', 'temp']);
+                            }
+
+                            $cpu_usage_value = pick_value($system, ['cpu_usage']);
+                            if ($cpu_usage_value === null) {
+                                $cpu_usage_value = pick_value($hw_info, ['cpu_usage']);
+                            }
+
+                            $memory_usage_value = pick_value($system, ['memory_usage']);
+                            if ($memory_usage_value === null) {
+                                $memory_usage_value = pick_value($hw_info, ['memory_usage']);
+                            }
+
+                            $disk_usage_value = pick_value($system, ['disk_usage']);
+                            if ($disk_usage_value === null) {
+                                $disk_usage_value = pick_value($hw_info, ['disk_usage']);
+                            }
+
+                            $rpi_version = pick_value($system, ['rpi_model', 'os_version']);
+                            if (!$rpi_version) {
+                                $rpi_version = pick_value($hw_info, ['rpi_model', 'os_version', 'os']);
+                            }
+                            if (!$rpi_version) {
+                                $rpi_version = $kiosk['version'] ?? null;
+                            }
+
+                            $uptime_seconds = pick_value($system, ['uptime', 'uptime_seconds']);
+                            if ($uptime_seconds === null) {
+                                $uptime_seconds = pick_value($hw_info, ['uptime_seconds']);
+                            }
+                            $last_reboot = format_last_reboot($uptime_seconds);
+
+                            if ($network_name === null || $network_name === '') {
+                                $network_name = '-';
+                            }
+                            if ($network_signal === null || $network_signal === '') {
+                                $network_signal = '-';
+                            }
+                            if ($cpu_temp_value === null || $cpu_temp_value === '') {
+                                $cpu_temp_value = '-';
+                            }
+                            if ($rpi_version === null || $rpi_version === '') {
+                                $rpi_version = '-';
+                            }
                         ?>
                         <tr>
                             <td class="nowrap"><?php echo (int)$kiosk['id']; ?></td>
@@ -291,15 +345,15 @@ include 'header.php';
                             <td class="nowrap"><?php echo format_datetime($kiosk['loop_last_update'] ?? null); ?></td>
                             <td class="nowrap"><?php echo format_datetime($kiosk['last_sync'] ?? null); ?></td>
                             <td class="nowrap"><?php echo format_datetime($kiosk['last_seen'] ?? null); ?></td>
-                            <td><?php echo htmlspecialchars($network_name ?? '-'); ?></td>
-                            <td><?php echo $network_signal !== null ? htmlspecialchars((string)$network_signal) : '-'; ?></td>
-                            <td><?php echo htmlspecialchars($system['cpu_temp'] ?? '-'); ?></td>
-                            <td><?php echo format_percent($system['cpu_usage'] ?? null); ?></td>
-                            <td><?php echo format_percent($system['memory_usage'] ?? null); ?></td>
-                            <td><?php echo format_percent($system['disk_usage'] ?? null); ?></td>
-                            <td><?php echo htmlspecialchars($kiosk['version'] ?? '-'); ?></td>
+                            <td><?php echo htmlspecialchars((string)$network_name); ?></td>
+                            <td><?php echo htmlspecialchars((string)$network_signal); ?></td>
+                            <td><?php echo htmlspecialchars((string)$cpu_temp_value); ?></td>
+                            <td><?php echo format_percent($cpu_usage_value); ?></td>
+                            <td><?php echo format_percent($memory_usage_value); ?></td>
+                            <td><?php echo format_percent($disk_usage_value); ?></td>
+                            <td><?php echo htmlspecialchars((string)$rpi_version); ?></td>
                             <td><?php echo htmlspecialchars($kiosk['screen_resolution'] ?? '-'); ?></td>
-                            <td class="nowrap"><?php echo format_last_reboot($system['uptime'] ?? null); ?></td>
+                            <td class="nowrap"><?php echo htmlspecialchars((string)$last_reboot); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

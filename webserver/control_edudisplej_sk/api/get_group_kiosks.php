@@ -4,6 +4,7 @@
  */
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../kiosk_status.php';
 
 header('Content-Type: application/json');
 
@@ -46,6 +47,7 @@ try {
     
     $kiosks = [];
     while ($row = $result->fetch_assoc()) {
+        kiosk_apply_effective_status($row);
         $kiosks[] = $row;
     }
     

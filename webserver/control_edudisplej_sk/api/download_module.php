@@ -6,6 +6,7 @@
  */
 require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
+require_once '../modules/module_standard.php';
 
 $api_company = validate_api_token();
 
@@ -101,22 +102,16 @@ try {
         exit;
     }
     
-    // Module directory path (module_name is actually module_key like 'clock', 'default-logo')
-    $module_dir_key = $module_name;
-    switch ($module_name) {
-        case 'clock':
-        case 'datetime':
-        case 'dateclock':
-            $module_dir_key = 'datetime';
-            break;
-        case 'default-logo':
-            $module_dir_key = 'default';
-            break;
-        default:
-            $module_dir_key = $module_name;
-            break;
+    $validation = edudisplej_validate_module_folder($module_name);
+    $runtime = $validation['runtime'];
+    $module_dir_key = $runtime['folder'];
+    $module_dir = $runtime['folder_abs'];
+
+    if (!$validation['ok']) {
+        $response['message'] = 'Module structure invalid: ' . implode('; ', $validation['errors']);
+        echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
     }
-    $module_dir = "../modules/{$module_dir_key}";
     
     if (!is_dir($module_dir)) {
         $response['message'] = "Module directory not found: {$module_dir_key}";
@@ -134,7 +129,7 @@ try {
     foreach ($iterator as $file) {
         if ($file->isFile()) {
             $filepath = $file->getPathname();
-            $relative_path = str_replace($module_dir . DIRECTORY_SEPARATOR, '', $filepath);
+            $relative_path = str_replace(rtrim($module_dir, '/\\') . DIRECTORY_SEPARATOR, '', $filepath);
             $relative_path = str_replace('\\', '/', $relative_path);
             
             // Read file content

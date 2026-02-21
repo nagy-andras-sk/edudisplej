@@ -19,6 +19,30 @@ $user_id = $_SESSION['user_id'];
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
 $default_group_id = null;
 
+function format_loop_version($value) {
+    if ($value === null || $value === '') {
+        return null;
+    }
+
+    if (is_numeric($value)) {
+        $num = (string)$value;
+        if (strlen($num) === 14) {
+            return $num;
+        }
+        $ts = (int)$value;
+        if ($ts > 0) {
+            return date('YmdHis', $ts);
+        }
+    }
+
+    $ts = strtotime((string)$value);
+    if ($ts === false) {
+        return null;
+    }
+
+    return date('YmdHis', $ts);
+}
+
 // Get user's company
 $company_id = null;
 try {
@@ -240,12 +264,14 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     }
 }
 
-// Get groups for this company with loop info
+// Get groups for this company
 $groups = [];
 try {
     $query = "SELECT g.*,
               (SELECT COUNT(*) FROM kiosk_group_assignments WHERE group_id = g.id) as kiosk_count,
-              (SELECT COUNT(*) FROM kiosk_group_modules WHERE group_id = g.id) as loop_count
+              (SELECT DATE_FORMAT(MAX(COALESCE(kgm.updated_at, kgm.created_at)), '%Y%m%d%H%i%s')
+                 FROM kiosk_group_modules kgm
+                WHERE kgm.group_id = g.id AND kgm.is_active = 1) as loop_version
               FROM kiosk_groups g 
               WHERE g.company_id = ? 
               ORDER BY g.priority DESC, g.name";
@@ -281,6 +307,95 @@ closeDbConnection($conn);
             cursor: not-allowed;
             opacity: 0.4;
         }
+
+        .group-kiosk-chip {
+            background: #e7f3ff;
+            color: #0b4b8a;
+            padding: 6px 10px;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            display: inline-block;
+            font-weight: 600;
+            border: 1px solid #bfd8f6;
+        }
+
+        .group-action-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .group-action-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid transparent;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 92px;
+        }
+
+        .group-action-btn-primary {
+            background: #1a3a52;
+            color: #fff;
+            border-color: #0f2537;
+        }
+
+        .group-action-btn-secondary {
+            background: #eef1f4;
+            color: #22313f;
+            border-color: #cfd9e2;
+        }
+
+        .group-action-btn-danger {
+            background: #fbe8e8;
+            color: #9c1e1e;
+            border-color: #efc8c8;
+            min-width: 46px;
+            padding: 6px 10px;
+        }
+
+        .group-action-btn-disabled {
+            background: #eef1f4;
+            color: #9aa5b1;
+            border-color: #d8dfe6;
+            cursor: not-allowed;
+        }
+
+        .new-group-separator {
+            background: #f5f8fb;
+        }
+
+        .new-group-separator td {
+            padding: 10px 12px;
+            border-top: 2px solid #d9e2ea;
+            border-bottom: 1px solid #d9e2ea;
+            font-size: 12px;
+            color: #40566b;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        .new-group-row {
+            background: #fbfdff;
+        }
+
+        .new-group-row input[type="text"] {
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .new-group-row td {
+                display: block;
+                width: 100% !important;
+                border-bottom: none;
+            }
+        }
     </style>
         
         <?php if ($error): ?>
@@ -293,13 +408,12 @@ closeDbConnection($conn);
         
         <!-- Groups Table -->
         <div class="card">
-            <h2 style="margin-bottom: 15px;">Csoportok (<?php echo count($groups); ?>)</h2>
+            <div style="margin-bottom: 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                <div style="font-size: 14px; font-weight: 700; color: #1f2d3d;">Csoportok (<?php echo count($groups); ?>)</div>
+                <a href="group_assignment.php" class="btn btn-primary">Grafikus hozzárendelés (drag & drop)</a>
+            </div>
             
-            <?php if (empty($groups)): ?>
-                <div style="text-align: center; padding: 40px; color: #999;">
-                    <p>Nincsenek csoportok. Hozz létre egy új csoportot az alábbi formban.</p>
-                </div>
-            <?php else: ?>
+            <form method="POST" action="">
                 <table>
                     <thead>
                         <tr>
@@ -307,7 +421,6 @@ closeDbConnection($conn);
                             <th>Csoport Neve</th>
                             <th>Leírás</th>
                             <th>Kijelzők</th>
-                            <th>Loop</th>
                             <th>Prioritás</th>
                             <th>Műveletek</th>
                         </tr>
@@ -324,39 +437,23 @@ closeDbConnection($conn);
                                 </td>
                                 <td>
                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                        <strong id="group-name-<?php echo $group['id']; ?>">
+                                        <?php $group_loop_version = format_loop_version($group['loop_version'] ?? null) ?? 'n/a'; ?>
+                                        <strong id="group-name-<?php echo $group['id']; ?>" title="Loop verzió: <?php echo htmlspecialchars($group_loop_version); ?>">
                                             <?php echo htmlspecialchars($group['name']); ?>
                                         </strong>
                                         <?php if (!empty($group['is_default'])): ?>
                                             <span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">Alapértelmezett</span>
-                                        <?php else: ?>
-                                            <button onclick="renameGroup(<?php echo $group['id']; ?>, '<?php echo htmlspecialchars($group['name'], ENT_QUOTES); ?>')" 
-                                                    class="action-btn" 
-                                                    style="padding: 4px 8px; font-size: 12px; background: #1a3a52;" 
-                                                    title="Átnevezés">
-                                                ✏️
-                                            </button>
                                         <?php endif; ?>
                                     </div>
+                                    <div style="font-size:11px;color:#75879a;margin-top:2px;">Loop verzió: <?php echo htmlspecialchars($group_loop_version); ?></div>
                                 </td>
                                 <td style="color: #666; font-size: 13px;">
                                     <?php echo htmlspecialchars($group['description'] ?? '—'); ?>
                                 </td>
                                 <td>
-                                    <span style="background: #e7f3ff; color: #0066cc; padding: 4px 8px; border-radius: 3px; font-size: 12px; cursor: pointer;" 
-                                          onclick="showGroupKiosks(<?php echo $group['id']; ?>, '<?php echo htmlspecialchars($group['name'], ENT_QUOTES); ?>')">
-                                        <?php echo $group['kiosk_count']; ?> kijelző
+                                    <span class="group-kiosk-chip">
+                                        <?php echo (int)$group['kiosk_count']; ?> kijelző
                                     </span>
-                                </td>
-                                <td>
-                                    <?php if ($group['loop_count'] > 0): ?>
-                                        <span style="background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 3px; font-size: 12px; cursor: pointer;" 
-                                              onclick="viewLoop(<?php echo $group['id']; ?>, '<?php echo htmlspecialchars($group['name'], ENT_QUOTES); ?>')">
-                                            🔄 <?php echo $group['loop_count']; ?> elem
-                                        </span>
-                                    <?php else: ?>
-                                        <span style="color: #999; font-size: 12px;">Nincs beállítva</span>
-                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <span class="priority-value" id="group-priority-value-<?php echo $group['id']; ?>" style="font-size: 12px; color: #333; font-weight: 600;">
@@ -364,40 +461,32 @@ closeDbConnection($conn);
                                     </span>
                                 </td>
                                 <td>
-                                    <div style="display: flex; gap: 5px; align-items: center;">
-                                        <!-- Primary action: Customize -->
-                                        <a href="group_loop.php?id=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="action-btn" style="background: #1a3a52; color: white; padding: 8px 16px; font-weight: bold;">⚙️ Testreszabás</a>
-                                        <!-- Secondary actions -->
-                                        <a href="group_kiosks.php?id=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="action-btn action-btn-small" style="background: #6c757d;">🖥️ Kijelzők</a>
+                                    <div class="group-action-row">
+                                        <a href="group_loop.php?id=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-primary">⚙️ Testreszabás</a>
                                         <?php if (!empty($group['is_default'])): ?>
-                                            <span class="action-btn action-btn-small" style="background: #adb5bd; cursor: not-allowed;">🗑️</span>
+                                            <span class="group-action-btn group-action-btn-danger group-action-btn-disabled">🗑️</span>
                                         <?php else: ?>
-                                            <a href="?delete=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="action-btn action-btn-small" style="background: #dc3545;" onclick="return confirm('Biztosan törölted ezt a csoportot?');">🗑️</a>
+                                            <a href="?delete=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-danger" onclick="return confirm('Biztosan törlöd ezt a csoportot?');">🗑️</a>
                                         <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <tbody>
+                        <tr class="new-group-separator">
+                            <td colspan="6">Új csoport létrehozása</td>
+                        </tr>
+                        <tr class="new-group-row">
+                            <td></td>
+                            <td><input type="text" id="group_name" name="group_name" required placeholder="Csoport neve"></td>
+                            <td><input type="text" id="description" name="description" placeholder="pl. Emelet 1, Épület A"></td>
+                            <td style="color:#75879a; font-size:12px;">0 kijelző</td>
+                            <td style="color:#75879a; font-size:12px;">Automatikus</td>
+                            <td><button type="submit" name="create_group" class="btn btn-primary" style="width: 100%;">+ Létrehozás</button></td>
+                        </tr>
+                    </tbody>
                 </table>
-            <?php endif; ?>
-        </div>
-        
-        <!-- Create Group Form - moved to bottom -->
-        <div class="card" style="margin-top: 20px;">
-            <h2 style="margin-bottom: 15px;">Új Csoport Létrehozása</h2>
-            <form method="POST" action="">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <div class="form-group">
-                        <label for="group_name">Csoport neve *</label>
-                        <input type="text" id="group_name" name="group_name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="description">Leírás</label>
-                        <input type="text" id="description" name="description" placeholder="pl. Emelet 1, Épület A">
-                    </div>
-                </div>
-                <button type="submit" name="create_group" class="btn">+ Csoport Létrehozása</button>
             </form>
         </div>
     </div>
@@ -510,191 +599,6 @@ closeDbConnection($conn);
 
         updatePriorityLabels();
         initDragAndDrop();
-        function renameGroup(groupId, currentName) {
-            const newName = prompt('Új csoport név:', currentName);
-            if (newName && newName !== currentName) {
-                const formData = new FormData();
-                formData.append('group_id', groupId);
-                formData.append('new_name', newName);
-                
-                fetch('../api/rename_group.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById('group-name-' + groupId).textContent = newName;
-                        alert('✓ ' + data.message);
-                    } else {
-                        alert('⚠️ ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    alert('⚠️ Hiba történt: ' + error);
-                });
-            }
-        }
-        
-        function showGroupKiosks(groupId, groupName) {
-            fetch('../api/get_group_kiosks.php?group_id=' + groupId)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const kiosks = data.kiosks;
-                        let html = '<div style="max-height: 400px; overflow-y: auto;">';
-                        
-                        if (kiosks.length === 0) {
-                            html += '<p style="text-align: center; color: #999; padding: 20px;">Nincsenek kijelzők ebben a csoportban</p>';
-                        } else {
-                            html += '<table style="width: 100%; font-size: 13px;">';
-                            html += '<thead><tr><th>Hostname</th><th>Státusz</th><th>Hely</th></tr></thead>';
-                            html += '<tbody>';
-                            kiosks.forEach(kiosk => {
-                                const statusBadge = kiosk.status === 'online' 
-                                    ? '<span style="color: #28a745;">🟢 Online</span>' 
-                                    : '<span style="color: #dc3545;">🔴 Offline</span>';
-                                html += `<tr>
-                                    <td><strong>${kiosk.hostname || kiosk.friendly_name || 'N/A'}</strong></td>
-                                    <td>${statusBadge}</td>
-                                    <td>${kiosk.location || '-'}</td>
-                                </tr>`;
-                            });
-                            html += '</tbody></table>';
-                        }
-                        html += '</div>';
-                        
-                        showModal('Kijelzők - ' + groupName, html);
-                    } else {
-                        alert('⚠️ ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    alert('⚠️ Hiba történt: ' + error);
-                });
-        }
-
-        
-        function viewLoop(groupId, groupName) {
-            fetch('../api/group_loop_config.php?group_id=' + groupId)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const loops = data.loops;
-                        let html = '<div style="max-height: 400px; overflow-y: auto;">';
-                        
-                        if (loops.length === 0) {
-                            html += '<p style="text-align: center; color: #999; padding: 20px;">Nincs beállított loop</p>';
-                        } else {
-                            html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
-                            loops.forEach((loop, index) => {
-                                html += `<div style="
-                                    background: linear-gradient(135deg, #0f2537 0%, #1a4d2e 100%);
-                                    color: white;
-                                    padding: 15px;
-                                    border-radius: 8px;
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 15px;
-                                    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-                                ">
-                                    <div style="
-                                        background: rgba(255,255,255,0.2);
-                                        padding: 8px 12px;
-                                        border-radius: 5px;
-                                        font-weight: bold;
-                                        font-size: 14px;
-                                    ">${index + 1}</div>
-                                    <div style="flex: 1;">
-                                        <div style="font-weight: bold; font-size: 14px;">${loop.module_name}</div>
-                                        <div style="font-size: 12px; opacity: 0.9;">${loop.description || ''}</div>
-                                    </div>
-                                    <div style="
-                                        background: rgba(255,255,255,0.2);
-                                        padding: 8px 12px;
-                                        border-radius: 5px;
-                                        text-align: center;
-                                    ">
-                                        <div style="font-size: 18px; font-weight: bold;">${loop.duration_seconds}</div>
-                                        <div style="font-size: 11px; opacity: 0.9;">sec</div>
-                                    </div>
-                                </div>`;
-                            });
-                            html += '</div>';
-                            
-                            // Add total duration
-                            const totalDuration = loops.reduce((sum, loop) => sum + parseInt(loop.duration_seconds), 0);
-                            html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
-                                <strong>Teljes loop időtartam:</strong> ${totalDuration} másodperc (${Math.floor(totalDuration / 60)} perc ${totalDuration % 60} mp)
-                            </div>`;
-                        }
-                        html += '</div>';
-                        
-                        showModal('🔄 Loop Konfiguráció - ' + groupName, html);
-                    } else {
-                        alert('⚠️ ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    alert('⚠️ Hiba történt: ' + error);
-                });
-        }
-        
-        function showModal(title, content) {
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                display: flex;
-                position: fixed;
-                z-index: 1000;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.5);
-                align-items: center;
-                justify-content: center;
-            `;
-            
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    modal.remove();
-                }
-            });
-            
-            modal.innerHTML = `
-                <div style="
-                    background: white;
-                    padding: 30px;
-                    border-radius: 12px;
-                    max-width: 700px;
-                    width: 90%;
-                    max-height: 80vh;
-                    overflow-y: auto;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-                ">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="margin: 0;">${title}</h2>
-                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
-                            background: #1a3a52;
-                            color: white;
-                            border: none;
-                            font-size: 16px;
-                            cursor: pointer;
-                            width: 36px;
-                            height: 36px;
-                            border-radius: 50%;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            transition: background 0.2s;
-                        " onmouseover="this.style.background='#0f2537'" onmouseout="this.style.background='#1a3a52'">✕</button>
-                    </div>
-                    <div>${content}</div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-        }
     </script>
 <?php include '../admin/footer.php'; ?>
 

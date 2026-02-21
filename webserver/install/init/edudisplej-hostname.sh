@@ -51,7 +51,11 @@ configure_hostname() {
     print_info "Primary MAC address: $mac"
     
     # Get suffix (last 6 chars)
-    local mac_suffix=$(get_mac_suffix "$mac")
+    local mac_suffix=$(get_mac_suffix "$mac" | tr '[:lower:]' '[:upper:]')
+    if [[ ! "$mac_suffix" =~ ^[A-F0-9]{6}$ ]]; then
+        print_error "Invalid MAC suffix generated: $mac_suffix"
+        return 1
+    fi
     print_info "MAC suffix: $mac_suffix"
     
     # Generate expected hostname
@@ -115,10 +119,12 @@ configure_hostname() {
     fi
     
     # Method 2: Direct hostname command
-    if ! hostname "$expected_hostname" 2>/dev/null; then
-        print_warning "Failed to set hostname via hostname command"
-    else
-        hostname_set=true
+    if [[ "$hostname_set" == false ]]; then
+        if ! hostname "$expected_hostname" 2>/dev/null; then
+            print_warning "Failed to set hostname via hostname command"
+        else
+            hostname_set=true
+        fi
     fi
     
     # Verify hostname was set
@@ -174,7 +180,11 @@ if [ -z "$mac" ]; then
     exit 1
 fi
 
-mac_suffix=$(get_mac_suffix "$mac")
+mac_suffix=$(get_mac_suffix "$mac" | tr '[:lower:]' '[:upper:]')
+if [[ ! "$mac_suffix" =~ ^[A-F0-9]{6}$ ]]; then
+    print_error "Invalid MAC suffix generated: $mac_suffix"
+    exit 1
+fi
 expected_hostname="edudisplej-${mac_suffix}"
 
 print_info "=== Hostname Check ==="

@@ -73,6 +73,9 @@ edudisplej/
 | `api/health/report.php` | ✅ Bearer token | – |
 | `api/health/status.php` | ✅ Bearer token | Fixed (was unauthenticated) |
 | `api/health/list.php` | ✅ Bearer token | Fixed (was unauthenticated) |
+| `api/install/progress.php` | ✅ Bearer token | Kiosk installer progress reporting |
+| `api/install/status.php` | ✅ Bearer token | Per-kiosk install progress |
+| `api/install/list.php` | ✅ Bearer token | Multi-kiosk install progress list |
 | `api/check_versions.php` | ✅ Bearer token | – |
 | `api/download_module.php` | ✅ Bearer token | – |
 | `api/registration.php` | ✅ Bearer token | – |

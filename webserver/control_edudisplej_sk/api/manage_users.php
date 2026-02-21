@@ -107,6 +107,11 @@ try {
                 $response['message'] = 'User ID is required';
                 break;
             }
+
+            if ($target_user_id === $user_id) {
+                $response['message'] = 'Own password cannot be changed from this screen';
+                break;
+            }
             
             // Verify user belongs to company
             $verify_stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
@@ -119,14 +124,14 @@ try {
             }
             $verify_stmt->close();
             
-            if ($password) {
-                $hashed_pwd = password_hash($password, PASSWORD_DEFAULT);
-                $update_stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-                $update_stmt->bind_param("si", $hashed_pwd, $target_user_id);
-            } else {
-                $update_stmt = $conn->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
-                $update_stmt->bind_param("i", $target_user_id);
+            if (!$password) {
+                $response['message'] = 'New password is required';
+                break;
             }
+
+            $hashed_pwd = password_hash($password, PASSWORD_DEFAULT);
+            $update_stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+            $update_stmt->bind_param("si", $hashed_pwd, $target_user_id);
             
             if ($update_stmt->execute()) {
                 $response['success'] = true;

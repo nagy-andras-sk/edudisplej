@@ -40,9 +40,38 @@ try {
     }
 
     $is_default_group = (!empty($group['is_default']) || strtolower($group['name']) === 'default');
+
+    $unconfigured_stmt = $conn->prepare("SELECT id, name, description, module_key FROM modules WHERE module_key = 'unconfigured' LIMIT 1");
+    $unconfigured_stmt->execute();
+    $unconfigured_result = $unconfigured_stmt->get_result();
+    $unconfigured_module = $unconfigured_result->fetch_assoc();
+    $unconfigured_stmt->close();
     
     // GET - Retrieve loop configuration
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        if ($is_default_group) {
+            if (!$unconfigured_module) {
+                echo json_encode(['success' => false, 'message' => 'Az unconfigured modul nem elerheto']);
+                exit();
+            }
+
+            echo json_encode([
+                'success' => true,
+                'loops' => [[
+                    'id' => null,
+                    'module_id' => (int)$unconfigured_module['id'],
+                    'module_name' => $unconfigured_module['name'],
+                    'module_key' => 'unconfigured',
+                    'description' => $unconfigured_module['description'] ?? '',
+                    'duration_seconds' => 60,
+                    'display_order' => 0,
+                    'settings' => new stdClass(),
+                    'is_active' => 1
+                ]]
+            ]);
+            exit();
+        }
+
         $stmt = $conn->prepare("SELECT kgm.*, m.name as module_name, m.module_key, m.description
                                 FROM kiosk_group_modules kgm
                                 JOIN modules m ON kgm.module_id = m.id
@@ -54,13 +83,17 @@ try {
         
         $loops = [];
         while ($row = $result->fetch_assoc()) {
+            $duration_seconds = (int)$row['duration_seconds'];
+            if (($row['module_key'] ?? '') === 'unconfigured') {
+                $duration_seconds = 60;
+            }
             $loops[] = [
                 'id' => $row['id'],
                 'module_id' => $row['module_id'],
                 'module_name' => $row['module_name'],
                 'module_key' => $row['module_key'],
                 'description' => $row['description'],
-                'duration_seconds' => $row['duration_seconds'],
+                'duration_seconds' => $duration_seconds,
                 'display_order' => $row['display_order'],
                 'settings' => $row['settings'] ? json_decode($row['settings'], true) : null,
                 'is_active' => $row['is_active']
@@ -81,24 +114,8 @@ try {
         }
 
         if ($is_default_group) {
-            $clock_stmt = $conn->prepare("SELECT id FROM modules WHERE module_key = 'clock' LIMIT 1");
-            $clock_stmt->execute();
-            $clock_result = $clock_stmt->get_result();
-            $clock_module = $clock_result->fetch_assoc();
-            $clock_stmt->close();
-
-            if (!$clock_module) {
-                echo json_encode(['success' => false, 'message' => 'Az ora modul nem elerheto']);
-                exit();
-            }
-
-            $clock_module_id = (int)$clock_module['id'];
-            $valid_default = (count($loops) === 1 && intval($loops[0]['module_id'] ?? 0) === $clock_module_id);
-
-            if (!$valid_default) {
-                echo json_encode(['success' => false, 'message' => 'Az alapertelmezett csoport csak ora modullal hasznalhato']);
-                exit();
-            }
+            echo json_encode(['success' => false, 'message' => 'A default csoport loopja nem szerkesztheto']);
+            exit();
         }
         
         // Start transaction
@@ -115,6 +132,10 @@ try {
             foreach ($loops as $index => $loop) {
                 $module_id = intval($loop['module_id']);
                 $duration = intval($loop['duration_seconds'] ?? 10);
+                $module_key = strtolower(trim((string)($loop['module_key'] ?? '')));
+                if ($module_key === 'unconfigured') {
+                    $duration = 60;
+                }
                 $settings = isset($loop['settings']) ? json_encode($loop['settings']) : null;
                 $display_order = $index;
                 

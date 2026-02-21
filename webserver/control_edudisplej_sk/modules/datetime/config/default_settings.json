@@ -1,0 +1,12 @@
+{
+  "type": "digital",
+  "format": "24h",
+  "dateFormat": "full",
+  "timeColor": "#ffffff",
+  "dateColor": "#ffffff",
+  "bgColor": "#1e40af",
+  "fontSize": 120,
+  "clockSize": 300,
+  "showSeconds": true,
+  "language": "hu"
+}

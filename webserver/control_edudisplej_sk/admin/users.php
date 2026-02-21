@@ -5,6 +5,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/db_autofix_bootstrap.php';
 require_once '../security_config.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
@@ -220,11 +221,6 @@ try {
 include 'header.php';
 ?>
 
-<div class="panel">
-    <div class="page-title">Felhasznalok</div>
-    <div class="muted">Fiokok, jogosultsagok, 2FA allapot.</div>
-</div>
-
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
@@ -252,9 +248,9 @@ include 'header.php';
             <input id="password" name="password" type="password">
         </div>
         <div class="form-field">
-            <label for="company_id">Ceg</label>
+            <label for="company_id">Institution</label>
             <select id="company_id" name="company_id">
-                <option value="">Nincs</option>
+                <option value="">None</option>
                 <?php foreach ($companies as $company): ?>
                     <option value="<?php echo (int)$company['id']; ?>" <?php echo $edit_user && (int)$edit_user['company_id'] === (int)$company['id'] ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars($company['name']); ?>
@@ -299,7 +295,7 @@ include 'header.php';
                     <th>Felhasznalo</th>
                     <th>Email</th>
                     <th>Admin</th>
-                    <th>Ceg</th>
+                    <th>Institution</th>
                     <th>2FA</th>
                     <th>Letrehozva</th>
                     <th>Last login</th>

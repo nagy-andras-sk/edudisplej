@@ -121,9 +121,9 @@ try {
         }
         
         // Get latest update from kiosk_modules
-        $stmt = $conn->prepare("SELECT MAX(updated_at) as latest_update, MAX(created_at) as created_at
-                                FROM kiosk_modules 
-                                WHERE kiosk_id = ? AND is_active = 1");
+        $stmt = $conn->prepare("SELECT MAX(created_at) as latest_update
+                    FROM kiosk_modules 
+                    WHERE kiosk_id = ? AND is_active = 1");
         
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $conn->error);
@@ -133,7 +133,7 @@ try {
         $stmt->execute();
         $result = $stmt->get_result();
         $row = $result->fetch_assoc();
-        $latest_update = $row['latest_update'] ?? $row['created_at'] ?? date('Y-m-d H:i:s');
+        $latest_update = $row['latest_update'] ?? date('Y-m-d H:i:s');
         $stmt->close();
         
         $response['success'] = true;

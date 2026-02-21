@@ -173,6 +173,16 @@ View logs / Zobraziť logy:
 tail -f /opt/edudisplej/logs/sync.log
 ```
 
+Installer progress (first boot) / Stav telepítése (prvý boot):
+```bash
+cat /opt/edudisplej/data/install_status.json
+tail -f /opt/edudisplej/apt.log
+```
+
+Optional API progress reporting / Voliteľné API hlásenie priebehu:
+- Set `INSTALL_STATUS_API_URL` in `/opt/edudisplej/edudisplej.conf`
+- If `/opt/edudisplej/lic/token` exists, installer sends Bearer-authenticated JSON updates best-effort
+
 ---
 
 ## 🔧 Technical Architecture / Technická architektúra
@@ -215,6 +225,9 @@ tail -f /opt/edudisplej/logs/sync.log
 | `/api/health/report.php` | POST | Kiosk health reporting |
 | `/api/health/status.php` | GET | Health status for one kiosk |
 | `/api/health/list.php` | GET | Health status for all company kiosks |
+| `/api/install/progress.php` | POST | Kiosk install progress reporting (phase, percent, ETA) |
+| `/api/install/status.php` | GET | Latest install progress for one kiosk |
+| `/api/install/list.php` | GET | Install progress list (company/state filters) |
 | `/api/kiosk/queue_full_update.php` | POST | Queue a full self-update for a kiosk |
 | `/api/kiosk/control_fast_loop.php` | POST | Enable/disable fast loop (30s sync) |
 | `/api/check_versions.php` | GET | Returns service versions + latest_system_version |

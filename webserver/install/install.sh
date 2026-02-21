@@ -322,6 +322,16 @@ echo "surf" > "${TARGET_DIR}/.kiosk_mode"
 echo "$CONSOLE_USER" > "${TARGET_DIR}/.console_user"
 echo "$USER_HOME" > "${TARGET_DIR}/.user_home"
 
+# Configure hostname immediately during install (running as root)
+if [ -x "${INIT_DIR}/edudisplej-hostname.sh" ]; then
+    echo "[*] Konfiguracia hostname - Configuring hostname..."
+    if bash "${INIT_DIR}/edudisplej-hostname.sh"; then
+        echo "[✓] Hostname nakonfigurovany - Hostname configured"
+    else
+        echo "[!] VAROVANIE: Hostname konfiguracia zlyhala - Hostname configuration failed"
+    fi
+fi
+
 # ============================================================================
 # SERVICE INSTALLATION / SZOLGALTATASOK TELEPITESE
 # ============================================================================
@@ -341,8 +351,8 @@ install_services_from_structure() {
     
     echo "[*] Sťahujem structure.json / Downloading structure.json..."
     STRUCTURE_JSON=""
-    if curl -sf --max-time 10 --connect-timeout 5 "${INIT_BASE}/download.php?getstructure" >/dev/null 2>&1; then
-        STRUCTURE_JSON="$(curl -s --max-time 30 --connect-timeout 10 "${INIT_BASE}/download.php?getstructure" 2>/dev/null | tr -d '\r')"
+    if curl -sf --max-time 10 --connect-timeout 5 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" >/dev/null 2>&1; then
+        STRUCTURE_JSON="$(curl -s --max-time 30 --connect-timeout 10 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" 2>/dev/null | tr -d '\r')"
     fi
     
     if [ -z "$STRUCTURE_JSON" ]; then
@@ -511,12 +521,49 @@ if ! install_services_from_structure; then
     fi
 fi
 
+# Ensure core services are always present and active even when structure download fails
+echo ""
+echo "[*] Overujem klucove sluzby - Ensuring core services..."
+
+CORE_SERVICES=(
+    "edudisplej-sync.service"
+    "edudisplej-watchdog.service"
+    "edudisplej-screenshot-service.service"
+)
+
+for service in "${CORE_SERVICES[@]}"; do
+    source_file="${INIT_DIR}/${service}"
+    target_file="/etc/systemd/system/${service}"
+
+    if [ -f "$source_file" ] && [ ! -f "$target_file" ]; then
+        cp "$source_file" "$target_file" 2>/dev/null || true
+        chmod 644 "$target_file" 2>/dev/null || true
+        echo "  [✓] Service file copied: $service"
+    fi
+
+    if [ -f "$target_file" ]; then
+        systemctl daemon-reload 2>/dev/null || true
+        if systemctl enable "$service" 2>/dev/null; then
+            echo "  [✓] Enabled: $service"
+        else
+            echo "  [!] VAROVANIE: enable zlyhal pre $service"
+        fi
+
+        if systemctl start "$service" 2>/dev/null; then
+            echo "  [✓] Started: $service"
+        else
+            echo "  [!] VAROVANIE: start zlyhal pre $service"
+        fi
+    fi
+done
+
 # Sudo konfiguracia - Sudo configuration
 echo "[*] Konfiguracia sudo - Configuring sudo..."
 mkdir -p /etc/sudoers.d
 cat > /etc/sudoers.d/edudisplej <<EOF
 # EduDisplej - Passwordless sudo for system scripts
 $CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-init.sh
+$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-hostname.sh
 $CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/update.sh
 $CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej_terminal_script.sh
 $CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-download-modules.sh
@@ -562,12 +609,10 @@ fi
 
 echo ""
 
-# Mark kiosk system as configured (so edudisplej-init.sh won't run installation on boot)
-echo "[*] Jelolom a rendszert konfiguraltnak - Marking system as configured..."
-mkdir -p "$TARGET_DIR"
-KIOSK_CONFIGURED_FILE="${TARGET_DIR}/.kiosk_system_configured"
-touch "$KIOSK_CONFIGURED_FILE"
-echo "[✓] Konfiguracios flag letrehozva - Configuration flag created"
+# NOTE:
+# Do NOT create .kiosk_system_configured during install.
+# First boot must run edudisplej-init.sh once to complete system setup
+# (install packages, create .xinitrc and Openbox autostart, finalize kiosk runtime config).
 
 echo ""
 echo "=========================================="

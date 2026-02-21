@@ -17,6 +17,18 @@ $api_company = validate_api_token();
 
 $response = ['success' => false, 'message' => ''];
 
+function sanitize_screenshot_filename($filename) {
+    $name = basename((string)$filename);
+    $name = str_replace(['\\', '/'], '', $name);
+    $name = preg_replace('/[^A-Za-z0-9._-]/', '', $name);
+
+    if ($name === '' || !preg_match('/\.(png|jpe?g)$/i', $name)) {
+        return '';
+    }
+
+    return $name;
+}
+
 try {
     // Get request data
     $data = json_decode(file_get_contents('php://input'), true);
@@ -51,7 +63,10 @@ try {
 
     // Use custom filename if provided, otherwise generate default
     if (!empty($custom_filename)) {
-        $filename = $custom_filename;
+        $filename = sanitize_screenshot_filename($custom_filename);
+        if ($filename === '') {
+            $filename = 'screenshot_' . md5($mac . time()) . '.png';
+        }
     } else {
         $filename = 'screenshot_' . md5($mac . time()) . '.png';
     }
@@ -85,7 +100,7 @@ try {
     file_put_contents($filepath, $image_data);
     
     // Update kiosk
-    $stmt = $conn->prepare("UPDATE kiosks SET screenshot_url = ?, screenshot_requested = 0 WHERE mac = ?");
+    $stmt = $conn->prepare("UPDATE kiosks SET screenshot_url = ?, screenshot_timestamp = NOW(), screenshot_requested = 0 WHERE mac = ?");
     $relative_path = 'screenshots/' . $filename;
     $stmt->bind_param("ss", $relative_path, $mac);
     

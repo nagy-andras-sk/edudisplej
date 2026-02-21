@@ -6,6 +6,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../kiosk_status.php';
 
 // Check if user is logged in and is NOT admin
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
@@ -45,6 +46,7 @@ try {
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
+            kiosk_apply_effective_status($row);
             $kiosks[] = $row;
         }
         $stmt->close();

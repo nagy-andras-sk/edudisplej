@@ -432,9 +432,9 @@ if [ -x "$TERMINAL_SCRIPT" ]; then
     # Run xterm in background so openbox keeps running
     # xterm will stay open until user closes it or error occurs
     # Pass DISPLAY and other environment variables to sudo
-    xterm -display :0 -fullscreen -fa Monospace -fs 14 \
-          -bg black -fg green -title "EduDisplej Kiosk" +sb \
-          -e "sudo DISPLAY=:0 XAUTHORITY=/home/edudisplej/.Xauthority bash $TERMINAL_SCRIPT" &
+            xterm -display :0 -fullscreen -fa Monospace -fs 14 \
+                -bg black -fg green -title "EduDisplej Kiosk" +sb \
+                -e "sudo -n DISPLAY=:0 XAUTHORITY=__USER_HOME__/.Xauthority $TERMINAL_SCRIPT || { echo 'ERROR: sudo failed for terminal script'; sleep 30; }" &
     
     XTERM_PID=$!
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Terminal script launched (PID: $XTERM_PID)"
@@ -454,6 +454,8 @@ done
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Openbox autostart completed"
 AUTOSTART_EOF
+
+sed -i "s|__USER_HOME__|$USER_HOME|g" "$USER_HOME/.config/openbox/autostart"
 
 chmod +x "$USER_HOME/.config/openbox/autostart"
 chown -R "$CONSOLE_USER:$CONSOLE_USER" "$USER_HOME/.config" 2>/dev/null || true
