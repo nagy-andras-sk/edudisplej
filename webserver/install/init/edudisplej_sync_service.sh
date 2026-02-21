@@ -18,6 +18,9 @@ fi
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 REGISTRATION_API="${API_BASE_URL}/api/registration.php"
 MODULES_API="${API_BASE_URL}/api/modules_sync.php"
+# Unified v1 sync endpoint (replaces hw_data_sync, screenshot_sync, log_sync)
+DEVICE_SYNC_API="${API_BASE_URL}/api/v1/device/sync.php"
+# Legacy endpoints kept for reference (deprecated)
 HW_SYNC_API="${API_BASE_URL}/api/hw_data_sync.php"
 KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
 CHECK_GROUP_LOOP_UPDATE_API="${API_BASE_URL}/api/check_group_loop_update.php"
@@ -34,6 +37,8 @@ DOWNLOAD_SCRIPT="${CONFIG_DIR}/init/edudisplej-download-modules.sh"
 CONFIG_MANAGER="${CONFIG_DIR}/init/edudisplej-config-manager.sh"
 STATUS_FILE="${CONFIG_DIR}/sync_status.json"
 SYNC_STATE_FILE="${CONFIG_DIR}/sync_state.json"
+# Latest sync response cached here; read by screenshot service for policy
+LAST_SYNC_RESPONSE="${CONFIG_DIR}/last_sync_response.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/sync.log"
 VERSION_FILE="${CONFIG_DIR}/local_versions.json"
@@ -362,7 +367,7 @@ sync_hw_data() {
     local token
     token=$(get_api_token) || { reset_to_unconfigured; return 1; }
 
-    response=$(curl -s -X POST "$HW_SYNC_API" \
+    response=$(curl -s -X POST "$DEVICE_SYNC_API" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "$request_data")
@@ -373,6 +378,9 @@ sync_hw_data() {
     fi
     
     if echo "$response" | grep -q '"success":true'; then
+        # Cache the full sync response for other services (e.g. screenshot service)
+        echo "$response" > "$LAST_SYNC_RESPONSE" 2>/dev/null || true
+
         local new_interval
         new_interval=$(echo "$response" | grep -o '"sync_interval":[0-9]*' | cut -d: -f2)
         if [ -n "$new_interval" ]; then

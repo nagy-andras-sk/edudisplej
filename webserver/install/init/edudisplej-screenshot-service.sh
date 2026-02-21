@@ -15,9 +15,11 @@ DATA_DIR="${CONFIG_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
 TEMP_DIR="/tmp/edudisplej-screenshots"
 TOKEN_FILE="${CONFIG_DIR}/lic/token"
-SCREENSHOT_INTERVAL=15  # Default 15 seconds
+SCREENSHOT_INTERVAL="${SCREENSHOT_INTERVAL:-15}"  # Default 15 seconds; overridden by server policy
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 SCREENSHOT_API="${API_BASE_URL}/api/screenshot_sync.php"
+# File written by the sync service with the last sync response (for screenshot policy)
+LAST_SYNC_RESPONSE="${CONFIG_DIR}/last_sync_response.json"
 
 # Create temp directory
 mkdir -p "$TEMP_DIR"
@@ -66,7 +68,46 @@ get_mac_address() {
     echo "$mac"
 }
 
-# Read config.json to check if screenshot is enabled
+# Read config.json to check if screenshot is enabled OR server requested one
+is_screenshot_active() {
+    # 1. Check server-side screenshot_requested flag from last sync response
+    if [ -f "$LAST_SYNC_RESPONSE" ]; then
+        local requested=""
+        if command -v jq >/dev/null 2>&1; then
+            requested=$(jq -r '.screenshot_requested // false' "$LAST_SYNC_RESPONSE" 2>/dev/null)
+        else
+            requested=$(grep -o '"screenshot_requested"[[:space:]]*:[[:space:]]*true' "$LAST_SYNC_RESPONSE" 2>/dev/null | head -1)
+            [ -n "$requested" ] && requested="true" || requested="false"
+        fi
+        if [ "$requested" = "true" ]; then
+            log_debug "screenshot_requested=true from last sync response"
+            return 0
+        fi
+    fi
+
+    # 2. Fallback: check local config.json screenshot_enabled flag
+    is_screenshot_enabled
+}
+
+# Read screenshot interval from server policy (last sync response)
+get_screenshot_interval() {
+    local interval="$SCREENSHOT_INTERVAL"
+    if [ -f "$LAST_SYNC_RESPONSE" ]; then
+        local server_interval=""
+        if command -v jq >/dev/null 2>&1; then
+            server_interval=$(jq -r '.screenshot_interval_seconds // empty' "$LAST_SYNC_RESPONSE" 2>/dev/null)
+        else
+            server_interval=$(grep -o '"screenshot_interval_seconds"[[:space:]]*:[[:space:]]*[0-9]*' "$LAST_SYNC_RESPONSE" \
+                | grep -o '[0-9]*$' | head -1)
+        fi
+        if [[ "$server_interval" =~ ^[0-9]+$ ]] && [ "$server_interval" -ge 1 ]; then
+            interval="$server_interval"
+        fi
+    fi
+    echo "$interval"
+}
+
+# Read config.json to check if screenshot is enabled (legacy flag)
 is_screenshot_enabled() {
     if [ ! -f "$CONFIG_FILE" ]; then
         log_debug "Config file not found: $CONFIG_FILE"
@@ -229,9 +270,13 @@ main() {
     echo ""
     
     while true; do
-        # Check if screenshot is enabled in config
-        if is_screenshot_enabled; then
-            log_debug "Screenshot enabled - capturing..."
+        # Determine screenshot interval from server policy
+        local current_interval
+        current_interval=$(get_screenshot_interval)
+
+        # Check if screenshot is active (server-requested OR locally enabled)
+        if is_screenshot_active; then
+            log_debug "Screenshot active - capturing (interval: ${current_interval}s)..."
             
             # Capture screenshot
             screenshot_file=$(capture_screenshot)
@@ -246,11 +291,11 @@ main() {
                 log_error "Failed to capture screenshot"
             fi
         else
-            log_debug "Screenshot disabled in config - skipping"
+            log_debug "Screenshot not active (not requested, not enabled) - skipping"
         fi
         
-        # Wait for next cycle
-        sleep "$SCREENSHOT_INTERVAL"
+        # Wait for next cycle using server-defined interval
+        sleep "$current_interval"
     done
 }
 

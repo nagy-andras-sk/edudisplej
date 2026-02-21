@@ -4,8 +4,16 @@
  * EduDisplej Control Panel
  */
 
+session_start();
 header('Content-Type: application/json');
 require_once '../dbkonfiguracia.php';
+
+// Require authenticated session (dashboard/admin use only)
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+    exit;
+}
 
 $response = ['success' => false, 'message' => '', 'location' => ''];
 
