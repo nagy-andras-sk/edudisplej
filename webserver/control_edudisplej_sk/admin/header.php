@@ -6,6 +6,33 @@
 require_once dirname(__DIR__) . '/i18n.php';
 
 $current_lang = edudisplej_apply_language_preferences();
+
+// Determine active page for navigation highlighting
+// basename() removes any directory components; validate against alphanumeric + dot chars only
+$current_file = preg_replace('/[^a-zA-Z0-9._-]/', '', basename($_SERVER['PHP_SELF']));
+
+// Admin nav page map: filename => label
+$admin_nav_pages = [
+    'dashboard.php'       => ['href' => 'dashboard.php',      'label' => 'Dashboard'],
+    'companies.php'       => ['href' => 'companies.php',       'label' => 'Cégek'],
+    'users.php'           => ['href' => 'users.php',           'label' => 'Felhasználók'],
+    'kiosk_health.php'    => ['href' => 'kiosk_health.php',    'label' => 'Kiosk Health'],
+    'module_licenses.php' => ['href' => 'module_licenses.php', 'label' => 'Licenszek'],
+    'api_logs.php'        => ['href' => 'api_logs.php',        'label' => 'API Logok'],
+    'security_logs.php'   => ['href' => 'security_logs.php',   'label' => 'Security Logok'],
+];
+
+// Dashboard nav page map
+$dashboard_nav_pages = [
+    'index.php'          => ['href' => 'index.php',          'label' => '🖥️ ' . t('nav.kiosks'),  'key' => 'kiosks'],
+    'groups.php'         => ['href' => 'groups.php',         'label' => '📁 ' . t('nav.groups'),  'key' => 'groups'],
+    'group_modules.php'  => ['href' => 'group_modules.php',  'label' => '🎬 ' . t('nav.modules'), 'key' => 'modules'],
+    'profile.php'        => ['href' => 'profile.php',        'label' => '🏢 ' . t('nav.profile'), 'key' => 'profile'],
+];
+
+$breadcrumb_label = $admin_nav_pages[$current_file]['label']
+    ?? $dashboard_nav_pages[$current_file]['label']
+    ?? null;
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars($current_lang); ?>">
@@ -45,10 +72,11 @@ $current_lang = edudisplej_apply_language_preferences();
             <div class="header-links">
                 <!-- Dashboard navigation for company users -->
                 <?php if (!$is_admin_user && strpos($_SERVER['PHP_SELF'], 'dashboard') !== false): ?>
-                    <a href="index.php" class="header-link">🖥️ <?php echo htmlspecialchars(t('nav.kiosks')); ?></a>
-                    <a href="groups.php" class="header-link">📁 <?php echo htmlspecialchars(t('nav.groups')); ?></a>
-                    <a href="group_modules.php" class="header-link">🎬 <?php echo htmlspecialchars(t('nav.modules')); ?></a>
-                    <a href="profile.php" class="header-link">🏢 <?php echo htmlspecialchars(t('nav.profile')); ?></a>
+                    <?php foreach ($dashboard_nav_pages as $page_file => $page): ?>
+                        <a href="<?php echo htmlspecialchars($page['href']); ?>" class="header-link<?php echo $current_file === $page_file ? ' active' : ''; ?>">
+                            <?php echo htmlspecialchars($page['label']); ?>
+                        </a>
+                    <?php endforeach; ?>
                 <?php endif; ?>
                 
                 <?php if ($is_admin_user && strpos($_SERVER['PHP_SELF'], 'dashboard') !== false): ?>
@@ -61,13 +89,16 @@ $current_lang = edudisplej_apply_language_preferences();
     </div>
     <?php if ($is_admin_user): ?>
         <div class="admin-nav">
-            <a href="dashboard.php">Dashboard</a>
-            <a href="companies.php">Cégek</a>
-            <a href="users.php">Felhasználók</a>
-            <a href="kiosk_health.php">Kiosk Health</a>
-            <a href="module_licenses.php">Licenszek</a>
-            <a href="api_logs.php">API Logok</a>
-            <a href="security_logs.php">Security Logok</a>
+            <?php foreach ($admin_nav_pages as $page_file => $page): ?>
+                <a href="<?php echo htmlspecialchars($page['href']); ?>"<?php echo $current_file === $page_file ? ' class="active"' : ''; ?>>
+                    <?php echo htmlspecialchars($page['label']); ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+    <?php if ($breadcrumb_label !== null): ?>
+        <div class="breadcrumb">
+            <span class="breadcrumb-current"><?php echo htmlspecialchars(strip_tags($breadcrumb_label)); ?></span>
         </div>
     <?php endif; ?>
     <script>
