@@ -4,6 +4,7 @@
  */
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../auth_roles.php';
 
 header('Content-Type: application/json');
 
@@ -15,6 +16,11 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
+
+if (!edudisplej_can_manage_loops()) {
+    echo json_encode(['success' => false, 'message' => 'Hozzáférés megtagadva']);
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
@@ -31,6 +37,7 @@ if (empty($new_name)) {
 
 try {
     $conn = getDbConnection();
+    edudisplej_ensure_user_role_column($conn);
 
     $default_check = $conn->query("SHOW COLUMNS FROM kiosk_groups LIKE 'is_default'");
     if ($default_check && $default_check->num_rows === 0) {

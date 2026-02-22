@@ -6,6 +6,7 @@
 require_once __DIR__ . '/dbkonfiguracia.php';
 
 define('EDUDISPLEJ_DEFAULT_LANG', 'sk');
+define('EDUDISPLEJ_I18N_OVERRIDES_DIR', __DIR__ . '/lang');
 
 $EDUDISPLEJ_SUPPORTED_LANGS = ['hu', 'en', 'sk'];
 
@@ -16,6 +17,8 @@ $EDUDISPLEJ_TRANSLATIONS = [
         'nav.groups' => 'Csoportok',
         'nav.modules' => 'Modulok',
         'nav.profile' => 'Intézmény',
+        'nav.settings' => 'Beállítások',
+        'nav.translations' => 'Fordítások',
         'nav.admin' => 'Admin',
         'nav.logout' => 'Kilepes',
         'lang.label' => 'Nyelv',
@@ -115,6 +118,8 @@ $EDUDISPLEJ_TRANSLATIONS = [
         'nav.groups' => 'Groups',
         'nav.modules' => 'Modules',
         'nav.profile' => 'Institution',
+        'nav.settings' => 'Settings',
+        'nav.translations' => 'Translations',
         'nav.admin' => 'Admin',
         'nav.logout' => 'Log out',
         'lang.label' => 'Language',
@@ -214,6 +219,8 @@ $EDUDISPLEJ_TRANSLATIONS = [
         'nav.groups' => 'Skupiny',
         'nav.modules' => 'Moduly',
         'nav.profile' => 'Inštitúcia',
+        'nav.settings' => 'Nastavenia',
+        'nav.translations' => 'Preklady',
         'nav.admin' => 'Admin',
         'nav.logout' => 'Odhlasit sa',
         'lang.label' => 'Jazyk',
@@ -395,11 +402,113 @@ function edudisplej_apply_language_preferences() {
     return edudisplej_get_lang();
 }
 
-function t($key, $vars = []) {
+function edudisplej_get_supported_langs() {
+    global $EDUDISPLEJ_SUPPORTED_LANGS;
+    return $EDUDISPLEJ_SUPPORTED_LANGS;
+}
+
+function edudisplej_ensure_i18n_override_dir() {
+    if (!is_dir(EDUDISPLEJ_I18N_OVERRIDES_DIR)) {
+        @mkdir(EDUDISPLEJ_I18N_OVERRIDES_DIR, 0755, true);
+    }
+}
+
+function edudisplej_get_i18n_override_file($lang) {
+    $normalized = edudisplej_normalize_lang($lang);
+    if (!$normalized) {
+        return null;
+    }
+    return EDUDISPLEJ_I18N_OVERRIDES_DIR . '/' . $normalized . '.json';
+}
+
+function edudisplej_load_lang_overrides($lang) {
+    $file = edudisplej_get_i18n_override_file($lang);
+    if (!$file || !is_file($file)) {
+        return [];
+    }
+
+    $json = @file_get_contents($file);
+    if ($json === false || trim($json) === '') {
+        return [];
+    }
+
+    $data = json_decode($json, true);
+    if (!is_array($data)) {
+        return [];
+    }
+
+    $clean = [];
+    foreach ($data as $key => $value) {
+        if (!is_string($key)) {
+            continue;
+        }
+        $clean[$key] = (string)$value;
+    }
+    return $clean;
+}
+
+function edudisplej_get_translation_catalog($lang = null, $include_overrides = true) {
     global $EDUDISPLEJ_TRANSLATIONS;
+    $lang = $lang ? edudisplej_normalize_lang($lang) : edudisplej_get_lang();
+    if (!$lang) {
+        $lang = EDUDISPLEJ_DEFAULT_LANG;
+    }
+
+    $base = $EDUDISPLEJ_TRANSLATIONS[$lang] ?? $EDUDISPLEJ_TRANSLATIONS['en'];
+    if (!$include_overrides) {
+        return $base;
+    }
+
+    $overrides = edudisplej_load_lang_overrides($lang);
+    if (empty($overrides)) {
+        return $base;
+    }
+
+    return array_merge($base, $overrides);
+}
+
+function edudisplej_save_translation_overrides($lang, $overrides) {
+    $lang = edudisplej_normalize_lang($lang);
+    if (!$lang || !is_array($overrides)) {
+        return false;
+    }
+
+    $base = edudisplej_get_translation_catalog($lang, false);
+    $filtered = [];
+    foreach ($base as $key => $base_value) {
+        if (!array_key_exists($key, $overrides)) {
+            continue;
+        }
+
+        $value = trim((string)$overrides[$key]);
+        $base_text = (string)$base_value;
+        if ($value === '' || $value === $base_text) {
+            continue;
+        }
+
+        $filtered[$key] = $value;
+    }
+
+    edudisplej_ensure_i18n_override_dir();
+    $file = edudisplej_get_i18n_override_file($lang);
+    if (!$file) {
+        return false;
+    }
+
+    $payload = json_encode($filtered, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if ($payload === false) {
+        return false;
+    }
+
+    return @file_put_contents($file, $payload) !== false;
+}
+
+function t($key, $vars = []) {
     $lang = edudisplej_get_lang();
-    $value = $EDUDISPLEJ_TRANSLATIONS[$lang][$key]
-        ?? $EDUDISPLEJ_TRANSLATIONS['en'][$key]
+    $catalog = edudisplej_get_translation_catalog($lang, true);
+    $fallback = edudisplej_get_translation_catalog('en', true);
+    $value = $catalog[$key]
+        ?? $fallback[$key]
         ?? $key;
     if (!empty($vars)) {
         foreach ($vars as $name => $val) {
@@ -410,8 +519,6 @@ function t($key, $vars = []) {
 }
 
 function edudisplej_i18n_catalog($lang = null) {
-    global $EDUDISPLEJ_TRANSLATIONS;
-    $lang = $lang ? edudisplej_normalize_lang($lang) : edudisplej_get_lang();
-    return $EDUDISPLEJ_TRANSLATIONS[$lang] ?? $EDUDISPLEJ_TRANSLATIONS['en'];
+    return edudisplej_get_translation_catalog($lang, true);
 }
 ?>

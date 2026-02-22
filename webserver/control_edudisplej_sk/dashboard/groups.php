@@ -6,10 +6,16 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../auth_roles.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../login.php');
+    exit();
+}
+
+if (!edudisplej_can_manage_loops()) {
+    header('Location: index.php');
     exit();
 }
 
@@ -91,6 +97,15 @@ try {
         FOREIGN KEY (group_id) REFERENCES kiosk_groups(id) ON DELETE CASCADE,
         FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Ensure kiosk_group_loop_plans table exists (planner loop styles per group)
+    $conn->query("CREATE TABLE IF NOT EXISTS kiosk_group_loop_plans (
+        group_id INT(11) NOT NULL PRIMARY KEY,
+        plan_json LONGTEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_updated_at (updated_at),
+        FOREIGN KEY (group_id) REFERENCES kiosk_groups(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     // Ensure new columns exist for priority and default handling
     $columns_result = $conn->query("SHOW COLUMNS FROM kiosk_groups");
@@ -199,17 +214,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_group'])) {
 
             $new_priority = (int)$max_priority['max_priority'] + 1;
 
+            $conn->begin_transaction();
+
             $stmt = $conn->prepare("INSERT INTO kiosk_groups (name, company_id, description, priority, is_default) VALUES (?, ?, ?, ?, 0)");
             $stmt->bind_param("sisi", $name, $company_id, $description, $new_priority);
-            
-            if ($stmt->execute()) {
-                $success = 'Csoport sikeresen létrehozva';
-            } else {
-                $error = 'A csoport létrehozása sikertelen';
+
+            if (!$stmt->execute()) {
+                throw new Exception('Group create failed');
             }
-            
+
+            $new_group_id = (int)$stmt->insert_id;
             $stmt->close();
+
+            $default_plan = [
+                'loop_styles' => [[
+                    'id' => 1,
+                    'name' => 'Alap loop',
+                    'items' => []
+                ]],
+                'default_loop_style_id' => 1,
+                'schedule_blocks' => []
+            ];
+
+            $plan_json = json_encode($default_plan, JSON_UNESCAPED_UNICODE);
+            if ($plan_json === false) {
+                throw new Exception('Default loop plan json encode failed');
+            }
+
+            $plan_stmt = $conn->prepare("INSERT INTO kiosk_group_loop_plans (group_id, plan_json) VALUES (?, ?)");
+            $plan_stmt->bind_param("is", $new_group_id, $plan_json);
+
+            if (!$plan_stmt->execute()) {
+                throw new Exception('Default loop plan insert failed');
+            }
+
+            $plan_stmt->close();
+            $conn->commit();
+            $success = 'Csoport sikeresen létrehozva (alap loop létrehozva)';
         } catch (Exception $e) {
+            if ($conn) {
+                try { $conn->rollback(); } catch (Throwable $rollbackError) {}
+            }
             $error = 'Adatbázis hiba';
             error_log($e->getMessage());
         }
@@ -437,15 +482,20 @@ closeDbConnection($conn);
                                 </td>
                                 <td>
                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                        <?php $group_loop_version = format_loop_version($group['loop_version'] ?? null) ?? 'n/a'; ?>
-                                        <strong id="group-name-<?php echo $group['id']; ?>" title="Loop verzió: <?php echo htmlspecialchars($group_loop_version); ?>">
+                                        <?php
+                                            $group_loop_version = format_loop_version($group['loop_version'] ?? null) ?? 'n/a';
+                                            $is_default_group = !empty($group['is_default']);
+                                        ?>
+                                        <strong id="group-name-<?php echo $group['id']; ?>"<?php echo !$is_default_group ? ' title="Loop verzió: ' . htmlspecialchars($group_loop_version) . '"' : ''; ?>>
                                             <?php echo htmlspecialchars($group['name']); ?>
                                         </strong>
                                         <?php if (!empty($group['is_default'])): ?>
                                             <span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">Alapértelmezett</span>
                                         <?php endif; ?>
                                     </div>
-                                    <div style="font-size:11px;color:#75879a;margin-top:2px;">Loop verzió: <?php echo htmlspecialchars($group_loop_version); ?></div>
+                                    <?php if (!$is_default_group): ?>
+                                        <div style="font-size:11px;color:#75879a;margin-top:2px;">Loop verzió: <?php echo htmlspecialchars($group_loop_version); ?></div>
+                                    <?php endif; ?>
                                 </td>
                                 <td style="color: #666; font-size: 13px;">
                                     <?php echo htmlspecialchars($group['description'] ?? '—'); ?>
@@ -462,7 +512,7 @@ closeDbConnection($conn);
                                 </td>
                                 <td>
                                     <div class="group-action-row">
-                                        <a href="group_loop.php?id=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-primary">⚙️ Testreszabás</a>
+                                        <a href="group_loop/index.php?id=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-primary">⚙️ Testreszabás</a>
                                         <?php if (!empty($group['is_default'])): ?>
                                             <span class="group-action-btn group-action-btn-danger group-action-btn-disabled">🗑️</span>
                                         <?php else: ?>

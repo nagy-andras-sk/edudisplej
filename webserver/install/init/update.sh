@@ -83,6 +83,8 @@ fi
 
 if [ "$USE_STRUCTURE" = true ]; then
     # Nova metoda: pouzivat structure.json / Uj modszer: structure.json hasznalata
+    echo "$STRUCTURE_JSON" > "${TARGET_DIR}/structure.json"
+    chmod 644 "${TARGET_DIR}/structure.json"
     
     # Kontrola ci je nainstalovaný jq, inak použijeme python3
     if ! command -v jq >/dev/null 2>&1; then

@@ -38,6 +38,53 @@ function v1_ensure_debug_mode_column(mysqli $conn): void {
     $conn->query("ALTER TABLE kiosks ADD COLUMN debug_mode TINYINT(1) NOT NULL DEFAULT 0");
 }
 
+function v1_enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_per_kiosk = 100): void {
+    if ($max_per_kiosk < 1) {
+        return;
+    }
+
+    $screenshots_dir = realpath(__DIR__ . '/../../../screenshots');
+
+    $old_stmt = $conn->prepare(
+        "SELECT id, details
+           FROM sync_logs
+          WHERE kiosk_id = ? AND action = 'screenshot'
+          ORDER BY timestamp DESC, id DESC
+          LIMIT 100000 OFFSET ?"
+    );
+    $old_stmt->bind_param("ii", $kiosk_id, $max_per_kiosk);
+    $old_stmt->execute();
+    $old_result = $old_stmt->get_result();
+
+    $ids_to_delete = [];
+    while ($row = $old_result->fetch_assoc()) {
+        $ids_to_delete[] = (int)$row['id'];
+
+        $details = json_decode((string)$row['details'], true);
+        if (!is_array($details) || empty($details['filename']) || !$screenshots_dir) {
+            continue;
+        }
+
+        $filename = v1_sanitize_screenshot_filename((string)$details['filename']);
+        if ($filename === '') {
+            continue;
+        }
+
+        $file_path = $screenshots_dir . DIRECTORY_SEPARATOR . $filename;
+        if (is_file($file_path)) {
+            @unlink($file_path);
+        }
+    }
+    $old_stmt->close();
+
+    if (empty($ids_to_delete)) {
+        return;
+    }
+
+    $id_list = implode(',', array_map('intval', $ids_to_delete));
+    $conn->query("DELETE FROM sync_logs WHERE id IN ($id_list)");
+}
+
 $api_company = validate_api_token();
 
 // Read raw body once
@@ -89,7 +136,7 @@ try {
         "UPDATE kiosks
             SET hostname = ?, hw_info = ?, public_ip = ?,
                 version = ?, screen_resolution = ?, screen_status = ?,
-                status = 'online', last_seen = NOW()
+                status = 'online', last_seen = NOW(), upgrade_started_at = NULL
           WHERE mac = ?"
     );
     $stmt->bind_param("sssssss",
@@ -182,6 +229,8 @@ try {
             $ls->bind_param("is", $kiosk_id, $ls_details);
             $ls->execute();
             $ls->close();
+
+            v1_enforce_screenshot_retention($conn, (int)$kiosk_id, 100);
         }
     }
 

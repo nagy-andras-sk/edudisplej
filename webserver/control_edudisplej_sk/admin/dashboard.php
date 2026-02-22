@@ -87,6 +87,7 @@ try {
             k.loop_last_update,
             k.last_sync,
             k.last_seen,
+            k.upgrade_started_at,
             k.version,
             k.hw_info,
             k.screen_resolution,
@@ -114,6 +115,28 @@ try {
 } catch (Exception $e) {
     $error = 'Failed to load dashboard data';
     error_log('Dashboard error: ' . $e->getMessage());
+}
+
+$status_counts = [
+    'online' => 0,
+    'offline' => 0,
+    'warning' => 0,
+    'unconfigured' => 0,
+    'upgrading' => 0,
+    'error' => 0
+];
+
+$failed_kiosks = [];
+foreach ($kiosks as $kiosk) {
+    $status = (string)($kiosk['status'] ?? 'offline');
+    if (!isset($status_counts[$status])) {
+        $status_counts[$status] = 0;
+    }
+    $status_counts[$status]++;
+
+    if ($status === 'error') {
+        $failed_kiosks[] = $kiosk;
+    }
 }
 
 $filtered = [];
@@ -179,6 +202,46 @@ include 'header.php';
 <?php endif; ?>
 
 <div class="panel">
+    <div class="panel-title">Overview</div>
+    <div class="toolbar">
+        <span class="badge success">Online: <?php echo (int)($status_counts['online'] ?? 0); ?></span>
+        <span class="badge">Offline: <?php echo (int)($status_counts['offline'] ?? 0); ?></span>
+        <span class="badge warning">Upgrading: <?php echo (int)($status_counts['upgrading'] ?? 0); ?></span>
+        <span class="badge danger">Upgrade errors: <?php echo (int)($status_counts['error'] ?? 0); ?></span>
+        <span class="badge info">Unconfigured: <?php echo (int)($status_counts['unconfigured'] ?? 0); ?></span>
+    </div>
+
+    <?php if (!empty($failed_kiosks)): ?>
+        <div style="margin-top:12px;" class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Hostname</th>
+                        <th>Institution</th>
+                        <th>Status</th>
+                        <th>Upgrade started</th>
+                        <th>Last seen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($failed_kiosks as $failed): ?>
+                        <tr>
+                            <td><?php echo (int)$failed['id']; ?></td>
+                            <td><?php echo htmlspecialchars((string)($failed['hostname'] ?? '-')); ?></td>
+                            <td><?php echo htmlspecialchars((string)($failed['company_name'] ?? '-')); ?></td>
+                            <td><span class="badge danger">error</span></td>
+                            <td><?php echo format_datetime($failed['upgrade_started_at'] ?? null); ?></td>
+                            <td><?php echo format_datetime($failed['last_seen'] ?? null); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+</div>
+
+<div class="panel">
     <div class="panel-title">Filters</div>
     <form method="get" class="toolbar">
         <div class="form-field">
@@ -199,6 +262,8 @@ include 'header.php';
                 <option value="online" <?php echo $filters['status'] === 'online' ? 'selected' : ''; ?>>Online</option>
                 <option value="warning" <?php echo $filters['status'] === 'warning' ? 'selected' : ''; ?>>Warning</option>
                 <option value="offline" <?php echo $filters['status'] === 'offline' ? 'selected' : ''; ?>>Offline</option>
+                <option value="upgrading" <?php echo $filters['status'] === 'upgrading' ? 'selected' : ''; ?>>Upgrading</option>
+                <option value="error" <?php echo $filters['status'] === 'error' ? 'selected' : ''; ?>>Error</option>
                 <option value="unconfigured" <?php echo $filters['status'] === 'unconfigured' ? 'selected' : ''; ?>>Unconfigured</option>
             </select>
         </div>
@@ -271,7 +336,11 @@ include 'header.php';
                                 $badge_class = 'success';
                             } elseif ($status === 'warning') {
                                 $badge_class = 'warning';
+                            } elseif ($status === 'upgrading') {
+                                $badge_class = 'warning';
                             } elseif ($status === 'offline') {
+                                $badge_class = 'danger';
+                            } elseif ($status === 'error') {
                                 $badge_class = 'danger';
                             }
                             $network_name = pick_value($network, ['wifi_name', 'ssid', 'network_name']);

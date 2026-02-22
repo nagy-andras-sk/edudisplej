@@ -8,6 +8,8 @@ session_start();
 require_once '../dbkonfiguracia.php';
 require_once '../i18n.php';
 require_once '../kiosk_status.php';
+require_once '../auth_roles.php';
+require_once __DIR__ . '/dashboard_helpers.php';
 
 $current_lang = edudisplej_apply_language_preferences();
 
@@ -19,6 +21,13 @@ if (!isset($_SESSION['user_id'])) {
 $user_id    = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
 $company_name = $_SESSION['company_name'] ?? '';
+$session_role = edudisplej_get_session_role();
+$can_edit_kiosk_details = !edudisplej_is_content_editor();
+
+if ($session_role === 'content_editor') {
+    header('Location: content_editor_index.php');
+    exit();
+}
 
 if (!$company_id) {
     header('Location: ../login.php');
@@ -28,41 +37,7 @@ if (!$company_id) {
 $kiosks = [];
 $groups = [];
 $error  = '';
-
-function normalize_screenshot_url($raw_url) {
-    if ($raw_url === null) {
-        return null;
-    }
-
-    $path = trim((string)$raw_url);
-    if ($path === '') {
-        return null;
-    }
-
-    $path = str_replace('\\', '/', $path);
-    $path = preg_replace('/^[^A-Za-z0-9\/._-]+/u', '', $path);
-    if ($path === '') {
-        return null;
-    }
-
-    if (preg_match('#^https?://#i', $path)) {
-        return $path;
-    }
-
-    if (strpos($path, 'screenshots/') === 0) {
-        return '../' . $path;
-    }
-
-    if (preg_match('#(^|/)screenshots/([^/]+)$#i', $path, $matches)) {
-        return '../screenshots/' . $matches[2];
-    }
-
-    if (preg_match('/^[A-Za-z0-9._-]+\.(png|jpe?g|webp|gif)$/i', $path)) {
-        return '../screenshots/' . $path;
-    }
-
-    return '../' . ltrim($path, '/');
-}
+$group_plans_by_id = [];
 
 try {
     $conn = getDbConnection();
@@ -90,8 +65,8 @@ try {
                     (SELECT DATE_FORMAT(MAX(km.created_at), '%Y%m%d%H%i%s')
                         FROM kiosk_modules km
                       WHERE km.kiosk_id = k.id AND km.is_active = 1) AS kiosk_server_loop_version,
-               GROUP_CONCAT(DISTINCT g.id   ORDER BY g.id SEPARATOR ',') AS group_ids,
-               GROUP_CONCAT(DISTINCT g.name ORDER BY g.name SEPARATOR ', ') AS group_names
+               GROUP_CONCAT(DISTINCT g.id   ORDER BY COALESCE(g.priority, 0) DESC, g.id SEPARATOR ',') AS group_ids,
+               GROUP_CONCAT(DISTINCT g.name ORDER BY COALESCE(g.priority, 0) DESC, g.id SEPARATOR ', ') AS group_names
         FROM kiosks k
         LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
         LEFT JOIN kiosk_groups g ON kga.group_id = g.id
@@ -113,7 +88,12 @@ try {
             }
         }
         $server_loop_version = $row['group_server_loop_version'] ?: $row['kiosk_server_loop_version'];
-        $loop_version_mismatch = ($kiosk_loop_version !== null && !empty($server_loop_version) && $kiosk_loop_version !== $server_loop_version);
+        $loop_version_mismatch = (
+            $row['status'] !== 'offline'
+            && $kiosk_loop_version !== null
+            && !empty($server_loop_version)
+            && $kiosk_loop_version !== $server_loop_version
+        );
 
         if ($loop_version_mismatch) {
             $row['status'] = 'online_error';
@@ -129,6 +109,39 @@ try {
         $kiosks[] = $row;
     }
     $stmt->close();
+
+    $group_ids_for_plans = [];
+    foreach ($kiosks as $kiosk_row) {
+        if (empty($kiosk_row['group_ids'])) {
+            continue;
+        }
+        foreach (explode(',', (string)$kiosk_row['group_ids']) as $gid_part) {
+            $gid = (int)$gid_part;
+            if ($gid > 0) {
+                $group_ids_for_plans[$gid] = true;
+            }
+        }
+    }
+
+    if (!empty($group_ids_for_plans)) {
+        $gid_list = array_keys($group_ids_for_plans);
+        $placeholders = implode(',', array_fill(0, count($gid_list), '?'));
+        $types = str_repeat('i', count($gid_list));
+        $plan_stmt = $conn->prepare("SELECT group_id, plan_json FROM kiosk_group_loop_plans WHERE group_id IN ($placeholders)");
+        if ($plan_stmt) {
+            $plan_stmt->bind_param($types, ...$gid_list);
+            $plan_stmt->execute();
+            $plan_result = $plan_stmt->get_result();
+            while ($plan_row = $plan_result->fetch_assoc()) {
+                $gid = (int)$plan_row['group_id'];
+                $decoded = json_decode((string)$plan_row['plan_json'], true);
+                if (is_array($decoded)) {
+                    $group_plans_by_id[$gid] = $decoded;
+                }
+            }
+            $plan_stmt->close();
+        }
+    }
 
     closeDbConnection($conn);
 
@@ -201,15 +214,18 @@ include '../admin/header.php';
                 <th>Státusz</th>
                 <th>Hely</th>
                 <th>Csoport</th>
+                <th>Aktuális tartalom</th>
                 <th>Utolsó szinkron</th>
                 <th>Képernyő</th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($kiosks)): ?>
-                <tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">Nincs regisztrált kijelző.</td></tr>
+                <tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Nincs regisztrált kijelző.</td></tr>
             <?php else: ?>
-                <?php foreach ($kiosks as $k):
+                <?php
+                $dashboard_now = new DateTimeImmutable('now');
+                foreach ($kiosks as $k):
                     $gids = $k['group_ids'] ? array_map('intval', explode(',', $k['group_ids'])) : [];
                     $data_groups = implode(' ', array_map(fn($id) => 'g' . $id, $gids));
                     $location_value = trim((string)($k['location'] ?? ''));
@@ -235,6 +251,11 @@ include '../admin/header.php';
                     $screenshot_ts_json = json_encode($screenshot_ts ?? 'Nincs időbélyeg', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
                     if ($screenshot_ts_json === false) {
                         $screenshot_ts_json = '"Nincs időbélyeg"';
+                    }
+                    $primary_group_id = !empty($gids) ? (int)$gids[0] : 0;
+                    $current_content = ['loop_name' => '—', 'schedule_text' => '—'];
+                    if ($primary_group_id > 0) {
+                        $current_content = edudisplej_resolve_group_current_content($group_plans_by_id[$primary_group_id] ?? null, $dashboard_now);
                     }
                 ?>
                     <tr class="kiosk-row"
@@ -273,8 +294,18 @@ include '../admin/header.php';
                                 <?php foreach ($gids as $idx => $gid):
                                     $gname = $group_names_arr[$idx] ?? ('Csoport #' . $gid);
                                 ?>
-                                    <a href="group_loop.php?id=<?php echo (int)$gid; ?>" title="Csoport szerkesztése"><?php echo htmlspecialchars($gname); ?></a><?php echo $idx < (count($gids) - 1) ? ', ' : ''; ?>
+                                    <a href="group_loop/index.php?id=<?php echo (int)$gid; ?>" title="Csoport szerkesztése"><?php echo htmlspecialchars($gname); ?></a><?php echo $idx < (count($gids) - 1) ? ', ' : ''; ?>
                                 <?php endforeach; ?>
+                            <?php else: ?>
+                                —
+                            <?php endif; ?>
+                        </td>
+                        <td class="muted">
+                            <?php if ($primary_group_id > 0): ?>
+                                <a href="group_loop/index.php?id=<?php echo (int)$primary_group_id; ?>" title="Megnyitás a loop szerkesztőben">
+                                    <strong><?php echo htmlspecialchars((string)$current_content['loop_name']); ?></strong><br>
+                                    <span style="font-size:11px;"><?php echo htmlspecialchars((string)$current_content['schedule_text']); ?></span>
+                                </a>
                             <?php else: ?>
                                 —
                             <?php endif; ?>
@@ -402,15 +433,28 @@ var _historyPlaybackElapsedMs = 0;
 var _dashboardAutoRefreshTimer = null;
 var _summaryFilter = 'all';
 var _quickFilter = { type: null, value: null, label: null };
-var SCREENSHOT_LOADING_TEXT = <?php echo json_encode(t('dashboard.screenshot.loading')); ?>;
-var SCREENSHOT_UNAVAILABLE_TEXT = <?php echo json_encode(t('dashboard.screenshot.unavailable')); ?>;
+var SCREENSHOT_LOADING_TEXT = <?php
+    $screenshot_loading_text_json = json_encode(t('dashboard.screenshot.loading'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $screenshot_loading_text_json !== false ? $screenshot_loading_text_json : '"Loading"';
+?>;
+var SCREENSHOT_UNAVAILABLE_TEXT = <?php
+    $screenshot_unavailable_text_json = json_encode(t('dashboard.screenshot.unavailable'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $screenshot_unavailable_text_json !== false ? $screenshot_unavailable_text_json : '"Screenshot unavailable"';
+?>;
 var SCREENSHOT_OFFLINE_TEXT = 'OFFLINE';
-var DASHBOARD_GROUPS = <?php echo json_encode(array_map(function ($group) {
-    return [
-        'id' => (int)$group['id'],
-        'name' => (string)$group['name']
-    ];
-}, $groups), JSON_UNESCAPED_UNICODE); ?>;
+var CAN_EDIT_KIOSK_DETAILS = <?php echo $can_edit_kiosk_details ? 'true' : 'false'; ?>;
+var DASHBOARD_GROUPS = <?php
+    $dashboard_groups_json = json_encode(
+        array_map(function ($group) {
+            return [
+                'id' => (int)$group['id'],
+                'name' => (string)$group['name']
+            ];
+        }, $groups),
+        JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
+    );
+    echo $dashboard_groups_json !== false ? $dashboard_groups_json : '[]';
+?>;
 
 function filterByGroup(filter) {
     _summaryFilter = filter;
@@ -967,14 +1011,25 @@ function buildKioskModalHTML(data) {
         groupOptions += '<option value="' + escapeHtml(group.id) + '"' + selected + '>' + escapeHtml(group.name) + '</option>';
     });
 
+    var editableSection = '';
+    if (CAN_EDIT_KIOSK_DETAILS) {
+        editableSection = '<table class="minimal-table"><tbody>'
+            + '<tr><th>Megnevezés</th><td><input type="text" id="kiosk-edit-friendly-name" value="' + escapeHtml(data.friendly_name || data.hostname || '') + '" style="width:100%;"></td></tr>'
+            + '<tr><th>Hely</th><td><input type="text" id="kiosk-edit-location" value="' + escapeHtml(data.location || '') + '" style="width:100%;"></td></tr>'
+            + '<tr><th>Csoport</th><td><select id="kiosk-edit-group" style="width:100%;">' + groupOptions + '</select></td></tr>'
+            + '<tr><td colspan="2" style="text-align:right;"><button class="btn btn-primary" onclick="saveKioskDetails(' + escapeHtml(data.id || 0) + ')">Mentés</button></td></tr>'
+            + '</tbody></table>';
+    } else {
+        editableSection = '<table class="minimal-table"><tbody>'
+            + '<tr><th>Megnevezés</th><td>' + escapeHtml(data.friendly_name || data.hostname || '') + '</td></tr>'
+            + '<tr><th>Hely</th><td>' + escapeHtml(data.location || '—') + '</td></tr>'
+            + '<tr><th>Csoport</th><td>' + escapeHtml(data.group_names || '—') + '</td></tr>'
+            + '</tbody></table>';
+    }
+
     return '<div class="kiosk-detail-grid">'
         + '<div class="kiosk-detail-info">'
-        + '<table class="minimal-table"><tbody>'
-        + '<tr><th>Megnevezés</th><td><input type="text" id="kiosk-edit-friendly-name" value="' + escapeHtml(data.friendly_name || data.hostname || '') + '" style="width:100%;"></td></tr>'
-        + '<tr><th>Hely</th><td><input type="text" id="kiosk-edit-location" value="' + escapeHtml(data.location || '') + '" style="width:100%;"></td></tr>'
-        + '<tr><th>Csoport</th><td><select id="kiosk-edit-group" style="width:100%;">' + groupOptions + '</select></td></tr>'
-        + '<tr><td colspan="2" style="text-align:right;"><button class="btn btn-primary" onclick="saveKioskDetails(' + escapeHtml(data.id || 0) + ')">Mentés</button></td></tr>'
-        + '</tbody></table>'
+        + editableSection
         + '<div style="height:12px;"></div>'
         + '<table class="minimal-table"><tbody>'
         + '<tr><th>ID</th><td>' + escapeHtml(data.id || '—') + '</td></tr>'
@@ -986,7 +1041,7 @@ function buildKioskModalHTML(data) {
         + '<tr><th>Verzió</th><td>' + escapeHtml(data.version || 'ismeretlen') + '</td></tr>'
         + '<tr><th>Kioskon lévő loop verzió</th><td class="mono">' + escapeHtml(data.kiosk_loop_version || 'n/a') + '</td></tr>'
         + '<tr><th>Szerveren lévő loop verzió</th><td class="mono">' + escapeHtml(data.server_loop_version || 'n/a') + '</td></tr>'
-        + '<tr><th>Loop állapot</th><td>' + (data.loop_version_mismatch ? '⚠️ Hiba (nem egyezik)' : '✓ Egyezik') + '</td></tr>'
+        + '<tr><th>Loop állapot</th><td>' + (data.status === 'offline' ? '— Offline (nem értékelt)' : (data.loop_version_mismatch ? '⚠️ Hiba (nem egyezik)' : '✓ Egyezik')) + '</td></tr>'
         + '<tr><th>Modulok</th><td>' + escapeHtml(modulesText) + '</td></tr>'
         + '</tbody></table>'
         + '</div>'

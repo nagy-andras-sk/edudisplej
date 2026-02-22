@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "module_key": "text",
+  "name": "Text",
+  "description": "Formatted text module with optional scroll mode and background image",
+  "renderer": "m_text.html",
+  "config": {
+    "defaults": "config/default_settings.json"
+  }
+}

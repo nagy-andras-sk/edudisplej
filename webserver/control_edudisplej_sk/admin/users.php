@@ -7,6 +7,7 @@ session_start();
 require_once '../dbkonfiguracia.php';
 require_once __DIR__ . '/db_autofix_bootstrap.php';
 require_once '../security_config.php';
+require_once '../auth_roles.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: ../login.php');
@@ -43,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $isadmin = isset($_POST['isadmin']) ? 1 : 0;
+    $user_role = edudisplej_normalize_user_role($_POST['user_role'] ?? 'user', (bool)$isadmin);
     $company_id = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
     $require_otp = isset($_POST['require_otp']) ? 1 : 0;
 
@@ -53,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     } else {
         try {
             $conn = getDbConnection();
+            edudisplej_ensure_user_role_column($conn);
             $stmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
             $stmt->bind_param("s", $username);
             $stmt->execute();
@@ -64,11 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
                 if ($company_id) {
-                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, isadmin, company_id, otp_enabled) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("sssiii", $username, $email, $hashed_password, $isadmin, $company_id, $require_otp);
+                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, isadmin, user_role, company_id, otp_enabled) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("sssisii", $username, $email, $hashed_password, $isadmin, $user_role, $company_id, $require_otp);
                 } else {
-                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, isadmin, otp_enabled) VALUES (?, ?, ?, ?, ?)");
-                    $stmt->bind_param("sssii", $username, $email, $hashed_password, $isadmin, $require_otp);
+                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, isadmin, user_role, otp_enabled) VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("sssisi", $username, $email, $hashed_password, $isadmin, $user_role, $require_otp);
                 }
 
                 if ($stmt->execute()) {
@@ -98,6 +101,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     } else {
         try {
             $conn = getDbConnection();
+            edudisplej_ensure_user_role_column($conn);
             $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
             $stmt->bind_param("i", $user_id);
 
@@ -120,6 +124,7 @@ $edit_user = null;
 if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
     try {
         $conn = getDbConnection();
+        edudisplej_ensure_user_role_column($conn);
         $user_id = (int)$_GET['edit'];
         $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->bind_param("i", $user_id);
@@ -143,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $isadmin = isset($_POST['isadmin']) ? 1 : 0;
+    $user_role = edudisplej_normalize_user_role($_POST['user_role'] ?? 'user', (bool)$isadmin);
     $company_id = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
 
     if ($username === '') {
@@ -150,6 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
     } else {
         try {
             $conn = getDbConnection();
+            edudisplej_ensure_user_role_column($conn);
 
             if ($password !== '') {
                 if (strlen($password) < 8) {
@@ -157,20 +164,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
                 } else {
                     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
                     if ($company_id) {
-                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ?, isadmin = ?, company_id = ? WHERE id = ?");
-                        $stmt->bind_param("sssiii", $username, $email, $hashed_password, $isadmin, $company_id, $user_id);
+                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ?, isadmin = ?, user_role = ?, company_id = ? WHERE id = ?");
+                        $stmt->bind_param("sssisii", $username, $email, $hashed_password, $isadmin, $user_role, $company_id, $user_id);
                     } else {
-                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ?, isadmin = ?, company_id = NULL WHERE id = ?");
-                        $stmt->bind_param("sssii", $username, $email, $hashed_password, $isadmin, $user_id);
+                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ?, isadmin = ?, user_role = ?, company_id = NULL WHERE id = ?");
+                        $stmt->bind_param("sssisi", $username, $email, $hashed_password, $isadmin, $user_role, $user_id);
                     }
                 }
             } else {
                 if ($company_id) {
-                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, isadmin = ?, company_id = ? WHERE id = ?");
-                    $stmt->bind_param("ssiii", $username, $email, $isadmin, $company_id, $user_id);
+                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, isadmin = ?, user_role = ?, company_id = ? WHERE id = ?");
+                    $stmt->bind_param("ssisii", $username, $email, $isadmin, $user_role, $company_id, $user_id);
                 } else {
-                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, isadmin = ?, company_id = NULL WHERE id = ?");
-                    $stmt->bind_param("ssii", $username, $email, $isadmin, $user_id);
+                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, isadmin = ?, user_role = ?, company_id = NULL WHERE id = ?");
+                    $stmt->bind_param("ssisi", $username, $email, $isadmin, $user_role, $user_id);
                 }
             }
 
@@ -195,6 +202,7 @@ $companies = [];
 
 try {
     $conn = getDbConnection();
+    edudisplej_ensure_user_role_column($conn);
 
     $result = $conn->query("SELECT * FROM companies ORDER BY name");
     while ($row = $result->fetch_assoc()) {
@@ -265,6 +273,15 @@ include 'header.php';
                 <option value="0" <?php echo !$edit_user || (int)$edit_user['isadmin'] === 0 ? 'selected' : ''; ?>>Nem</option>
             </select>
         </div>
+        <div class="form-field">
+            <label for="user_role">Szerepkör</label>
+            <select id="user_role" name="user_role">
+                <?php $selected_role = $edit_user ? edudisplej_normalize_user_role($edit_user['user_role'] ?? 'user', !empty($edit_user['isadmin'])) : 'user'; ?>
+                <option value="user" <?php echo $selected_role === 'user' ? 'selected' : ''; ?>>Felhasználó</option>
+                <option value="loop_manager" <?php echo $selected_role === 'loop_manager' ? 'selected' : ''; ?>>Loop/modul kezelő</option>
+                <option value="content_editor" <?php echo $selected_role === 'content_editor' ? 'selected' : ''; ?>>Tartalom módosító</option>
+            </select>
+        </div>
         <?php if (!$edit_user): ?>
             <div class="form-field">
                 <label for="require_otp">2FA kotelezo</label>
@@ -294,7 +311,7 @@ include 'header.php';
                     <th>ID</th>
                     <th>Felhasznalo</th>
                     <th>Email</th>
-                    <th>Admin</th>
+                    <th>Szerepkör</th>
                     <th>Institution</th>
                     <th>2FA</th>
                     <th>Letrehozva</th>
@@ -313,7 +330,20 @@ include 'header.php';
                             <td><?php echo (int)$user['id']; ?></td>
                             <td><?php echo htmlspecialchars($user['username']); ?></td>
                             <td><?php echo htmlspecialchars($user['email'] ?? '-'); ?></td>
-                            <td><?php echo (int)$user['isadmin'] === 1 ? 'Igen' : 'Nem'; ?></td>
+                            <td><?php
+                                $role_label = 'Felhasználó';
+                                if ((int)$user['isadmin'] === 1) {
+                                    $role_label = 'Admin';
+                                } else {
+                                    $role_value = edudisplej_normalize_user_role($user['user_role'] ?? 'user', false);
+                                    if ($role_value === 'loop_manager') {
+                                        $role_label = 'Loop/modul kezelő';
+                                    } elseif ($role_value === 'content_editor') {
+                                        $role_label = 'Tartalom módosító';
+                                    }
+                                }
+                                echo htmlspecialchars($role_label);
+                            ?></td>
                             <td><?php echo htmlspecialchars($user['company_name'] ?? '-'); ?></td>
                             <td>
                                 <?php if ((int)$user['otp_enabled'] === 1 && (int)$user['otp_verified'] === 1): ?>

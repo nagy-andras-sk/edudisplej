@@ -74,11 +74,23 @@ function edudisplej_db_autofix_run(): void {
             INDEX idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        $conn->query("CREATE TABLE IF NOT EXISTS service_versions (
+            id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            service_name VARCHAR(255) NOT NULL,
+            version_token VARCHAR(64) NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            updated_by_user_id INT(11) DEFAULT NULL,
+            UNIQUE KEY uniq_service_name (service_name),
+            INDEX idx_updated_by_user (updated_by_user_id),
+            CONSTRAINT service_versions_user_fk FOREIGN KEY (updated_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
         $kiosk_columns = [
             'last_heartbeat' => "ALTER TABLE kiosks ADD COLUMN last_heartbeat DATETIME DEFAULT NULL",
             'license_active' => "ALTER TABLE kiosks ADD COLUMN license_active TINYINT(1) NOT NULL DEFAULT 1",
             'activated_at' => "ALTER TABLE kiosks ADD COLUMN activated_at DATETIME DEFAULT NULL",
-            'debug_mode' => "ALTER TABLE kiosks ADD COLUMN debug_mode TINYINT(1) NOT NULL DEFAULT 0"
+            'debug_mode' => "ALTER TABLE kiosks ADD COLUMN debug_mode TINYINT(1) NOT NULL DEFAULT 0",
+            'upgrade_started_at' => "ALTER TABLE kiosks ADD COLUMN upgrade_started_at DATETIME DEFAULT NULL"
         ];
 
         foreach ($kiosk_columns as $col => $sql) {
@@ -86,6 +98,21 @@ function edudisplej_db_autofix_run(): void {
             if (!$check || $check->num_rows === 0) {
                 $conn->query($sql);
             }
+        }
+
+        $status_col = $conn->query("SHOW COLUMNS FROM kiosks LIKE 'status'");
+        if ($status_col && $status_col->num_rows > 0) {
+            $status_row = $status_col->fetch_assoc();
+            $status_type = strtolower((string)($status_row['Type'] ?? ''));
+            if (strpos($status_type, "'upgrading'") === false || strpos($status_type, "'error'") === false) {
+                $conn->query("ALTER TABLE kiosks MODIFY COLUMN status ENUM('online','offline','pending','unconfigured','upgrading','error') DEFAULT 'unconfigured'");
+            }
+        }
+
+        $user_role_check = $conn->query("SHOW COLUMNS FROM users LIKE 'user_role'");
+        if (!$user_role_check || $user_role_check->num_rows === 0) {
+            $conn->query("ALTER TABLE users ADD COLUMN user_role VARCHAR(32) NOT NULL DEFAULT 'user' AFTER isadmin");
+            $conn->query("UPDATE users SET user_role = 'admin' WHERE isadmin = 1");
         }
 
         closeDbConnection($conn);

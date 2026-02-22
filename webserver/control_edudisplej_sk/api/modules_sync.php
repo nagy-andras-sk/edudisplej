@@ -21,6 +21,149 @@ function parse_unix_timestamp($value) {
     return $ts ? $ts : null;
 }
 
+function edudisplej_ensure_time_block_schema(mysqli $conn) {
+    $conn->query("CREATE TABLE IF NOT EXISTS kiosk_group_time_blocks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        group_id INT NOT NULL,
+        block_name VARCHAR(120) NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        days_mask VARCHAR(40) NOT NULL DEFAULT '1,2,3,4,5,6,7',
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        display_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_group (group_id),
+        INDEX idx_active (group_id, is_active)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $has_block_type = $conn->query("SHOW COLUMNS FROM kiosk_group_time_blocks LIKE 'block_type'");
+    if ($has_block_type && $has_block_type->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_group_time_blocks ADD COLUMN block_type VARCHAR(16) NOT NULL DEFAULT 'weekly' AFTER block_name");
+    }
+
+    $has_specific_date = $conn->query("SHOW COLUMNS FROM kiosk_group_time_blocks LIKE 'specific_date'");
+    if ($has_specific_date && $has_specific_date->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_group_time_blocks ADD COLUMN specific_date DATE NULL AFTER block_type");
+    }
+
+    $has_priority = $conn->query("SHOW COLUMNS FROM kiosk_group_time_blocks LIKE 'priority'");
+    if ($has_priority && $has_priority->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_group_time_blocks ADD COLUMN priority INT NOT NULL DEFAULT 100 AFTER is_active");
+    }
+
+    $has_time_block_col = $conn->query("SHOW COLUMNS FROM kiosk_group_modules LIKE 'time_block_id'");
+    if ($has_time_block_col && $has_time_block_col->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_group_modules ADD COLUMN time_block_id INT NULL AFTER group_id");
+        $conn->query("CREATE INDEX idx_group_time_block ON kiosk_group_modules (group_id, time_block_id)");
+    }
+}
+
+function edudisplej_ensure_loop_plan_schema(mysqli $conn) {
+    $conn->query("CREATE TABLE IF NOT EXISTS kiosk_group_loop_plans (
+        group_id INT PRIMARY KEY,
+        plan_json LONGTEXT NOT NULL,
+        plan_version BIGINT NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_updated_at (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $has_plan_version = $conn->query("SHOW COLUMNS FROM kiosk_group_loop_plans LIKE 'plan_version'");
+    if ($has_plan_version && $has_plan_version->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_group_loop_plans ADD COLUMN plan_version BIGINT NOT NULL DEFAULT 0 AFTER plan_json");
+    }
+}
+
+function edudisplej_resolve_active_time_block_id(mysqli $conn, int $group_id): array {
+    $stmt = $conn->prepare("SELECT id, block_type, specific_date, start_time, end_time, days_mask, priority, display_order FROM kiosk_group_time_blocks WHERE group_id = ? AND is_active = 1 ORDER BY display_order, id");
+    $stmt->bind_param("i", $group_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $blocks = [];
+    while ($row = $result->fetch_assoc()) {
+        $blocks[] = $row;
+    }
+    $stmt->close();
+
+    if (empty($blocks)) {
+        return ['has_blocks' => false, 'active_block_id' => null];
+    }
+
+    $day = (int)date('N');
+    $now = date('H:i:s');
+
+    $date_key = date('Y-m-d');
+    $candidates = [];
+    foreach ($blocks as $block) {
+        $block_type = strtolower(trim((string)($block['block_type'] ?? 'weekly')));
+        if (!in_array($block_type, ['weekly', 'date'], true)) {
+            $block_type = 'weekly';
+        }
+
+        if ($block_type === 'date') {
+            if ((string)($block['specific_date'] ?? '') !== $date_key) {
+                continue;
+            }
+        }
+
+        $days_raw = trim((string)($block['days_mask'] ?? ''));
+        $allowed_days = [];
+        if ($block_type === 'weekly' && $days_raw !== '') {
+            foreach (explode(',', $days_raw) as $part) {
+                $val = (int)trim($part);
+                if ($val >= 1 && $val <= 7) {
+                    $allowed_days[$val] = true;
+                }
+            }
+        }
+
+        if ($block_type === 'weekly' && !empty($allowed_days) && !isset($allowed_days[$day])) {
+            continue;
+        }
+
+        $start = (string)$block['start_time'];
+        $end = (string)$block['end_time'];
+        if ($start <= $end) {
+            if ($now >= $start && $now <= $end) {
+                $candidates[] = $block;
+            }
+        } else {
+            if ($now >= $start || $now <= $end) {
+                $candidates[] = $block;
+            }
+        }
+    }
+
+    if (!empty($candidates)) {
+        usort($candidates, function ($a, $b) {
+            $typeA = strtolower(trim((string)($a['block_type'] ?? 'weekly'))) === 'date' ? 2 : 1;
+            $typeB = strtolower(trim((string)($b['block_type'] ?? 'weekly'))) === 'date' ? 2 : 1;
+            if ($typeA !== $typeB) {
+                return $typeB <=> $typeA;
+            }
+
+            $priorityA = (int)($a['priority'] ?? 100);
+            $priorityB = (int)($b['priority'] ?? 100);
+            if ($priorityA !== $priorityB) {
+                return $priorityB <=> $priorityA;
+            }
+
+            $orderA = (int)($a['display_order'] ?? 0);
+            $orderB = (int)($b['display_order'] ?? 0);
+            if ($orderA !== $orderB) {
+                return $orderA <=> $orderB;
+            }
+
+            return ((int)$a['id']) <=> ((int)$b['id']);
+        });
+
+        return ['has_blocks' => true, 'active_block_id' => (int)$candidates[0]['id']];
+    }
+
+    return ['has_blocks' => true, 'active_block_id' => null];
+}
+
 try {
     $data = json_decode(file_get_contents('php://input'), true);
     
@@ -35,6 +178,8 @@ try {
     }
     
     $conn = getDbConnection();
+    edudisplej_ensure_time_block_schema($conn);
+    edudisplej_ensure_loop_plan_schema($conn);
     
     // Find kiosk
     if ($kiosk_id) {
@@ -82,35 +227,13 @@ try {
     $response['kiosk_id'] = $kiosk['id'];
     $response['device_id'] = $kiosk['device_id'];
     $response['sync_interval'] = (int)$kiosk['sync_interval'];
-    $response['is_configured'] = (bool)$kiosk['is_configured'];
-    
-    // If not configured, return unconfigured module
-    if (!$kiosk['is_configured']) {
-        $response['success'] = true;
-        $response['message'] = 'Kiosk not configured';
-        $response['modules'] = [
-            [
-                'module_key' => 'unconfigured',
-                'display_order' => 0,
-                'duration_seconds' => 60,
-                'settings' => []
-            ]
-        ];
-        $response['needs_update'] = false;
-        
-        // Log modules sync
-        $log_stmt = $conn->prepare("INSERT INTO sync_logs (kiosk_id, action, details) VALUES (?, 'modules_sync', ?)");
-        $details = json_encode(['status' => 'unconfigured', 'timestamp' => date('Y-m-d H:i:s')]);
-        $log_stmt->bind_param("is", $kiosk['id'], $details);
-        $log_stmt->execute();
-        $log_stmt->close();
-        
-        echo json_encode($response);
-        exit;
-    }
-    
+
     // Check if kiosk belongs to any group and get the latest update timestamp
-    $group_query = "SELECT kga.group_id, MAX(kgm.updated_at) as latest_update 
+    $group_query = "SELECT
+                        kga.group_id,
+                        MAX(kgm.updated_at) as modules_latest_update,
+                        (SELECT klp.updated_at FROM kiosk_group_loop_plans klp WHERE klp.group_id = kga.group_id LIMIT 1) as plan_latest_update,
+                        (SELECT klp.plan_version FROM kiosk_group_loop_plans klp WHERE klp.group_id = kga.group_id LIMIT 1) as plan_version
                     FROM kiosk_group_assignments kga
                     JOIN kiosk_group_modules kgm ON kga.group_id = kgm.group_id
                     WHERE kga.kiosk_id = ?
@@ -125,6 +248,47 @@ try {
 
     if ($group_row && !empty($group_row['group_id'])) {
         api_require_group_company($conn, $api_company, (int)$group_row['group_id']);
+    }
+
+    $has_group_configuration = !empty($group_row) && !empty($group_row['group_id']);
+    $effective_configured = (bool)$kiosk['is_configured'] || $has_group_configuration;
+    $response['is_configured'] = $effective_configured;
+
+    // If still not configured and no group fallback exists, return unconfigured module
+    if (!$effective_configured) {
+        $response['success'] = true;
+        $response['message'] = 'Kiosk not configured';
+        $response['modules'] = [
+            [
+                'module_key' => 'unconfigured',
+                'display_order' => 0,
+                'duration_seconds' => 60,
+                'settings' => []
+            ]
+        ];
+        $response['preload_modules'] = [
+            ['module_key' => 'unconfigured', 'name' => 'Unconfigured']
+        ];
+        $response['active_scope'] = 'base';
+        $response['needs_update'] = false;
+        
+        // Log modules sync
+        $log_stmt = $conn->prepare("INSERT INTO sync_logs (kiosk_id, action, details) VALUES (?, 'modules_sync', ?)");
+        $details = json_encode(['status' => 'unconfigured', 'timestamp' => date('Y-m-d H:i:s')]);
+        $log_stmt->bind_param("is", $kiosk['id'], $details);
+        $log_stmt->execute();
+        $log_stmt->close();
+        
+        echo json_encode($response);
+        exit;
+    }
+
+    $active_time_block_id = null;
+    $has_time_blocks = false;
+    if ($group_row && !empty($group_row['group_id'])) {
+        $block_state = edudisplej_resolve_active_time_block_id($conn, (int)$group_row['group_id']);
+        $active_time_block_id = $block_state['active_block_id'];
+        $has_time_blocks = $block_state['has_blocks'];
     }
     
     $server_timestamp = null;
@@ -144,7 +308,14 @@ try {
     }
 
     if ($group_row) {
-        $server_timestamp = $group_row['latest_update'];
+        $server_timestamp = $group_row['modules_latest_update'];
+        if (!empty($group_row['plan_latest_update'])) {
+            $modules_ts = parse_unix_timestamp($group_row['modules_latest_update'] ?? null);
+            $plan_ts = parse_unix_timestamp($group_row['plan_latest_update'] ?? null);
+            if ($plan_ts && (!$modules_ts || $plan_ts > $modules_ts)) {
+                $server_timestamp = $group_row['plan_latest_update'];
+            }
+        }
         $server_ts = parse_unix_timestamp($server_timestamp);
 
         if ($server_ts) {
@@ -172,8 +343,13 @@ try {
             }
         }
     }
+
+    if (!empty($group_row) && $has_time_blocks) {
+        $needs_update = true;
+    }
     
     $response['server_timestamp'] = $server_timestamp;
+    $response['loop_plan_version'] = $group_row ? (int)($group_row['plan_version'] ?? 0) : 0;
     $response['needs_update'] = $needs_update;
     
     // If no update needed, return minimal response
@@ -189,17 +365,49 @@ try {
     
     // Fetch modules (update needed)
     $modules = [];
+    $preload_map = [];
     
     if ($group_row) {
+        $group_id_int = (int)$group_row['group_id'];
+
+        $preload_stmt = $conn->prepare("SELECT DISTINCT m.module_key, m.name
+                                        FROM kiosk_group_modules kgm
+                                        JOIN modules m ON kgm.module_id = m.id
+                                        WHERE kgm.group_id = ? AND kgm.is_active = 1
+                                        ORDER BY m.module_key ASC");
+        $preload_stmt->bind_param("i", $group_id_int);
+        $preload_stmt->execute();
+        $preload_result = $preload_stmt->get_result();
+        while ($preload_row = $preload_result->fetch_assoc()) {
+            $module_key = (string)($preload_row['module_key'] ?? '');
+            if ($module_key === '') {
+                continue;
+            }
+            $preload_map[$module_key] = [
+                'module_key' => $module_key,
+                'name' => (string)($preload_row['name'] ?? $module_key)
+            ];
+        }
+        $preload_stmt->close();
+
         // Get modules from group configuration
-        $query = "SELECT m.module_key, m.name, kgm.display_order, kgm.duration_seconds, kgm.settings
-                  FROM kiosk_group_modules kgm
-                  JOIN modules m ON kgm.module_id = m.id
-                  WHERE kgm.group_id = ? AND kgm.is_active = 1
-                  ORDER BY kgm.display_order ASC";
-        
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("i", $group_row['group_id']);
+        if ($has_time_blocks && $active_time_block_id !== null) {
+            $query = "SELECT m.module_key, m.name, kgm.display_order, kgm.duration_seconds, kgm.settings
+                      FROM kiosk_group_modules kgm
+                      JOIN modules m ON kgm.module_id = m.id
+                      WHERE kgm.group_id = ? AND kgm.is_active = 1 AND kgm.time_block_id = ?
+                      ORDER BY kgm.display_order ASC";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param("ii", $group_row['group_id'], $active_time_block_id);
+        } else {
+            $query = "SELECT m.module_key, m.name, kgm.display_order, kgm.duration_seconds, kgm.settings
+                      FROM kiosk_group_modules kgm
+                      JOIN modules m ON kgm.module_id = m.id
+                      WHERE kgm.group_id = ? AND kgm.is_active = 1 AND kgm.time_block_id IS NULL
+                      ORDER BY kgm.display_order ASC";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param("i", $group_row['group_id']);
+        }
         $stmt->execute();
         $result = $stmt->get_result();
         
@@ -220,11 +428,21 @@ try {
                 'duration_seconds' => $duration,
                 'settings' => $settings
             ];
+
+            $module_key = (string)($row['module_key'] ?? '');
+            if ($module_key !== '' && !isset($preload_map[$module_key])) {
+                $preload_map[$module_key] = [
+                    'module_key' => $module_key,
+                    'name' => (string)($row['name'] ?? $module_key)
+                ];
+            }
         }
         
         $stmt->close();
         $response['config_source'] = 'group';
-        $response['group_id'] = (int)$group_row['group_id'];
+        $response['group_id'] = $group_id_int;
+        $response['active_time_block_id'] = $active_time_block_id;
+        $response['active_scope'] = $active_time_block_id !== null ? 'block' : 'base';
     }
     
     // If no group modules found, fall back to kiosk-specific configuration
@@ -257,15 +475,25 @@ try {
                 'duration_seconds' => $duration,
                 'settings' => $settings
             ];
+
+            $module_key = (string)($row['module_key'] ?? '');
+            if ($module_key !== '' && !isset($preload_map[$module_key])) {
+                $preload_map[$module_key] = [
+                    'module_key' => $module_key,
+                    'name' => (string)($row['name'] ?? $module_key)
+                ];
+            }
         }
         
         $stmt->close();
         $response['config_source'] = 'kiosk';
+        $response['active_scope'] = 'base';
     }
     
     $response['success'] = true;
     $response['message'] = count($modules) > 0 ? 'Modules retrieved' : 'No modules configured';
     $response['modules'] = $modules;
+    $response['preload_modules'] = array_values($preload_map);
     
     // Log modules sync
     $log_stmt = $conn->prepare("INSERT INTO sync_logs (kiosk_id, action, details) VALUES (?, 'modules_sync', ?)");

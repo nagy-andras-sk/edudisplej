@@ -6,6 +6,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../auth_roles.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -24,9 +25,16 @@ $company_users = [];
 $error = '';
 $success = '';
 $is_admin_user = !empty($_SESSION['isadmin']);
+$current_role = edudisplej_get_session_role();
+
+if ($current_role === 'content_editor' || $current_role === 'loop_manager') {
+    header('Location: index.php');
+    exit();
+}
 
 try {
     $conn = getDbConnection();
+    edudisplej_ensure_user_role_column($conn);
 
     // Ensure optional institution columns exist
     $existing_company_columns = [];
@@ -109,13 +117,14 @@ try {
         $stmt->close();
 
         $filtered_licenses = [];
+        $legacy_alias_keys = ['datetime', 'dateclock'];
         foreach ($licenses as $row) {
             $module_key = strtolower(trim((string)($row['module_key'] ?? '')));
             $module_name = strtolower(trim((string)($row['name'] ?? '')));
             $is_technical_unconfigured = strpos($module_key, 'unconfigured') !== false
                 || (strpos($module_name, 'unconfigured') !== false
                     && (strpos($module_name, 'displej') !== false || strpos($module_name, 'display') !== false));
-            if ($is_technical_unconfigured) {
+            if ($is_technical_unconfigured || in_array($module_key, $legacy_alias_keys, true)) {
                 continue;
             }
             $filtered_licenses[] = $row;
@@ -125,7 +134,7 @@ try {
         $disabled_licenses = array_values(array_filter($filtered_licenses, fn($lic) => (int)($lic['total_licenses'] ?? 0) <= 0));
         
         // Get company users
-        $stmt = $conn->prepare("SELECT id, username, email, isadmin, last_login FROM users WHERE company_id = ? ORDER BY username");
+        $stmt = $conn->prepare("SELECT id, username, email, isadmin, user_role, last_login FROM users WHERE company_id = ? ORDER BY username");
         $stmt->bind_param("i", $company_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -185,8 +194,21 @@ $logout_url = '../login.php?logout=1';
                             <tbody>
                                 <?php foreach ($company_users as $u): 
                                     $is_admin = $u['isadmin'];
-                                    $role = $is_admin ? 'Admin' : 'Felhasználó';
-                                    $role_color = $is_admin ? '#ff9800' : '#1e40af';
+                                    if ($is_admin) {
+                                        $role = 'Admin';
+                                        $role_color = '#ff9800';
+                                    } else {
+                                        $normalized_role = edudisplej_normalize_user_role($u['user_role'] ?? 'user', false);
+                                        $role = 'Felhasználó';
+                                        $role_color = '#1e40af';
+                                        if ($normalized_role === 'loop_manager') {
+                                            $role = 'Loop/modul kezelő';
+                                            $role_color = '#00695c';
+                                        } elseif ($normalized_role === 'content_editor') {
+                                            $role = 'Tartalom módosító';
+                                            $role_color = '#6a1b9a';
+                                        }
+                                    }
                                 ?>
                                     <tr>
                                         <td><strong><?php echo htmlspecialchars($u['username']); ?></strong></td>
@@ -471,19 +493,20 @@ $logout_url = '../login.php?logout=1';
                         </div>
                         
                         <div>
-                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Jogosultság</label>
-                            <select id="is_admin" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;">
-                                <option value="0">👤 Felhasználó (korlátozott hozzáférés)</option>
-                                <option value="1">⚙️ Admin (teljes hozzáférés)</option>
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Szerepkör</label>
+                            <select id="user_role" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;">
+                                <option value="user">👤 Felhasználó</option>
+                                <option value="loop_manager">🔁 Loop/modul kezelő</option>
+                                <option value="content_editor">📝 Tartalom módosító</option>
                             </select>
                         </div>
                         
                         <div style="background: #f9f9f9; padding: 12px; border-radius: 3px; border-left: 4px solid #1e40af; font-size: 12px; color: #666;">
                             <strong>Felhasználó jogosultságai:</strong>
                             <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                                <li>Kijelzők megtekintése és módosítása</li>
-                                <li>Hardware adatok megtekintése</li>
-                                <li>Modulok kezelése</li>
+                                <li>Admin jogosultság itt nem adható</li>
+                                <li>Szerepkör szerint eltérő dashboard hozzáférés</li>
+                                <li>Tartalom módosító csak modul tartalmat kezelhet</li>
                             </ul>
                         </div>
                         
@@ -502,7 +525,7 @@ $logout_url = '../login.php?logout=1';
             const username = document.getElementById('username').value.trim();
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
-            const is_admin = document.getElementById('is_admin').value;
+            const user_role = document.getElementById('user_role').value;
             
             if (!username || !email || !password) {
                 alert('Kérem töltse ki az összes szükséges mezőt!');
@@ -519,7 +542,8 @@ $logout_url = '../login.php?logout=1';
             formData.append('username', username);
             formData.append('email', email);
             formData.append('password', password);
-            formData.append('is_admin', is_admin);
+            formData.append('is_admin', '0');
+            formData.append('user_role', user_role);
             
             fetch('../api/manage_users.php', {
                 method: 'POST',

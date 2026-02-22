@@ -6,6 +6,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../auth_roles.php';
 
 header('Content-Type: application/json');
 
@@ -35,9 +36,10 @@ $action = $_GET['action'] ?? ($_POST['action'] ?? '');
 
 try {
     $conn = getDbConnection();
+    edudisplej_ensure_user_role_column($conn);
     
-    // Get user's company_id from database (not session)
-    $stmt = $conn->prepare("SELECT company_id FROM users WHERE id = ?");
+    // Get caller context from database (not session)
+    $stmt = $conn->prepare("SELECT company_id, isadmin, user_role FROM users WHERE id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -51,6 +53,7 @@ try {
     }
     
     $company_id = $user_row['company_id'];
+    $caller_is_admin = !empty($user_row['isadmin']);
     
     if (!$company_id) {
         $response['message'] = 'No company assigned';
@@ -65,6 +68,12 @@ try {
             $email = trim($_POST['email'] ?? '');
             $password = $_POST['password'] ?? '';
             $is_admin = intval($_POST['is_admin'] ?? 0);
+            $user_role = edudisplej_normalize_user_role($_POST['user_role'] ?? 'user', $is_admin === 1);
+
+            if (!$caller_is_admin) {
+                $is_admin = 0;
+                $user_role = edudisplej_normalize_user_role($user_role, false);
+            }
             
             if (!$username || !$password) {
                 $response['message'] = 'Username and password are required';
@@ -86,8 +95,8 @@ try {
             $hashed_pwd = password_hash($password, PASSWORD_DEFAULT);
             
             // Create user
-            $insert_stmt = $conn->prepare("INSERT INTO users (username, email, password, company_id, isadmin) VALUES (?, ?, ?, ?, ?)");
-            $insert_stmt->bind_param("sssii", $username, $email, $hashed_pwd, $company_id, $is_admin);
+            $insert_stmt = $conn->prepare("INSERT INTO users (username, email, password, company_id, isadmin, user_role) VALUES (?, ?, ?, ?, ?, ?)");
+            $insert_stmt->bind_param("sssiis", $username, $email, $hashed_pwd, $company_id, $is_admin, $user_role);
             
             if ($insert_stmt->execute()) {
                 $response['success'] = true;
@@ -114,8 +123,13 @@ try {
             }
             
             // Verify user belongs to company
-            $verify_stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
-            $verify_stmt->bind_param("ii", $target_user_id, $company_id);
+            if ($caller_is_admin) {
+                $verify_stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
+                $verify_stmt->bind_param("ii", $target_user_id, $company_id);
+            } else {
+                $verify_stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ? AND isadmin = 0");
+                $verify_stmt->bind_param("ii", $target_user_id, $company_id);
+            }
             $verify_stmt->execute();
             if ($verify_stmt->get_result()->num_rows === 0) {
                 $verify_stmt->close();
@@ -157,8 +171,13 @@ try {
             }
             
             // Verify user belongs to company
-            $verify_stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
-            $verify_stmt->bind_param("ii", $target_user_id, $company_id);
+            if ($caller_is_admin) {
+                $verify_stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ?");
+                $verify_stmt->bind_param("ii", $target_user_id, $company_id);
+            } else {
+                $verify_stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND company_id = ? AND isadmin = 0");
+                $verify_stmt->bind_param("ii", $target_user_id, $company_id);
+            }
             $verify_stmt->execute();
             if ($verify_stmt->get_result()->num_rows === 0) {
                 $verify_stmt->close();

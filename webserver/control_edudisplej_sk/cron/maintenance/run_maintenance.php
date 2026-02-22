@@ -6,13 +6,67 @@
  */
 
 $baseDir = dirname(__DIR__, 2);
-$runtimeDir = __DIR__ . '/.runtime';
-$logDir = $baseDir . '/logs';
-$lockFile = $runtimeDir . '/maintenance.lock';
-$cronLog = $logDir . '/maintenance-cron.log';
+$runtimeDirPrimary = __DIR__ . '/.runtime';
+$logDirPrimary = $baseDir . '/logs';
 
-@mkdir($runtimeDir, 0775, true);
-@mkdir($logDir, 0775, true);
+function ensureWritableDir(string $dir): bool {
+    if (is_dir($dir)) {
+        return is_writable($dir);
+    }
+
+    return @mkdir($dir, 0775, true) && is_writable($dir);
+}
+
+function pickRuntimeDir(string $runtimeDirPrimary, string $logDirPrimary): string {
+    $fallback = rtrim((string)sys_get_temp_dir(), '/\\') . '/edudisplej-maintenance';
+    $candidates = [$runtimeDirPrimary, $logDirPrimary . '/.runtime', $fallback];
+
+    foreach ($candidates as $candidate) {
+        if (ensureWritableDir($candidate)) {
+            return $candidate;
+        }
+    }
+
+    return $fallback;
+}
+
+function pickCronLogPath(string $logDirPrimary): ?string {
+    $fallbackDir = rtrim((string)sys_get_temp_dir(), '/\\') . '/edudisplej-maintenance';
+    $candidates = [$logDirPrimary, $fallbackDir];
+
+    foreach ($candidates as $dir) {
+        if (ensureWritableDir($dir)) {
+            return rtrim($dir, '/\\') . '/maintenance-cron.log';
+        }
+    }
+
+    return null;
+}
+
+function appendCronLog(?string $cronLog, string $line): void {
+    if ($cronLog !== null) {
+        @file_put_contents($cronLog, $line, FILE_APPEND);
+        return;
+    }
+
+    error_log(trim($line));
+}
+
+$runtimeDir = pickRuntimeDir($runtimeDirPrimary, $logDirPrimary);
+$lockFile = rtrim($runtimeDir, '/\\') . '/maintenance.lock';
+$cronLog = pickCronLogPath($logDirPrimary);
+$isCli = (PHP_SAPI === 'cli');
+
+function emitMaintenanceOutput(string $line, bool $isCli): void {
+    static $httpHeadersSent = false;
+
+    if (!$isCli && !$httpHeadersSent && !headers_sent()) {
+        header('Content-Type: text/plain; charset=utf-8');
+        $httpHeadersSent = true;
+    }
+
+    echo $line;
+}
 
 @set_time_limit(300);
 ini_set('max_execution_time', '300');
@@ -20,41 +74,52 @@ ini_set('memory_limit', '256M');
 
 $timestamp = date('Y-m-d H:i:s');
 
-$lockHandle = fopen($lockFile, 'c+');
+$lockHandle = @fopen($lockFile, 'c+');
 if ($lockHandle === false) {
-    file_put_contents($cronLog, "[$timestamp] [ERROR] Cannot open lock file: $lockFile\n", FILE_APPEND);
-    exit(2);
+    appendCronLog($cronLog, "[$timestamp] [WARNING] Cannot open lock file, continuing without lock: $lockFile\n");
 }
 
-if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
-    file_put_contents($cronLog, "[$timestamp] [INFO] Previous maintenance run still active, skipping.\n", FILE_APPEND);
+if (is_resource($lockHandle) && !flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    $skipLine = "[$timestamp] [INFO] Previous maintenance run still active, skipping.\n";
+    appendCronLog($cronLog, $skipLine);
+    emitMaintenanceOutput($skipLine, $isCli);
     fclose($lockHandle);
     exit(0);
 }
 
-ftruncate($lockHandle, 0);
-fwrite($lockHandle, (string)getmypid());
-fflush($lockHandle);
+if (is_resource($lockHandle)) {
+    ftruncate($lockHandle, 0);
+    fwrite($lockHandle, (string)getmypid());
+    fflush($lockHandle);
+}
 
 $start = microtime(true);
-file_put_contents($cronLog, "[$timestamp] [INFO] Maintenance start\n", FILE_APPEND);
+$startLine = "[$timestamp] [INFO] Maintenance start\n";
+appendCronLog($cronLog, $startLine);
+emitMaintenanceOutput($startLine, $isCli);
 
 ob_start();
 
 define('EDUDISPLEJ_DBJAVITO_NO_HTML', true);
 define('EDUDISPLEJ_DBJAVITO_ECHO', true);
 
-require $baseDir . '/dbjavito.php';
+require __DIR__ . '/maintenance_task.php';
 
 $output = trim((string)ob_get_clean());
 if ($output !== '') {
-    file_put_contents($cronLog, $output . "\n", FILE_APPEND);
+    $taskOutput = $output . "\n";
+    appendCronLog($cronLog, $taskOutput);
+    emitMaintenanceOutput($taskOutput, $isCli);
 }
 
 $duration = round(microtime(true) - $start, 3);
-file_put_contents($cronLog, '[' . date('Y-m-d H:i:s') . "] [INFO] Maintenance finished in {$duration}s\n", FILE_APPEND);
+$finishedLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Maintenance finished in {$duration}s\n";
+appendCronLog($cronLog, $finishedLine);
+emitMaintenanceOutput($finishedLine, $isCli);
 
-flock($lockHandle, LOCK_UN);
-fclose($lockHandle);
+if (is_resource($lockHandle)) {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+}
 
 exit(0);

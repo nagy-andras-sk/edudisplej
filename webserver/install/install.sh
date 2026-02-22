@@ -68,6 +68,58 @@ stop_heartbeat() {
     fi
 }
 
+# Kompletny cleanup starej instalacie - Full cleanup of previous installation
+cleanup_existing_installation() {
+    echo "[*] Kontrola starej instalacie - Checking previous installation..."
+
+    local has_old_install=false
+    if [ -d "$TARGET_DIR" ]; then
+        has_old_install=true
+    fi
+
+    local existing_services
+    existing_services=$(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '$1 ~ /^edudisplej.*\.service$/ {print $1}' || true)
+    if [ -n "$existing_services" ]; then
+        has_old_install=true
+    fi
+
+    if [ "$has_old_install" != true ]; then
+        echo "[*] Stara instalacia nenajdena - No previous installation found"
+        return 0
+    fi
+
+    echo "[*] Stara instalacia najdena - Previous installation found"
+    echo "[*] Zastavujem a deaktivujem sluzby - Stopping and disabling services..."
+
+    while IFS= read -r service_name; do
+        [ -z "$service_name" ] && continue
+        systemctl stop "$service_name" 2>/dev/null || true
+        systemctl disable "$service_name" 2>/dev/null || true
+        systemctl reset-failed "$service_name" 2>/dev/null || true
+        echo "    [✓] Cleanup service: $service_name"
+    done <<< "$existing_services"
+
+    # Remove unit files and symlinks
+    if command -v find >/dev/null 2>&1; then
+        find /etc/systemd/system -maxdepth 3 -type f -name 'edudisplej*.service' -delete 2>/dev/null || true
+        find /etc/systemd/system -maxdepth 4 -type l -name 'edudisplej*.service' -delete 2>/dev/null || true
+    fi
+
+    # Kill any remaining runtime processes tied to old installation path
+    pkill -f '/opt/edudisplej/' 2>/dev/null || true
+
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl daemon-reexec 2>/dev/null || true
+
+    # Always remove target directory for clean reinstall
+    if [ -d "$TARGET_DIR" ]; then
+        echo "[*] Mazanie existujuceho adresara - Removing existing directory: $TARGET_DIR"
+        rm -rf "$TARGET_DIR"
+    fi
+
+    echo "[✓] Cleanup dokonceny - Cleanup completed"
+}
+
 # Oprava boot konfiguracie pre ARMv6 - Fix boot config for ARMv6
 # Reference: Issue #47 - Pi Zero/Pi1 black screen fix
 fix_armv6_boot_config() {
@@ -142,6 +194,9 @@ if [ "$ARCH" = "armv6l" ]; then
   fix_armv6_boot_config
 fi
 
+# Always perform cleanup of previous installation before fresh install
+cleanup_existing_installation
+
 # Instalacia zakladnych nastroje - Install basic tools
 MISSING_TOOLS=()
 if ! command -v curl >/dev/null 2>&1; then
@@ -163,12 +218,6 @@ if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
   apt-get update -qq && apt-get install -y "${MISSING_TOOLS[@]}" >/dev/null 2>&1
   stop_heartbeat
   echo "[✓] Zakladne nastroje nainstalovane - Basic tools installed"
-fi
-
-# Vzdy prepisat cielovy priecinok - Always overwrite target directory
-if [ -d "$TARGET_DIR" ]; then
-  echo "[*] Mazanie existujuceho adresara - Removing existing directory: $TARGET_DIR"
-  rm -rf "$TARGET_DIR"
 fi
 
 # Vytvorenie priecinkov - Create directories
@@ -359,6 +408,10 @@ install_services_from_structure() {
         echo "[!] Nemozem stiahnut structure.json, pouzivam staru metodu"
         return 1
     fi
+
+    # Cache structure.json locally for runtime version comparisons
+    echo "$STRUCTURE_JSON" > "${TARGET_DIR}/structure.json"
+    chmod 644 "${TARGET_DIR}/structure.json"
     
     # Extract services using Python
     SERVICES_JSON=$(echo "$STRUCTURE_JSON" | python3 -c "

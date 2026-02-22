@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDisplej Text Module</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        .module-root {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+        }
+
+        .text-viewport {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            padding: 4vh 4vw;
+        }
+
+        .text-content {
+            width: 100%;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            transform: translateY(0px);
+            will-change: transform;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(60px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes zoomIn {
+            from { transform: scale(0.85); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .text-animation-fadeIn {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+        .text-animation-slideUp {
+            animation: slideUp 0.8s ease-out forwards;
+        }
+
+        .text-animation-zoomIn {
+            animation: zoomIn 0.8s ease-out forwards;
+        }        .text-content p,
+        .text-content div,
+        .text-content blockquote,
+        .text-content h1,
+        .text-content h2,
+        .text-content h3,
+        .text-content h4,
+        .text-content h5,
+        .text-content h6 {
+            margin: 0.15em 0;
+        }
+
+        .text-content ul,
+        .text-content ol {
+            margin: 0.25em 0 0.25em 1.2em;
+            padding-left: 1em;
+            list-style-position: outside;
+        }
+
+        .text-content li {
+            margin: 0.1em 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="module-root" id="moduleRoot">
+        <div class="text-viewport" id="textViewport">
+            <div class="text-content" id="textContent"></div>
+        </div>
+    </div>
+
+    <script>
+        function parseNum(value, fallback) {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : fallback;
+        }
+
+        function parseBool(value, fallback = false) {
+            if (value === null || value === undefined || value === '') {
+                return fallback;
+            }
+            if (typeof value === 'boolean') {
+                return value;
+            }
+            const normalized = String(value).toLowerCase();
+            if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+            if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+            return fallback;
+        }
+
+        function sanitizeRichHtml(value) {
+            const raw = String(value || '').trim();
+            if (!raw) {
+                return '';
+            }
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(`<div>${raw}</div>`, 'text/html');
+            const root = doc.body.firstElementChild;
+            if (!root) {
+                return '';
+            }
+
+            const allowedTags = new Set([
+                'p', 'div', 'span', 'br', 'strong', 'b', 'em', 'i', 'u',
+                'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'
+            ]);
+            const allowedStyles = new Set([
+                'color', 'font-weight', 'font-style', 'text-decoration', 'text-decoration-line',
+                'text-align', 'font-family', 'font-size', 'line-height', 'background-color'
+            ]);
+
+            const sanitizeNode = (node) => {
+                const children = Array.from(node.childNodes);
+                children.forEach((child) => {
+                    if (child.nodeType === Node.ELEMENT_NODE) {
+                        const tag = child.tagName.toLowerCase();
+                        if (!allowedTags.has(tag)) {
+                            const text = doc.createTextNode(child.textContent || '');
+                            child.replaceWith(text);
+                            return;
+                        }
+
+                        Array.from(child.attributes).forEach((attr) => {
+                            const attrName = attr.name.toLowerCase();
+                            if (attrName.startsWith('on')) {
+                                child.removeAttribute(attr.name);
+                                return;
+                            }
+
+                            if (attrName === 'style') {
+                                const safeRules = [];
+                                String(attr.value || '').split(';').forEach((rule) => {
+                                    const parts = rule.split(':');
+                                    if (parts.length < 2) {
+                                        return;
+                                    }
+                                    const prop = parts[0].trim().toLowerCase();
+                                    const val = parts.slice(1).join(':').trim();
+                                    if (!allowedStyles.has(prop)) {
+                                        return;
+                                    }
+                                    if (/url\s*\(|expression\s*\(|javascript:/i.test(val)) {
+                                        return;
+                                    }
+                                    safeRules.push(`${prop}: ${val}`);
+                                });
+
+                                if (safeRules.length > 0) {
+                                    child.setAttribute('style', safeRules.join('; '));
+                                } else {
+                                    child.removeAttribute('style');
+                                }
+                                return;
+                            }
+
+                            child.removeAttribute(attr.name);
+                        });
+
+                        sanitizeNode(child);
+                    } else if (child.nodeType === Node.COMMENT_NODE) {
+                        child.remove();
+                    }
+                });
+            };
+
+            sanitizeNode(root);
+            return root.innerHTML;
+        }
+
+        function getSettings() {
+            const defaults = {
+                text: 'Sem vložte text...',
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 72,
+                fontWeight: '700',
+                fontStyle: 'normal',
+                lineHeight: 1.2,
+                textAlign: 'left',
+                textColor: '#ffffff',
+                bgColor: '#000000',
+                bgImageData: '',
+                bgImageStorageKey: '',
+                durationSeconds: 10,
+                textAnimationEntry: 'none',
+                scrollMode: false,
+                scrollStartPauseMs: 3000,
+                scrollEndPauseMs: 3000,
+                scrollSpeedPxPerSec: 35
+            };
+
+            const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS)
+                ? window.EDUDISPLEJ_SETTINGS
+                : {};
+
+            const params = new URLSearchParams(window.location.search);
+            const merged = {
+                ...defaults,
+                ...injected,
+                text: params.get('text') ?? injected.text ?? defaults.text,
+                fontFamily: params.get('fontFamily') ?? injected.fontFamily ?? defaults.fontFamily,
+                fontSize: parseNum(params.get('fontSize') ?? injected.fontSize, defaults.fontSize),
+                fontWeight: String(params.get('fontWeight') ?? injected.fontWeight ?? defaults.fontWeight),
+                fontStyle: String(params.get('fontStyle') ?? injected.fontStyle ?? defaults.fontStyle),
+                lineHeight: parseNum(params.get('lineHeight') ?? injected.lineHeight, defaults.lineHeight),
+                textAlign: String(params.get('textAlign') ?? injected.textAlign ?? defaults.textAlign),
+                textColor: params.get('textColor') ?? injected.textColor ?? defaults.textColor,
+                bgColor: params.get('bgColor') ?? injected.bgColor ?? defaults.bgColor,
+                bgImageData: params.get('bgImageData') ?? injected.bgImageData ?? defaults.bgImageData,
+                bgImageStorageKey: params.get('bgImageStorageKey') ?? injected.bgImageStorageKey ?? '',
+                durationSeconds: parseNum(params.get('durationSeconds') ?? injected.durationSeconds, defaults.durationSeconds),
+                textAnimationEntry: String(params.get('textAnimationEntry') ?? injected.textAnimationEntry ?? defaults.textAnimationEntry),
+                scrollMode: parseBool(params.get('scrollMode') ?? injected.scrollMode, defaults.scrollMode),
+                scrollStartPauseMs: parseNum(params.get('scrollStartPauseMs') ?? injected.scrollStartPauseMs, defaults.scrollStartPauseMs),
+                scrollEndPauseMs: parseNum(params.get('scrollEndPauseMs') ?? injected.scrollEndPauseMs, defaults.scrollEndPauseMs),
+                scrollSpeedPxPerSec: parseNum(params.get('scrollSpeedPxPerSec') ?? injected.scrollSpeedPxPerSec, defaults.scrollSpeedPxPerSec)
+            };
+
+            if (!merged.bgImageData && merged.bgImageStorageKey) {
+                try {
+                    const stored = localStorage.getItem(merged.bgImageStorageKey);
+                    if (stored) {
+                        merged.bgImageData = stored;
+                    }
+                } catch (error) {
+                }
+            }
+
+            return merged;
+        }
+
+        const settings = getSettings();
+        const root = document.getElementById('moduleRoot');
+        const viewport = document.getElementById('textViewport');
+        const content = document.getElementById('textContent');
+
+        function applyStyles() {
+            root.style.backgroundColor = settings.bgColor || '#000000';
+
+            if (settings.bgImageData) {
+                root.style.backgroundImage = `url("${settings.bgImageData}")`;
+            } else {
+                root.style.backgroundImage = 'none';
+            }
+
+            const safeHtml = sanitizeRichHtml(settings.text || '');
+            content.innerHTML = safeHtml || 'Sem vložte text...';
+            content.style.fontFamily = settings.fontFamily || 'Arial, sans-serif';
+            content.style.fontSize = `${Math.max(10, parseNum(settings.fontSize, 72))}px`;
+            content.style.fontWeight = settings.fontWeight || '700';
+            content.style.fontStyle = settings.fontStyle || 'normal';
+            content.style.lineHeight = String(Math.max(0.8, parseNum(settings.lineHeight, 1.2)));
+            content.style.textAlign = settings.textAlign || 'left';
+            content.style.color = settings.textColor || '#ffffff';
+
+            const animationEntry = String(settings.textAnimationEntry || 'none').toLowerCase();
+            if (animationEntry === 'fadein') {
+                content.classList.add('text-animation-fadeIn');
+            } else if (animationEntry === 'slideup') {
+                content.classList.add('text-animation-slideUp');
+            } else if (animationEntry === 'zoomin') {
+                content.classList.add('text-animation-zoomIn');
+            }
+        }
+
+        let scrollAnimationFrame = null;
+        let scrollTimeout = null;
+
+        function clearScrollRuntime() {
+            if (scrollAnimationFrame) {
+                cancelAnimationFrame(scrollAnimationFrame);
+                scrollAnimationFrame = null;
+            }
+            if (scrollTimeout) {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = null;
+            }
+        }
+
+        function startScrollIfNeeded() {
+            clearScrollRuntime();
+            content.style.transform = 'translateY(0px)';
+
+            if (!settings.scrollMode) {
+                return;
+            }
+
+            const overflow = content.scrollHeight - viewport.clientHeight;
+            if (overflow <= 0) {
+                return;
+            }
+
+            const startPause = Math.max(0, parseNum(settings.scrollStartPauseMs, 3000));
+            const endPause = Math.max(0, parseNum(settings.scrollEndPauseMs, 3000));
+            let speed = Math.max(5, parseNum(settings.scrollSpeedPxPerSec, 35));
+            const distance = overflow;
+
+            const availableTotalMs = Math.max(1000, parseNum(settings.durationSeconds, 10) * 1000);
+            let effectiveStartPause = startPause;
+            let effectiveEndPause = endPause;
+            let scrollingMs = Math.max(200, availableTotalMs - effectiveStartPause - effectiveEndPause);
+
+            if (availableTotalMs <= (effectiveStartPause + effectiveEndPause + 200)) {
+                const reducedPause = Math.max(0, (availableTotalMs - 200) / 2);
+                effectiveStartPause = reducedPause;
+                effectiveEndPause = reducedPause;
+                scrollingMs = Math.max(200, availableTotalMs - effectiveStartPause - effectiveEndPause);
+            }
+
+            const fittedSpeed = distance / Math.max(0.2, scrollingMs / 1000);
+            if (Number.isFinite(fittedSpeed) && fittedSpeed > 0) {
+                speed = fittedSpeed;
+            }
+            const durationMs = (distance / speed) * 1000;
+
+            scrollTimeout = setTimeout(() => {
+                const startedAt = performance.now();
+
+                const tick = (now) => {
+                    const elapsed = now - startedAt;
+                    const progress = Math.min(elapsed / durationMs, 1);
+                    const y = -distance * progress;
+                    content.style.transform = `translateY(${y}px)`;
+
+                    if (progress < 1) {
+                        scrollAnimationFrame = requestAnimationFrame(tick);
+                    } else {
+                        scrollTimeout = setTimeout(() => {
+                        }, effectiveEndPause);
+                    }
+                };
+
+                scrollAnimationFrame = requestAnimationFrame(tick);
+            }, effectiveStartPause);
+        }
+
+        function render() {
+            applyStyles();
+            requestAnimationFrame(startScrollIfNeeded);
+        }
+
+        render();
+        window.addEventListener('resize', () => {
+            render();
+        });
+    </script>
+</body>
+</html>

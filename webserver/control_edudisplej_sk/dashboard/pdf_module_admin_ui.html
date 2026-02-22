@@ -1,0 +1,564 @@
+<!-- 
+  PDF Module Admin UI Component
+  Bemásolható az admin/dashboard loop szerkesztőbe
+  Szeretett: group_loop.php vagy group_modules_new.php
+-->
+
+<style>
+  .pdf-settings-panel {
+    border: 1px solid #d9e0e7;
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background: #fafbfc;
+  }
+
+  .pdf-settings-panel h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2b3f52;
+  }
+
+  .pdf-upload-area {
+    border: 2px dashed #b8c5d6;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+  }
+
+  .pdf-upload-area:hover {
+    border-color: #0066cc;
+    background: #f0f6ff;
+  }
+
+  .pdf-upload-area.drag-over {
+    border-color: #0066cc;
+    background: #e6f2ff;
+  }
+
+  .pdf-file-input {
+    display: none;
+  }
+
+  .pdf-upload-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+
+  .pdf-file-info {
+    background: #e8f4f8;
+    border-left: 4px solid #0088cc;
+    padding: 10px 12px;
+    border-radius: 2px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #2b3f52;
+  }
+
+  .pdf-file-info-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .pdf-file-info-detail {
+    margin: 2px 0;
+  }
+
+  .pdf-file-info .btn-small {
+    background: #d9e0e7;
+    color: #2b3f52;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+
+  .pdf-file-info .btn-small:hover {
+    background: #bcc5d0;
+  }
+
+  .pdf-settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .pdf-settings-grid.full {
+    grid-template-columns: 1fr;
+  }
+
+  .pdf-setting-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pdf-setting-item label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #425466;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .pdf-setting-item input,
+  .pdf-setting-item select,
+  .pdf-setting-item textarea {
+    padding: 6px 8px;
+    border: 1px solid #c5cfd9;
+    border-radius: 3px;
+    font-size: 12px;
+    background: #ffffff;
+    color: #2b3f52;
+  }
+
+  .pdf-setting-item textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .pdf-setting-item input:focus,
+  .pdf-setting-item select:focus,
+  .pdf-setting-item textarea:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+  }
+
+  .pdf-setting-help {
+    font-size: 11px;
+    color: #607083;
+    margin-top: 2px;
+  }
+
+  .pdf-preview-container {
+    background: #fff;
+    border: 1px solid #d9e0e7;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 12px;
+    max-height: 400px;
+    overflow: auto;
+  }
+
+  .pdf-preview-placeholder {
+    width: 100%;
+    height: 300px;
+    background: #f5f5f5;
+    border: 1px dashed #c5cfd9;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8a97a6;
+    font-size: 12px;
+  }
+
+  .pdf-pause-points-editor {
+    background: #f8fafc;
+    border: 1px solid #d9e0e7;
+    border-radius: 3px;
+    padding: 10px;
+    margin-top: 8px;
+  }
+
+  .pdf-pause-point-item {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 6px;
+    align-items: center;
+    background: #fff;
+    padding: 8px;
+    border-radius: 2px;
+    margin-bottom: 6px;
+    border: 1px solid #e0e6ec;
+  }
+
+  .pdf-pause-point-item input {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .pdf-pause-point-item button {
+    background: #d32f2f;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .pdf-pause-point-item button:hover {
+    background: #b71c1c;
+  }
+
+  .btn-add-pause-point {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .btn-add-pause-point:hover {
+    background: #45a049;
+  }
+
+  .config-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #d9e0e7;
+    margin-bottom: 12px;
+  }
+
+  .config-tab {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: #607083;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+
+  .config-tab:hover {
+    color: #2b3f52;
+  }
+
+  .config-tab.active {
+    color: #0066cc;
+    border-bottom-color: #0066cc;
+  }
+
+  .config-tab-content {
+    display: none;
+  }
+
+  .config-tab-content.active {
+    display: block;
+  }
+</style>
+
+<!-- PDF Modul Admin UI -->
+<div class="pdf-settings-panel" id="pdfModulePanel" style="display: none;">
+  <h4>📄 PDF Modul Beállítások</h4>
+
+  <!-- PDF feltöltés -->
+  <div class="pdf-upload-area" id="pdfUploadArea">
+    <div class="pdf-upload-icon">📁</div>
+    <div style="font-weight: 600; color: #2b3f52; margin-bottom: 4px;">PDF fájl feltöltése</div>
+    <div style="font-size: 12px; color: #607083;">Kattints vagy húzz egy PDF-et ide (max 50 MB)</div>
+  </div>
+  <input type="file" id="pdfFileInput" class="pdf-file-input" accept=".pdf">
+
+  <!-- Feltöltés státusz -->
+  <div id="pdfFileInfo" class="pdf-file-info" style="display: none;">
+    <div class="pdf-file-info-title">✓ PDF betöltve</div>
+    <div class="pdf-file-info-detail">Fájlnév: <strong id="pdfFileName">—</strong></div>
+    <div class="pdf-file-info-detail">Méret: <strong id="pdfFileSize">—</strong></div>
+    <div class="pdf-file-info-detail" id="pdfEncodingStatus">Kódolás folyamatban...</div>
+    <button class="btn-small" onclick="clearPdfFile()">Törlés</button>
+  </div>
+
+  <!-- Beállítások fülei -->
+  <div class="config-tabs">
+    <button class="config-tab active" onclick="switchPdfTab('basic')">Alapvető</button>
+    <button class="config-tab" onclick="switchPdfTab('navigation')">Navigáció</button>
+    <button class="config-tab" onclick="switchPdfTab('advanced')">Haladó</button>
+  </div>
+
+  <!-- Basic tab -->
+  <div id="pdfTab-basic" class="config-tab-content active">
+    <div class="pdf-settings-grid full">
+      <div class="pdf-setting-item">
+        <label>Orientáció</label>
+        <select id="pdfOrientation">
+          <option value="landscape">Fekvő (landscape)</option>
+          <option value="portrait">Álló (portrait)</option>
+        </select>
+        <div class="pdf-setting-help">A PDF nézet orientációja</div>
+      </div>
+    </div>
+
+    <div class="pdf-settings-grid">
+      <div class="pdf-setting-item">
+        <label>Zoom szint (%)</label>
+        <input type="number" id="pdfZoomLevel" min="50" max="400" value="100">
+        <div class="pdf-setting-help">50-400% között</div>
+      </div>
+
+      <div class="pdf-setting-item">
+        <label>Megjelenítés mód</label>
+        <select id="pdfDisplayMode">
+          <option value="fit-page">Laphoz igazítás (fit-page)</option>
+          <option value="fit-width">Szélességhez igazítás (fit-width)</option>
+          <option value="fit-height">Magassághoz igazítás (fit-height)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="pdf-settings-grid">
+      <div class="pdf-setting-item">
+        <label>Háttérszín</label>
+        <input type="color" id="pdfBgColor" value="#ffffff">
+        <div class="pdf-setting-help">PDF háttérszíne</div>
+      </div>
+
+      <div class="pdf-setting-item">
+        <label>Oldalszámok megjelenítése</label>
+        <select id="pdfShowPageNumbers">
+          <option value="1">Igen, mutasd</option>
+          <option value="0">Nem, rejtsd el</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation tab -->
+  <div id="pdfTab-navigation" class="config-tab-content">
+    <div class="pdf-settings-grid full">
+      <div class="pdf-setting-item">
+        <label>Kezelés módja</label>
+        <select id="pdfNavigationMode" onchange="updatePdfModeVisibility()">
+          <option value="manual">Kézi (Manual) - Felhasználó navigál gombok segítségével</option>
+          <option value="auto">Automatikus (Auto) - Szoknya automatikus görgetés</option>
+        </select>
+        <div class="pdf-setting-help">Manual: felhasználó kézzel navegál. Auto: szoknya automatikus előrehaladás</div>
+      </div>
+    </div>
+
+    <!-- Auto scroll settings -->
+    <div id="pdfAutoScrollSettings" style="display: none; border-top: 1px solid #d9e0e7; padding-top: 12px; margin-top: 12px;">
+      <div class="pdf-settings-grid">
+        <div class="pdf-setting-item">
+          <label>Görgetés sebessége (px/sec)</label>
+          <input type="number" id="pdfAutoScrollSpeed" min="5" max="200" value="30">
+          <div class="pdf-setting-help">5-200 pixel per másodperc</div>
+        </div>
+
+        <div class="pdf-setting-item">
+          <label>Kezdeti várakozás (ms)</label>
+          <input type="number" id="pdfAutoScrollStartPause" min="0" max="15000" value="2000">
+          <div class="pdf-setting-help">Görgetés előtt várakozás (0-15000 ms)</div>
+        </div>
+      </div>
+
+      <div class="pdf-settings-grid">
+        <div class="pdf-setting-item">
+          <label>Végső várakozás (ms)</label>
+          <input type="number" id="pdfAutoScrollEndPause" min="0" max="15000" value="2000">
+          <div class="pdf-setting-help">Görgetés után várakozás (0-15000 ms)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advanced tab -->
+  <div id="pdfTab-advanced" class="config-tab-content">
+    <div class="pdf-settings-grid full">
+      <div class="pdf-setting-item">
+        <label>Rögzített oldal mód</label>
+        <select id="pdfFixedViewMode" onchange="updatePdfFixedPageVisibility()">
+          <option value="0">Nem - Összes oldal megjelenítése</option>
+          <option value="1">Igen - Csak egy oldal</option>
+        </select>
+        <div class="pdf-setting-help">Ha 'Igen', csak a kiválasztott oldal jelenik meg</div>
+      </div>
+    </div>
+
+    <!-- Fixed page settings -->
+    <div id="pdfFixedPageSettings" style="display: none;">
+      <div class="pdf-settings-grid full">
+        <div class="pdf-setting-item">
+          <label>Rögzített oldal száma</label>
+          <input type="number" id="pdfFixedPage" min="1" max="9999" value="1">
+          <div class="pdf-setting-help">Melyik oldal jelenjen meg (1-től kezdve)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause Points -->
+    <div class="pdf-settings-grid full">
+      <div class="pdf-setting-item">
+        <label>Megállási pontok (JSON)</label>
+        <textarea id="pdfPausePoints" placeholder='[{"page": 1, "scrollPosition": 500, "waitMs": 3000}]'>[]</textarea>
+        <div class="pdf-setting-help">Automatikus mód: megállási pontok ahol várunk. Üres lista = nincs megállás</div>
+        <button class="btn-add-pause-point" onclick="showPdfPausePointEditor()">Pont szerkesztője</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Előnézet gomb -->
+  <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #d9e0e7;">
+    <button onclick="previewPdfModule()" style="background: #0066cc; color: white; border: none; padding: 8px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500;">
+      👁️ Előnézet megnyitása
+    </button>
+  </div>
+</div>
+
+<!-- Script -->
+<script>
+  // PDF Module Handler
+  window.pdfModuleHandler = {
+    pdfDataBase64: '',
+    settings: {},
+
+    init() {
+      const uploadArea = document.getElementById('pdfUploadArea');
+      const fileInput = document.getElementById('pdfFileInput');
+
+      if (uploadArea) {
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          uploadArea.classList.add('drag-over');
+        });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+        uploadArea.addEventListener('drop', (e) => {
+          e.preventDefault();
+          uploadArea.classList.remove('drag-over');
+          this.handleFileSelect(e.dataTransfer.files);
+        });
+      }
+
+      if (fileInput) {
+        fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files));
+      }
+
+      const navMode = document.getElementById('pdfNavigationMode');
+      if (navMode) {
+        navMode.addEventListener('change', () => updatePdfModeVisibility());
+      }
+
+      const fixedMode = document.getElementById('pdfFixedViewMode');
+      if (fixedMode) {
+        fixedMode.addEventListener('change', () => updatePdfFixedPageVisibility());
+      }
+    },
+
+    handleFileSelect(files) {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      if (!file.type.includes('pdf')) {
+        alert('Csak PDF fájlok engedélyezve!');
+        return;
+      }
+
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (file.size > maxSize) {
+        alert('A fájl túl nagy! Maximum 50 MB engedélyezett.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const arrayBuffer = e.target.result;
+        this.pdfDataBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(arrayBuffer)));
+        
+        document.getElementById('pdfFileName').textContent = file.name;
+        document.getElementById('pdfFileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+        document.getElementById('pdfEncodingStatus').textContent = '✓ Kódolva és kész mentésre';
+        document.getElementById('pdfFileInfo').style.display = 'block';
+      };
+      reader.readAsArrayBuffer(file);
+    },
+
+    getSettings() {
+      return {
+        pdfDataBase64: this.pdfDataBase64,
+        orientation: document.getElementById('pdfOrientation')?.value || 'landscape',
+        zoomLevel: parseInt(document.getElementById('pdfZoomLevel')?.value || 100),
+        navigationMode: document.getElementById('pdfNavigationMode')?.value || 'manual',
+        displayMode: document.getElementById('pdfDisplayMode')?.value || 'fit-page',
+        autoScrollSpeedPxPerSec: parseInt(document.getElementById('pdfAutoScrollSpeed')?.value || 30),
+        autoScrollStartPauseMs: parseInt(document.getElementById('pdfAutoScrollStartPause')?.value || 2000),
+        autoScrollEndPauseMs: parseInt(document.getElementById('pdfAutoScrollEndPause')?.value || 2000),
+        pausePoints: (() => {
+          try {
+            const raw = document.getElementById('pdfPausePoints')?.value || '[]';
+            return JSON.parse(raw);
+          } catch {
+            return [];
+          }
+        })(),
+        fixedViewMode: document.getElementById('pdfFixedViewMode')?.value === '1',
+        fixedPage: parseInt(document.getElementById('pdfFixedPage')?.value || 1),
+        bgColor: document.getElementById('pdfBgColor')?.value || '#ffffff',
+        showPageNumbers: document.getElementById('pdfShowPageNumbers')?.value === '1'
+      };
+    }
+  };
+
+  function switchPdfTab(tabName) {
+    document.querySelectorAll('.config-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.config-tab-content').forEach(c => c.classList.remove('active'));
+    
+    event.target.classList.add('active');
+    document.getElementById(`pdfTab-${tabName}`).classList.add('active');
+  }
+
+  function updatePdfModeVisibility() {
+    const mode = document.getElementById('pdfNavigationMode')?.value;
+    const autoSettings = document.getElementById('pdfAutoScrollSettings');
+    if (autoSettings) {
+      autoSettings.style.display = mode === 'auto' ? 'block' : 'none';
+    }
+  }
+
+  function updatePdfFixedPageVisibility() {
+    const fixed = document.getElementById('pdfFixedViewMode')?.value === '1';
+    const fixedSettings = document.getElementById('pdfFixedPageSettings');
+    if (fixedSettings) {
+      fixedSettings.style.display = fixed ? 'block' : 'none';
+    }
+  }
+
+  function clearPdfFile() {
+    window.pdfModuleHandler.pdfDataBase64 = '';
+    document.getElementById('pdfFileInfo').style.display = 'none';
+    document.getElementById('pdfFileInput').value = '';
+  }
+
+  function previewPdfModule() {
+    const settings = window.pdfModuleHandler.getSettings();
+    if (!settings.pdfDataBase64) {
+      alert('Kérjük töltsd fel a PDF-et előbb!');
+      return;
+    }
+
+    const previewUrl = `/webserver/control_edudisplej_sk/modules/pdf/m_pdf.html?` +
+      `pdfDataBase64=${encodeURIComponent(settings.pdfDataBase64)}&` +
+      `navigationMode=${settings.navigationMode}&` +
+      `zoomLevel=${settings.zoomLevel}`;
+    
+    window.open(previewUrl, 'pdf_preview', 'width=1024,height=768');
+  }
+
+  function showPdfPausePointEditor() {
+    alert('Pause Points szerkesztő: Hamarosan implementálva!');
+  }
+
+  // Inicializáció
+  window.addEventListener('DOMContentLoaded', () => {
+    window.pdfModuleHandler.init();
+    updatePdfModeVisibility();
+    updatePdfFixedPageVisibility();
+  });
+</script>

@@ -1,0 +1,15 @@
+{
+  "pdfDataBase64": "",
+  "orientation": "landscape",
+  "zoomLevel": 100,
+  "navigationMode": "manual",
+  "displayMode": "fit-page",
+  "autoScrollSpeedPxPerSec": 30,
+  "autoScrollStartPauseMs": 2000,
+  "autoScrollEndPauseMs": 2000,
+  "pausePoints": [],
+  "fixedViewMode": false,
+  "fixedPage": 1,
+  "bgColor": "#ffffff",
+  "showPageNumbers": true
+}

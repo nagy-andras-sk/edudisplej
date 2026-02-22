@@ -69,6 +69,46 @@ if (isset($_GET['getstructure'])) {
         echo "Error reading structure file.";
         exit;
     }
+
+    // Apply service_versions overrides from database (if available)
+    $structureData = json_decode($structureContent, true);
+    if (is_array($structureData)) {
+        try {
+            $conn = getDbConnection();
+            $conn->query("CREATE TABLE IF NOT EXISTS service_versions (
+                id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                service_name VARCHAR(255) NOT NULL,
+                version_token VARCHAR(64) NOT NULL,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                updated_by_user_id INT(11) DEFAULT NULL,
+                UNIQUE KEY uniq_service_name (service_name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            $result = $conn->query("SELECT service_name, version_token FROM service_versions");
+            if ($result) {
+                if (!isset($structureData['service_versions']) || !is_array($structureData['service_versions'])) {
+                    $structureData['service_versions'] = [];
+                }
+
+                while ($row = $result->fetch_assoc()) {
+                    $serviceName = trim((string)($row['service_name'] ?? ''));
+                    $versionToken = trim((string)($row['version_token'] ?? ''));
+                    if ($serviceName === '' || $versionToken === '') {
+                        continue;
+                    }
+                    $structureData['service_versions'][$serviceName] = $versionToken;
+                }
+            }
+
+            closeDbConnection($conn);
+            $encoded = json_encode($structureData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (is_string($encoded) && $encoded !== '') {
+                $structureContent = $encoded;
+            }
+        } catch (Exception $e) {
+            // Fallback silently to file content if DB override load fails
+        }
+    }
     
     header('Content-Type: application/json');
     header('Content-Length: ' . strlen($structureContent));

@@ -7,6 +7,7 @@
 session_start();
 require_once '../dbkonfiguracia.php';
 require_once '../kiosk_status.php';
+require_once '../auth_roles.php';
 
 header('Content-Type: application/json');
 
@@ -14,6 +15,62 @@ $response = [
     'success' => false,
     'message' => ''
 ];
+
+function normalize_version_text($value) {
+    $text = trim((string)$value);
+    if ($text === '') {
+        return '';
+    }
+
+    $normalized = strtolower($text);
+    $invalid_values = ['unknown', 'ismeretlen', 'n/a', 'na', '-', '--', 'null', 'undefined'];
+    if (in_array($normalized, $invalid_values, true)) {
+        return '';
+    }
+
+    return $text;
+}
+
+function extract_version_from_hw_info($hw_info) {
+    if (!is_array($hw_info)) {
+        return '';
+    }
+
+    $direct_keys = [
+        'version',
+        'app_version',
+        'software_version',
+        'appVersion',
+        'softwareVersion',
+        'client_version',
+        'kiosk_version',
+        'build_version',
+        'buildVersion',
+        'app_build',
+        'release',
+    ];
+
+    foreach ($direct_keys as $key) {
+        if (!array_key_exists($key, $hw_info)) {
+            continue;
+        }
+        $candidate = normalize_version_text($hw_info[$key]);
+        if ($candidate !== '') {
+            return $candidate;
+        }
+    }
+
+    foreach ($hw_info as $value) {
+        if (is_array($value)) {
+            $nested = extract_version_from_hw_info($value);
+            if ($nested !== '') {
+                return $nested;
+            }
+        }
+    }
+
+    return '';
+}
 
 function normalize_loop_version_value($value) {
     if ($value === null || $value === '') {
@@ -125,7 +182,12 @@ if (isset($_GET['refresh_list'])) {
             $kiosk_loop_version = normalize_loop_version_value($row['loop_last_update'] ?? null);
             $server_loop_version = normalize_loop_version_value($row['group_server_loop_version'] ?? null)
                 ?? normalize_loop_version_value($row['kiosk_server_loop_version'] ?? null);
-            $loop_version_mismatch = ($kiosk_loop_version !== null && $server_loop_version !== null && $kiosk_loop_version !== $server_loop_version);
+            $loop_version_mismatch = (
+                ($row['status'] ?? '') !== 'offline'
+                && $kiosk_loop_version !== null
+                && $server_loop_version !== null
+                && $kiosk_loop_version !== $server_loop_version
+            );
 
             if ($loop_version_mismatch) {
                 $row['status'] = 'online_error';
@@ -163,6 +225,13 @@ $user_id = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (edudisplej_is_content_editor()) {
+        http_response_code(403);
+        $response['message'] = 'A tartalom módosító szerepkör nem szerkesztheti a kijelző adatait';
+        echo json_encode($response);
+        exit();
+    }
+
     $data = json_decode(file_get_contents('php://input'), true);
     $kiosk_id_post = intval($data['id'] ?? 0);
     $friendly_name = trim((string)($data['friendly_name'] ?? ''));
@@ -282,7 +351,12 @@ try {
         $kiosk_loop_version = normalize_loop_version_value($kiosk['loop_last_update'] ?? null);
         $server_loop_version = normalize_loop_version_value($kiosk['group_server_loop_version'] ?? null)
             ?? normalize_loop_version_value($kiosk['kiosk_server_loop_version'] ?? null);
-        $loop_version_mismatch = ($kiosk_loop_version !== null && $server_loop_version !== null && $kiosk_loop_version !== $server_loop_version);
+        $loop_version_mismatch = (
+            ($kiosk['status'] ?? '') !== 'offline'
+            && $kiosk_loop_version !== null
+            && $server_loop_version !== null
+            && $kiosk_loop_version !== $server_loop_version
+        );
 
         if ($loop_version_mismatch) {
             $kiosk['status'] = 'online_error';
@@ -315,16 +389,11 @@ try {
     $response['group_ids'] = $kiosk['group_ids'] ?? null;
     
     // Add technical information
-    $resolved_version = trim((string)($kiosk['version'] ?? ''));
+    $resolved_version = normalize_version_text($kiosk['version'] ?? '');
     if ($resolved_version === '' && !empty($kiosk['hw_info'])) {
         $hw_info = json_decode($kiosk['hw_info'], true);
         if (is_array($hw_info)) {
-            $resolved_version = trim((string)(
-                $hw_info['version']
-                ?? $hw_info['app_version']
-                ?? $hw_info['software_version']
-                ?? ''
-            ));
+            $resolved_version = extract_version_from_hw_info($hw_info);
         }
     }
     $response['version'] = $resolved_version !== '' ? $resolved_version : null;

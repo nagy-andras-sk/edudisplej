@@ -307,7 +307,7 @@ try {
     
     $table_check = $conn->query("SHOW TABLES LIKE 'kiosks'");
     if ($table_check && $table_check->num_rows === 0) {
-        $response['message'] = 'Database table "kiosks" does not exist - run migration (dbjavito.php or cron/maintenance/run_maintenance.php)';
+        $response['message'] = 'Database table "kiosks" does not exist - run maintenance (cron/maintenance/run_maintenance.php)';
         add_debug('table_error', 'kiosks table not found in database');
         echo json_encode($response, JSON_PRETTY_PRINT);
         exit;

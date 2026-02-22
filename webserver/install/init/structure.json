@@ -1,5 +1,21 @@
 {
   "version": "1.0",
+  "service_versions": {
+    "install.sh": "2026-02-22T00:00:00Z",
+    "update.sh": "2026-02-22T00:00:00Z",
+    "common.sh": "2026-02-22T00:00:00Z",
+    "edudisplej_sync_service.sh": "2026-02-22T00:00:00Z",
+    "edudisplej-download-modules.sh": "2026-02-22T00:00:00Z",
+    "edudisplej-config-manager.sh": "2026-02-22T00:00:00Z",
+    "edudisplej-watchdog.sh": "2026-02-22T00:00:00Z",
+    "edudisplej-watchdog.service": "2026-02-22T00:00:00Z",
+    "edudisplej-sync.service": "2026-02-22T00:00:00Z",
+    "edudisplej-kiosk.service": "2026-02-22T00:00:00Z",
+    "edudisplej-screenshot-service.sh": "2026-02-22T00:00:00Z",
+    "edudisplej-screenshot-service.service": "2026-02-22T00:00:00Z",
+    "edudisplej-command-executor.sh": "2026-02-22T00:00:00Z",
+    "edudisplej-command-executor.service": "2026-02-22T00:00:00Z"
+  },
   "files": [
     {
       "source": "common.sh",

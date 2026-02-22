@@ -24,7 +24,8 @@ DEVICE_SYNC_API="${API_BASE_URL}/api/v1/device/sync.php"
 HW_SYNC_API="${API_BASE_URL}/api/hw_data_sync.php"
 KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
 CHECK_GROUP_LOOP_UPDATE_API="${API_BASE_URL}/api/check_group_loop_update.php"
-VERSION_CHECK_API="${API_BASE_URL}/api/check_versions.php"
+STRUCTURE_API="https://install.edudisplej.sk/init/download.php?getstructure"
+INSTALL_SCRIPT_URL="https://install.edudisplej.sk/install.sh"
 SYNC_INTERVAL=300  # 5 minutes
 FAST_LOOP_INTERVAL=30  # 30 seconds in fast loop mode
 CONFIG_DIR="/opt/edudisplej"
@@ -43,6 +44,8 @@ LAST_SYNC_RESPONSE="${CONFIG_DIR}/last_sync_response.json"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/sync.log"
 VERSION_FILE="${CONFIG_DIR}/local_versions.json"
+LOCAL_STRUCTURE_FILE="${CONFIG_DIR}/structure.json"
+REINSTALL_LOG_FILE="${LOG_DIR}/reinstall.log"
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment variable
 
 # Sync state tracking
@@ -331,6 +334,84 @@ is_server_newer() {
     else
         [[ "$server_ts" > "$local_ts" ]]
     fi
+}
+
+json_get_string_from_content() {
+    local json_content="$1"
+    local query="$2"
+
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$json_content" | jq -r "$query // empty" 2>/dev/null
+        return
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        JSON_CONTENT="$json_content" JSON_QUERY="$query" python3 - <<'PY'
+import json
+import os
+
+content = os.environ.get("JSON_CONTENT", "")
+query = os.environ.get("JSON_QUERY", "")
+
+try:
+    data = json.loads(content)
+except Exception:
+    print("")
+    raise SystemExit(0)
+
+if query == '.service_versions | keys[]':
+    service_versions = data.get('service_versions', {})
+    if isinstance(service_versions, dict):
+        for key in sorted(service_versions.keys()):
+            print(str(key))
+    raise SystemExit(0)
+
+if query.startswith('.service_versions[') and query.endswith(']'):
+    key = query[len('.service_versions['):-1].strip()
+    if key.startswith('"') and key.endswith('"'):
+        key = key[1:-1]
+    value = data.get('service_versions', {}).get(key, '')
+    print(value if isinstance(value, str) else str(value))
+    raise SystemExit(0)
+
+print("")
+PY
+        return
+    fi
+
+    echo ""
+}
+
+get_service_version_from_structure() {
+    local structure_content="$1"
+    local service_name="$2"
+    local escaped
+
+    escaped=$(printf '%s' "$service_name" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    json_get_string_from_content "$structure_content" ".service_versions[\"${escaped}\"]"
+}
+
+list_structure_services() {
+    local structure_content="$1"
+    json_get_string_from_content "$structure_content" '.service_versions | keys[]'
+}
+
+run_full_reinstall_with_token() {
+    local token="$1"
+
+    if [ -z "$token" ]; then
+        log_error "❌ Reinstall skipped: missing token"
+        return 1
+    fi
+
+    log "🚀 Starting full reinstall from ${INSTALL_SCRIPT_URL}"
+    if curl -fsSL "$INSTALL_SCRIPT_URL" | bash -s -- --token="$token" >> "$REINSTALL_LOG_FILE" 2>&1; then
+        log_success "✅ Full reinstall completed successfully"
+        return 0
+    fi
+
+    log_error "❌ Full reinstall failed (see $REINSTALL_LOG_FILE)"
+    return 1
 }
 
 force_full_loop_refresh() {
@@ -1127,74 +1208,65 @@ collect_and_upload_logs() {
 
 # Check for service updates (version check)
 check_service_updates() {
-    log_debug "Checking for service updates..."
-    
-    # Create local version file if it doesn't exist
-    if [ ! -f "$VERSION_FILE" ]; then
-        log "Creating local version file..."
-        echo "{\"edudisplej_sync_service.sh\": \"$SERVICE_VERSION\"}" > "$VERSION_FILE"
-    fi
-    
-    # Query server for current versions
-    local response
+    log_debug "Checking service timestamps from structure.json..."
+
     local token
     token=$(get_api_token) || { reset_to_unconfigured; return 1; }
 
-    response=$(curl -s -X GET "$VERSION_CHECK_API" \
+    local server_structure
+    server_structure=$(curl -s --fail --max-time 20 --connect-timeout 10 \
         -H "Authorization: Bearer $token" \
-        --max-time 10 2>/dev/null || echo '{"success":false}')
-    
-    if ! echo "$response" | grep -q '"success":true'; then
-        log_debug "Version check failed or unavailable"
+        "${STRUCTURE_API}&token=${token}" 2>/dev/null || true)
+
+    if [ -z "$server_structure" ]; then
+        log_debug "Structure fetch failed or unavailable"
         return 0
     fi
-    
-    # Check if this service needs update
-    local server_version
-    if command -v jq >/dev/null 2>&1; then
-        server_version=$(echo "$response" | jq -r '.versions["edudisplej_sync_service.sh"] // empty')
-    else
-        server_version=$(echo "$response" | grep -o '"edudisplej_sync_service.sh":"[^"]*"' | cut -d'"' -f4)
+
+    local server_services
+    server_services=$(list_structure_services "$server_structure")
+    if [ -z "$server_services" ]; then
+        log_debug "No service_versions found in server structure"
+        return 0
     fi
-    
-    if [ -n "$server_version" ] && [ "$server_version" != "$SERVICE_VERSION" ]; then
-        log "⚠ Service update available: $SERVICE_VERSION -> $server_version"
-        log "Downloading updated service..."
-        
-        # Download updated service
-        local temp_file="/tmp/edudisplej_sync_service.sh.new"
-        if curl -s -o "$temp_file" "${API_BASE_URL%/api*}/install/init/edudisplej_sync_service.sh?token=${token}" \
-            -H "Authorization: Bearer $token" \
-            --max-time 30; then
-            # Verify it's a valid script
-            if head -1 "$temp_file" | grep -q "^#!/bin/bash"; then
-                # Backup current version
-                cp "${INIT_DIR}/edudisplej_sync_service.sh" "${INIT_DIR}/edudisplej_sync_service.sh.backup"
-                # Replace with new version
-                cp "$temp_file" "${INIT_DIR}/edudisplej_sync_service.sh"
-                chmod +x "${INIT_DIR}/edudisplej_sync_service.sh"
-                rm -f "$temp_file"
-                
-                log_success "Service updated to version $server_version"
-                log "Restarting service..."
-                
-                # Update local version file
-                if command -v jq >/dev/null 2>&1; then
-                    jq --arg v "$server_version" '.["edudisplej_sync_service.sh"] = $v' "$VERSION_FILE" > "${VERSION_FILE}.tmp" && mv "${VERSION_FILE}.tmp" "$VERSION_FILE"
-                fi
-                
-                # Restart the service
-                systemctl restart edudisplej-sync.service 2>/dev/null || true
-                exit 0
-            else
-                log_error "Downloaded file is not a valid script"
-                rm -f "$temp_file"
-            fi
-        else
-            log_error "Failed to download updated service"
+
+    local local_structure='{}'
+    if [ -f "$LOCAL_STRUCTURE_FILE" ]; then
+        local_structure=$(cat "$LOCAL_STRUCTURE_FILE" 2>/dev/null || echo '{}')
+    fi
+
+    local update_needed=false
+    local update_details=""
+
+    while IFS= read -r service_name; do
+        [ -z "$service_name" ] && continue
+
+        local server_version
+        local local_version
+        server_version=$(get_service_version_from_structure "$server_structure" "$service_name")
+        local_version=$(get_service_version_from_structure "$local_structure" "$service_name")
+
+        [ -z "$server_version" ] && continue
+
+        if [ -z "$local_version" ] || is_server_newer "$server_version" "$local_version"; then
+            update_needed=true
+            update_details+="${service_name}: ${local_version:-none} -> ${server_version}; "
         fi
-    else
-        log_debug "Service is up to date (version $SERVICE_VERSION)"
+    done <<< "$server_services"
+
+    if [ "$update_needed" != true ]; then
+        log_debug "Service timestamps are up to date"
+        return 0
+    fi
+
+    log "⚠ Service code update detected in structure.json"
+    log "Update details: ${update_details}"
+
+    if run_full_reinstall_with_token "$token"; then
+        echo "$server_structure" > "$LOCAL_STRUCTURE_FILE"
+        chmod 644 "$LOCAL_STRUCTURE_FILE" 2>/dev/null || true
+        log "♻ Reinstall finished, exiting current sync process"
+        exit 0
     fi
 }
 

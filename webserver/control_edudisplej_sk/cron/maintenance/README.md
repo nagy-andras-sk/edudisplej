@@ -24,4 +24,4 @@ It installs:
 - file lock prevents overlapping runs
 - max execution time is limited
 - logs are written to `logs/maintenance-cron.log`
-- runs `dbjavito.php` in no-HTML mode
+- runs `maintenance_task.php` directly in console mode

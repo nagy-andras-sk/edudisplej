@@ -9,6 +9,7 @@ session_start();
 require_once 'dbkonfiguracia.php';
 require_once 'logging.php';
 require_once 'i18n.php';
+require_once 'auth_roles.php';
 
 $current_lang = edudisplej_apply_language_preferences();
 
@@ -27,6 +28,8 @@ if (isset($_SESSION['user_id']) && isset($_SESSION['username'])) {
     // Redirect based on role
     if (isset($_SESSION['isadmin']) && $_SESSION['isadmin']) {
         header('Location: admin/dashboard.php');
+    } elseif (edudisplej_get_session_role() === 'content_editor') {
+        header('Location: dashboard/content_editor_index.php');
     } else {
         header('Location: dashboard/index.php');
     }
@@ -45,9 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     } else {
         try {
             $conn = getDbConnection();
+            edudisplej_ensure_user_role_column($conn);
             
             // Get user with OTP settings
-            $stmt = $conn->prepare("SELECT id, username, email, password, isadmin, company_id, otp_enabled, otp_secret, otp_verified, lang FROM users WHERE email = ?");
+            $stmt = $conn->prepare("SELECT id, username, email, password, isadmin, user_role, company_id, otp_enabled, otp_secret, otp_verified, lang FROM users WHERE email = ?");
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -117,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                         $_SESSION['user_id'] = $user['id'];
                                         $_SESSION['username'] = $user['username'];
                                         $_SESSION['isadmin'] = (bool)$user['isadmin'];
+                                        $_SESSION['user_role'] = edudisplej_normalize_user_role($user['user_role'] ?? null, (bool)$user['isadmin']);
                                         $_SESSION['company_id'] = $user['company_id'];
                                         edudisplej_set_lang($user['lang'] ?? EDUDISPLEJ_DEFAULT_LANG, false);
                                 
@@ -138,6 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                         // Redirect based on role
                                         if ($user['isadmin']) {
                                             header('Location: admin/dashboard.php');
+                                        } elseif (edudisplej_normalize_user_role($user['user_role'] ?? null, false) === 'content_editor') {
+                                            header('Location: dashboard/content_editor_index.php');
                                         } else {
                                             header('Location: dashboard/index.php');
                                         }
@@ -155,6 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         $_SESSION['user_id'] = $user['id'];
                         $_SESSION['username'] = $user['username'];
                         $_SESSION['isadmin'] = (bool)$user['isadmin'];
+                        $_SESSION['user_role'] = edudisplej_normalize_user_role($user['user_role'] ?? null, (bool)$user['isadmin']);
                         $_SESSION['company_id'] = $user['company_id'];
                         edudisplej_set_lang($user['lang'] ?? EDUDISPLEJ_DEFAULT_LANG, false);
                         
@@ -176,6 +184,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         // Redirect based on role
                         if ($user['isadmin']) {
                             header('Location: admin/dashboard.php');
+                        } elseif (edudisplej_normalize_user_role($user['user_role'] ?? null, false) === 'content_editor') {
+                            header('Location: dashboard/content_editor_index.php');
                         } else {
                             header('Location: dashboard/index.php');
                         }

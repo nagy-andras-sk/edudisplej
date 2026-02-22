@@ -29,6 +29,53 @@ function sanitize_screenshot_filename($filename) {
     return $name;
 }
 
+function enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_per_kiosk = 100): void {
+    if ($max_per_kiosk < 1) {
+        return;
+    }
+
+    $screenshots_dir = realpath(__DIR__ . '/../screenshots');
+
+    $old_stmt = $conn->prepare(
+        "SELECT id, details
+           FROM sync_logs
+          WHERE kiosk_id = ? AND action = 'screenshot'
+          ORDER BY timestamp DESC, id DESC
+          LIMIT 100000 OFFSET ?"
+    );
+    $old_stmt->bind_param("ii", $kiosk_id, $max_per_kiosk);
+    $old_stmt->execute();
+    $old_result = $old_stmt->get_result();
+
+    $ids_to_delete = [];
+    while ($row = $old_result->fetch_assoc()) {
+        $ids_to_delete[] = (int)$row['id'];
+
+        $details = json_decode((string)$row['details'], true);
+        if (!is_array($details) || empty($details['filename']) || !$screenshots_dir) {
+            continue;
+        }
+
+        $filename = sanitize_screenshot_filename((string)$details['filename']);
+        if ($filename === '') {
+            continue;
+        }
+
+        $file_path = $screenshots_dir . DIRECTORY_SEPARATOR . $filename;
+        if (is_file($file_path)) {
+            @unlink($file_path);
+        }
+    }
+    $old_stmt->close();
+
+    if (empty($ids_to_delete)) {
+        return;
+    }
+
+    $id_list = implode(',', array_map('intval', $ids_to_delete));
+    $conn->query("DELETE FROM sync_logs WHERE id IN ($id_list)");
+}
+
 try {
     // Get request data
     $data = json_decode(file_get_contents('php://input'), true);
@@ -114,6 +161,8 @@ try {
         $log_stmt->bind_param("is", $kiosk_row['id'], $details);
         $log_stmt->execute();
         $log_stmt->close();
+
+        enforce_screenshot_retention($conn, (int)$kiosk_row['id'], 100);
     } else {
         $response['message'] = 'Screenshot upload failed';
     }

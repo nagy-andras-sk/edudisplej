@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "module_key": "pdf",
+  "name": "PDF Viewer",
+  "description": "PDF megjelenítés testreszabható nézet, zoom és navigációs beállításokkal",
+  "renderer": "m_pdf.html",
+  "config": {
+    "defaults": "config/default_settings.json"
+  }
+}
