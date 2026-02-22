@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDisplej Képgaléria Modul</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        #root {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: #000;
+            --overlay-top-height: 0%;
+            --overlay-bottom-height: 0%;
+        }
+
+        .content-layer {
+            top: var(--overlay-top-height);
+            bottom: var(--overlay-bottom-height);
+        }
+
+        #empty {
+            position: absolute;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #d1d5db;
+            font-size: 24px;
+            text-align: center;
+            padding: 24px;
+        }
+
+        #slideshow {
+            position: absolute;
+            left: 0;
+            right: 0;
+            overflow: hidden;
+            display: none;
+        }
+
+        .slide {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 450ms ease;
+            background: #111;
+        }
+
+        .slide.active { opacity: 1; }
+
+        #collage {
+            position: absolute;
+            left: 0;
+            right: 0;
+            display: none;
+            gap: 10px;
+            padding: 10px;
+        }
+
+        .collage-item {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #111;
+        }
+
+        #single {
+            position: absolute;
+            left: 0;
+            right: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 8px;
+        }
+
+        .overlay-band {
+            position: absolute;
+            left: 0;
+            right: 0;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.86);
+            display: none;
+            overflow: hidden;
+            padding: 0 2vw;
+            gap: 8px;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #overlayTop {
+            top: 0;
+        }
+
+        #overlayBottom {
+            bottom: 0;
+        }
+
+        .overlay-clock {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            line-height: 1;
+            white-space: nowrap;
+            font-weight: 700;
+        }
+
+        .overlay-clock-date {
+            opacity: 0.95;
+            font-weight: 600;
+        }
+
+        .overlay-text {
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+            font-weight: 700;
+        }
+
+        .overlay-text-track {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            will-change: transform;
+        }
+
+        .overlay-text-segment {
+            display: inline-block;
+            margin-right: 60px;
+        }
+
+        @keyframes overlayMarquee {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+
+        #singleImage {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+    </style>
+</head>
+<body>
+<div id="root">
+    <div id="overlayTop" class="overlay-band"></div>
+    <div id="overlayBottom" class="overlay-band"></div>
+    <div id="empty" class="content-layer">Nincs betöltött kép a galériához</div>
+    <div id="slideshow" class="content-layer"></div>
+    <div id="collage" class="content-layer"></div>
+    <div id="single" class="content-layer"><img id="singleImage" alt="single"></div>
+</div>
+
+<script>
+    function parseNum(value, fallback) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+    }
+
+    function parseBool(value, fallback = false) {
+        if (value === null || value === undefined || value === '') {
+            return fallback;
+        }
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        const normalized = String(value).toLowerCase();
+        if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+        if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+        return fallback;
+    }
+
+    function parseJsonArray(raw) {
+        try {
+            const data = JSON.parse(String(raw || '[]'));
+            return Array.isArray(data) ? data : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function getSettings() {
+        function normalizeAssetApiUrl(inputUrl) {
+            const raw = String(inputUrl || '').trim();
+            if (!raw) {
+                return '';
+            }
+
+            if (raw.includes('module_asset_file.php')) {
+                return raw;
+            }
+
+            const appendToken = (url) => {
+                const pageParams = new URLSearchParams(window.location.search);
+                const pageToken = pageParams.get('token');
+                if (!pageToken || url.includes('token=')) {
+                    return url;
+                }
+                const glue = url.includes('?') ? '&' : '?';
+                return `${url}${glue}token=${encodeURIComponent(pageToken)}`;
+            };
+
+            let candidatePath = raw;
+            try {
+                const parsed = new URL(raw, window.location.href);
+                candidatePath = String(parsed.pathname || raw);
+            } catch (_) {
+                candidatePath = raw;
+            }
+
+            candidatePath = candidatePath.replace(/\\/g, '/');
+            const marker = '/uploads/companies/';
+            const idx = candidatePath.toLowerCase().indexOf(marker);
+            if (idx === -1) {
+                return raw;
+            }
+
+            const relPath = candidatePath.slice(idx + 1);
+            const apiUrl = `../../api/group_loop/module_asset_file.php?path=${encodeURIComponent(relPath)}`;
+            return appendToken(apiUrl);
+        }
+
+        const defaults = {
+            imageUrlsJson: '[]',
+            displayMode: 'slideshow',
+            fitMode: 'cover',
+            slideIntervalSec: 5,
+            transitionMs: 450,
+            collageColumns: 3,
+            bgColor: '#000000',
+            clockOverlayEnabled: false,
+            clockOverlayPosition: 'top',
+            clockOverlayHeightPercent: 25,
+            clockOverlayTimeColor: '#ffffff',
+            clockOverlayDateColor: '#ffffff',
+            textOverlayEnabled: false,
+            textOverlayPosition: 'bottom',
+            textOverlayHeightPercent: 20,
+            textOverlayText: 'Sem vložte text...',
+            textOverlayFontSize: 52,
+            textOverlayColor: '#ffffff',
+            textOverlaySpeedPxPerSec: 120
+        };
+
+        const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS) ? window.EDUDISPLEJ_SETTINGS : {};
+        const params = new URLSearchParams(window.location.search);
+
+        const settings = {
+            ...defaults,
+            ...injected,
+            imageUrlsJson: params.get('imageUrlsJson') ?? injected.imageUrlsJson ?? defaults.imageUrlsJson,
+            displayMode: String(params.get('displayMode') ?? injected.displayMode ?? defaults.displayMode),
+            fitMode: String(params.get('fitMode') ?? injected.fitMode ?? defaults.fitMode),
+            slideIntervalSec: parseNum(params.get('slideIntervalSec') ?? injected.slideIntervalSec, defaults.slideIntervalSec),
+            transitionMs: parseNum(params.get('transitionMs') ?? injected.transitionMs, defaults.transitionMs),
+            collageColumns: parseNum(params.get('collageColumns') ?? injected.collageColumns, defaults.collageColumns),
+            bgColor: String(params.get('bgColor') ?? injected.bgColor ?? defaults.bgColor),
+            clockOverlayEnabled: parseBool(params.get('clockOverlayEnabled') ?? injected.clockOverlayEnabled, defaults.clockOverlayEnabled),
+            clockOverlayPosition: String(params.get('clockOverlayPosition') ?? injected.clockOverlayPosition ?? defaults.clockOverlayPosition),
+            clockOverlayHeightPercent: parseNum(params.get('clockOverlayHeightPercent') ?? injected.clockOverlayHeightPercent, defaults.clockOverlayHeightPercent),
+            clockOverlayTimeColor: String(params.get('clockOverlayTimeColor') ?? injected.clockOverlayTimeColor ?? defaults.clockOverlayTimeColor),
+            clockOverlayDateColor: String(params.get('clockOverlayDateColor') ?? injected.clockOverlayDateColor ?? defaults.clockOverlayDateColor),
+            textOverlayEnabled: parseBool(params.get('textOverlayEnabled') ?? injected.textOverlayEnabled, defaults.textOverlayEnabled),
+            textOverlayPosition: String(params.get('textOverlayPosition') ?? injected.textOverlayPosition ?? defaults.textOverlayPosition),
+            textOverlayHeightPercent: parseNum(params.get('textOverlayHeightPercent') ?? injected.textOverlayHeightPercent, defaults.textOverlayHeightPercent),
+            textOverlayText: String(params.get('textOverlayText') ?? injected.textOverlayText ?? defaults.textOverlayText),
+            textOverlayFontSize: parseNum(params.get('textOverlayFontSize') ?? injected.textOverlayFontSize, defaults.textOverlayFontSize),
+            textOverlayColor: String(params.get('textOverlayColor') ?? injected.textOverlayColor ?? defaults.textOverlayColor),
+            textOverlaySpeedPxPerSec: parseNum(params.get('textOverlaySpeedPxPerSec') ?? injected.textOverlaySpeedPxPerSec, defaults.textOverlaySpeedPxPerSec)
+        };
+
+        settings.displayMode = ['slideshow', 'collage', 'single'].includes(settings.displayMode) ? settings.displayMode : 'slideshow';
+        settings.fitMode = ['cover', 'contain', 'fill'].includes(settings.fitMode) ? settings.fitMode : 'cover';
+        settings.slideIntervalSec = Math.max(1, Math.min(30, settings.slideIntervalSec));
+        settings.transitionMs = Math.max(100, Math.min(2000, settings.transitionMs));
+        settings.collageColumns = Math.max(2, Math.min(5, Math.floor(settings.collageColumns)));
+        settings.clockOverlayPosition = settings.clockOverlayPosition === 'bottom' ? 'bottom' : 'top';
+        settings.textOverlayPosition = settings.textOverlayPosition === 'top' ? 'top' : 'bottom';
+        settings.clockOverlayHeightPercent = Math.max(20, Math.min(40, Math.floor(settings.clockOverlayHeightPercent || 25)));
+        settings.textOverlayHeightPercent = Math.max(12, Math.min(40, Math.floor(settings.textOverlayHeightPercent || 20)));
+        settings.textOverlayFontSize = Math.max(18, Math.min(120, Math.floor(settings.textOverlayFontSize || 52)));
+        settings.textOverlaySpeedPxPerSec = Math.max(40, Math.min(320, Math.floor(settings.textOverlaySpeedPxPerSec || 120)));
+        settings.images = parseJsonArray(settings.imageUrlsJson)
+            .map((url) => String(url || '').trim())
+            .map((url) => normalizeAssetApiUrl(url))
+            .filter(Boolean)
+            .slice(0, 10);
+
+        return settings;
+    }
+
+    const settings = getSettings();
+    const root = document.getElementById('root');
+    const empty = document.getElementById('empty');
+    const slideshow = document.getElementById('slideshow');
+    const collage = document.getElementById('collage');
+    const single = document.getElementById('single');
+    const singleImage = document.getElementById('singleImage');
+    const overlayTop = document.getElementById('overlayTop');
+    const overlayBottom = document.getElementById('overlayBottom');
+
+    root.style.backgroundColor = settings.bgColor;
+
+    let slideshowTimer = null;
+    let overlayClockTimer = null;
+
+    function hideAllModes() {
+        slideshow.style.display = 'none';
+        collage.style.display = 'none';
+        single.style.display = 'none';
+    }
+
+    function renderSlideshow(images) {
+        slideshow.innerHTML = '';
+        slideshow.style.display = 'block';
+
+        const slides = images.map((url, idx) => {
+            const img = document.createElement('img');
+            img.className = 'slide' + (idx === 0 ? ' active' : '');
+            img.src = url;
+            img.alt = `slide-${idx + 1}`;
+            img.style.objectFit = settings.fitMode;
+            img.style.transitionDuration = `${settings.transitionMs}ms`;
+            slideshow.appendChild(img);
+            return img;
+        });
+
+        if (slides.length <= 1) {
+            return;
+        }
+
+        let activeIndex = 0;
+        slideshowTimer = setInterval(() => {
+            const prev = activeIndex;
+            activeIndex = (activeIndex + 1) % slides.length;
+            slides[prev].classList.remove('active');
+            slides[activeIndex].classList.add('active');
+        }, settings.slideIntervalSec * 1000);
+    }
+
+    function renderCollage(images) {
+        collage.innerHTML = '';
+        collage.style.display = 'grid';
+        collage.style.gridTemplateColumns = `repeat(${settings.collageColumns}, minmax(0, 1fr))`;
+
+        images.forEach((url, idx) => {
+            const img = document.createElement('img');
+            img.className = 'collage-item';
+            img.src = url;
+            img.alt = `collage-${idx + 1}`;
+            img.style.objectFit = settings.fitMode;
+            collage.appendChild(img);
+        });
+    }
+
+    function renderSingle(images) {
+        single.style.display = 'flex';
+        singleImage.src = images[0] || '';
+        singleImage.style.objectFit = settings.fitMode;
+    }
+
+    function init() {
+        if (slideshowTimer) {
+            clearInterval(slideshowTimer);
+            slideshowTimer = null;
+        }
+
+        if (overlayClockTimer) {
+            clearInterval(overlayClockTimer);
+            overlayClockTimer = null;
+        }
+
+        renderOverlays();
+
+        const images = settings.images;
+        if (!images.length) {
+            hideAllModes();
+            empty.style.display = 'flex';
+            return;
+        }
+
+        empty.style.display = 'none';
+        hideAllModes();
+
+        if (settings.displayMode === 'collage') {
+            renderCollage(images);
+            return;
+        }
+
+        if (settings.displayMode === 'single') {
+            renderSingle(images);
+            return;
+        }
+
+        renderSlideshow(images);
+    }
+
+    function formatOverlayDate(date) {
+        return date.toLocaleDateString('hu-HU', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    }
+
+    function createClockOverlayRow() {
+        const row = document.createElement('div');
+        row.className = 'overlay-clock';
+
+        const time = document.createElement('div');
+        time.className = 'overlay-clock-time';
+        time.style.color = settings.clockOverlayTimeColor;
+
+        const date = document.createElement('div');
+        date.className = 'overlay-clock-date';
+        date.style.color = settings.clockOverlayDateColor;
+
+        row.appendChild(time);
+        row.appendChild(date);
+
+        const applySize = () => {
+            const bandHeight = row.parentElement ? row.parentElement.clientHeight : 80;
+            const base = Math.max(18, Math.floor(bandHeight * 0.42));
+            time.style.fontSize = `${base}px`;
+            date.style.fontSize = `${Math.max(14, Math.floor(base * 0.48))}px`;
+        };
+
+        const tick = () => {
+            const now = new Date();
+            time.textContent = now.toLocaleTimeString('hu-HU', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            date.textContent = formatOverlayDate(now);
+        };
+
+        applySize();
+        tick();
+        overlayClockTimer = setInterval(tick, 1000);
+        window.addEventListener('resize', applySize);
+        return row;
+    }
+
+    function createTextOverlayRow() {
+        const row = document.createElement('div');
+        row.className = 'overlay-text';
+        row.style.color = settings.textOverlayColor;
+        row.style.fontSize = `${settings.textOverlayFontSize}px`;
+
+        const track = document.createElement('div');
+        track.className = 'overlay-text-track';
+
+        const textValue = String(settings.textOverlayText || '').trim() || 'Sem vložte text...';
+        const segmentA = document.createElement('span');
+        segmentA.className = 'overlay-text-segment';
+        segmentA.textContent = textValue;
+        const segmentB = document.createElement('span');
+        segmentB.className = 'overlay-text-segment';
+        segmentB.textContent = textValue;
+
+        track.appendChild(segmentA);
+        track.appendChild(segmentB);
+        row.appendChild(track);
+
+        requestAnimationFrame(() => {
+            const distance = Math.max(120, segmentA.offsetWidth + 60);
+            const durationSec = Math.max(1, distance / Math.max(40, settings.textOverlaySpeedPxPerSec));
+            track.style.width = `${distance * 2}px`;
+            track.style.animation = `overlayMarquee ${durationSec.toFixed(2)}s linear infinite`;
+
+            if (segmentA.offsetWidth <= row.clientWidth - 20) {
+                track.style.animation = 'none';
+                track.style.transform = 'translateX(0)';
+                segmentB.style.display = 'none';
+            }
+        });
+
+        return row;
+    }
+
+    function renderBand(targetBand, widgets, heightPercent) {
+        targetBand.innerHTML = '';
+        if (!widgets.length || heightPercent <= 0) {
+            targetBand.style.display = 'none';
+            targetBand.style.height = '0';
+            return;
+        }
+
+        targetBand.style.display = 'flex';
+        targetBand.style.height = `${heightPercent}%`;
+        widgets.forEach((widget) => {
+            widget.style.flex = '1';
+            targetBand.appendChild(widget);
+        });
+    }
+
+    function renderOverlays() {
+        const topWidgets = [];
+        const bottomWidgets = [];
+        let topHeight = 0;
+        let bottomHeight = 0;
+
+        if (settings.clockOverlayEnabled) {
+            const clockRow = createClockOverlayRow();
+            if (settings.clockOverlayPosition === 'bottom') {
+                bottomWidgets.push(clockRow);
+                bottomHeight = Math.max(bottomHeight, settings.clockOverlayHeightPercent);
+            } else {
+                topWidgets.push(clockRow);
+                topHeight = Math.max(topHeight, settings.clockOverlayHeightPercent);
+            }
+        }
+
+        if (settings.textOverlayEnabled) {
+            const textRow = createTextOverlayRow();
+            if (settings.textOverlayPosition === 'top') {
+                topWidgets.push(textRow);
+                topHeight = Math.max(topHeight, settings.textOverlayHeightPercent);
+            } else {
+                bottomWidgets.push(textRow);
+                bottomHeight = Math.max(bottomHeight, settings.textOverlayHeightPercent);
+            }
+        }
+
+        root.style.setProperty('--overlay-top-height', `${topHeight}%`);
+        root.style.setProperty('--overlay-bottom-height', `${bottomHeight}%`);
+
+        renderBand(overlayTop, topWidgets, topHeight);
+        renderBand(overlayBottom, bottomWidgets, bottomHeight);
+    }
+
+    init();
+</script>
+</body>
+</html>

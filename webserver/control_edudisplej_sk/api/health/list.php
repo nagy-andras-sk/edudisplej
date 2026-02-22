@@ -26,7 +26,7 @@ try {
     // Build query
     $query = "
         SELECT 
-            k.id, k.device_id, k.name, k.status, k.last_sync, k.last_seen,
+            k.id, k.device_id, k.name, k.status, k.last_sync, k.last_seen, k.last_heartbeat, k.upgrade_started_at,
             k.company_id, c.name as company_name,
             h.status as health_status, h.system_data, h.services_data, h.network_data, h.sync_data, h.timestamp
         FROM kiosks k

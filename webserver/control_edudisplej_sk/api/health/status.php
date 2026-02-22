@@ -22,7 +22,7 @@ try {
     }
     
     // Verify kiosk exists
-    $stmt = $conn->prepare("SELECT id, device_id, status, company_id, last_sync, last_seen FROM kiosks WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, device_id, status, company_id, last_sync, last_seen, last_heartbeat, upgrade_started_at FROM kiosks WHERE id = ?");
     $stmt->bind_param("i", $kiosk_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -32,7 +32,6 @@ try {
     }
     
     $kiosk = $result->fetch_assoc();
-    kiosk_apply_effective_status($kiosk);
     api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
     
     // Get latest health data
@@ -57,6 +56,8 @@ try {
     }
     
     $health = $result->fetch_assoc();
+    $kiosk['health_timestamp'] = $health['timestamp'] ?? null;
+    kiosk_apply_effective_status($kiosk);
     
     echo json_encode([
         'success' => true,

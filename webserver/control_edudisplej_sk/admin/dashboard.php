@@ -56,10 +56,12 @@ function format_last_reboot($uptime_seconds) {
 $error = '';
 $companies = [];
 $kiosks = [];
+$company_license_overview = [];
 
 $filters = [
     'company_id' => isset($_GET['company_id']) ? (int)$_GET['company_id'] : 0,
     'status' => trim($_GET['status'] ?? ''),
+    'overuse' => trim($_GET['overuse'] ?? ''),
     'search' => trim($_GET['search'] ?? ''),
     'min_cpu' => isset($_GET['min_cpu']) ? (float)$_GET['min_cpu'] : 0,
     'min_ram' => isset($_GET['min_ram']) ? (float)$_GET['min_ram'] : 0,
@@ -72,6 +74,34 @@ try {
     $result = $conn->query("SELECT id, name FROM companies ORDER BY name");
     while ($row = $result->fetch_assoc()) {
         $companies[] = $row;
+    }
+
+    $license_overview_result = $conn->query("SELECT
+            c.id AS company_id,
+            COALESCE((
+                SELECT cl.device_limit
+                FROM company_licenses cl
+                WHERE cl.company_id = c.id AND cl.status = 'active'
+                ORDER BY cl.valid_until DESC, cl.id DESC
+                LIMIT 1
+            ), 0) AS purchased,
+            (
+                SELECT COUNT(*)
+                FROM kiosks k2
+                WHERE k2.company_id = c.id AND k2.license_active = 1
+            ) AS used
+        FROM companies c");
+    if ($license_overview_result) {
+        while ($row = $license_overview_result->fetch_assoc()) {
+            $cid = (int)($row['company_id'] ?? 0);
+            if ($cid <= 0) {
+                continue;
+            }
+            $company_license_overview[$cid] = [
+                'purchased' => (int)($row['purchased'] ?? 0),
+                'used' => (int)($row['used'] ?? 0),
+            ];
+        }
     }
 
     $query = "
@@ -145,6 +175,20 @@ foreach ($kiosks as $kiosk) {
         continue;
     }
 
+    if ($filters['overuse'] !== '') {
+        $filter_company_id = (int)($kiosk['company_id'] ?? 0);
+        $filter_purchased = (int)($company_license_overview[$filter_company_id]['purchased'] ?? 0);
+        $filter_used = (int)($company_license_overview[$filter_company_id]['used'] ?? 0);
+        $filter_is_overused = $filter_used > $filter_purchased;
+
+        if ($filters['overuse'] === '1' && !$filter_is_overused) {
+            continue;
+        }
+        if ($filters['overuse'] === '0' && $filter_is_overused) {
+            continue;
+        }
+    }
+
     if ($filters['status'] && $kiosk['status'] !== $filters['status']) {
         continue;
     }
@@ -187,11 +231,18 @@ foreach ($kiosks as $kiosk) {
 
 $grouped = [];
 foreach ($filtered as $kiosk) {
-    $company = $kiosk['company_name'] ?? 'Unassigned';
-    if (!isset($grouped[$company])) {
-        $grouped[$company] = [];
+    $company_id = (int)($kiosk['company_id'] ?? 0);
+    $group_key = $company_id > 0 ? 'c_' . $company_id : 'unassigned';
+    $company_name = $kiosk['company_name'] ?? 'Unassigned';
+
+    if (!isset($grouped[$group_key])) {
+        $grouped[$group_key] = [
+            'company_id' => $company_id,
+            'company_name' => $company_name,
+            'kiosks' => [],
+        ];
     }
-    $grouped[$company][] = $kiosk;
+    $grouped[$group_key]['kiosks'][] = $kiosk;
 }
 
 include 'header.php';
@@ -267,6 +318,14 @@ include 'header.php';
                 <option value="unconfigured" <?php echo $filters['status'] === 'unconfigured' ? 'selected' : ''; ?>>Unconfigured</option>
             </select>
         </div>
+        <div class="form-field">
+            <label for="overuse">License usage</label>
+            <select id="overuse" name="overuse">
+                <option value="" <?php echo $filters['overuse'] === '' ? 'selected' : ''; ?>>All</option>
+                <option value="1" <?php echo $filters['overuse'] === '1' ? 'selected' : ''; ?>>Overuse only</option>
+                <option value="0" <?php echo $filters['overuse'] === '0' ? 'selected' : ''; ?>>Within purchased</option>
+            </select>
+        </div>
         <div class="form-field" style="min-width: 220px;">
             <label for="search">Search</label>
             <input id="search" name="search" type="text" value="<?php echo htmlspecialchars($filters['search']); ?>" placeholder="hostname, mac, device id">
@@ -298,9 +357,27 @@ include 'header.php';
     </div>
 <?php endif; ?>
 
-<?php foreach ($grouped as $company_name => $company_kiosks): ?>
+<?php foreach ($grouped as $group): ?>
+    <?php
+        $company_id = (int)($group['company_id'] ?? 0);
+        $company_name = (string)($group['company_name'] ?? 'Unassigned');
+        $company_kiosks = (array)($group['kiosks'] ?? []);
+        $purchased = (int)($company_license_overview[$company_id]['purchased'] ?? 0);
+        $used = (int)($company_license_overview[$company_id]['used'] ?? count($company_kiosks));
+        $is_overused = $used > $purchased;
+    ?>
     <div class="panel">
-        <div class="panel-title">Institution: <?php echo htmlspecialchars($company_name); ?> (<?php echo count($company_kiosks); ?>)</div>
+        <div class="panel-title">
+            Institution: <?php echo htmlspecialchars($company_name); ?> (<?php echo count($company_kiosks); ?>)
+            <?php if ($company_id > 0): ?>
+                <span style="margin-left:10px; font-size:12px; font-weight:700; color: <?php echo $is_overused ? '#b23b3b' : '#1f7a39'; ?>;">
+                    purchased: <?php echo $purchased; ?> / used: <?php echo $used; ?>
+                </span>
+                <?php if ($is_overused): ?>
+                    <span class="badge" style="margin-left:8px; background:#b23b3b; color:#fff;">OVERUSE</span>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
         <div class="table-wrap">
             <table>
                 <thead>

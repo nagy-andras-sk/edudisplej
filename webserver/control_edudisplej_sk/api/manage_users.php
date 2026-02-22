@@ -7,6 +7,8 @@
 session_start();
 require_once '../dbkonfiguracia.php';
 require_once '../auth_roles.php';
+require_once '../user_archive.php';
+require_once '../logging.php';
 
 header('Content-Type: application/json');
 
@@ -54,6 +56,10 @@ try {
     
     $company_id = $user_row['company_id'];
     $caller_is_admin = !empty($user_row['isadmin']);
+
+    if ($caller_is_admin && !empty($_SESSION['company_id'])) {
+        $company_id = (int)$_SESSION['company_id'];
+    }
     
     if (!$company_id) {
         $response['message'] = 'No company assigned';
@@ -185,17 +191,35 @@ try {
                 break;
             }
             $verify_stmt->close();
-            
-            $delete_stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-            $delete_stmt->bind_param("i", $target_user_id);
-            
-            if ($delete_stmt->execute()) {
+
+            $archive_result = edudisplej_archive_user(
+                $conn,
+                $target_user_id,
+                $user_id,
+                'company_user_delete',
+                'Archived from manage_users API'
+            );
+
+            if (!empty($archive_result['success'])) {
                 $response['success'] = true;
-                $response['message'] = 'User deleted successfully';
+                $response['message'] = 'User archived successfully';
+
+                log_security_event(
+                    'user_archived',
+                    $user_id,
+                    (string)($_SESSION['username'] ?? 'unknown'),
+                    get_client_ip(),
+                    get_user_agent(),
+                    [
+                        'target_user_id' => $target_user_id,
+                        'target_username' => $archive_result['username'] ?? null,
+                        'archive_reason' => 'company_user_delete',
+                        'archive_id' => $archive_result['archive_id'] ?? null,
+                    ]
+                );
             } else {
-                $response['message'] = 'Failed to delete user';
+                $response['message'] = $archive_result['message'] ?? 'Failed to archive user';
             }
-            $delete_stmt->close();
             break;
             
         default:

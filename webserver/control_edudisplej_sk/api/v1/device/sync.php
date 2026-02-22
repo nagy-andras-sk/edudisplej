@@ -38,6 +38,34 @@ function v1_ensure_debug_mode_column(mysqli $conn): void {
     $conn->query("ALTER TABLE kiosks ADD COLUMN debug_mode TINYINT(1) NOT NULL DEFAULT 0");
 }
 
+function v1_assign_default_group_for_company(mysqli $conn, int $kiosk_id, int $company_id): void {
+    if ($kiosk_id <= 0 || $company_id <= 0) {
+        return;
+    }
+
+    $group_stmt = $conn->prepare("SELECT id FROM kiosk_groups WHERE company_id = ? ORDER BY is_default DESC, priority DESC, id ASC LIMIT 1");
+    $group_stmt->bind_param("i", $company_id);
+    $group_stmt->execute();
+    $group_row = $group_stmt->get_result()->fetch_assoc();
+    $group_stmt->close();
+
+    if (!$group_row || empty($group_row['id'])) {
+        return;
+    }
+
+    $target_group_id = (int)$group_row['id'];
+
+    $delete_stmt = $conn->prepare("DELETE FROM kiosk_group_assignments WHERE kiosk_id = ?");
+    $delete_stmt->bind_param("i", $kiosk_id);
+    $delete_stmt->execute();
+    $delete_stmt->close();
+
+    $assign_stmt = $conn->prepare("INSERT INTO kiosk_group_assignments (kiosk_id, group_id) VALUES (?, ?)");
+    $assign_stmt->bind_param("ii", $kiosk_id, $target_group_id);
+    $assign_stmt->execute();
+    $assign_stmt->close();
+}
+
 function v1_enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_per_kiosk = 100): void {
     if ($max_per_kiosk < 1) {
         return;
@@ -171,9 +199,43 @@ try {
         exit;
     }
 
-    // Enforce company ownership
+    // Enforce company ownership (with migration handover support)
     if (!empty($kiosk['company_id'])) {
-        api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+        $current_company_id = (int)$kiosk['company_id'];
+        $api_company_id = (int)($api_company['id'] ?? 0);
+
+        if ($current_company_id !== $api_company_id && !api_is_admin_session($api_company)) {
+            $migration_stmt = $conn->prepare("SELECT id, target_company_id FROM kiosk_migrations WHERE kiosk_id = ? AND status IN ('queued','in_progress') ORDER BY id DESC LIMIT 1");
+            $migration_stmt->bind_param("i", $kiosk['id']);
+            $migration_stmt->execute();
+            $migration = $migration_stmt->get_result()->fetch_assoc();
+            $migration_stmt->close();
+
+            if ($migration && (int)$migration['target_company_id'] === $api_company_id) {
+                $conn->begin_transaction();
+                try {
+                    $update_kiosk_stmt = $conn->prepare("UPDATE kiosks SET company_id = ? WHERE id = ?");
+                    $update_kiosk_stmt->bind_param("ii", $api_company_id, $kiosk['id']);
+                    $update_kiosk_stmt->execute();
+                    $update_kiosk_stmt->close();
+
+                    v1_assign_default_group_for_company($conn, (int)$kiosk['id'], $api_company_id);
+
+                    $migration_update_stmt = $conn->prepare("UPDATE kiosk_migrations SET status = 'completed', completed_at = NOW(), updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $migration_update_stmt->bind_param("i", $migration['id']);
+                    $migration_update_stmt->execute();
+                    $migration_update_stmt->close();
+
+                    $conn->commit();
+                    $kiosk['company_id'] = $api_company_id;
+                } catch (Throwable $migration_error) {
+                    $conn->rollback();
+                    throw $migration_error;
+                }
+            } else {
+                api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
+            }
+        }
     } elseif (!empty($api_company['id']) && !api_is_admin_session($api_company)) {
         $assign = $conn->prepare("UPDATE kiosks SET company_id = ? WHERE id = ?");
         $assign->bind_param("ii", $api_company['id'], $kiosk['id']);

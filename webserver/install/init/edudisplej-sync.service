@@ -8,7 +8,7 @@ Wants=network-online.target
 Type=simple
 ExecStart=/opt/edudisplej/init/edudisplej_sync_service.sh start
 Restart=always
-RestartSec=30
+RestartSec=5
 User=root
 Environment=EDUDISPLEJ_API_URL=https://control.edudisplej.sk
 Environment=DISPLAY=:0

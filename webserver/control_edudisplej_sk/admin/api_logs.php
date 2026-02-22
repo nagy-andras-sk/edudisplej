@@ -149,6 +149,68 @@ try {
 
 $total_pages = max(1, (int)ceil($total_logs / $per_page));
 
+function edudisplej_format_payload_for_view($payload): string
+{
+    if ($payload === null) {
+        return '—';
+    }
+
+    $raw = trim((string)$payload);
+    if ($raw === '') {
+        return '—';
+    }
+
+    $decoded = json_decode($raw, true);
+    if (json_last_error() === JSON_ERROR_NONE) {
+        $pretty = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return $pretty !== false ? $pretty : $raw;
+    }
+
+    if (strpos($raw, '=') !== false && strpos($raw, '{') === false && strpos($raw, '[') === false) {
+        parse_str($raw, $parsed);
+        if (!empty($parsed)) {
+            $pretty = json_encode($parsed, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return $pretty !== false ? $pretty : $raw;
+        }
+    }
+
+    return $raw;
+}
+
+function edudisplej_extract_get_params(array $log): array
+{
+    $params = [];
+    $endpoint = (string)($log['endpoint'] ?? '');
+
+    if ($endpoint !== '') {
+        $query = (string)parse_url($endpoint, PHP_URL_QUERY);
+        if ($query !== '') {
+            parse_str($query, $params);
+        }
+    }
+
+    if (!empty($params)) {
+        return $params;
+    }
+
+    if (strtoupper((string)($log['method'] ?? '')) !== 'GET') {
+        return [];
+    }
+
+    $requestDataRaw = trim((string)($log['request_data'] ?? ''));
+    if ($requestDataRaw === '') {
+        return [];
+    }
+
+    $decoded = json_decode($requestDataRaw, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        return $decoded;
+    }
+
+    parse_str($requestDataRaw, $parsed);
+    return is_array($parsed) ? $parsed : [];
+}
+
 include 'header.php';
 ?>
 
@@ -214,15 +276,24 @@ include 'header.php';
                     <th>Status</th>
                     <th>IP</th>
                     <th>Exec ms</th>
+                    <th>Reszletek</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($logs)): ?>
                     <tr>
-                        <td colspan="9" class="muted">Nincs log.</td>
+                        <td colspan="10" class="muted">Nincs log.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($logs as $log): ?>
+                        <?php
+                            $get_params = edudisplej_extract_get_params($log);
+                            $formatted_get_params = empty($get_params)
+                                ? '—'
+                                : (json_encode($get_params, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '—');
+                            $formatted_request = edudisplej_format_payload_for_view($log['request_data'] ?? null);
+                            $formatted_response = edudisplej_format_payload_for_view($log['response_data'] ?? null);
+                        ?>
                         <tr>
                             <td><?php echo (int)$log['id']; ?></td>
                             <td class="nowrap"><?php echo date('Y-m-d H:i:s', strtotime($log['timestamp'])); ?></td>
@@ -233,6 +304,25 @@ include 'header.php';
                             <td><?php echo (int)$log['status_code']; ?></td>
                             <td class="mono"><?php echo htmlspecialchars($log['ip_address'] ?? '-'); ?></td>
                             <td><?php echo $log['execution_time'] !== null ? number_format((float)$log['execution_time'] * 1000, 1) : '-'; ?></td>
+                            <td>
+                                <details>
+                                    <summary style="cursor:pointer;">Megnezes</summary>
+                                    <div style="margin-top:8px; display:grid; gap:8px; min-width:420px;">
+                                        <div>
+                                            <strong>GET params:</strong>
+                                            <pre class="mono" style="white-space:pre-wrap; margin:4px 0 0; background:#f6f8fa; padding:8px; border-radius:6px;"><?php echo htmlspecialchars($formatted_get_params); ?></pre>
+                                        </div>
+                                        <div>
+                                            <strong>Request:</strong>
+                                            <pre class="mono" style="white-space:pre-wrap; margin:4px 0 0; background:#f6f8fa; padding:8px; border-radius:6px;"><?php echo htmlspecialchars($formatted_request); ?></pre>
+                                        </div>
+                                        <div>
+                                            <strong>Response:</strong>
+                                            <pre class="mono" style="white-space:pre-wrap; margin:4px 0 0; background:#f6f8fa; padding:8px; border-radius:6px;"><?php echo htmlspecialchars($formatted_response); ?></pre>
+                                        </div>
+                                    </div>
+                                </details>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>

@@ -121,6 +121,180 @@ function cleanupModuleFilesystem(string $baseDir): void {
     logResult("Cleanup: module filesystem summary - files removed: $removedFiles, folders removed: $removedDirs", 'info');
 }
 
+function edudisplej_maintenance_asset_url_to_api(string $value): string {
+    $raw = trim($value);
+    if ($raw === '') {
+        return $value;
+    }
+
+    if (stripos($raw, 'module_asset_file.php') !== false) {
+        return $value;
+    }
+
+    $candidate = $raw;
+    if (preg_match('/^https?:\/\//i', $candidate)) {
+        $parsedPath = (string)parse_url($candidate, PHP_URL_PATH);
+        if ($parsedPath !== '') {
+            $candidate = $parsedPath;
+        }
+    } else {
+        $parsedPath = (string)parse_url($candidate, PHP_URL_PATH);
+        if ($parsedPath !== '') {
+            $candidate = $parsedPath;
+        }
+    }
+
+    $candidate = urldecode($candidate);
+    $candidate = str_replace('\\', '/', $candidate);
+
+    $needle = 'uploads/companies/';
+    $idx = stripos($candidate, $needle);
+    if ($idx === false) {
+        return $value;
+    }
+
+    $relPath = substr($candidate, $idx);
+    $relPath = ltrim((string)$relPath, '/');
+    $relPath = preg_replace('#/+#', '/', $relPath);
+
+    if ($relPath === '' || strpos($relPath, '..') !== false) {
+        return $value;
+    }
+
+    return '../../api/group_loop/module_asset_file.php?path=' . rawurlencode($relPath);
+}
+
+function edudisplej_maintenance_migrate_settings_payload(&$payload): bool {
+    if (!is_array($payload)) {
+        return false;
+    }
+
+    $changed = false;
+
+    foreach ($payload as $key => &$value) {
+        if (is_array($value)) {
+            if (edudisplej_maintenance_migrate_settings_payload($value)) {
+                $changed = true;
+            }
+            continue;
+        }
+
+        if (!is_string($value)) {
+            continue;
+        }
+
+        if ($key === 'pdfAssetUrl') {
+            $normalized = edudisplej_maintenance_asset_url_to_api($value);
+            if ($normalized !== $value) {
+                $value = $normalized;
+                $changed = true;
+            }
+            continue;
+        }
+
+        if ($key === 'imageUrlsJson') {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                $listChanged = false;
+                foreach ($decoded as $index => $urlItem) {
+                    if (!is_string($urlItem)) {
+                        continue;
+                    }
+                    $normalized = edudisplej_maintenance_asset_url_to_api($urlItem);
+                    if ($normalized !== $urlItem) {
+                        $decoded[$index] = $normalized;
+                        $listChanged = true;
+                    }
+                }
+                if ($listChanged) {
+                    $reencoded = json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                    if ($reencoded !== false) {
+                        $value = $reencoded;
+                        $changed = true;
+                    }
+                }
+            }
+            continue;
+        }
+
+        if ($key === 'imageUrls') {
+            continue;
+        }
+    }
+    unset($value);
+
+    if (isset($payload['imageUrls']) && is_array($payload['imageUrls'])) {
+        foreach ($payload['imageUrls'] as $idx => $urlValue) {
+            if (!is_string($urlValue)) {
+                continue;
+            }
+            $normalized = edudisplej_maintenance_asset_url_to_api($urlValue);
+            if ($normalized !== $urlValue) {
+                $payload['imageUrls'][$idx] = $normalized;
+                $changed = true;
+            }
+        }
+    }
+
+    return $changed;
+}
+
+function edudisplej_maintenance_migrate_json_column(mysqli $conn, string $table, string $idColumn, string $jsonColumn): void {
+    $sql = "SELECT $idColumn AS rec_id, $jsonColumn AS json_payload FROM $table WHERE $jsonColumn IS NOT NULL AND $jsonColumn <> '' AND $jsonColumn LIKE '%uploads/companies/%'";
+    $result = $conn->query($sql);
+    if (!$result) {
+        logError("Asset URL migration query failed for $table.$jsonColumn: " . $conn->error);
+        return;
+    }
+
+    $rowsUpdated = 0;
+    while ($row = $result->fetch_assoc()) {
+        $recordId = (int)($row['rec_id'] ?? 0);
+        $rawJson = (string)($row['json_payload'] ?? '');
+        if ($recordId <= 0 || $rawJson === '') {
+            continue;
+        }
+
+        $decoded = json_decode($rawJson, true);
+        if (!is_array($decoded)) {
+            continue;
+        }
+
+        if (!edudisplej_maintenance_migrate_settings_payload($decoded)) {
+            continue;
+        }
+
+        $encoded = json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if ($encoded === false) {
+            logError("Asset URL migration encode failed for $table.$jsonColumn id=$recordId");
+            continue;
+        }
+
+        $update = $conn->prepare("UPDATE $table SET $jsonColumn = ? WHERE $idColumn = ? LIMIT 1");
+        if (!$update) {
+            logError("Asset URL migration prepare failed for $table.$jsonColumn id=$recordId: " . $conn->error);
+            continue;
+        }
+
+        $update->bind_param('si', $encoded, $recordId);
+        if ($update->execute()) {
+            $rowsUpdated++;
+        } else {
+            logError("Asset URL migration update failed for $table.$jsonColumn id=$recordId: " . $conn->error);
+        }
+        $update->close();
+    }
+
+    logResult("Asset URL migration on $table.$jsonColumn: $rowsUpdated row(s) updated", $rowsUpdated > 0 ? 'success' : 'info');
+}
+
+function edudisplej_maintenance_migrate_legacy_asset_urls(mysqli $conn): void {
+    logResult('Starting legacy asset URL migration (uploads -> API endpoint)...', 'info');
+    edudisplej_maintenance_migrate_json_column($conn, 'kiosk_modules', 'id', 'settings');
+    edudisplej_maintenance_migrate_json_column($conn, 'kiosk_group_modules', 'id', 'settings');
+    edudisplej_maintenance_migrate_json_column($conn, 'kiosk_group_loop_plans', 'group_id', 'plan_json');
+}
+
 try {
     @set_time_limit(240);
 
@@ -238,10 +412,11 @@ try {
                 'company_id' => "int(11) DEFAULT NULL",
                 'description' => "text DEFAULT NULL",
                 'priority' => "int(11) NOT NULL DEFAULT 0",
-                'is_default' => "tinyint(1) NOT NULL DEFAULT 0"
+                'is_default' => "tinyint(1) NOT NULL DEFAULT 0",
+                'created_at' => "timestamp NOT NULL DEFAULT current_timestamp()"
             ],
             'primary_key' => 'id',
-            'unique_keys' => [],
+            'unique_keys' => ['company_id,name'],
             'foreign_keys' => [
                 'kiosk_groups_company_fk' => "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
             ]
@@ -336,6 +511,19 @@ try {
             'foreign_keys' => [
                 'kgm_group_fk' => "FOREIGN KEY (group_id) REFERENCES kiosk_groups(id) ON DELETE CASCADE",
                 'kgm_module_fk' => "FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE"
+            ]
+        ],
+        'kiosk_group_loop_plans' => [
+            'columns' => [
+                'group_id' => "int(11) NOT NULL",
+                'plan_json' => "longtext NOT NULL",
+                'plan_version' => "bigint(20) NOT NULL DEFAULT 0",
+                'updated_at' => "timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()"
+            ],
+            'primary_key' => 'group_id',
+            'unique_keys' => [],
+            'foreign_keys' => [
+                'kglp_group_fk' => "FOREIGN KEY (group_id) REFERENCES kiosk_groups(id) ON DELETE CASCADE"
             ]
         ],
         'kiosk_modules' => [
@@ -1041,6 +1229,13 @@ try {
         }
     }
 
+    // Migrate legacy stored asset URLs in module settings to protected API endpoint URLs
+    if (!defined('EDUDISPLEJ_MAINTENANCE_MIGRATE_ASSET_URLS') || EDUDISPLEJ_MAINTENANCE_MIGRATE_ASSET_URLS) {
+        edudisplej_maintenance_migrate_legacy_asset_urls($conn);
+    } else {
+        logResult('Legacy asset URL migration skipped by configuration flag', 'info');
+    }
+
     // Cleanup phase: remove unused/orphaned remnants safely
     logResult("Starting cleanup of unused remnants...", 'info');
 
@@ -1165,18 +1360,6 @@ function registerCoreModules(mysqli $conn): void {
             'is_active' => 1
         ],
         [
-            'module_key' => 'datetime',
-            'name' => 'Dátum és Óra',
-            'description' => 'Dátum és óra kombinált megjelenítés',
-            'is_active' => 1
-        ],
-        [
-            'module_key' => 'dateclock',
-            'name' => 'Dátum-Óra',
-            'description' => 'Dátum és óra egy modulban',
-            'is_active' => 1
-        ],
-        [
             'module_key' => 'default-logo',
             'name' => 'Alapértelmezett logó',
             'description' => 'Egyedi logó vagy szöveg megjelenítés',
@@ -1192,6 +1375,18 @@ function registerCoreModules(mysqli $conn): void {
             'module_key' => 'pdf',
             'name' => 'PDF Megjelenítő',
             'description' => 'PDF dokumentumok kijelzése és navigációja',
+            'is_active' => 1
+        ],
+        [
+            'module_key' => 'image-gallery',
+            'name' => 'Képgaléria',
+            'description' => 'Több kép megjelenítése slideshow vagy kollázs módokban',
+            'is_active' => 1
+        ],
+        [
+            'module_key' => 'video',
+            'name' => 'Videó lejátszó',
+            'description' => 'Optimalizált MP4 videó lejátszása gyenge hardveren',
             'is_active' => 1
         ],
         [

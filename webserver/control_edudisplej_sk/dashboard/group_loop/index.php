@@ -125,6 +125,25 @@ try {
 $group_loop_modules_catalog = array_values(array_merge($available_modules, $unconfigured_module ? [$unconfigured_module] : []));
 $group_loop_css_version = (string)(@filemtime(__DIR__ . '/assets/css/app.css') ?: time());
 $group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: time());
+
+function edudisplej_group_loop_module_emoji(string $moduleKey): string {
+    $key = strtolower(trim($moduleKey));
+    $map = [
+        'clock' => '🕒',
+        'datetime' => '🕒',
+        'default-logo' => '🏷️',
+        'text' => '📝',
+        'pdf' => '📄',
+        'image-gallery' => '🖼️',
+        'gallery' => '🖼️',
+        'video' => '🎬',
+        'weather' => '🌤️',
+        'rss' => '📰',
+        'unconfigured' => '⚙️',
+    ];
+
+    return $map[$key] ?? '🧩';
+}
 ?>
 <?php include '../../admin/header.php'; ?>
     <link rel="stylesheet" href="assets/css/app.css?v=<?php echo rawurlencode($group_loop_css_version); ?>">
@@ -1092,31 +1111,40 @@ $group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: t
 
                                 <?php if (!$is_default_group): ?>
                                     <?php foreach ($available_modules as $module): ?>
-                                        <div class="module-item"
+                                        <?php $module_key = (string)($module['module_key'] ?? ''); ?>
+                                        <div class="module-item is-collapsed"
                                             data-module-id="<?php echo (int)$module['id']; ?>"
+                                            data-module-key="<?php echo htmlspecialchars($module_key, ENT_QUOTES, 'UTF-8'); ?>"
                                             data-module-name="<?php echo htmlspecialchars((string)$module['name'], ENT_QUOTES, 'UTF-8'); ?>"
                                             data-module-desc="<?php echo htmlspecialchars((string)($module['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
                                             <?php if (!$is_content_only_mode): ?>
                                                 draggable="true"
                                             <?php endif; ?>
                                         >
-                                            <div class="module-name"><?php echo htmlspecialchars($module['name']); ?></div>
+                                            <div class="module-item-head">
+                                                <div class="module-name"><span class="module-icon"><?php echo htmlspecialchars(edudisplej_group_loop_module_emoji($module_key)); ?></span><?php echo htmlspecialchars($module['name']); ?></div>
+                                                <button type="button" class="module-toggle-btn" aria-expanded="false" title="Leírás nyitása/zárása">▾</button>
+                                            </div>
                                             <div class="module-desc"><?php echo htmlspecialchars($module['description'] ?? ''); ?></div>
                                         </div>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
 
                                 <?php if ($unconfigured_module): ?>
-                                    <div id="unconfiguredModuleItem" class="module-item"
+                                    <div id="unconfiguredModuleItem" class="module-item is-collapsed"
                                         style="display: <?php echo $is_default_group ? 'block' : 'none'; ?>;"
                                         data-module-id="<?php echo (int)$unconfigured_module['id']; ?>"
+                                        data-module-key="<?php echo htmlspecialchars((string)($unconfigured_module['module_key'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
                                         data-module-name="<?php echo htmlspecialchars((string)$unconfigured_module['name'], ENT_QUOTES, 'UTF-8'); ?>"
                                         data-module-desc="<?php echo htmlspecialchars((string)($unconfigured_module['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
                                         <?php if (!$is_default_group && !$is_content_only_mode): ?>
                                             draggable="true"
                                         <?php endif; ?>
                                     >
-                                        <div class="module-name"><?php echo htmlspecialchars($unconfigured_module['name']); ?></div>
+                                        <div class="module-item-head">
+                                            <div class="module-name"><span class="module-icon"><?php echo htmlspecialchars(edudisplej_group_loop_module_emoji((string)($unconfigured_module['module_key'] ?? 'unconfigured'))); ?></span><?php echo htmlspecialchars($unconfigured_module['name']); ?></div>
+                                            <button type="button" class="module-toggle-btn" aria-expanded="false" title="Leírás nyitása/zárása">▾</button>
+                                        </div>
                                         <div class="module-desc"><?php echo htmlspecialchars($unconfigured_module['description'] ?? 'Technikai modul – csak üres loop esetén.'); ?></div>
                                     </div>
                                 <?php endif; ?>
@@ -1336,6 +1364,8 @@ $group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: t
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
     </script>
     <script src="assets/js/modules/pdf.js?v=<?php echo rawurlencode($group_loop_js_version); ?>"></script>
+    <script src="assets/js/modules/gallery.js?v=<?php echo rawurlencode($group_loop_js_version); ?>"></script>
+    <script src="assets/js/modules/video.js?v=<?php echo rawurlencode($group_loop_js_version); ?>"></script>
     <script src="assets/js/app.js?v=<?php echo rawurlencode($group_loop_js_version); ?>"></script>
     <?php if (false): ?>
     
@@ -3679,30 +3709,6 @@ $group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: t
                     showSeconds: true,
                     language: 'hu'
                 },
-                'datetime': {
-                    type: 'digital',
-                    format: '24h',
-                    dateFormat: 'full',
-                    timeColor: '#ffffff',
-                    dateColor: '#ffffff',
-                    bgColor: '#1e40af',
-                    fontSize: 120,
-                    clockSize: 300,
-                    showSeconds: true,
-                    language: 'hu'
-                },
-                'dateclock': {
-                    type: 'digital',
-                    format: '24h',
-                    dateFormat: 'full',
-                    timeColor: '#ffffff',
-                    dateColor: '#ffffff',
-                    bgColor: '#1e40af',
-                    fontSize: 120,
-                    clockSize: 300,
-                    showSeconds: true,
-                    language: 'hu'
-                },
                 'default-logo': {
                     text: 'EDUDISPLEJ',
                     fontSize: 120,
@@ -3723,7 +3729,7 @@ $group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: t
             let formHtml = '';
             
             // Generate form based on module type
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 formHtml = `
                     <div style="display: grid; gap: 15px;">
                         <div>
@@ -4178,7 +4184,7 @@ $group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: t
             const newSettings = {};
             
             // Collect all settings from form
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 newSettings.type = document.getElementById('setting-type')?.value || 'digital';
                 newSettings.format = document.getElementById('setting-format')?.value || '24h';
                 newSettings.dateFormat = document.getElementById('setting-dateFormat')?.value || 'full';
@@ -4411,9 +4417,7 @@ $group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: t
             // Determine module path
             switch(moduleKey) {
                 case 'clock':
-                case 'datetime':
-                case 'dateclock':
-                    baseUrl = '../modules/datetime/m_datetime.html';
+                    baseUrl = '../modules/clock/m_clock.html';
                     // Add all clock settings as URL parameters
                     if (settings.type) params.append('type', settings.type);
                     if (settings.format) params.append('format', settings.format);
@@ -4464,7 +4468,7 @@ $group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: t
             const moduleKey = item.module_key || getModuleKeyById(item.module_id);
             const settings = item.settings || {};
 
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 const type = settings.type === 'analog' ? 'Analóg' : 'Digitális';
                 const details = [type];
 

@@ -137,30 +137,6 @@ const GroupLoopUtils = (() => {
                 showSeconds: true,
                 language: 'hu'
             },
-            'datetime': {
-                type: 'digital',
-                format: '24h',
-                dateFormat: 'full',
-                timeColor: '#ffffff',
-                dateColor: '#ffffff',
-                bgColor: '#000000',
-                fontSize: 120,
-                clockSize: 300,
-                showSeconds: true,
-                language: 'hu'
-            },
-            'dateclock': {
-                type: 'digital',
-                format: '24h',
-                dateFormat: 'full',
-                timeColor: '#ffffff',
-                dateColor: '#ffffff',
-                bgColor: '#000000',
-                fontSize: 120,
-                clockSize: 300,
-                showSeconds: true,
-                language: 'hu'
-            },
             'default-logo': {
                 text: 'EDUDISPLEJ',
                 fontSize: 120,

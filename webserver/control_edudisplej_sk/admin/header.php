@@ -45,6 +45,7 @@ if (isset($_SESSION['user_id'])) {
 }
 
 $is_admin_user = !empty($_SESSION['isadmin']);
+$is_admin_acting_company = $is_admin_user && !empty($_SESSION['admin_acting_company_id']);
 $current_user_role = edudisplej_get_session_role();
 $current_lang = edudisplej_apply_language_preferences();
 
@@ -54,20 +55,22 @@ $current_file = preg_replace('/[^a-zA-Z0-9._-]/', '', basename($_SERVER['PHP_SEL
 
 // Admin nav page map: filename => label
 $admin_nav_pages = [
-    'dashboard.php'       => ['href' => 'dashboard.php',      'label' => 'Dashboard'],
-    'companies.php'       => ['href' => 'companies.php',       'label' => 'Institutions'],
-    'modules.php'         => ['href' => 'modules.php',         'label' => 'Modules'],
-    'users.php'           => ['href' => 'users.php',           'label' => 'Users'],
+    'dashboard.php'       => ['href' => 'dashboard.php',      'label' => t_def('nav.admin.dashboard', 'Dashboard')],
+    'companies.php'       => ['href' => 'companies.php',       'label' => t_def('nav.admin.companies', 'Institutions')],
+    'modules.php'         => ['href' => 'modules.php',         'label' => t_def('nav.admin.modules', 'Modules')],
+    'users.php'           => ['href' => 'users.php',           'label' => t_def('nav.admin.users', 'Users')],
+    'archived_users.php'  => ['href' => 'archived_users.php',  'label' => t_def('nav.admin.archived_users', 'Archived Users')],
+    'kiosk_migrations.php'=> ['href' => 'kiosk_migrations.php','label' => t_def('nav.admin.kiosk_migrations', 'Kiosk Migration')],
     'translations.php'    => ['href' => 'translations.php',    'label' => t('nav.translations')],
     'settings.php'        => ['href' => '../dashboard/settings.php', 'label' => t('nav.settings')],
-    'kiosk_health.php'    => ['href' => 'kiosk_health.php',    'label' => 'Kiosk Health'],
-    'module_licenses.php' => ['href' => 'module_licenses.php', 'label' => 'Module Licenses'],
-    'licenses.php'        => ['href' => 'licenses.php',        'label' => 'Institution Licenses'],
-    'services.php'        => ['href' => 'services.php',        'label' => 'Service Updates'],
-    'email_settings.php'  => ['href' => 'email_settings.php',  'label' => 'Email Settings'],
-    'email_templates.php' => ['href' => 'email_templates.php', 'label' => 'Email Templates'],
-    'api_logs.php'        => ['href' => 'api_logs.php',        'label' => 'API Logs'],
-    'security_logs.php'   => ['href' => 'security_logs.php',   'label' => 'Security Logs'],
+    'kiosk_health.php'    => ['href' => 'kiosk_health.php',    'label' => t_def('nav.admin.kiosk_health', 'Kiosk Health')],
+    'module_licenses.php' => ['href' => 'module_licenses.php', 'label' => t_def('nav.admin.module_licenses', 'Module Licenses')],
+    'licenses.php'        => ['href' => 'licenses.php',        'label' => t_def('nav.admin.licenses', 'Institution Licenses')],
+    'services.php'        => ['href' => 'services.php',        'label' => t_def('nav.admin.services', 'Service Updates')],
+    'email_settings.php'  => ['href' => 'email_settings.php',  'label' => t_def('nav.admin.email_settings', 'Email Settings')],
+    'email_templates.php' => ['href' => 'email_templates.php', 'label' => t_def('nav.admin.email_templates', 'Email Templates')],
+    'api_logs.php'        => ['href' => 'api_logs.php',        'label' => t_def('nav.admin.api_logs', 'API Logs')],
+    'security_logs.php'   => ['href' => 'security_logs.php',   'label' => t_def('nav.admin.security_logs', 'Security Logs')],
 ];
 
 // Dashboard nav page map
@@ -121,20 +124,23 @@ if (!isset($breadcrumb_items) || !is_array($breadcrumb_items)) {
     <div class="header">
         <h1>EDUDISPLEJ</h1>
         <div class="header-nav">
-            <div class="header-user">
-                <?php 
+            <?php
                 $current_user = $_SESSION['username'] ?? 'Felhasználó';
                 $company_display = $company_name ?? '';
-                ?>
+                $header_user_href = $is_admin_user
+                    ? ($app_root_prefix . 'admin/companies.php')
+                    : ($app_root_prefix . 'dashboard/profile.php');
+            ?>
+            <a href="<?php echo htmlspecialchars($header_user_href); ?>" class="header-user" style="text-decoration:none;color:inherit;cursor:pointer;">
                 👤 <strong><?php echo htmlspecialchars($current_user); ?></strong>
                 <?php if ($company_display): ?>
                     <span style="color: rgba(255,255,255,0.6);">(<?php echo htmlspecialchars($company_display); ?>)</span>
                 <?php endif; ?>
-            </div>
+            </a>
             
             <div class="header-links">
                 <!-- Dashboard navigation for company users -->
-                <?php if (!$is_admin_user && strpos($_SERVER['PHP_SELF'], 'dashboard') !== false): ?>
+                <?php if (strpos($_SERVER['PHP_SELF'], 'dashboard') !== false && (!$is_admin_user || $is_admin_acting_company)): ?>
                     <?php foreach ($dashboard_nav_pages as $page_file => $page): ?>
                         <a href="<?php echo htmlspecialchars($dashboard_prefix . $page['href']); ?>" class="header-link<?php echo $current_file === $page_file ? ' active' : ''; ?>">
                             <?php echo htmlspecialchars($page['label']); ?>
@@ -153,7 +159,25 @@ if (!isset($breadcrumb_items) || !is_array($breadcrumb_items)) {
     <?php if ($is_admin_user): ?>
         <div class="admin-nav">
             <?php foreach ($admin_nav_pages as $page_file => $page): ?>
-                <a href="<?php echo htmlspecialchars($page['href']); ?>"<?php echo $current_file === $page_file ? ' class="active"' : ''; ?>>
+                <?php
+                    $admin_href = (string)($page['href'] ?? '');
+                    if ($admin_href !== '' && preg_match('#^(?:https?:)?//#i', $admin_href) !== 1 && strpos($admin_href, '#') !== 0) {
+                        if (strpos($admin_href, '../dashboard/') === 0) {
+                            $admin_href = $app_root_prefix . 'dashboard/' . substr($admin_href, strlen('../dashboard/'));
+                        } elseif (strpos($admin_href, 'dashboard/') === 0) {
+                            $admin_href = $app_root_prefix . $admin_href;
+                        } elseif (strpos($admin_href, '../admin/') === 0) {
+                            $admin_href = $app_root_prefix . 'admin/' . substr($admin_href, strlen('../admin/'));
+                        } elseif (strpos($admin_href, 'admin/') === 0) {
+                            $admin_href = $app_root_prefix . $admin_href;
+                        } elseif (strpos($admin_href, '/') === false) {
+                            $admin_href = $app_root_prefix . 'admin/' . $admin_href;
+                        } else {
+                            $admin_href = $app_root_prefix . ltrim($admin_href, './');
+                        }
+                    }
+                ?>
+                <a href="<?php echo htmlspecialchars($admin_href); ?>"<?php echo $current_file === $page_file ? ' class="active"' : ''; ?>>
                     <?php echo htmlspecialchars($page['label']); ?>
                 </a>
             <?php endforeach; ?>

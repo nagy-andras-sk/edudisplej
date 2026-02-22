@@ -17,8 +17,6 @@ APT_LOG="${EDUDISPLEJ_HOME}/apt.log"
 
 # Export kornyezeti valtozok -- Export premennych prostredia
 export DISPLAY=:0
-export HOME="${EDUDISPLEJ_HOME}"
-export USER="edudisplej"
 
 # Log fajl tisztitas -- Cistenie log suboru
 if [[ -f "$SESSION_LOG" ]]; then
@@ -26,8 +24,13 @@ if [[ -f "$SESSION_LOG" ]]; then
 fi
 
 # Kimenet atiranyitas log fajlba -- Presmerovanie vystupu do log suboru
-# Log to file only (not exec to avoid looping)
+# Log to file and, when available, mirror to tty1 for live on-screen progress
 LOG_FILE="${SESSION_LOG}"
+TTY_OUTPUT="/dev/null"
+if [[ -w /dev/tty1 ]]; then
+    TTY_OUTPUT="/dev/tty1"
+fi
+
 {
 echo "==========================================="
 echo "      E D U D I S P L E J"
@@ -177,6 +180,10 @@ read_kiosk_preferences() {
 
 echo ""
 read_kiosk_preferences
+# Align runtime env with detected console user
+export HOME="$USER_HOME"
+export USER="$CONSOLE_USER"
+export XAUTHORITY="$USER_HOME/.Xauthority"
 echo ""
 
 # =============================================================================
@@ -184,8 +191,11 @@ echo ""
 # =============================================================================
 
 print_info "Internet ellenorzese -- Kontrola internetu..."
-wait_for_internet
-INTERNET_AVAILABLE=$?
+if wait_for_internet; then
+    INTERNET_AVAILABLE=0
+else
+    INTERNET_AVAILABLE=1
+fi
 
 if [[ $INTERNET_AVAILABLE -eq 0 ]]; then
     print_success "✓ Internet elerheto -- Internet je dostupny"
@@ -223,7 +233,6 @@ echo ""
 REQUIRED_PACKAGES=(
     openbox
     xinit
-    xterm
     unclutter
     curl
     x11-utils
@@ -470,4 +479,4 @@ print_success "=========================================="
 print_success "Setup complete! Reboot to start terminal"
 print_success "=========================================="
 exit 0
-} >> "$LOG_FILE" 2>&1
+} 2>&1 | tee -a "$LOG_FILE" > "$TTY_OUTPUT"

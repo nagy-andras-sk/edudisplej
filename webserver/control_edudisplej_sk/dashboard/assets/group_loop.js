@@ -2834,30 +2834,6 @@
                     showSeconds: true,
                     language: 'hu'
                 },
-                'datetime': {
-                    type: 'digital',
-                    format: '24h',
-                    dateFormat: 'full',
-                    timeColor: '#ffffff',
-                    dateColor: '#ffffff',
-                    bgColor: '#1e40af',
-                    fontSize: 120,
-                    clockSize: 300,
-                    showSeconds: true,
-                    language: 'hu'
-                },
-                'dateclock': {
-                    type: 'digital',
-                    format: '24h',
-                    dateFormat: 'full',
-                    timeColor: '#ffffff',
-                    dateColor: '#ffffff',
-                    bgColor: '#1e40af',
-                    fontSize: 120,
-                    clockSize: 300,
-                    showSeconds: true,
-                    language: 'hu'
-                },
                 'default-logo': {
                     text: 'EDUDISPLEJ',
                     fontSize: 120,
@@ -2878,7 +2854,7 @@
             let formHtml = '';
             
             // Generate form based on module type
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 formHtml = `
                     <div style="display: grid; gap: 15px;">
                         <div>
@@ -3090,7 +3066,7 @@
             const newSettings = {};
             
             // Collect all settings from form
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 newSettings.type = document.getElementById('setting-type')?.value || 'digital';
                 newSettings.format = document.getElementById('setting-format')?.value || '24h';
                 newSettings.dateFormat = document.getElementById('setting-dateFormat')?.value || 'full';
@@ -3306,9 +3282,7 @@
             // Determine module path
             switch(moduleKey) {
                 case 'clock':
-                case 'datetime':
-                case 'dateclock':
-                    baseUrl = '../modules/datetime/m_datetime.html';
+                    baseUrl = '../modules/clock/m_clock.html';
                     // Add all clock settings as URL parameters
                     if (settings.type) params.append('type', settings.type);
                     if (settings.format) params.append('format', settings.format);
@@ -3359,7 +3333,7 @@
             const moduleKey = item.module_key || getModuleKeyById(item.module_id);
             const settings = item.settings || {};
 
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 const type = settings.type === 'analog' ? 'Analóg' : 'Digitális';
                 const details = [type];
 

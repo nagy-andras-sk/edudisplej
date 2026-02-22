@@ -20,6 +20,7 @@
 session_start();
 header('Content-Type: application/json');
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 require_once 'auth.php';
 
 $response = ['success' => false, 'message' => ''];
@@ -43,7 +44,7 @@ try {
     $ttl       = max(5, min(300, intval($data['ttl_seconds'] ?? 60)));
 
     if ($kiosk_id <= 0) {
-        $response['message'] = 'kiosk_id required';
+        $response['message'] = t_def('api.screenshot_request.kiosk_id_required', 'kiosk_id required');
         echo json_encode($response);
         exit;
     }
@@ -58,7 +59,7 @@ try {
     $stmt->close();
 
     if (!$kiosk) {
-        $response['message'] = 'Kiosk not found';
+        $response['message'] = t_def('api.common.kiosk_not_found', 'Kiosk not found');
         echo json_encode($response);
         $conn->close();
         exit;
@@ -70,7 +71,7 @@ try {
     } elseif (!empty($session_company_id) && empty($is_admin)) {
         if ((int)$session_company_id !== (int)$kiosk['company_id']) {
             http_response_code(403);
-            $response['message'] = 'Unauthorized';
+            $response['message'] = t_def('api.common.unauthorized', 'Unauthorized');
             echo json_encode($response);
             $conn->close();
             exit;
@@ -88,7 +89,7 @@ try {
 
         $response['success'] = true;
         $response['screenshot_requested_until'] = null;
-        $response['message'] = 'Screenshot request cleared';
+        $response['message'] = t_def('api.screenshot_request.cleared', 'Screenshot request cleared');
     } else {
         // Set / extend TTL
         $upd = $conn->prepare(
@@ -117,7 +118,7 @@ try {
     $conn->close();
 
 } catch (Exception $e) {
-    $response['message'] = 'Server error';
+    $response['message'] = t_def('api.common.server_error', 'Server error');
     error_log('screenshot_request.php: ' . $e->getMessage());
 }
 

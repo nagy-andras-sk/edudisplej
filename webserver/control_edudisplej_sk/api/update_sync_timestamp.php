@@ -5,6 +5,7 @@
  */
 
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 require_once 'auth.php';
 
 header('Content-Type: application/json');
@@ -22,7 +23,7 @@ try {
     $loop_last_update = $data['loop_last_update'] ?? null;
     
     if (empty($mac)) {
-        $response['message'] = 'MAC address required';
+        $response['message'] = t_def('api.update_sync_timestamp.mac_required', 'MAC address required');
         echo json_encode($response);
         exit;
     }
@@ -38,7 +39,7 @@ try {
     $kiosk_lookup->close();
 
     if (!$kiosk_row) {
-        $response['message'] = 'Kiosk not found';
+        $response['message'] = t_def('api.common.kiosk_not_found', 'Kiosk not found');
         echo json_encode($response);
         exit;
     }
@@ -58,16 +59,16 @@ try {
     
     if ($conn->affected_rows > 0) {
         $response['success'] = true;
-        $response['message'] = 'Sync timestamp updated';
+        $response['message'] = t_def('api.update_sync_timestamp.updated', 'Sync timestamp updated');
     } else {
-        $response['message'] = 'Kiosk not found';
+        $response['message'] = t_def('api.common.kiosk_not_found', 'Kiosk not found');
     }
     
     $stmt->close();
     closeDbConnection($conn);
     
 } catch (Exception $e) {
-    $response['message'] = 'Server error: ' . $e->getMessage();
+    $response['message'] = t_def('api.common.server_error', 'Server error') . ': ' . $e->getMessage();
     error_log($e->getMessage());
 }
 

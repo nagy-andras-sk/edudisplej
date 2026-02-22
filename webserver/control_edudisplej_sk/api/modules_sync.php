@@ -4,6 +4,7 @@ header('Content-Type: application/json');
 require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
 require_once '../logging.php';
+require_once '../modules/module_asset_service.php';
 
 // Validate API authentication for device requests
 $api_company = validate_api_token();
@@ -162,6 +163,60 @@ function edudisplej_resolve_active_time_block_id(mysqli $conn, int $group_id): a
     }
 
     return ['has_blocks' => true, 'active_block_id' => null];
+}
+
+function edudisplej_optimize_module_settings_for_sync(string $module_key, $settings): array {
+    $normalized = is_array($settings) ? $settings : [];
+    $key = strtolower(trim($module_key));
+    $requestToken = edudisplej_current_request_api_token();
+
+    if ($key === 'pdf') {
+        $assetId = (int)($normalized['pdfAssetId'] ?? 0);
+        $assetUrl = trim((string)($normalized['pdfAssetUrl'] ?? ''));
+        if ($assetId > 0) {
+            $normalized['pdfAssetUrl'] = edudisplej_module_asset_api_url_by_id($assetId, $requestToken);
+        } else {
+            $normalized['pdfAssetUrl'] = edudisplej_module_asset_normalize_url_for_api($assetUrl, $requestToken);
+        }
+
+        $assetUrl = trim((string)($normalized['pdfAssetUrl'] ?? ''));
+        if ($assetUrl !== '' && array_key_exists('pdfDataBase64', $normalized)) {
+            $normalized['pdfDataBase64'] = '';
+        }
+        return $normalized;
+    }
+
+    if ($key === 'image-gallery' || $key === 'gallery') {
+        $raw = (string)($normalized['imageUrlsJson'] ?? '[]');
+        $parsed = json_decode($raw, true);
+        if (is_array($parsed)) {
+            $clean = [];
+            foreach ($parsed as $item) {
+                $value = trim((string)$item);
+                if ($value !== '') {
+                    $normalizedValue = edudisplej_module_asset_normalize_url_for_api($value, $requestToken);
+                    $clean[] = $normalizedValue !== '' ? $normalizedValue : $value;
+                }
+                if (count($clean) >= 10) {
+                    break;
+                }
+            }
+            $normalized['imageUrlsJson'] = json_encode($clean, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+    }
+
+    if ($key === 'video') {
+        $assetId = (int)($normalized['videoAssetId'] ?? 0);
+        $assetUrl = trim((string)($normalized['videoAssetUrl'] ?? ''));
+        if ($assetId > 0) {
+            $normalized['videoAssetUrl'] = edudisplej_module_asset_api_url_by_id($assetId, $requestToken);
+        } else {
+            $normalized['videoAssetUrl'] = edudisplej_module_asset_normalize_url_for_api($assetUrl, $requestToken);
+        }
+        return $normalized;
+    }
+
+    return $normalized;
 }
 
 try {
@@ -416,6 +471,7 @@ try {
             if (!empty($row['settings'])) {
                 $settings = json_decode($row['settings'], true) ?? [];
             }
+            $settings = edudisplej_optimize_module_settings_for_sync((string)($row['module_key'] ?? ''), $settings);
             $duration = (int)$row['duration_seconds'];
             if (($row['module_key'] ?? '') === 'unconfigured') {
                 $duration = 60;
@@ -463,6 +519,7 @@ try {
             if (!empty($row['settings'])) {
                 $settings = json_decode($row['settings'], true) ?? [];
             }
+            $settings = edudisplej_optimize_module_settings_for_sync((string)($row['module_key'] ?? ''), $settings);
             $duration = (int)$row['duration_seconds'];
             if (($row['module_key'] ?? '') === 'unconfigured') {
                 $duration = 60;

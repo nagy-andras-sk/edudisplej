@@ -178,8 +178,25 @@ wait_for_enter() {
 
 # Pomocne funkcie / Segito funkciok
 check_internet() {
-    ping -c 1 -W 5 google.com &> /dev/null
-    return $?
+    local net_check_urls=(
+        "${EDUDISPLEJ_NET_CHECK_URL:-https://control.edudisplej.sk/api/health.php}"
+        "https://install.edudisplej.sk/init/download.php?health=1"
+    )
+
+    if command -v curl >/dev/null 2>&1; then
+        local url
+        for url in "${net_check_urls[@]}"; do
+            if curl -fsSL --max-time 8 --connect-timeout 4 --head "$url" >/dev/null 2>&1; then
+                return 0
+            fi
+        done
+    fi
+
+    if ping -c 1 -W 3 1.1.1.1 &>/dev/null || ping -c 1 -W 3 8.8.8.8 &>/dev/null; then
+        return 0
+    fi
+
+    return 1
 }
 
 check_url() {
@@ -198,7 +215,7 @@ check_url() {
 
 
 wait_for_internet() {
-    local max_attempts=10
+    local max_attempts="${EDUDISPLEJ_NET_MAX_ATTEMPTS:-15}"
     local attempt=1
     print_info "$(t boot_waiting_network)"
     while [[ $attempt -le $max_attempts ]]; do

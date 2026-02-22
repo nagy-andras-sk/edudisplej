@@ -115,6 +115,61 @@ function edudisplej_db_autofix_run(): void {
             $conn->query("UPDATE users SET user_role = 'admin' WHERE isadmin = 1");
         }
 
+        $conn->query("CREATE TABLE IF NOT EXISTS archived_users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            original_user_id INT NULL,
+            username VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            company_id INT NULL,
+            isadmin TINYINT(1) NOT NULL DEFAULT 0,
+            user_role VARCHAR(32) NOT NULL DEFAULT 'user',
+            otp_enabled TINYINT(1) NOT NULL DEFAULT 0,
+            otp_verified TINYINT(1) NOT NULL DEFAULT 0,
+            otp_secret VARCHAR(255) NULL,
+            last_login DATETIME NULL,
+            original_created_at DATETIME NULL,
+            archived_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            archived_by_user_id INT NULL,
+            archive_reason VARCHAR(64) NOT NULL DEFAULT 'manual_delete',
+            archive_note TEXT NULL,
+            restored_at DATETIME NULL,
+            restored_by_user_id INT NULL,
+            restored_user_id INT NULL,
+            INDEX idx_archived_at (archived_at),
+            INDEX idx_original_user (original_user_id),
+            INDEX idx_username (username),
+            INDEX idx_company (company_id),
+            INDEX idx_restored_at (restored_at),
+            CONSTRAINT archived_users_company_fk FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL,
+            CONSTRAINT archived_users_archived_by_fk FOREIGN KEY (archived_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT archived_users_restored_by_fk FOREIGN KEY (restored_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT archived_users_restored_user_fk FOREIGN KEY (restored_user_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $conn->query("CREATE TABLE IF NOT EXISTS kiosk_migrations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            kiosk_id INT NOT NULL,
+            source_company_id INT NULL,
+            target_company_id INT NOT NULL,
+            target_api_token VARCHAR(255) NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'queued',
+            requested_by_user_id INT NULL,
+            command_queue_id INT NULL,
+            note TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            completed_at DATETIME NULL,
+            INDEX idx_kiosk (kiosk_id),
+            INDEX idx_status (status),
+            INDEX idx_target_company (target_company_id),
+            CONSTRAINT kiosk_migrations_kiosk_fk FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE,
+            CONSTRAINT kiosk_migrations_source_company_fk FOREIGN KEY (source_company_id) REFERENCES companies(id) ON DELETE SET NULL,
+            CONSTRAINT kiosk_migrations_target_company_fk FOREIGN KEY (target_company_id) REFERENCES companies(id) ON DELETE CASCADE,
+            CONSTRAINT kiosk_migrations_requested_by_fk FOREIGN KEY (requested_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT kiosk_migrations_command_fk FOREIGN KEY (command_queue_id) REFERENCES kiosk_command_queue(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
         closeDbConnection($conn);
     } catch (Throwable $e) {
         error_log('db_autofix_bootstrap: ' . $e->getMessage());

@@ -93,16 +93,6 @@ try {
             }
 
             $cid = (int)$krow['company_id'];
-            $stmt = $conn->prepare("SELECT cl.device_limit, (SELECT COUNT(*) FROM kiosks WHERE company_id=? AND license_active=1) AS used_slots FROM company_licenses cl WHERE cl.company_id=? AND cl.status='active' ORDER BY cl.valid_until DESC LIMIT 1");
-            $stmt->bind_param("ii", $cid, $cid);
-            $stmt->execute();
-            $lic = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
-
-            if ($lic && (int)$lic['used_slots'] >= (int)$lic['device_limit']) {
-                echo json_encode(['success' => false, 'message' => 'No free license slots']);
-                break;
-            }
 
             $stmt = $conn->prepare("UPDATE kiosks SET license_active = 1 WHERE id = ?");
             $stmt->bind_param("i", $kiosk_id);

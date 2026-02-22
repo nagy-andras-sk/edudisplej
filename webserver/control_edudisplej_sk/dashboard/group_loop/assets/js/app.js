@@ -46,6 +46,7 @@
         let planVersionToken = '';
         let draftPersistTimer = null;
         let isDraftDirty = false;
+        let pendingBarPromptState = null;
         let scheduleRangeSelection = null;
         let scheduleBlockResize = null;
         let scheduleGridStepMinutes = 60;
@@ -82,12 +83,45 @@
         function updatePendingSaveBar() {
             const bar = document.getElementById('pending-save-bar');
             const label = document.getElementById('pending-save-text');
+            const actions = bar?.querySelector('.pending-save-actions');
             if (!bar || !label) {
                 return;
             }
 
-            if (isDefaultGroup || !hasLoadedInitialLoop) {
+            if (!actions) {
+                return;
+            }
+
+            if (isDefaultGroup || (!hasLoadedInitialLoop && !pendingBarPromptState)) {
                 bar.style.display = 'none';
+                return;
+            }
+
+            if (pendingBarPromptState) {
+                bar.style.display = 'flex';
+                label.textContent = pendingBarPromptState.message;
+                actions.innerHTML = `
+                    <button type="button" class="btn pending-save-btn" id="pending-bar-confirm">${pendingBarPromptState.confirmLabel}</button>
+                    <button type="button" class="btn pending-discard-btn" id="pending-bar-cancel">${pendingBarPromptState.cancelLabel}</button>
+                `;
+                const confirmBtn = document.getElementById('pending-bar-confirm');
+                const cancelBtn = document.getElementById('pending-bar-cancel');
+                confirmBtn?.addEventListener('click', () => {
+                    const handler = pendingBarPromptState?.onConfirm;
+                    pendingBarPromptState = null;
+                    updatePendingSaveBar();
+                    if (typeof handler === 'function') {
+                        handler();
+                    }
+                });
+                cancelBtn?.addEventListener('click', () => {
+                    const handler = pendingBarPromptState?.onCancel;
+                    pendingBarPromptState = null;
+                    updatePendingSaveBar();
+                    if (typeof handler === 'function') {
+                        handler();
+                    }
+                });
                 return;
             }
 
@@ -96,6 +130,21 @@
             label.textContent = isDraftDirty
                 ? `Nem mentett változtatások${versionText}`
                 : `Minden változtatás mentve${versionText}`;
+            actions.innerHTML = `
+                <button type="button" class="btn pending-save-btn" onclick="publishLoopPlan()">💾 Mentés</button>
+                <button type="button" class="btn pending-discard-btn" onclick="discardLocalDraft()" title="Elvetés">✕</button>
+            `;
+        }
+
+        function showPendingBarPrompt({ message, confirmLabel = 'Igen', cancelLabel = 'Mégse', onConfirm = null, onCancel = null }) {
+            pendingBarPromptState = {
+                message: String(message || ''),
+                confirmLabel: String(confirmLabel || 'Igen'),
+                cancelLabel: String(cancelLabel || 'Mégse'),
+                onConfirm,
+                onCancel
+            };
+            updatePendingSaveBar();
         }
 
         function setDraftDirty(flag) {
@@ -196,24 +245,28 @@
                 return;
             }
 
-            const restore = confirm('Találtam nem mentett helyi piszkozatot. Betöltsem?');
-            if (!restore) {
-                setDraftDirty(true);
-                updatePendingSaveBar();
-                return;
-            }
-
-            try {
-                const payload = JSON.parse(parsed.snapshot);
-                if (applyPlanPayload(payload)) {
-                    showAutosaveToast('✓ Helyi piszkozat betöltve');
+            showPendingBarPrompt({
+                message: 'Találtam nem mentett helyi piszkozatot. Betöltsem?',
+                confirmLabel: 'Betöltés',
+                cancelLabel: 'Mégse',
+                onConfirm: () => {
+                    try {
+                        const payload = JSON.parse(parsed.snapshot);
+                        if (applyPlanPayload(payload)) {
+                            showAutosaveToast('✓ Helyi piszkozat betöltve');
+                            setDraftDirty(true);
+                        }
+                    } catch (error) {
+                        showAutosaveToast('⚠️ A helyi piszkozat sérült, törölve', true);
+                        clearDraftCache();
+                        setDraftDirty(false);
+                    }
+                },
+                onCancel: () => {
                     setDraftDirty(true);
+                    updatePendingSaveBar();
                 }
-            } catch (error) {
-                showAutosaveToast('⚠️ A helyi piszkozat sérült, törölve', true);
-                clearDraftCache();
-                setDraftDirty(false);
-            }
+            });
         }
 
         function publishLoopPlan() {
@@ -224,15 +277,18 @@
             if (!isDraftDirty) {
                 return;
             }
-            if (!confirm('Biztosan elveted a helyi módosításokat?')) {
-                return;
-            }
-
-            if (lastPublishedPayload && applyPlanPayload(lastPublishedPayload)) {
-                clearDraftCache();
-                setDraftDirty(false);
-                showAutosaveToast('✓ Helyi módosítások elvetve');
-            }
+            showPendingBarPrompt({
+                message: 'Biztosan elveted a helyi módosításokat?',
+                confirmLabel: 'Elvetés',
+                cancelLabel: 'Mégse',
+                onConfirm: () => {
+                    if (lastPublishedPayload && applyPlanPayload(lastPublishedPayload)) {
+                        clearDraftCache();
+                        setDraftDirty(false);
+                        showAutosaveToast('✓ Helyi módosítások elvetve');
+                    }
+                }
+            });
         }
 
         function normalizeDaysMask(daysMask) {
@@ -470,8 +526,22 @@
 
                 item.dataset.boundCatalogHandlers = '1';
 
+                const toggleBtn = item.querySelector('.module-toggle-btn');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        item.classList.toggle('is-collapsed');
+                        const expanded = !item.classList.contains('is-collapsed');
+                        toggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                    });
+                }
+
                 if (!isContentOnlyMode) {
-                    item.addEventListener('click', () => {
+                    item.addEventListener('click', (event) => {
+                        if (event.target && event.target.closest('.module-toggle-btn')) {
+                            return;
+                        }
                         addModuleToLoopFromDataset(item);
                     });
                 }
@@ -2320,7 +2390,8 @@
                 module_name: moduleName,
                 description: moduleDesc,
                 module_key: moduleKey || null,
-                duration_seconds: moduleKey === 'unconfigured' ? 60 : 10
+                duration_seconds: moduleKey === 'unconfigured' ? 60 : 10,
+                settings: getDefaultSettings(moduleKey || '')
             });
 
             normalizeLoopItems();
@@ -2442,6 +2513,26 @@
                 if (!moduleId || !moduleName) {
                     return;
                 }
+
+                const droppedModuleKey = getModuleKeyById(moduleId);
+                const targetLoopItem = event.target?.closest ? event.target.closest('.loop-item') : null;
+                const targetIndex = parseInt(targetLoopItem?.dataset?.index || '-1', 10);
+                const hasTarget = Number.isFinite(targetIndex) && targetIndex >= 0 && !!loopItems[targetIndex];
+
+                if (hasTarget && (droppedModuleKey === 'clock' || droppedModuleKey === 'text')) {
+                    const targetItem = loopItems[targetIndex];
+                    const targetModuleKey = targetItem?.module_key || getModuleKeyById(targetItem?.module_id);
+                    if (isOverlayCarrierModule(targetModuleKey)) {
+                        targetItem.settings = applyOverlayPresetToSettings(targetItem.settings || {}, droppedModuleKey);
+                        renderLoop();
+                        scheduleAutoSave();
+                        showAutosaveToast(droppedModuleKey === 'clock'
+                            ? '✓ Óra overlay hozzáadva a modulhoz'
+                            : '✓ Szöveg overlay hozzáadva a modulhoz');
+                        return;
+                    }
+                }
+
                 addModuleToLoop(moduleId, moduleName, moduleDesc);
             } catch (error) {
                 console.error('Invalid module drop payload', error);
@@ -2492,6 +2583,8 @@
                 return;
             }
 
+            const moduleKey = loopItems[index]?.module_key || getModuleKeyById(loopItems[index]?.module_id);
+
             if (isTechnicalLoopItem(loopItems[index])) {
                 loopItems[index].duration_seconds = 60;
                 updateTotalDuration();
@@ -2502,7 +2595,24 @@
                 return;
             }
 
-            loopItems[index].duration_seconds = parseInt(value) || 10;
+            if (moduleKey === 'video') {
+                const fixedDuration = parseInt(loopItems[index]?.settings?.videoDurationSec || 0, 10);
+                if (fixedDuration > 0) {
+                    loopItems[index].duration_seconds = fixedDuration;
+                    updateTotalDuration();
+                    scheduleAutoSave();
+                    if (loopItems.length > 0) {
+                        startPreview();
+                    }
+                }
+                return;
+            }
+
+            const parsedValue = parseInt(value, 10);
+            const safeValue = Number.isFinite(parsedValue) ? parsedValue : 10;
+            const steppedValue = Math.round(safeValue / 5) * 5;
+            const clampedValue = Math.max(5, Math.min(300, steppedValue || 10));
+            loopItems[index].duration_seconds = clampedValue;
             updateTotalDuration();
             scheduleAutoSave();
             if (loopItems.length > 0) {
@@ -2528,6 +2638,10 @@
         }
         
         function handleDrop(e) {
+            if (!draggedElement) {
+                return true;
+            }
+
             if (e.stopPropagation) {
                 e.stopPropagation();
             }
@@ -3035,44 +3149,110 @@
             const module = modules.find(m => m.id == moduleId);
             return module ? module.module_key : null;
         }
+
+        function isOverlayCarrierModule(moduleKey) {
+            return moduleKey === 'image-gallery' || moduleKey === 'gallery';
+        }
+
+        function getClockOverlayDefaults() {
+            return {
+                clockOverlayEnabled: false,
+                clockOverlayPosition: 'top',
+                clockOverlayHeightPercent: 25,
+                clockOverlayTimeColor: '#ffffff',
+                clockOverlayDateColor: '#ffffff'
+            };
+        }
+
+        function getTextOverlayDefaults() {
+            return {
+                textOverlayEnabled: false,
+                textOverlayPosition: 'bottom',
+                textOverlayHeightPercent: 20,
+                textOverlayText: 'Sem vložte text...',
+                textOverlayFontSize: 52,
+                textOverlayColor: '#ffffff',
+                textOverlaySpeedPxPerSec: 120
+            };
+        }
+
+        function ensureOverlayDefaults(settings) {
+            return {
+                ...getClockOverlayDefaults(),
+                ...getTextOverlayDefaults(),
+                ...(settings || {})
+            };
+        }
+
+        function applyOverlayPresetToSettings(settings, overlayType) {
+            const merged = ensureOverlayDefaults(settings);
+            if (overlayType === 'clock') {
+                merged.clockOverlayEnabled = true;
+            }
+            if (overlayType === 'text') {
+                merged.textOverlayEnabled = true;
+            }
+            return merged;
+        }
+
+        function appendOverlayParams(params, settings, moduleKey) {
+            if (!isOverlayCarrierModule(moduleKey)) {
+                return;
+            }
+
+            const merged = ensureOverlayDefaults(settings);
+            if (merged.clockOverlayEnabled) {
+                params.append('clockOverlayEnabled', 'true');
+                params.append('clockOverlayPosition', merged.clockOverlayPosition || 'top');
+                params.append('clockOverlayHeightPercent', String(merged.clockOverlayHeightPercent || 25));
+                params.append('clockOverlayTimeColor', merged.clockOverlayTimeColor || '#ffffff');
+                params.append('clockOverlayDateColor', merged.clockOverlayDateColor || '#ffffff');
+            }
+            if (merged.textOverlayEnabled) {
+                params.append('textOverlayEnabled', 'true');
+                params.append('textOverlayPosition', merged.textOverlayPosition || 'bottom');
+                params.append('textOverlayHeightPercent', String(merged.textOverlayHeightPercent || 20));
+                params.append('textOverlayText', merged.textOverlayText || '');
+                params.append('textOverlayFontSize', String(merged.textOverlayFontSize || 52));
+                params.append('textOverlayColor', merged.textOverlayColor || '#ffffff');
+                params.append('textOverlaySpeedPxPerSec', String(merged.textOverlaySpeedPxPerSec || 120));
+            }
+        }
+
+        function collectOverlaySettingsFromForm(baseSettings) {
+            const merged = ensureOverlayDefaults(baseSettings);
+            merged.clockOverlayEnabled = document.getElementById('setting-clockOverlayEnabled')?.checked === true;
+            merged.clockOverlayPosition = document.getElementById('setting-clockOverlayPosition')?.value || 'top';
+            merged.clockOverlayHeightPercent = Math.max(20, Math.min(40, parseInt(document.getElementById('setting-clockOverlayHeightPercent')?.value || '25', 10) || 25));
+            merged.clockOverlayTimeColor = document.getElementById('setting-clockOverlayTimeColor')?.value || '#ffffff';
+            merged.clockOverlayDateColor = document.getElementById('setting-clockOverlayDateColor')?.value || '#ffffff';
+
+            merged.textOverlayEnabled = document.getElementById('setting-textOverlayEnabled')?.checked === true;
+            merged.textOverlayPosition = document.getElementById('setting-textOverlayPosition')?.value || 'bottom';
+            merged.textOverlayHeightPercent = Math.max(12, Math.min(40, parseInt(document.getElementById('setting-textOverlayHeightPercent')?.value || '20', 10) || 20));
+            merged.textOverlayText = document.getElementById('setting-textOverlayText')?.value || 'Sem vložte text...';
+            merged.textOverlayFontSize = Math.max(18, Math.min(120, parseInt(document.getElementById('setting-textOverlayFontSize')?.value || '52', 10) || 52));
+            merged.textOverlayColor = document.getElementById('setting-textOverlayColor')?.value || '#ffffff';
+            merged.textOverlaySpeedPxPerSec = Math.max(40, Math.min(320, parseInt(document.getElementById('setting-textOverlaySpeedPxPerSec')?.value || '120', 10) || 120));
+            return merged;
+        }
         
         function getDefaultSettings(moduleKey) {
             const defaults = {
                 'clock': {
                     type: 'digital',
                     format: '24h',
-                    dateFormat: 'full',
+                    dateFormat: 'dmy',
                     timeColor: '#ffffff',
                     dateColor: '#ffffff',
                     bgColor: '#000000',
                     fontSize: 120,
+                    timeFontSize: 120,
+                    dateFontSize: 36,
                     clockSize: 300,
                     showSeconds: true,
-                    language: 'hu'
-                },
-                'datetime': {
-                    type: 'digital',
-                    format: '24h',
-                    dateFormat: 'full',
-                    timeColor: '#ffffff',
-                    dateColor: '#ffffff',
-                    bgColor: '#000000',
-                    fontSize: 120,
-                    clockSize: 300,
-                    showSeconds: true,
-                    language: 'hu'
-                },
-                'dateclock': {
-                    type: 'digital',
-                    format: '24h',
-                    dateFormat: 'full',
-                    timeColor: '#ffffff',
-                    dateColor: '#ffffff',
-                    bgColor: '#000000',
-                    fontSize: 120,
-                    clockSize: 300,
-                    showSeconds: true,
-                    language: 'hu'
+                    showDate: true,
+                    language: 'sk'
                 },
                 'default-logo': {
                     text: 'EDUDISPLEJ',
@@ -3097,9 +3277,31 @@
                     scrollStartPauseMs: 3000,
                     scrollEndPauseMs: 3000,
                     scrollSpeedPxPerSec: 35
+                },
+                'video': {
+                    videoAssetUrl: '',
+                    videoAssetId: '',
+                    videoDurationSec: 10,
+                    muted: true,
+                    fitMode: 'contain',
+                    bgColor: '#000000'
+                },
+                'image-gallery': {
+                    imageUrlsJson: '[]',
+                    displayMode: 'slideshow',
+                    fitMode: 'cover',
+                    slideIntervalSec: 5,
+                    transitionMs: 450,
+                    collageColumns: 3,
+                    bgColor: '#000000',
+                    ...getClockOverlayDefaults(),
+                    ...getTextOverlayDefaults()
                 }
             };
             
+            if (moduleKey === 'gallery') {
+                return defaults['image-gallery'];
+            }
             return defaults[moduleKey] || {};
         }
 
@@ -3313,6 +3515,9 @@
 
             const bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
             const bgImageData = document.getElementById('setting-bgImageData')?.value || '';
+            const fontFamily = document.getElementById('setting-richFontFamily')?.value || 'Arial, sans-serif';
+            const fontSize = Math.max(8, parseInt(document.getElementById('setting-richFontSize')?.value || '72', 10) || 72);
+            const lineHeight = Math.max(0.8, Math.min(2.5, parseFloat(document.getElementById('setting-richLineHeight')?.value || '1.2') || 1.2));
             const resolution = document.getElementById('setting-previewResolution')?.value || groupDefaultResolution || '1920x1080';
             const [deviceWidthRaw, deviceHeightRaw] = String(resolution).split('x').map((v) => parseInt(v, 10));
             const deviceWidth = Math.max(320, deviceWidthRaw || 1920);
@@ -3334,6 +3539,13 @@
                 duration_seconds: parseInt(document.getElementById('setting-previewDurationSec')?.value || '10', 10) || 10,
                 settings: {
                     text: sanitizedHtml || 'Sem vložte text...',
+                    fontFamily,
+                    fontSize,
+                    fontWeight: '700',
+                    fontStyle: 'normal',
+                    lineHeight,
+                    textAlign: 'left',
+                    textColor: '#ffffff',
                     bgColor,
                     bgImageData,
                     textAnimationEntry: document.getElementById('setting-textAnimationEntry')?.value || 'none',
@@ -3573,6 +3785,9 @@
                     }
                     restoreSelection();
                     applyInlineStyleToSelection('font-family', richFontFamily.value);
+                    if (editor) {
+                        editor.style.fontFamily = richFontFamily.value;
+                    }
                     saveSelection();
                     updateTextModuleMiniPreview();
                 });
@@ -3587,6 +3802,9 @@
                     restoreSelection();
                     const px = Math.max(8, parseInt(richFontSize.value || '32', 10));
                     applyInlineStyleToSelection('font-size', `${px}px`);
+                    if (editor) {
+                        editor.style.fontSize = `${px}px`;
+                    }
                     saveSelection();
                     updateTextModuleMiniPreview();
                 });
@@ -3601,6 +3819,9 @@
                     restoreSelection();
                     const value = Math.max(0.8, parseFloat(richLineHeight.value || '1.2'));
                     applyLineHeightToCurrentBlock(value);
+                    if (editor) {
+                        editor.style.lineHeight = String(value);
+                    }
                     saveSelection();
                     updateTextModuleMiniPreview();
                 });
@@ -3717,6 +3938,15 @@
                 bgStatus.textContent = 'Nincs kiválasztott kép';
             }
 
+            if (editor) {
+                const initialFontFamily = richFontFamily?.value || settings.fontFamily || 'Arial, sans-serif';
+                const initialFontSize = Math.max(8, parseInt(String(richFontSize?.value || settings.fontSize || '72'), 10) || 72);
+                const initialLineHeight = Math.max(0.8, Math.min(2.5, parseFloat(String(richLineHeight?.value || settings.lineHeight || '1.2')) || 1.2));
+                editor.style.fontFamily = initialFontFamily;
+                editor.style.fontSize = `${initialFontSize}px`;
+                editor.style.lineHeight = String(initialLineHeight);
+            }
+
             applyTextEditorBackground();
             updateTextModuleMiniPreview();
             startTextPreviewPlayback();
@@ -3725,11 +3955,12 @@
         function showCustomizationModal(item, index) {
             const moduleKey = item.module_key || getModuleKeyById(item.module_id);
             const settings = item.settings || {};
+            const overlaySettings = ensureOverlayDefaults(settings);
             
             let formHtml = '';
             
             // Generate form based on module type
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 formHtml = `
                     <div style="display: grid; gap: 15px;">
                         <div>
@@ -3752,6 +3983,7 @@
                             <select id="setting-dateFormat" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                                 <option value="full" ${settings.dateFormat === 'full' ? 'selected' : ''}>Teljes (év, hónap, nap, napnév)</option>
                                 <option value="short" ${settings.dateFormat === 'short' ? 'selected' : ''}>Rövid (év, hónap, nap)</option>
+                                <option value="dmy" ${settings.dateFormat === 'dmy' ? 'selected' : ''}>Nap.Hónap.Év (NN.HH.ÉÉÉÉ)</option>
                                 <option value="numeric" ${settings.dateFormat === 'numeric' ? 'selected' : ''}>Numerikus (ÉÉÉÉ.HH.NN)</option>
                                 <option value="none" ${settings.dateFormat === 'none' ? 'selected' : ''}>Nincs dátum</option>
                             </select>
@@ -3762,6 +3994,7 @@
                             <select id="setting-language" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                                 <option value="hu" ${settings.language === 'hu' ? 'selected' : ''}>Magyar</option>
                                 <option value="sk" ${settings.language === 'sk' ? 'selected' : ''}>Szlovák</option>
+                                <option value="en" ${settings.language === 'en' ? 'selected' : ''}>Angol</option>
                             </select>
                         </div>
                         
@@ -3783,8 +4016,16 @@
                         </div>
                         
                         <div id="digitalSettings" style="${settings.type === 'analog' ? 'display: none;' : ''}">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Betűméret (px):</label>
-                            <input type="number" id="setting-fontSize" value="${settings.fontSize || 120}" min="50" max="300" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra betűméret (px):</label>
+                                    <input type="number" id="setting-timeFontSize" value="${settings.timeFontSize || settings.fontSize || 120}" min="40" max="320" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum betűméret (px):</label>
+                                    <input type="number" id="setting-dateFontSize" value="${settings.dateFontSize || Math.max(16, Math.round((settings.timeFontSize || settings.fontSize || 120) * 0.3))}" min="14" max="180" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                                </div>
+                            </div>
                         </div>
                         
                         <div id="analogSettings" style="${settings.type === 'digital' ? 'display: none;' : ''}">
@@ -3796,6 +4037,13 @@
                             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                                 <input type="checkbox" id="setting-showSeconds" ${settings.showSeconds !== false ? 'checked' : ''} style="width: 20px; height: 20px;">
                                 <span style="font-weight: bold;">Másodpercek mutatása</span>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="setting-showDate" ${(settings.showDate !== false && settings.dateFormat !== 'none') ? 'checked' : ''} style="width: 20px; height: 20px;">
+                                <span style="font-weight: bold;">Dátum megjelenítése</span>
                             </label>
                         </div>
                     </div>
@@ -3840,6 +4088,9 @@
                 const safeTextHtml = sanitizeRichTextHtml(settings.text || '');
                 const safeTextInput = escapeHtml(safeTextHtml);
                 const safeBgImageData = escapeHtml(settings.bgImageData || '');
+                const resolvedFontFamily = String(settings.fontFamily || 'Arial, sans-serif');
+                const resolvedFontSize = Math.max(8, parseInt(settings.fontSize, 10) || 72);
+                const resolvedLineHeight = Math.max(0.8, Math.min(2.5, parseFloat(settings.lineHeight) || 1.2));
                 const scrollStartSec = Math.max(0, Math.min(5, (parseInt(settings.scrollStartPauseMs, 10) || 3000) / 1000));
                 const scrollEndSec = Math.max(0, Math.min(5, (parseInt(settings.scrollEndPauseMs, 10) || 3000) / 1000));
                 const scrollSpeed = Math.max(5, Math.min(200, parseInt(settings.scrollSpeedPxPerSec, 10) || 35));
@@ -3861,19 +4112,19 @@
                                     <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Szín <input type="color" id="setting-richColor" value="#ffffff"></label>
                                     <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Háttér <input type="color" id="setting-richBgColor" value="#ffd54f"></label>
                                     <select id="setting-richFontFamily" style="padding:4px 6px; border:1px solid #ccc; border-radius:4px; max-width:180px;">
-                                        <option value="Arial, sans-serif">Arial</option>
-                                        <option value="Verdana, sans-serif">Verdana</option>
-                                        <option value="Tahoma, sans-serif">Tahoma</option>
-                                        <option value="Trebuchet MS, sans-serif">Trebuchet</option>
-                                        <option value="Georgia, serif">Georgia</option>
-                                        <option value="Times New Roman, serif">Times New Roman</option>
-                                        <option value="Courier New, monospace">Courier New</option>
+                                        <option value="Arial, sans-serif" ${resolvedFontFamily === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option>
+                                        <option value="Verdana, sans-serif" ${resolvedFontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option>
+                                        <option value="Tahoma, sans-serif" ${resolvedFontFamily === 'Tahoma, sans-serif' ? 'selected' : ''}>Tahoma</option>
+                                        <option value="Trebuchet MS, sans-serif" ${resolvedFontFamily === 'Trebuchet MS, sans-serif' ? 'selected' : ''}>Trebuchet</option>
+                                        <option value="Georgia, serif" ${resolvedFontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option>
+                                        <option value="Times New Roman, serif" ${resolvedFontFamily === 'Times New Roman, serif' ? 'selected' : ''}>Times New Roman</option>
+                                        <option value="Courier New, monospace" ${resolvedFontFamily === 'Courier New, monospace' ? 'selected' : ''}>Courier New</option>
                                     </select>
                                     <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Méret
-                                        <input type="number" id="setting-richFontSize" value="36" min="8" max="260" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
+                                        <input type="number" id="setting-richFontSize" value="${resolvedFontSize}" min="8" max="260" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
                                     </label>
                                     <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Sorköz
-                                        <input type="number" id="setting-richLineHeight" value="1.2" min="0.8" max="2.5" step="0.1" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
+                                        <input type="number" id="setting-richLineHeight" value="${resolvedLineHeight}" min="0.8" max="2.5" step="0.1" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
                                     </label>
                                 </div>
                                 <style>
@@ -3953,13 +4204,103 @@
                     </div>
                     <input type="hidden" id="setting-previewDurationSec" value="${parseInt(item.duration_seconds || 10, 10) || 10}">
                 `;
+            } else if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
+                let galleryImages = [];
+                try {
+                    const parsed = JSON.parse(String(settings.imageUrlsJson || '[]'));
+                    galleryImages = Array.isArray(parsed)
+                        ? parsed.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+                        : [];
+                } catch (_) {
+                    galleryImages = [];
+                }
+                const safeGalleryJson = escapeHtml(JSON.stringify(galleryImages));
+
+                formHtml = `
+                    <div style="display:grid; gap:14px;">
+                        <div>
+                            <label style="display:block; margin-bottom:6px; font-weight:bold;">🖼️ Képek feltöltése</label>
+                            <div id="gallery-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
+                                <input type="file" id="gallery-file-input" accept="image/*" multiple style="display:none;">
+                                <div style="font-size:14px; color:#425466;">Húzz ide képeket vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
+                                <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Max 10 kép, képenként max 15 MB</div>
+                            </div>
+                            <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
+                                <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
+                                    <strong style="font-size:13px; color:#1f2a37;">☁️ Korábban feltöltött képek (Company Cloud)</strong>
+                                    <button type="button" id="gallery-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">Frissítés</button>
+                                </div>
+                                <div id="gallery-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">Betöltés...</div>
+                                <div id="gallery-library-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px;"></div>
+                                <button type="button" id="gallery-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">Kijelöltek importálása</button>
+                            </div>
+                            <input type="hidden" id="gallery-image-urls-json" value='${safeGalleryJson}'>
+                            <div id="gallery-upload-status" style="font-size:12px; color:#425466; margin-top:6px;"></div>
+                            <div id="gallery-upload-progress-wrap" style="display:none; margin-top:6px;">
+                                <div style="height:8px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
+                                    <div id="gallery-upload-progress-bar" style="height:100%; width:0%; background:#1e40af; transition:width .2s ease;"></div>
+                                </div>
+                                <div id="gallery-upload-progress-text" style="font-size:11px; color:#475569; margin-top:4px;">0%</div>
+                            </div>
+                            <div id="gallery-image-list" style="display:grid; gap:6px; margin-top:8px;"></div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Megjelenítési mód</label>
+                                <select id="gallery-display-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="slideshow" ${(settings.displayMode || 'slideshow') === 'slideshow' ? 'selected' : ''}>Slideshow</option>
+                                    <option value="collage" ${settings.displayMode === 'collage' ? 'selected' : ''}>Kollázs</option>
+                                    <option value="single" ${settings.displayMode === 'single' ? 'selected' : ''}>Egy kép</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Kép igazítás</label>
+                                <select id="gallery-fit-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="cover" ${(settings.fitMode || 'cover') === 'cover' ? 'selected' : ''}>Cover</option>
+                                    <option value="contain" ${settings.fitMode === 'contain' ? 'selected' : ''}>Contain</option>
+                                    <option value="fill" ${settings.fitMode === 'fill' ? 'selected' : ''}>Fill</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Slideshow váltás (s)</label>
+                                <input type="number" id="gallery-slide-interval" value="${settings.slideIntervalSec || 5}" min="1" max="30" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Transition (ms)</label>
+                                <input type="number" id="gallery-transition-ms" value="${settings.transitionMs || 450}" min="100" max="2000" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Kollázs oszlopok</label>
+                                <input type="number" id="gallery-collage-columns" value="${settings.collageColumns || 3}" min="2" max="5" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Háttérszín</label>
+                                <input type="color" id="gallery-bg-color" value="${settings.bgColor || '#000000'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                        </div>
+
+                        <div style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
+                            <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                            <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
+                                <iframe id="gallery-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
+                            </div>
+                            <div id="gallery-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${galleryImages.length ? 'none' : 'block'};">Tölts fel legalább 1 képet az előnézethez.</div>
+                        </div>
+                    </div>
+                `;
             } else if (moduleKey === 'pdf') {
                 const pdfDataBase64 = item.settings?.pdfDataBase64 || '';
+                const pdfAssetUrl = item.settings?.pdfAssetUrl || '';
                 const fileSizeKB = pdfDataBase64 ? Math.round(pdfDataBase64.length / 1024) : 0;
+                const hasPdfSource = !!pdfAssetUrl || !!pdfDataBase64;
+                const autoScrollEnabled = settings.autoScrollEnabled === true || settings.navigationMode === 'auto';
+                const pauseAtPercent = Number.isFinite(parseInt(settings.pauseAtPercent, 10))
+                    ? parseInt(settings.pauseAtPercent, 10)
+                    : -1;
                 
                 formHtml = `
                     <div style="display: grid; gap: 16px;">
-                        <!-- PDF Upload Section -->
                         <div>
                             <label style="display: block; margin-bottom: 10px; font-weight: bold;">📄 PDF Feltöltés</label>
                             <div id="pdf-upload-area" style="
@@ -3976,132 +4317,185 @@
                                     Húzd ide a PDF-et vagy <span style="color: #1e40af; font-weight: bold; text-decoration: underline;">kattints a kiválasztáshoz</span>
                                 </div>
                                 <div style="font-size: 12px; color: #8a97a6; margin-top: 8px;">Max. 50 MB</div>
-                                ${fileSizeKB > 0 ? `<div style="color: #28a745; margin-top: 8px; font-size: 13px;">✓ PDF betöltve (${fileSizeKB} KB)</div>` : ''}
+                                ${hasPdfSource ? `<div style="color: #28a745; margin-top: 8px; font-size: 13px;">✓ PDF betöltve${fileSizeKB > 0 ? ` (${fileSizeKB} KB)` : ''}</div>` : ''}
                             </div>
                         </div>
-                        
-                        <!-- Tabs for settings -->
+                        <div style="display:grid; gap:12px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fix zoom (%):</label>
+                                <input type="number" id="pdf-zoomLevel" value="${settings.zoomLevel || 100}" min="50" max="250" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                            </div>
+                            <div>
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" id="pdf-autoScrollEnabled" ${autoScrollEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
+                                    <span style="font-weight: bold;">Automatikus görgetés</span>
+                                </label>
+                            </div>
+                            <div class="pdf-scroll-settings" style="display:${autoScrollEnabled ? 'grid' : 'none'}; gap:12px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Görgetési sebesség (px/s):</label>
+                                    <input type="number" id="pdf-scrollSpeed" value="${settings.autoScrollSpeedPxPerSec || 30}" min="5" max="300" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Indulás előtti várakozás (ms):</label>
+                                    <input type="number" id="pdf-startPause" value="${settings.autoScrollStartPauseMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ciklus végi várakozás (ms):</label>
+                                    <input type="number" id="pdf-endPause" value="${settings.autoScrollEndPauseMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megállás pozíció (%):</label>
+                                    <input type="number" id="pdf-pauseAtPercent" value="${pauseAtPercent}" min="-1" max="100" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                                    <div style="font-size:12px; color:#8a97a6; margin-top:4px;">-1 = nincs köztes megállás</div>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megállás hossza (ms):</label>
+                                    <input type="number" id="pdf-pauseDurationMs" value="${settings.pauseDurationMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="pdf-preview-area" style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
+                            <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                            <div style="height:360px; overflow:auto; border:1px solid #e0e6ed; border-radius:6px; background:#fff; padding:8px;">
+                                <iframe id="pdf-live-preview-iframe" style="width:100%; height:100%; border:0; background:#fff;"></iframe>
+                            </div>
+                            <div id="pdf-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${hasPdfSource ? 'none' : 'block'};">Tölts fel PDF-et az előnézethez.</div>
+                        </div>
+                    </div>
+                `;
+            } else if (moduleKey === 'video') {
+                const durationSec = parseInt(settings.videoDurationSec || item.duration_seconds || 10, 10) || 10;
+                formHtml = `
+                    <div style="display:grid; gap:14px;">
                         <div>
-                            <div style="display: flex; gap: 8px; border-bottom: 2px solid #e0e6ed; margin-bottom: 16px;">
-                                <button type="button" class="pdf-tab-btn" data-tab="basic" style="
-                                    padding: 10px 16px;
-                                    background: none;
-                                    border: none;
-                                    cursor: pointer;
-                                    font-weight: bold;
-                                    border-bottom: 3px solid #1e40af;
-                                    color: #1e40af;
-                                ">Alap</button>
-                                <button type="button" class="pdf-tab-btn" data-tab="navigation" style="
-                                    padding: 10px 16px;
-                                    background: none;
-                                    border: none;
-                                    cursor: pointer;
-                                    font-weight: bold;
-                                    border-bottom: 3px solid transparent;
-                                    color: #607083;
-                                ">Navigáció</button>
-                                <button type="button" class="pdf-tab-btn" data-tab="advanced" style="
-                                    padding: 10px 16px;
-                                    background: none;
-                                    border: none;
-                                    cursor: pointer;
-                                    font-weight: bold;
-                                    border-bottom: 3px solid transparent;
-                                    color: #607083;
-                                ">Haladó</button>
+                            <label style="display:block; margin-bottom:6px; font-weight:bold;">🎬 Videó feltöltés (MP4)</label>
+                            <div id="video-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
+                                <input type="file" id="video-file-input" accept="video/mp4,.mp4" style="display:none;">
+                                <div style="font-size:14px; color:#425466;">Húzz ide videót vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
+                                <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Csak MP4 (H.264/AAC), max 80 MB</div>
                             </div>
-                            
-                            <!-- Basic Tab -->
-                            <div class="pdf-tab-content" data-tab="basic" style="display: grid; gap: 12px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tájolás:</label>
-                                    <select id="pdf-orientation" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                        <option value="landscape" ${settings.orientation === 'landscape' ? 'selected' : ''}>Fekvő (landscape)</option>
-                                        <option value="portrait" ${settings.orientation === 'portrait' ? 'selected' : ''}>Álló (portrait)</option>
-                                    </select>
+                            <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
+                                <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
+                                    <strong style="font-size:13px; color:#1f2a37;">☁️ Korábban feltöltött videók</strong>
+                                    <button type="button" id="video-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">Frissítés</button>
                                 </div>
-                                
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Zoom szint (%):</label>
-                                    <input type="number" id="pdf-zoomLevel" value="${settings.zoomLevel || 100}" min="50" max="400" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                </div>
-                                
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Háttérszín:</label>
-                                    <input type="color" id="pdf-bgColor" value="${settings.bgColor || '#ffffff'}" style="width: 100%; height: 40px; border: 1px solid #ccc; border-radius: 5px;">
-                                </div>
+                                <div id="video-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">Betöltés...</div>
+                                <div id="video-library-list" style="display:grid; gap:6px;"></div>
+                                <button type="button" id="video-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">Kiválasztott importálása</button>
                             </div>
-                            
-                            <!-- Navigation Tab -->
-                            <div class="pdf-tab-content" data-tab="navigation" style="display: none; gap: 12px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Navigációs mód:</label>
-                                    <select id="pdf-navigationMode" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                        <option value="manual" ${settings.navigationMode === 'manual' ? 'selected' : ''}>Manuális (gombokkal)</option>
-                                        <option value="auto" ${settings.navigationMode === 'auto' ? 'selected' : ''}>Automatikus (görgetés)</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="auto-scroll-settings" style="display: ${settings.navigationMode === 'auto' ? 'grid' : 'none'}; gap: 12px;">
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Görgetési sebesség (px/s):</label>
-                                        <input type="number" id="pdf-scrollSpeed" value="${settings.autoScrollSpeedPxPerSec || 30}" min="5" max="200" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                    </div>
-                                    
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Kezdeti várakozás (ms):</label>
-                                        <input type="number" id="pdf-startPause" value="${settings.autoScrollStartPauseMs || 2000}" min="0" max="10000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                    </div>
-                                    
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Vég várakozás (ms):</label>
-                                        <input type="number" id="pdf-endPause" value="${settings.autoScrollEndPauseMs || 2000}" min="0" max="10000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                    </div>
-                                </div>
+                            <div id="video-upload-status" style="font-size:12px; color:#425466; margin-top:8px;"></div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Kitöltés</label>
+                                <select id="video-fit-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="contain" ${(settings.fitMode || 'contain') === 'contain' ? 'selected' : ''}>Contain</option>
+                                    <option value="cover" ${settings.fitMode === 'cover' ? 'selected' : ''}>Cover</option>
+                                    <option value="fill" ${settings.fitMode === 'fill' ? 'selected' : ''}>Fill</option>
+                                </select>
                             </div>
-                            
-                            <!-- Advanced Tab -->
-                            <div class="pdf-tab-content" data-tab="advanced" style="display: none; gap: 12px;">
-                                <div>
-                                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                        <input type="checkbox" id="pdf-fixedViewMode" ${settings.fixedViewMode ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                        <span style="font-weight: bold;">Rögzített oldal mód</span>
-                                    </label>
-                                </div>
-                                
-                                <div class="fixed-page-settings" style="display: ${settings.fixedViewMode ? 'grid' : 'none'}; gap: 12px;">
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megjelenítendő oldal:</label>
-                                        <input type="number" id="pdf-fixedPage" value="${settings.fixedPage || 1}" min="1" max="999" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                        <input type="checkbox" id="pdf-showPageNumbers" ${settings.showPageNumbers !== false ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                        <span style="font-weight: bold;">Oldal számok mutatása</span>
-                                    </label>
-                                </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Némítás</label>
+                                <label style="display:flex; align-items:center; gap:8px; border:1px solid #d1d5db; border-radius:5px; padding:8px;">
+                                    <input type="checkbox" id="video-muted" ${(settings.muted !== false) ? 'checked' : ''}>
+                                    <span style="font-size:13px;">Lejátszás némítva</span>
+                                </label>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Háttérszín</label>
+                                <input type="color" id="video-bg-color" value="${settings.bgColor || '#000000'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                         </div>
-                        
-                        <!-- Preview Button -->
-                        <button type="button" style="
-                            padding: 10px 16px;
-                            background: #17a2b8;
-                            color: white;
-                            border: none;
-                            border-radius: 5px;
-                            cursor: pointer;
-                            font-weight: bold;
-                        " onclick="GroupLoopPdfModule.openPdfPreview()">
-                            👁️ Előnézet
-                        </button>
+
+                        <div id="video-duration-badge" style="padding:10px; border:1px solid #c7e7d2; background:#ecfdf3; border-radius:8px; color:#0f5132; font-size:13px;">
+                            Loop időtartam: ${durationSec} s (fix, videó hossza)
+                        </div>
+
+                        <div style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
+                            <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                            <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
+                                <iframe id="video-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
+                            </div>
+                            <div id="video-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${settings.videoAssetUrl ? 'none' : 'block'};">Tölts fel MP4 videót az előnézethez.</div>
+                        </div>
                     </div>
                 `;
             } else {
                 formHtml = '<p style="text-align: center; color: #999;">Ez a modul nem rendelkezik testreszabási lehetőségekkel.</p>';
+            }
+
+            if (isOverlayCarrierModule(moduleKey)) {
+                formHtml += `
+                    <div style="display:grid; gap:12px; margin-top:16px; border:1px solid #d6dde8; border-radius:8px; padding:12px; background:#f8fafc;">
+                        <div style="font-weight:700; color:#1f2a37;">🧩 Overlay modulok (ráhúzható óra/szöveg)</div>
+
+                        <div style="padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; display:grid; gap:10px;">
+                            <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                                <input type="checkbox" id="setting-clockOverlayEnabled" ${overlaySettings.clockOverlayEnabled ? 'checked' : ''} style="width:20px; height:20px;">
+                                <span style="font-weight:600;">Óra overlay bekapcsolása</span>
+                            </label>
+                            <div id="clockOverlaySettings" style="display:${overlaySettings.clockOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Pozíció</label>
+                                    <select id="setting-clockOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                        <option value="top" ${overlaySettings.clockOverlayPosition === 'top' ? 'selected' : ''}>FENT</option>
+                                        <option value="bottom" ${overlaySettings.clockOverlayPosition === 'bottom' ? 'selected' : ''}>LENT</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Sáv magasság (%)</label>
+                                    <input type="number" id="setting-clockOverlayHeightPercent" value="${overlaySettings.clockOverlayHeightPercent || 25}" min="20" max="40" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Óra szín</label>
+                                    <input type="color" id="setting-clockOverlayTimeColor" value="${overlaySettings.clockOverlayTimeColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Dátum szín</label>
+                                    <input type="color" id="setting-clockOverlayDateColor" value="${overlaySettings.clockOverlayDateColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; display:grid; gap:10px;">
+                            <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                                <input type="checkbox" id="setting-textOverlayEnabled" ${overlaySettings.textOverlayEnabled ? 'checked' : ''} style="width:20px; height:20px;">
+                                <span style="font-weight:600;">Szöveg overlay bekapcsolása</span>
+                            </label>
+                            <div id="textOverlaySettings" style="display:${overlaySettings.textOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Pozíció</label>
+                                    <select id="setting-textOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                        <option value="top" ${overlaySettings.textOverlayPosition === 'top' ? 'selected' : ''}>FENT</option>
+                                        <option value="bottom" ${overlaySettings.textOverlayPosition === 'bottom' ? 'selected' : ''}>LENT</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Sáv magasság (%)</label>
+                                    <input type="number" id="setting-textOverlayHeightPercent" value="${overlaySettings.textOverlayHeightPercent || 20}" min="12" max="40" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Betűméret (px)</label>
+                                    <input type="number" id="setting-textOverlayFontSize" value="${overlaySettings.textOverlayFontSize || 52}" min="18" max="120" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Szín</label>
+                                    <input type="color" id="setting-textOverlayColor" value="${overlaySettings.textOverlayColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div style="grid-column:1 / span 2;">
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Gördülési sebesség (px/s)</label>
+                                    <input type="number" id="setting-textOverlaySpeedPxPerSec" value="${overlaySettings.textOverlaySpeedPxPerSec || 120}" min="40" max="320" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div style="grid-column:1 / span 2;">
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg</label>
+                                    <input type="text" id="setting-textOverlayText" value="${escapeHtml(overlaySettings.textOverlayText || 'Sem vložte text...')}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
             }
             
             const modal = document.createElement('div');
@@ -4118,7 +4512,7 @@
                 justify-content: center;
             `;
             
-            const modalWidthStyle = moduleKey === 'text'
+            const modalWidthStyle = (moduleKey === 'text' || moduleKey === 'image-gallery' || moduleKey === 'gallery' || moduleKey === 'video')
                 ? 'max-width: 94vw; width: 94vw;'
                 : 'max-width: 600px; width: 90%;';
 
@@ -4174,10 +4568,39 @@
             // Initialize module-specific UI
             if (moduleKey === 'pdf') {
                 window.currentPdfBase64 = item.settings?.pdfDataBase64 || '';
-                window.pdfModuleSettings = { pdfDataBase64: window.currentPdfBase64 };
+                window.pdfModuleSettings = {
+                    ...item.settings,
+                    pdfDataBase64: window.currentPdfBase64
+                };
                 // Initialize PDF module UI after modal is added to DOM
                 setTimeout(() => {
                     GroupLoopPdfModule.init();
+                }, 0);
+            } else if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
+                window.galleryModuleSettings = { ...item.settings };
+                setTimeout(() => {
+                    const galleryModuleApi =
+                        window.GroupLoopGalleryModule ||
+                        (typeof GroupLoopGalleryModule !== 'undefined' ? GroupLoopGalleryModule : null);
+
+                    if (galleryModuleApi?.init) {
+                        galleryModuleApi.init();
+                    }
+                }, 0);
+            } else if (moduleKey === 'video') {
+                window.videoModuleSettings = {
+                    videoAssetUrl: '',
+                    videoAssetId: '',
+                    videoDurationSec: parseInt(item.duration_seconds || 10, 10) || 10,
+                    muted: true,
+                    fitMode: 'contain',
+                    bgColor: '#000000',
+                    ...item.settings
+                };
+                setTimeout(() => {
+                    if (window.GroupLoopVideoModule?.init) {
+                        window.GroupLoopVideoModule.init();
+                    }
                 }, 0);
             }
             
@@ -4196,12 +4619,48 @@
                     }
                 });
             }
+
+            const showDateCheckbox = document.getElementById('setting-showDate');
+            const dateFormatSelect = document.getElementById('setting-dateFormat');
+            if (showDateCheckbox && dateFormatSelect) {
+                const syncDateFormatState = () => {
+                    dateFormatSelect.disabled = !showDateCheckbox.checked;
+                    if (!showDateCheckbox.checked) {
+                        dateFormatSelect.dataset.lastValue = dateFormatSelect.value;
+                        dateFormatSelect.value = 'none';
+                    } else if (dateFormatSelect.value === 'none') {
+                        dateFormatSelect.value = dateFormatSelect.dataset.lastValue || 'dmy';
+                    }
+                };
+                showDateCheckbox.addEventListener('change', syncDateFormatState);
+                syncDateFormatState();
+            }
             
             const showVersionCheckbox = document.getElementById('setting-showVersion');
             if (showVersionCheckbox) {
                 showVersionCheckbox.addEventListener('change', function() {
                     const versionSettings = document.getElementById('versionSettings');
                     versionSettings.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+
+            const clockOverlayToggle = document.getElementById('setting-clockOverlayEnabled');
+            if (clockOverlayToggle) {
+                clockOverlayToggle.addEventListener('change', function() {
+                    const section = document.getElementById('clockOverlaySettings');
+                    if (section) {
+                        section.style.display = this.checked ? 'grid' : 'none';
+                    }
+                });
+            }
+
+            const textOverlayToggle = document.getElementById('setting-textOverlayEnabled');
+            if (textOverlayToggle) {
+                textOverlayToggle.addEventListener('change', function() {
+                    const section = document.getElementById('textOverlaySettings');
+                    if (section) {
+                        section.style.display = this.checked ? 'grid' : 'none';
+                    }
                 });
             }
 
@@ -4221,17 +4680,23 @@
             const newSettings = {};
             
             // Collect all settings from form
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 newSettings.type = document.getElementById('setting-type')?.value || 'digital';
                 newSettings.format = '24h';
                 newSettings.dateFormat = document.getElementById('setting-dateFormat')?.value || 'full';
                 newSettings.timeColor = document.getElementById('setting-timeColor')?.value || '#ffffff';
                 newSettings.dateColor = document.getElementById('setting-dateColor')?.value || '#ffffff';
                 newSettings.bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
-                newSettings.fontSize = parseInt(document.getElementById('setting-fontSize')?.value) || 120;
+                newSettings.timeFontSize = parseInt(document.getElementById('setting-timeFontSize')?.value, 10) || parseInt(document.getElementById('setting-fontSize')?.value, 10) || 120;
+                newSettings.dateFontSize = parseInt(document.getElementById('setting-dateFontSize')?.value, 10) || Math.max(16, Math.round(newSettings.timeFontSize * 0.3));
+                newSettings.fontSize = newSettings.timeFontSize;
                 newSettings.clockSize = parseInt(document.getElementById('setting-clockSize')?.value) || 300;
                 newSettings.showSeconds = document.getElementById('setting-showSeconds')?.checked !== false;
-                newSettings.language = document.getElementById('setting-language')?.value || 'hu';
+                newSettings.showDate = document.getElementById('setting-showDate')?.checked !== false;
+                if (!newSettings.showDate) {
+                    newSettings.dateFormat = 'none';
+                }
+                newSettings.language = document.getElementById('setting-language')?.value || 'sk';
             } else if (moduleKey === 'default-logo') {
                 newSettings.text = document.getElementById('setting-text')?.value || 'EDUDISPLEJ';
                 newSettings.fontSize = parseInt(document.getElementById('setting-fontSize')?.value) || 120;
@@ -4243,6 +4708,13 @@
                 const richEditor = document.getElementById('text-editor-area');
                 const textHtml = sanitizeRichTextHtml(richEditor ? richEditor.innerHTML : (document.getElementById('setting-text')?.value || ''));
                 newSettings.text = textHtml;
+                newSettings.fontFamily = document.getElementById('setting-richFontFamily')?.value || 'Arial, sans-serif';
+                newSettings.fontSize = Math.max(8, parseInt(document.getElementById('setting-richFontSize')?.value || '72', 10) || 72);
+                newSettings.fontWeight = '700';
+                newSettings.fontStyle = 'normal';
+                newSettings.lineHeight = Math.max(0.8, Math.min(2.5, parseFloat(document.getElementById('setting-richLineHeight')?.value || '1.2') || 1.2));
+                newSettings.textAlign = 'left';
+                newSettings.textColor = '#ffffff';
                 newSettings.bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
                 newSettings.bgImageData = document.getElementById('setting-bgImageData')?.value || '';
                 newSettings.textAnimationEntry = document.getElementById('setting-textAnimationEntry')?.value || 'none';
@@ -4253,20 +4725,65 @@
             } else if (moduleKey === 'pdf') {
                 // PDF module settings
                 const pdfBase64 = window.pdfModuleSettings?.pdfDataBase64 || (item.settings?.pdfDataBase64 || '');
+                const pdfAssetUrl = window.pdfModuleSettings?.pdfAssetUrl || (item.settings?.pdfAssetUrl || '');
+                const pdfAssetId = window.pdfModuleSettings?.pdfAssetId || (item.settings?.pdfAssetId || '');
                 
-                newSettings.pdfDataBase64 = pdfBase64;
-                newSettings.orientation = document.getElementById('pdf-orientation')?.value || 'landscape';
-                newSettings.zoomLevel = parseInt(document.getElementById('pdf-zoomLevel')?.value) || 100;
-                newSettings.navigationMode = document.getElementById('pdf-navigationMode')?.value || 'manual';
-                newSettings.displayMode = 'fit-page';
+                newSettings.pdfAssetUrl = pdfAssetUrl;
+                if (pdfAssetId) {
+                    newSettings.pdfAssetId = parseInt(pdfAssetId, 10) || String(pdfAssetId);
+                }
+                newSettings.pdfDataBase64 = pdfAssetUrl ? '' : pdfBase64;
+                newSettings.zoomLevel = parseInt(document.getElementById('pdf-zoomLevel')?.value, 10) || 100;
+                newSettings.autoScrollEnabled = document.getElementById('pdf-autoScrollEnabled')?.checked === true;
                 newSettings.autoScrollSpeedPxPerSec = parseInt(document.getElementById('pdf-scrollSpeed')?.value) || 30;
                 newSettings.autoScrollStartPauseMs = parseInt(document.getElementById('pdf-startPause')?.value) || 2000;
                 newSettings.autoScrollEndPauseMs = parseInt(document.getElementById('pdf-endPause')?.value) || 2000;
-                newSettings.pausePoints = [];
-                newSettings.fixedViewMode = document.getElementById('pdf-fixedViewMode')?.checked || false;
-                newSettings.fixedPage = parseInt(document.getElementById('pdf-fixedPage')?.value) || 1;
-                newSettings.bgColor = document.getElementById('pdf-bgColor')?.value || '#ffffff';
-                newSettings.showPageNumbers = document.getElementById('pdf-showPageNumbers')?.checked !== false;
+                newSettings.pauseAtPercent = parseInt(document.getElementById('pdf-pauseAtPercent')?.value, 10);
+                if (!Number.isFinite(newSettings.pauseAtPercent)) {
+                    newSettings.pauseAtPercent = -1;
+                }
+                newSettings.pauseDurationMs = parseInt(document.getElementById('pdf-pauseDurationMs')?.value, 10) || 2000;
+            } else if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
+                const rawJson = document.getElementById('gallery-image-urls-json')?.value || '[]';
+                let normalizedImages = [];
+                try {
+                    const parsed = JSON.parse(rawJson);
+                    normalizedImages = Array.isArray(parsed)
+                        ? parsed.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+                        : [];
+                } catch (_) {
+                    normalizedImages = [];
+                }
+
+                newSettings.imageUrlsJson = JSON.stringify(normalizedImages);
+                newSettings.displayMode = document.getElementById('gallery-display-mode')?.value || 'slideshow';
+                newSettings.fitMode = document.getElementById('gallery-fit-mode')?.value || 'cover';
+                newSettings.slideIntervalSec = parseInt(document.getElementById('gallery-slide-interval')?.value, 10) || 5;
+                newSettings.transitionMs = parseInt(document.getElementById('gallery-transition-ms')?.value, 10) || 450;
+                newSettings.collageColumns = parseInt(document.getElementById('gallery-collage-columns')?.value, 10) || 3;
+                newSettings.bgColor = document.getElementById('gallery-bg-color')?.value || '#000000';
+            } else if (moduleKey === 'video') {
+                const source = window.videoModuleSettings || item.settings || {};
+                const videoDurationSec = Math.max(1, parseInt(source.videoDurationSec || item.duration_seconds || 10, 10) || 10);
+
+                newSettings.videoAssetUrl = String(source.videoAssetUrl || '');
+                newSettings.videoAssetId = source.videoAssetId ? parseInt(source.videoAssetId, 10) || String(source.videoAssetId) : '';
+                newSettings.videoDurationSec = videoDurationSec;
+                newSettings.muted = source.muted !== false;
+                newSettings.fitMode = ['contain', 'cover', 'fill'].includes(String(source.fitMode || 'contain'))
+                    ? String(source.fitMode)
+                    : 'contain';
+                newSettings.bgColor = String(source.bgColor || '#000000');
+
+                loopItems[index].duration_seconds = videoDurationSec;
+            }
+
+            if (isOverlayCarrierModule(moduleKey)) {
+                const withOverlay = collectOverlaySettingsFromForm({
+                    ...(item.settings || {}),
+                    ...newSettings
+                });
+                Object.assign(newSettings, withOverlay);
             }
             
             loopItems[index].settings = newSettings;
@@ -4462,13 +4979,26 @@
             
             let baseUrl = '';
             let params = new URLSearchParams();
+
+            const createPdfDataPreviewKey = (pdfDataBase64) => {
+                const key = `pdf_preview_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+                window.__edudisplejPdfPreviewStore = window.__edudisplejPdfPreviewStore || {};
+                window.__edudisplejPdfPreviewStore[key] = String(pdfDataBase64 || '');
+
+                const keys = Object.keys(window.__edudisplejPdfPreviewStore);
+                if (keys.length > 30) {
+                    keys.slice(0, keys.length - 30).forEach((staleKey) => {
+                        delete window.__edudisplejPdfPreviewStore[staleKey];
+                    });
+                }
+
+                return key;
+            };
             
             // Determine module path
             switch(moduleKey) {
                 case 'clock':
-                case 'datetime':
-                case 'dateclock':
-                    baseUrl = '../../modules/datetime/m_datetime.html';
+                    baseUrl = '../../modules/clock/m_clock.html';
                     // Add all clock settings as URL parameters
                     if (settings.type) params.append('type', settings.type);
                     if (settings.format) params.append('format', settings.format);
@@ -4477,8 +5007,11 @@
                     if (settings.dateColor) params.append('dateColor', settings.dateColor);
                     if (settings.bgColor) params.append('bgColor', settings.bgColor);
                     if (settings.fontSize) params.append('fontSize', settings.fontSize);
+                    if (settings.timeFontSize) params.append('timeFontSize', settings.timeFontSize);
+                    if (settings.dateFontSize) params.append('dateFontSize', settings.dateFontSize);
                     if (settings.clockSize) params.append('clockSize', settings.clockSize);
                     if (settings.showSeconds !== undefined) params.append('showSeconds', settings.showSeconds);
+                    if (settings.showDate !== undefined) params.append('showDate', settings.showDate);
                     if (settings.language) params.append('language', settings.language);
                     break;
                     
@@ -4519,6 +5052,53 @@
                         }
                     }
                     break;
+
+                case 'pdf':
+                    baseUrl = '../../modules/pdf/m_pdf.html';
+                    if (settings.pdfAssetUrl) {
+                        params.append('pdfAssetUrl', settings.pdfAssetUrl);
+                    } else if (settings.pdfDataBase64) {
+                        const dataKey = createPdfDataPreviewKey(settings.pdfDataBase64);
+                        params.append('pdfDataKey', dataKey);
+                    }
+                    if (settings.zoomLevel !== undefined) params.append('zoomLevel', settings.zoomLevel);
+
+                    const autoScrollEnabled = settings.autoScrollEnabled === true || settings.navigationMode === 'auto';
+                    params.append('autoScrollEnabled', autoScrollEnabled ? 'true' : 'false');
+                    if (settings.autoScrollSpeedPxPerSec !== undefined) params.append('autoScrollSpeedPxPerSec', settings.autoScrollSpeedPxPerSec);
+                    if (settings.autoScrollStartPauseMs !== undefined) params.append('autoScrollStartPauseMs', settings.autoScrollStartPauseMs);
+                    if (settings.autoScrollEndPauseMs !== undefined) params.append('autoScrollEndPauseMs', settings.autoScrollEndPauseMs);
+
+                    if (settings.pauseAtPercent !== undefined) {
+                        params.append('pauseAtPercent', settings.pauseAtPercent);
+                    } else {
+                        params.append('pauseAtPercent', '-1');
+                    }
+
+                    if (settings.pauseDurationMs !== undefined) {
+                        params.append('pauseDurationMs', settings.pauseDurationMs);
+                    }
+                    break;
+
+                case 'image-gallery':
+                case 'gallery':
+                    baseUrl = '../../modules/gallery/m_gallery.html';
+                    params.append('imageUrlsJson', settings.imageUrlsJson || '[]');
+                    params.append('displayMode', settings.displayMode || 'slideshow');
+                    params.append('fitMode', settings.fitMode || 'cover');
+                    params.append('slideIntervalSec', settings.slideIntervalSec || 5);
+                    params.append('transitionMs', settings.transitionMs || 450);
+                    params.append('collageColumns', settings.collageColumns || 3);
+                    params.append('bgColor', settings.bgColor || '#000000');
+                    break;
+
+                case 'video':
+                    baseUrl = '../../modules/video/m_video.html';
+                    if (settings.videoAssetUrl) params.append('videoAssetUrl', settings.videoAssetUrl);
+                    params.append('muted', settings.muted === false ? 'false' : 'true');
+                    params.append('fitMode', settings.fitMode || 'contain');
+                    params.append('bgColor', settings.bgColor || '#000000');
+                    break;
                     
                 default:
                     // Default fallback - show module name
@@ -4526,13 +5106,15 @@
                     params.append('text', module.module_name);
                     params.append('bgColor', '#1a3a52');
             }
+
+            appendOverlayParams(params, settings, moduleKey);
             
             const queryString = params.toString();
             return queryString ? `${baseUrl}?${queryString}` : baseUrl;
         }
 
         function formatLanguageCode(language) {
-            const code = String(language || 'hu').toLowerCase();
+            const code = String(language || 'sk').toLowerCase();
             if (code === 'hu') return 'HU';
             if (code === 'sk') return 'SK';
             if (code === 'en') return 'EN';
@@ -4547,7 +5129,7 @@
             const moduleKey = item.module_key || getModuleKeyById(item.module_id);
             const settings = item.settings || {};
 
-            if (['clock', 'datetime', 'dateclock'].includes(moduleKey)) {
+            if (moduleKey === 'clock') {
                 const type = settings.type === 'analog' ? 'Analóg' : 'Digitális';
                 const details = [type];
 
@@ -4590,6 +5172,42 @@
                     : baseText;
             }
 
+            if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
+                let imageCount = 0;
+                try {
+                    const parsed = JSON.parse(String(settings.imageUrlsJson || '[]'));
+                    imageCount = Array.isArray(parsed) ? parsed.filter(Boolean).length : 0;
+                } catch (_) {
+                    imageCount = 0;
+                }
+
+                const modeMap = {
+                    slideshow: 'slideshow',
+                    collage: 'kollázs',
+                    single: 'egy kép'
+                };
+                const mode = modeMap[String(settings.displayMode || 'slideshow')] || 'slideshow';
+                const overlayFlags = [];
+                if (settings.clockOverlayEnabled) {
+                    overlayFlags.push(`óra:${settings.clockOverlayPosition === 'bottom' ? 'lent' : 'fent'}`);
+                }
+                if (settings.textOverlayEnabled) {
+                    overlayFlags.push(`szöveg:${settings.textOverlayPosition === 'bottom' ? 'lent' : 'fent'}`);
+                }
+                const overlayLine = overlayFlags.length ? `<br>Overlay: ${overlayFlags.join(' • ')}` : '';
+                return `${imageCount} kép<br>Mód: ${mode}${overlayLine}`;
+            }
+
+            if (moduleKey === 'video') {
+                const duration = parseInt(settings.videoDurationSec || item.duration_seconds || 0, 10);
+                const fit = String(settings.fitMode || 'contain');
+                const muted = settings.muted === false ? 'hanggal' : 'némítva';
+                if (duration > 0) {
+                    return `${duration}s • ${fit}<br>${muted}`;
+                }
+                return `Videó • ${fit}<br>${muted}`;
+            }
+
             return '';
         }
         
@@ -4616,10 +5234,11 @@
                 loopItem.dataset.index = index;
 
                 const isTechnicalItem = isTechnicalLoopItem(item);
+                const isVideoItem = (item.module_key || getModuleKeyById(item.module_id)) === 'video';
                 const durationValue = isTechnicalItem ? 60 : parseInt(item.duration_seconds || 10);
-                const durationInputHtml = (isDefaultGroup || isTechnicalItem || isContentOnlyMode)
-                    ? `<input type="number" value="${durationValue}" min="1" max="300" disabled>`
-                    : `<input type="number" value="${durationValue}" min="1" max="300" onchange="updateDuration(${index}, this.value)" onclick="event.stopPropagation()">`;
+                const durationInputHtml = (isDefaultGroup || isTechnicalItem || isContentOnlyMode || isVideoItem)
+                    ? `<input type="number" value="${durationValue}" min="5" max="300" step="5" disabled>`
+                    : `<input type="number" value="${durationValue}" min="5" max="300" step="5" onchange="updateDuration(${index}, this.value)" onclick="event.stopPropagation()">`;
 
                 const actionButtonsHtml = isDefaultGroup
                     ? `<button class="loop-btn" disabled title="A default csoport nem szerkeszthető">🔒</button>`
@@ -4636,9 +5255,8 @@
                         <div class="loop-module-desc">${getLoopItemSummary(item)}</div>
                     </div>
                     <div class="loop-duration">
-                        <label>Időtartam</label>
                         ${durationInputHtml}
-                        <span style="font-size: 11px; opacity: 0.9;">sec</span>
+                        <span class="loop-duration-suffix">s</span>
                     </div>
                     <div class="loop-actions">
                         ${actionButtonsHtml}

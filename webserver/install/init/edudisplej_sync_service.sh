@@ -47,12 +47,17 @@ VERSION_FILE="${CONFIG_DIR}/local_versions.json"
 LOCAL_STRUCTURE_FILE="${CONFIG_DIR}/structure.json"
 REINSTALL_LOG_FILE="${LOG_DIR}/reinstall.log"
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment variable
+ENABLE_SYNC_SCREENSHOT_CAPTURE="${EDUDISPLEJ_SYNC_CAPTURE_SCREENSHOT:-false}"
+ENABLE_LEGACY_LOG_UPLOAD="${EDUDISPLEJ_LEGACY_LOG_UPLOAD:-false}"
+SERVICE_UPDATE_CHECK_INTERVAL="${EDUDISPLEJ_SERVICE_UPDATE_CHECK_INTERVAL:-900}"
 
 # Sync state tracking
 LOOP_CHECK_SERVER_UPDATED_AT=""
 LOOP_CHECK_LOCAL_UPDATED_AT=""
 LOOP_CHECK_NEEDS_UPDATE="false"
 LAST_SCREENSHOT_STATUS="not_run"
+CYCLE_REFRESH_DONE="false"
+LAST_SERVICE_UPDATE_CHECK_EPOCH=0
 
 # Create directories
 mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
@@ -232,6 +237,26 @@ if ! command -v get_hw_info &> /dev/null; then
     "wifi_name": "${wifi_name}",
     "wifi_signal": "${wifi_signal}",
     "local_ip": "${local_ip}"
+}
+EOF
+    }
+fi
+
+if ! command -v get_hw_info_quick &> /dev/null; then
+    get_hw_info_quick() {
+        local host kernel arch uptime_seconds
+        host=$(hostname 2>/dev/null || echo "unknown")
+        kernel=$(uname -r 2>/dev/null || echo "unknown")
+        arch=$(uname -m 2>/dev/null || echo "unknown")
+        uptime_seconds=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo "0")
+
+        cat << EOF
+{
+    "hostname": "${host}",
+    "kernel": "${kernel}",
+    "architecture": "${arch}",
+    "uptime_seconds": ${uptime_seconds},
+    "boot_phase": "registration"
 }
 EOF
     }
@@ -601,7 +626,10 @@ sync_hw_data() {
             local update_reason=$(json_get "$response" "update_reason")
             log "⚠ Update needed: $update_reason"
 
-            force_full_loop_refresh "server reported version change (${update_reason:-unknown reason})" || true
+            if force_full_loop_refresh "server reported version change (${update_reason:-unknown reason})"; then
+                CYCLE_REFRESH_DONE="true"
+                LOOP_CHECK_NEEDS_UPDATE="true"
+            fi
         fi
         
         return 0
@@ -620,9 +648,11 @@ check_loop_updates() {
     
     # Get local last_update timestamp from loop.json
     local local_last_update=""
+    local local_plan_version=""
     if [ -f "$LOOP_FILE" ]; then
         if command -v jq >/dev/null 2>&1; then
             local_last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
+            local_plan_version=$(jq -r '.loop_plan_version // empty' "$LOOP_FILE" 2>/dev/null)
         fi
     fi
 
@@ -669,11 +699,14 @@ check_loop_updates() {
     company_name=$(json_get "$response" "company_name")
     local group_id
     group_id=$(json_get "$response" "group_id")
+    local server_plan_version
+    server_plan_version=$(json_get "$response" "loop_plan_version")
 
     LOOP_CHECK_SERVER_UPDATED_AT="$server_updated_at"
     
     log "📋 Loop version check: Company='$company_name', Source='$config_source', Group='${group_id:-none}'"
     log_debug "Server loop updated_at: ${server_updated_at:-none} (from $config_source)"
+    log_debug "Plan version check: server='${server_plan_version:-none}', local='${local_plan_version:-none}'"
     
     # Compare timestamps: if no local timestamp, or server is newer, update
     local needs_update=false
@@ -690,6 +723,13 @@ check_loop_updates() {
             needs_update=true
         else
             log_debug "✓ Loop configuration is up-to-date"
+        fi
+    fi
+
+    if [ "$needs_update" = "false" ] && [ -n "$server_plan_version" ] && [ "$server_plan_version" != "null" ]; then
+        if [ -z "$local_plan_version" ] || [ "$local_plan_version" = "null" ] || [ "$server_plan_version" != "$local_plan_version" ]; then
+            log "⬆️ Loop plan version changed - update required (server: $server_plan_version, local: ${local_plan_version:-none})"
+            needs_update=true
         fi
     fi
 
@@ -781,7 +821,8 @@ capture_and_upload_screenshot() {
 register_and_sync() {
     local mac=$(get_mac_address)
     local hostname=$(get_hostname)
-    local hw_info=$(get_hw_info)
+    local hw_info=$(get_hw_info_quick)
+    CYCLE_REFRESH_DONE="false"
     
     log "=========================================="
     log "Starting sync cycle..."
@@ -944,8 +985,12 @@ EOF
         
         # Always check for loop updates if we have a device_id
         if [ -n "$device_id" ] && [ "$device_id" != "unknown" ]; then
-            log "Checking for loop configuration changes..."
-            check_loop_updates "$device_id"
+            if [ "$CYCLE_REFRESH_DONE" = "true" ]; then
+                log "Skipping extra loop check in this cycle (refresh already completed)"
+            else
+                log "Checking for loop configuration changes..."
+                check_loop_updates "$device_id"
+            fi
             
             # Get loop version for logging and DB update
             local loop_updated_at=""
@@ -978,8 +1023,12 @@ EOF
             log "Last sync: $sync_timestamp"
             
             # Collect and upload logs
-            log_debug "Uploading logs to server..."
-            collect_and_upload_logs "$device_id"
+            if [ "$ENABLE_LEGACY_LOG_UPLOAD" = "true" ]; then
+                log_debug "Uploading logs to server..."
+                collect_and_upload_logs "$device_id"
+            else
+                log_debug "Legacy log upload disabled (EDUDISPLEJ_LEGACY_LOG_UPLOAD=false)"
+            fi
         fi
         
         # Notify if not fully configured
@@ -1208,6 +1257,17 @@ collect_and_upload_logs() {
 
 # Check for service updates (version check)
 check_service_updates() {
+    local now_epoch
+    now_epoch=$(date +%s)
+    if [ "$LAST_SERVICE_UPDATE_CHECK_EPOCH" -gt 0 ]; then
+        local elapsed=$((now_epoch - LAST_SERVICE_UPDATE_CHECK_EPOCH))
+        if [ "$elapsed" -lt "$SERVICE_UPDATE_CHECK_INTERVAL" ]; then
+            log_debug "Skipping service update check (next in $((SERVICE_UPDATE_CHECK_INTERVAL - elapsed))s)"
+            return 0
+        fi
+    fi
+    LAST_SERVICE_UPDATE_CHECK_EPOCH=$now_epoch
+
     log_debug "Checking service timestamps from structure.json..."
 
     local token
@@ -1315,6 +1375,9 @@ main() {
     log "Version: $SERVICE_VERSION"
     log "API URL: $REGISTRATION_API"
     log "Sync interval: ${SYNC_INTERVAL}s"
+    log "Sync screenshot capture: ${ENABLE_SYNC_SCREENSHOT_CAPTURE}"
+    log "Legacy log upload: ${ENABLE_LEGACY_LOG_UPLOAD}"
+    log "Service update check interval: ${SERVICE_UPDATE_CHECK_INTERVAL}s"
     log "Auto-update: Enabled (daily)"
     log "Debug mode: $DEBUG"
     log "=========================================="
@@ -1340,8 +1403,12 @@ main() {
         
         if register_and_sync; then
             log "Sync completed successfully"
-            # Take screenshot after sync
-            capture_and_upload_screenshot
+            if [ "$ENABLE_SYNC_SCREENSHOT_CAPTURE" = "true" ]; then
+                capture_and_upload_screenshot
+            else
+                LAST_SCREENSHOT_STATUS="disabled"
+                log_debug "Sync screenshot capture disabled (screenshot service handles captures)"
+            fi
             write_sync_state "success" ""
             local sleep_secs="$SYNC_INTERVAL"
             if [ -f "${CONFIG_DIR}/.fast_loop_enabled" ]; then

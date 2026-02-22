@@ -4,11 +4,12 @@
  */
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+    echo json_encode(['success' => false, 'message' => t_def('api.common.not_authenticated', 'Not authenticated')]);
     exit();
 }
 
@@ -17,7 +18,7 @@ $company_id = $_SESSION['company_id'] ?? null;
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+    echo json_encode(['success' => false, 'message' => t_def('api.common.invalid_request_method', 'Invalid request method')]);
     exit();
 }
 
@@ -25,7 +26,7 @@ $group_id = intval($_POST['group_id'] ?? 0);
 $priority = intval($_POST['priority'] ?? 0);
 
 if (!$group_id) {
-    echo json_encode(['success' => false, 'message' => 'Invalid group id']);
+    echo json_encode(['success' => false, 'message' => t_def('api.update_group_priority.invalid_group_id', 'Invalid group id')]);
     exit();
 }
 
@@ -40,7 +41,7 @@ try {
     $stmt->close();
 
     if (!$group || (!$is_admin && $group['company_id'] != $company_id)) {
-        echo json_encode(['success' => false, 'message' => 'Hozzaferes megtagadva']);
+        echo json_encode(['success' => false, 'message' => t_def('api.common.access_denied', 'Access denied')]);
         exit();
     }
 
@@ -48,9 +49,9 @@ try {
     $stmt->bind_param("ii", $priority, $group_id);
 
     if ($stmt->execute()) {
-        echo json_encode(['success' => true, 'message' => 'Prioritas frissitve']);
+        echo json_encode(['success' => true, 'message' => t_def('api.update_group_priority.updated', 'Priority updated')]);
     } else {
-        echo json_encode(['success' => false, 'message' => 'Prioritas frissitese sikertelen']);
+        echo json_encode(['success' => false, 'message' => t_def('api.update_group_priority.update_failed', 'Failed to update priority')]);
     }
 
     $stmt->close();
@@ -58,6 +59,6 @@ try {
 
 } catch (Exception $e) {
     error_log($e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Adatbazis hiba']);
+    echo json_encode(['success' => false, 'message' => t_def('api.common.database_error', 'Database error')]);
 }
 ?>

@@ -27,6 +27,27 @@ $filter_event = $_GET['event'] ?? '';
 $filter_username = $_GET['username'] ?? '';
 $filter_date = $_GET['date'] ?? '';
 
+$critical_events = ['failed_login', 'failed_otp'];
+$warning_events = ['password_reset_request', 'settings_change'];
+$informative_events = ['successful_login', 'password_reset_success'];
+
+$critical_events_sql = "'" . implode("','", array_map('addslashes', $critical_events)) . "'";
+$warning_events_sql = "'" . implode("','", array_map('addslashes', $warning_events)) . "'";
+$informative_events_sql = "'" . implode("','", array_map('addslashes', $informative_events)) . "'";
+
+$severity_sql = "CASE
+    WHEN event_type IN ($critical_events_sql) THEN 'critical'
+    WHEN event_type IN ($warning_events_sql) THEN 'warning'
+    WHEN event_type IN ($informative_events_sql) THEN 'informative'
+    ELSE 'normal'
+END";
+
+$severity_rank_sql = "CASE
+    WHEN event_type IN ($critical_events_sql) THEN 3
+    WHEN event_type IN ($warning_events_sql) THEN 2
+    ELSE 1
+END";
+
 $logs = [];
 $total_logs = 0;
 $event_types = [];
@@ -106,9 +127,9 @@ try {
     }
 
     $query = "
-        SELECT * FROM security_logs
+        SELECT security_logs.*, $severity_sql AS severity, $severity_rank_sql AS severity_rank FROM security_logs
         $where_sql
-        ORDER BY timestamp DESC
+        ORDER BY severity_rank DESC, timestamp DESC
         LIMIT ? OFFSET ?
     ";
 
@@ -217,6 +238,7 @@ include 'header.php';
                     <th>ID</th>
                     <th>Timestamp</th>
                     <th>Event</th>
+                    <th>Kritikussag</th>
                     <th>Username</th>
                     <th>IP</th>
                     <th>Details</th>
@@ -225,14 +247,20 @@ include 'header.php';
             <tbody>
                 <?php if (empty($logs)): ?>
                     <tr>
-                        <td colspan="6" class="muted">Nincs log.</td>
+                        <td colspan="7" class="muted">Nincs log.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($logs as $log): ?>
+                        <?php $severity = $log['severity'] ?? 'normal'; ?>
                         <tr>
                             <td><?php echo (int)$log['id']; ?></td>
                             <td class="nowrap"><?php echo date('Y-m-d H:i:s', strtotime($log['timestamp'])); ?></td>
                             <td><?php echo htmlspecialchars($log['event_type']); ?></td>
+                            <td>
+                                <span class="badge <?php echo in_array($severity, ['critical', 'warning'], true) ? 'danger' : ''; ?>">
+                                    <?php echo htmlspecialchars($severity); ?>
+                                </span>
+                            </td>
                             <td><?php echo htmlspecialchars($log['username']); ?></td>
                             <td class="mono"><?php echo htmlspecialchars($log['ip_address']); ?></td>
                             <td class="mono"><?php echo htmlspecialchars(substr($log['details'] ?? '', 0, 200)); ?></td>

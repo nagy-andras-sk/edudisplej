@@ -1,10 +1,9 @@
 {
   "schema_version": "1.0",
   "module_key": "clock",
-  "name": "Clock (shared renderer)",
-  "renderer": "../datetime/m_datetime.html",
+  "name": "Clock",
+  "renderer": "m_clock.html",
   "config": {
-    "defaults": "../datetime/config/default_settings.json"
-  },
-  "notes": "Clock, datetime and dateclock share one renderer and settings schema."
+    "defaults": "config/default_settings.json"
+  }
 }

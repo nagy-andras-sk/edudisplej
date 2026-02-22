@@ -1,9 +1,0 @@
-{
-  "schema_version": "1.0",
-  "module_key": "datetime",
-  "name": "DateTime",
-  "renderer": "m_datetime.html",
-  "config": {
-    "defaults": "config/default_settings.json"
-  }
-}

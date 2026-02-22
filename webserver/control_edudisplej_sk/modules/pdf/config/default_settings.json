@@ -1,15 +1,12 @@
 {
   "pdfDataBase64": "",
-  "orientation": "landscape",
+  "pdfAssetUrl": "",
+  "pdfAssetId": "",
   "zoomLevel": 100,
-  "navigationMode": "manual",
-  "displayMode": "fit-page",
+  "autoScrollEnabled": false,
   "autoScrollSpeedPxPerSec": 30,
   "autoScrollStartPauseMs": 2000,
   "autoScrollEndPauseMs": 2000,
-  "pausePoints": [],
-  "fixedViewMode": false,
-  "fixedPage": 1,
-  "bgColor": "#ffffff",
-  "showPageNumbers": true
+  "pauseAtPercent": -1,
+  "pauseDurationMs": 2000
 }

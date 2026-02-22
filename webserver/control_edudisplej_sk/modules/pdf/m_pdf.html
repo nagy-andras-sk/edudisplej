@@ -16,412 +16,355 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-        }
-
-        body {
-            background: #f5f5f5;
+            background: #111;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
-        .module-root {
-            position: relative;
+        #root {
             width: 100%;
             height: 100%;
             display: flex;
             flex-direction: column;
-            background-color: #333;
         }
 
-        .pdf-viewport {
-            position: relative;
+        #viewport {
             flex: 1;
-            overflow: hidden;
+            overflow: auto;
             display: flex;
-            align-items: center;
             justify-content: center;
-            background-color: #333;
+            padding: 24px 0;
+            scrollbar-width: none;
         }
 
-        .pdf-container {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow: hidden;
+        #viewport::-webkit-scrollbar {
+            display: none;
+        }
+
+        #pages {
+            display: grid;
+            gap: 18px;
+            justify-items: center;
+            width: 100%;
         }
 
         .pdf-page {
-            background: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            margin: 20px;
-        }
-
-        .pdf-page canvas {
             display: block;
-            width: 100%;
-            height: 100%;
+            background: #fff;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
         }
 
-        .pdf-controls {
-            background: #222;
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            border-top: 1px solid #444;
-        }
-
-        .pdf-controls-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .control-btn {
-            background: #444;
-            color: #fff;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background 0.2s;
-        }
-
-        .control-btn:hover {
-            background: #555;
-        }
-
-        .control-btn:disabled {
-            background: #333;
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-
-        .page-info {
-            color: #aaa;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-
-        .zoom-control {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .zoom-control input {
-            width: 50px;
-            padding: 4px;
-            border: 1px solid #555;
-            border-radius: 3px;
-            background: #333;
-            color: #fff;
-            text-align: center;
-        }
-
-        .no-pdf {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #999;
-            font-size: 18px;
-            text-align: center;
-            padding: 40px;
-        }
-
-        .error-message {
-            background: #d32f2f;
-            color: white;
-            padding: 12px 16px;
-            text-align: center;
-            font-size: 14px;
-        }
-
-        .loading-indicator {
-            position: absolute;
-            top: 50%;
+        #status {
+            position: fixed;
             left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 20px 40px;
+            top: 16px;
+            transform: translateX(-50%);
+            z-index: 20;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.70);
+            border: 1px solid rgba(255, 255, 255, 0.20);
             border-radius: 8px;
-            z-index: 100;
+            padding: 10px 14px;
+            font-size: 13px;
+            line-height: 1.4;
+            display: none;
+            max-width: calc(100% - 24px);
+            text-align: center;
         }
 
-        .hidden {
-            display: none !important;
+        #status.show {
+            display: block;
         }
     </style>
 </head>
 <body>
-    <div class="module-root" id="moduleRoot">
-        <div class="error-message hidden" id="errorMessage"></div>
-        <div class="pdf-viewport" id="pdfViewport">
-            <div class="no-pdf" id="noPdfMessage">PDF kell betölteni</div>
-            <div class="pdf-container" id="pdfContainer">
-                <canvas id="pdfCanvas"></canvas>
-                <div class="loading-indicator hidden" id="loadingIndicator">Betöltés...</div>
-            </div>
-        </div>
-        <div class="pdf-controls" id="pdfControls" style="display: none;">
-            <div class="pdf-controls-left">
-                <button class="control-btn" id="prevPageBtn" title="Előző oldal">← Előző</button>
-                <button class="control-btn" id="nextPageBtn" title="Következő oldal">Következő →</button>
-                <span class="page-info"><span id="currentPage">1</span> / <span id="totalPages">0</span></span>
-                <input type="number" id="pageInput" min="1" max="1" style="width: 50px; padding: 4px;">
-                <button class="control-btn" id="goToPageBtn">Ugrás</button>
-            </div>
-            <div class="zoom-control">
-                <button class="control-btn" id="zoomOutBtn">−</button>
-                <input type="number" id="zoomLevel" min="50" max="400" value="100" style="width: 50px;">
-                <span style="color: #aaa; font-size: 12px; width: 30px;">%</span>
-                <button class="control-btn" id="zoomInBtn">+</button>
-            </div>
-        </div>
+<div id="root">
+    <div id="status"></div>
+    <div id="viewport">
+        <div id="pages"></div>
     </div>
+</div>
 
-    <script>
-        // PDF.js worker beállítás
-        if (typeof pdfjsLib !== 'undefined') {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }
+<script>
+    if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
 
-        // Segédfüggvények
-        function parseNum(value, fallback) {
-            const n = Number(value);
-            return Number.isFinite(n) ? n : fallback;
-        }
+    function parseIntSafe(value, fallback) {
+        const parsed = parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
 
-        function parseBool(value, fallback = false) {
-            if (value === null || value === undefined || value === '') {
-                return fallback;
-            }
-            if (typeof value === 'boolean') {
-                return value;
-            }
-            const normalized = String(value).toLowerCase();
-            if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
-            if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+    function parseBool(value, fallback = false) {
+        if (value === undefined || value === null || value === '') {
             return fallback;
         }
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        const normalized = String(value).toLowerCase();
+        if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+            return true;
+        }
+        if (['0', 'false', 'no', 'off'].includes(normalized)) {
+            return false;
+        }
+        return fallback;
+    }
 
-        // Beállítások lekérése
-        function getSettings() {
-            const defaults = {
-                pdfDataBase64: '',
-                orientation: 'landscape',
-                zoomLevel: 100,
-                navigationMode: 'manual',
-                displayMode: 'fit-page',
-                autoScrollSpeedPxPerSec: 30,
-                autoScrollStartPauseMs: 2000,
-                autoScrollEndPauseMs: 2000,
-                pausePoints: [],
-                fixedViewMode: false,
-                fixedPage: 1,
-                bgColor: '#ffffff',
-                showPageNumbers: true,
-                durationSeconds: 10
+    function normalizeBase64(source) {
+        const raw = String(source || '').trim();
+        if (!raw) {
+            return '';
+        }
+        return raw.includes(',') ? raw.split(',').pop() : raw;
+    }
+
+    function getSettings() {
+        function normalizeAssetApiUrl(inputUrl) {
+            const raw = String(inputUrl || '').trim();
+            if (!raw) {
+                return '';
+            }
+
+            if (raw.includes('module_asset_file.php')) {
+                return raw;
+            }
+
+            const appendToken = (url) => {
+                const pageParams = new URLSearchParams(window.location.search);
+                const pageToken = pageParams.get('token');
+                if (!pageToken || url.includes('token=')) {
+                    return url;
+                }
+                const glue = url.includes('?') ? '&' : '?';
+                return `${url}${glue}token=${encodeURIComponent(pageToken)}`;
             };
 
-            const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS)
-                ? window.EDUDISPLEJ_SETTINGS
-                : {};
+            let candidatePath = raw;
+            try {
+                const parsed = new URL(raw, window.location.href);
+                candidatePath = String(parsed.pathname || raw);
+            } catch (_) {
+                candidatePath = raw;
+            }
 
-            const params = new URLSearchParams(window.location.search);
+            candidatePath = candidatePath.replace(/\\/g, '/');
+            const marker = '/uploads/companies/';
+            const idx = candidatePath.toLowerCase().indexOf(marker);
+            if (idx === -1) {
+                return raw;
+            }
 
-            const merged = {
-                ...defaults,
-                ...injected,
-                pdfDataBase64: params.get('pdfDataBase64') ?? injected.pdfDataBase64 ?? defaults.pdfDataBase64,
-                orientation: String(params.get('orientation') ?? injected.orientation ?? defaults.orientation),
-                zoomLevel: parseNum(params.get('zoomLevel') ?? injected.zoomLevel, defaults.zoomLevel),
-                navigationMode: String(params.get('navigationMode') ?? injected.navigationMode ?? defaults.navigationMode),
-                displayMode: String(params.get('displayMode') ?? injected.displayMode ?? defaults.displayMode),
-                autoScrollSpeedPxPerSec: parseNum(params.get('autoScrollSpeedPxPerSec') ?? injected.autoScrollSpeedPxPerSec, defaults.autoScrollSpeedPxPerSec),
-                autoScrollStartPauseMs: parseNum(params.get('autoScrollStartPauseMs') ?? injected.autoScrollStartPauseMs, defaults.autoScrollStartPauseMs),
-                autoScrollEndPauseMs: parseNum(params.get('autoScrollEndPauseMs') ?? injected.autoScrollEndPauseMs, defaults.autoScrollEndPauseMs),
-                pausePoints: injected.pausePoints ?? defaults.pausePoints,
-                fixedViewMode: parseBool(params.get('fixedViewMode') ?? injected.fixedViewMode, defaults.fixedViewMode),
-                fixedPage: parseNum(params.get('fixedPage') ?? injected.fixedPage, defaults.fixedPage),
-                bgColor: params.get('bgColor') ?? injected.bgColor ?? defaults.bgColor,
-                showPageNumbers: parseBool(params.get('showPageNumbers') ?? injected.showPageNumbers, defaults.showPageNumbers),
-                durationSeconds: parseNum(params.get('durationSeconds') ?? injected.durationSeconds, defaults.durationSeconds)
-            };
-
-            return merged;
+            const relPath = candidatePath.slice(idx + 1);
+            const apiUrl = `../../api/group_loop/module_asset_file.php?path=${encodeURIComponent(relPath)}`;
+            return appendToken(apiUrl);
         }
 
-        // Állapot
-        let pdfDoc = null;
-        let currentPage = 1;
-        let totalPages = 0;
-        let currentZoom = 100;
-        let isAutoScrolling = false;
-        let autoScrollTimeout = null;
-        let autoScrollAnimFrame = null;
+        const defaults = {
+            pdfDataBase64: '',
+            pdfDataKey: '',
+            pdfAssetUrl: '',
+            zoomLevel: 100,
+            autoScrollEnabled: false,
+            autoScrollSpeedPxPerSec: 30,
+            autoScrollStartPauseMs: 2000,
+            autoScrollEndPauseMs: 2000,
+            pauseAtPercent: -1,
+            pauseDurationMs: 2000
+        };
 
-        const settings = getSettings();
-        const moduleRoot = document.getElementById('moduleRoot');
-        const pdfViewport = document.getElementById('pdfViewport');
-        const pdfContainer = document.getElementById('pdfContainer');
-        const pdfCanvas = document.getElementById('pdfCanvas');
-        const pdfControls = document.getElementById('pdfControls');
-        const noPdfMessage = document.getElementById('noPdfMessage');
-        const errorMessage = document.getElementById('errorMessage');
-        const loadingIndicator = document.getElementById('loadingIndicator');
+        const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS)
+            ? window.EDUDISPLEJ_SETTINGS
+            : {};
 
-        // UI elemek
-        const prevPageBtn = document.getElementById('prevPageBtn');
-        const nextPageBtn = document.getElementById('nextPageBtn');
-        const pageInput = document.getElementById('pageInput');
-        const goToPageBtn = document.getElementById('goToPageBtn');
-        const zoomInBtn = document.getElementById('zoomInBtn');
-        const zoomOutBtn = document.getElementById('zoomOutBtn');
-        const zoomLevelInput = document.getElementById('zoomLevel');
-        const currentPageSpan = document.getElementById('currentPage');
-        const totalPagesSpan = document.getElementById('totalPages');
+        const params = new URLSearchParams(window.location.search);
+        const legacyNavigationMode = String(params.get('navigationMode') ?? injected.navigationMode ?? 'manual');
 
-        // Event listeners
-        prevPageBtn?.addEventListener('click', () => goToPage(Math.max(1, currentPage - 1)));
-        nextPageBtn?.addEventListener('click', () => goToPage(Math.min(totalPages, currentPage + 1)));
-        goToPageBtn?.addEventListener('click', () => {
-            const page = parseInt(pageInput.value);
-            if (!isNaN(page) && page >= 1 && page <= totalPages) {
-                goToPage(page);
+        const merged = {
+            ...defaults,
+            ...injected,
+            pdfDataBase64: params.get('pdfDataBase64') ?? injected.pdfDataBase64 ?? defaults.pdfDataBase64,
+            pdfDataKey: params.get('pdfDataKey') ?? injected.pdfDataKey ?? defaults.pdfDataKey,
+            pdfAssetUrl: params.get('pdfAssetUrl') ?? injected.pdfAssetUrl ?? defaults.pdfAssetUrl,
+            zoomLevel: parseIntSafe(params.get('zoomLevel') ?? injected.zoomLevel, defaults.zoomLevel),
+            autoScrollEnabled: parseBool(
+                params.get('autoScrollEnabled') ?? injected.autoScrollEnabled,
+                legacyNavigationMode === 'auto'
+            ),
+            autoScrollSpeedPxPerSec: parseIntSafe(params.get('autoScrollSpeedPxPerSec') ?? injected.autoScrollSpeedPxPerSec, defaults.autoScrollSpeedPxPerSec),
+            autoScrollStartPauseMs: parseIntSafe(params.get('autoScrollStartPauseMs') ?? injected.autoScrollStartPauseMs, defaults.autoScrollStartPauseMs),
+            autoScrollEndPauseMs: parseIntSafe(params.get('autoScrollEndPauseMs') ?? injected.autoScrollEndPauseMs, defaults.autoScrollEndPauseMs),
+            pauseAtPercent: parseIntSafe(params.get('pauseAtPercent') ?? injected.pauseAtPercent, defaults.pauseAtPercent),
+            pauseDurationMs: parseIntSafe(params.get('pauseDurationMs') ?? injected.pauseDurationMs, defaults.pauseDurationMs)
+        };
+
+        merged.zoomLevel = Math.max(50, Math.min(250, merged.zoomLevel));
+        merged.autoScrollSpeedPxPerSec = Math.max(5, Math.min(300, merged.autoScrollSpeedPxPerSec));
+        merged.autoScrollStartPauseMs = Math.max(0, merged.autoScrollStartPauseMs);
+        merged.autoScrollEndPauseMs = Math.max(0, merged.autoScrollEndPauseMs);
+        merged.pauseDurationMs = Math.max(0, merged.pauseDurationMs);
+        merged.pauseAtPercent = Math.max(-1, Math.min(100, merged.pauseAtPercent));
+
+        if (!merged.pdfDataBase64 && merged.pdfDataKey) {
+            try {
+                const parentStore = window.parent && window.parent.__edudisplejPdfPreviewStore;
+                if (parentStore && typeof parentStore === 'object' && parentStore[merged.pdfDataKey]) {
+                    merged.pdfDataBase64 = String(parentStore[merged.pdfDataKey] || '');
+                }
+            } catch (error) {
             }
-        });
-        zoomInBtn?.addEventListener('click', () => changeZoom(currentZoom + 10));
-        zoomOutBtn?.addEventListener('click', () => changeZoom(currentZoom - 10));
-        zoomLevelInput?.addEventListener('change', () => changeZoom(parseNum(zoomLevelInput.value, 100)));
+        }
 
-        pageInput?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                goToPageBtn?.click();
+        merged.pdfAssetUrl = normalizeAssetApiUrl(merged.pdfAssetUrl);
+
+        return merged;
+    }
+
+    const settings = getSettings();
+    const statusEl = document.getElementById('status');
+    const viewportEl = document.getElementById('viewport');
+    const pagesEl = document.getElementById('pages');
+
+    let currentRafId = null;
+    let restartTimer = null;
+    let pausedAtPoint = false;
+
+    function showStatus(message, persist = false) {
+        statusEl.textContent = String(message || '');
+        statusEl.classList.add('show');
+        if (!persist) {
+            setTimeout(() => {
+                statusEl.classList.remove('show');
+            }, 1800);
+        }
+    }
+
+    function stopAutoScroll() {
+        if (currentRafId) {
+            cancelAnimationFrame(currentRafId);
+            currentRafId = null;
+        }
+        if (restartTimer) {
+            clearTimeout(restartTimer);
+            restartTimer = null;
+        }
+    }
+
+    async function renderPdf(base64Data) {
+        try {
+            let bytes = null;
+
+            const normalized = normalizeBase64(base64Data);
+            if (normalized) {
+                const binary = atob(normalized);
+                bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i += 1) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+            } else if (settings.pdfAssetUrl) {
+                const response = await fetch(String(settings.pdfAssetUrl), { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error('PDF asset letöltési hiba');
+                }
+                const buffer = await response.arrayBuffer();
+                bytes = new Uint8Array(buffer);
             }
-        });
 
-        // PDF betöltése
-        async function loadPDF(base64Data) {
-            if (!base64Data || typeof base64Data !== 'string') {
-                showError('Nincs PDF adat');
+            if (!bytes || !bytes.length) {
+                showStatus('Nincs PDF feltöltve', true);
+                return false;
+            }
+
+            const pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+            pagesEl.innerHTML = '';
+            const scale = settings.zoomLevel / 100;
+
+            for (let pageIndex = 1; pageIndex <= pdfDoc.numPages; pageIndex += 1) {
+                const page = await pdfDoc.getPage(pageIndex);
+                const viewport = page.getViewport({ scale });
+                const canvas = document.createElement('canvas');
+                canvas.className = 'pdf-page';
+                canvas.width = Math.max(1, Math.floor(viewport.width));
+                canvas.height = Math.max(1, Math.floor(viewport.height));
+                pagesEl.appendChild(canvas);
+
+                await page.render({
+                    canvasContext: canvas.getContext('2d'),
+                    viewport
+                }).promise;
+            }
+
+            return true;
+        } catch (error) {
+            showStatus('PDF betöltési hiba', true);
+            return false;
+        }
+    }
+
+    function runAutoScroll() {
+        stopAutoScroll();
+
+        if (!settings.autoScrollEnabled) {
+            return;
+        }
+
+        const maxScroll = Math.max(0, viewportEl.scrollHeight - viewportEl.clientHeight);
+        if (maxScroll <= 0) {
+            return;
+        }
+
+        pausedAtPoint = false;
+        const speedPerMs = settings.autoScrollSpeedPxPerSec / 1000;
+        let lastTs = null;
+
+        const tick = (timestamp) => {
+            if (lastTs === null) {
+                lastTs = timestamp;
+            }
+
+            const delta = timestamp - lastTs;
+            lastTs = timestamp;
+            const nextTop = Math.min(maxScroll, viewportEl.scrollTop + (speedPerMs * delta));
+            viewportEl.scrollTop = nextTop;
+
+            const progress = maxScroll > 0 ? (nextTop / maxScroll) * 100 : 100;
+
+            if (!pausedAtPoint && settings.pauseAtPercent >= 0 && progress >= settings.pauseAtPercent) {
+                pausedAtPoint = true;
+                restartTimer = setTimeout(() => {
+                    lastTs = null;
+                    currentRafId = requestAnimationFrame(tick);
+                }, settings.pauseDurationMs);
                 return;
             }
 
-            try {
-                loadingIndicator?.classList.remove('hidden');
-                const binaryString = atob(base64Data);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-
-                pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
-                totalPages = pdfDoc.numPages;
-                currentPage = Math.max(1, Math.min(settings.fixedPage || 1, totalPages));
-
-                totalPagesSpan.textContent = totalPages;
-                pageInput.max = totalPages;
-
-                noPdfMessage?.classList.add('hidden');
-                pdfControls.style.display = '';
-                pdfContainer.style.display = 'flex';
-
-                await renderPage(currentPage);
-                loadingIndicator?.classList.add('hidden');
-
-                // Ha fixed view mode, csak egy página megjelenítése
-                if (settings.fixedViewMode) {
-                    pdfControls.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('PDF betöltési hiba:', error);
-                showError('PDF betöltési hiba: ' + (error.message || 'Ismeretlen hiba'));
-                loadingIndicator?.classList.add('hidden');
-            }
-        }
-
-        // Oldal renderelése
-        async function renderPage(pageNum) {
-            if (!pdfDoc || pageNum < 1 || pageNum > totalPages) {
+            if (nextTop >= maxScroll) {
+                restartTimer = setTimeout(() => {
+                    viewportEl.scrollTop = 0;
+                    pausedAtPoint = false;
+                    lastTs = null;
+                    currentRafId = requestAnimationFrame(tick);
+                }, settings.autoScrollEndPauseMs);
                 return;
             }
 
-            try {
-                const page = await pdfDoc.getPage(pageNum);
-                currentZoom = Math.max(50, Math.min(400, parseNum(settings.zoomLevel, 100)));
-                
-                const viewport = page.getViewport({ scale: currentZoom / 100 });
-                pdfCanvas.width = viewport.width;
-                pdfCanvas.height = viewport.height;
+            currentRafId = requestAnimationFrame(tick);
+        };
 
-                const renderContext = {
-                    canvasContext: pdfCanvas.getContext('2d'),
-                    viewport: viewport
-                };
+        restartTimer = setTimeout(() => {
+            currentRafId = requestAnimationFrame(tick);
+        }, settings.autoScrollStartPauseMs);
+    }
 
-                await page.render(renderContext).promise;
-                
-                currentPage = pageNum;
-                currentPageSpan.textContent = currentPage;
-                pageInput.value = currentPage;
-                zoomLevelInput.value = currentZoom;
-
-                prevPageBtn.disabled = currentPage <= 1;
-                nextPageBtn.disabled = currentPage >= totalPages;
-            } catch (error) {
-                console.error('Oldal renderelési hiba:', error);
-                showError('Renderelésis hiba: ' + (error.message || 'Ismeretlen hiba'));
-            }
+    async function init() {
+        const success = await renderPdf(settings.pdfDataBase64);
+        if (!success) {
+            return;
         }
+        runAutoScroll();
+    }
 
-        // Oldal váltása
-        async function goToPage(pageNum) {
-            if (pdfDoc && pageNum >= 1 && pageNum <= totalPages) {
-                await renderPage(pageNum);
-            }
-        }
-
-        // Zoom módosítása
-        async function changeZoom(newZoom) {
-            newZoom = Math.max(50, Math.min(400, newZoom));
-            currentZoom = newZoom;
-            zoomLevelInput.value = newZoom;
-            await renderPage(currentPage);
-        }
-
-        // Hiba megjelenítése
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.classList.remove('hidden');
-            noPdfMessage?.classList.add('hidden');
-            pdfControls.style.display = 'none';
-        }
-
-        // Inicializáció
-        async function init() {
-            // Beállítások alkalmazása
-            moduleRoot.style.backgroundColor = settings.bgColor || '#ffffff';
-            pdfContainer.style.display = 'none';
-
-            if (settings.pdfDataBase64) {
-                await loadPDF(settings.pdfDataBase64);
-
-                // Ha manual navigation mód, kontroller mutatása
-                if (settings.navigationMode === 'manual') {
-                    pdfControls.style.display = '';
-                }
-            } else {
-                noPdfMessage.textContent = 'Nincs PDF feltöltve';
-            }
-        }
-
-        // Indulás
-        init();
-    </script>
+    init();
+</script>
 </body>
 </html>

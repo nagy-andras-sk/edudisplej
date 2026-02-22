@@ -7,6 +7,7 @@
 session_start();
 require_once '../dbkonfiguracia.php';
 require_once '../auth_roles.php';
+require_once '../i18n.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -23,7 +24,12 @@ $error = '';
 $success = '';
 $user_id = $_SESSION['user_id'];
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
+$session_company_id = isset($_SESSION['company_id']) ? (int)$_SESSION['company_id'] : 0;
 $default_group_id = null;
+$has_group_modules_is_active = false;
+$has_group_created_at = false;
+$has_group_modules_created_at = false;
+$has_group_modules_updated_at = false;
 
 function format_loop_version($value) {
     if ($value === null || $value === '') {
@@ -53,13 +59,21 @@ function format_loop_version($value) {
 $company_id = null;
 try {
     $conn = getDbConnection();
-    $stmt = $conn->prepare("SELECT company_id FROM users WHERE id = ?");
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $user = $result->fetch_assoc();
-    $company_id = $user['company_id'];
-    $stmt->close();
+    if ($session_company_id > 0) {
+        $company_id = $session_company_id;
+    } else {
+        $stmt = $conn->prepare("SELECT company_id FROM users WHERE id = ?");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user = $result->fetch_assoc();
+        $company_id = (int)($user['company_id'] ?? 0);
+        $stmt->close();
+    }
+
+    if ((int)$company_id <= 0) {
+        throw new Exception('Invalid company context in groups.php');
+    }
     
     // Ensure kiosk_groups table exists
     $conn->query("CREATE TABLE IF NOT EXISTS kiosk_groups (
@@ -98,14 +112,28 @@ try {
         FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+    $has_is_active_col = $conn->query("SHOW COLUMNS FROM kiosk_group_modules LIKE 'is_active'");
+    if ($has_is_active_col && $has_is_active_col->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_group_modules ADD COLUMN is_active TINYINT(1) DEFAULT 1 AFTER settings");
+        $has_group_modules_is_active = true;
+    } else {
+        $has_group_modules_is_active = (bool)($has_is_active_col && $has_is_active_col->num_rows > 0);
+    }
+
     // Ensure kiosk_group_loop_plans table exists (planner loop styles per group)
     $conn->query("CREATE TABLE IF NOT EXISTS kiosk_group_loop_plans (
         group_id INT(11) NOT NULL PRIMARY KEY,
         plan_json LONGTEXT NOT NULL,
+        plan_version BIGINT NOT NULL DEFAULT 0,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_updated_at (updated_at),
         FOREIGN KEY (group_id) REFERENCES kiosk_groups(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $has_plan_version_col = $conn->query("SHOW COLUMNS FROM kiosk_group_loop_plans LIKE 'plan_version'");
+    if ($has_plan_version_col && $has_plan_version_col->num_rows === 0) {
+        $conn->query("ALTER TABLE kiosk_group_loop_plans ADD COLUMN plan_version BIGINT NOT NULL DEFAULT 0 AFTER plan_json");
+    }
 
     // Ensure new columns exist for priority and default handling
     $columns_result = $conn->query("SHOW COLUMNS FROM kiosk_groups");
@@ -119,6 +147,27 @@ try {
     if (!isset($existing_columns['is_default'])) {
         $conn->query("ALTER TABLE kiosk_groups ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0");
     }
+    if (!isset($existing_columns['created_at'])) {
+        $conn->query("ALTER TABLE kiosk_groups ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+    }
+    $has_group_created_at = true;
+
+    $kgm_columns_result = $conn->query("SHOW COLUMNS FROM kiosk_group_modules");
+    $kgm_columns = [];
+    if ($kgm_columns_result) {
+        while ($kgm_col = $kgm_columns_result->fetch_assoc()) {
+            $kgm_columns[$kgm_col['Field']] = true;
+        }
+    }
+
+    if (!isset($kgm_columns['created_at'])) {
+        $conn->query("ALTER TABLE kiosk_group_modules ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+    }
+    if (!isset($kgm_columns['updated_at'])) {
+        $conn->query("ALTER TABLE kiosk_group_modules ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    }
+    $has_group_modules_created_at = true;
+    $has_group_modules_updated_at = true;
 
     // Ensure default group exists for this company
     $stmt = $conn->prepare("SELECT id, name FROM kiosk_groups WHERE company_id = ? AND is_default = 1 LIMIT 1");
@@ -194,6 +243,9 @@ try {
     
 } catch (Exception $e) {
     $error = 'Database error';
+    if ($is_admin) {
+        $error .= ': ' . $e->getMessage();
+    }
     error_log($e->getMessage());
 }
 
@@ -206,6 +258,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_group'])) {
         $error = 'A csoport neve kötelező';
     } else {
         try {
+            $duplicate_stmt = $conn->prepare("SELECT id FROM kiosk_groups WHERE company_id = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1");
+            if (!$duplicate_stmt) {
+                throw new Exception('Duplicate-check prepare failed: ' . $conn->error);
+            }
+            $duplicate_stmt->bind_param("is", $company_id, $name);
+            $duplicate_stmt->execute();
+            $duplicate_row = $duplicate_stmt->get_result()->fetch_assoc();
+            $duplicate_stmt->close();
+
+            if ($duplicate_row) {
+                $error = t_def('groups.error.duplicate_name', 'Ilyen nevű csoport már létezik ennél a cégnél.');
+                throw new Exception('Duplicate group name blocked');
+            }
+
             $stmt = $conn->prepare("SELECT COALESCE(MAX(priority), 0) as max_priority FROM kiosk_groups WHERE company_id = ?");
             $stmt->bind_param("i", $company_id);
             $stmt->execute();
@@ -238,25 +304,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_group'])) {
 
             $plan_json = json_encode($default_plan, JSON_UNESCAPED_UNICODE);
             if ($plan_json === false) {
-                throw new Exception('Default loop plan json encode failed');
+                throw new Exception(t_def('groups.error.default_plan_json_failed', 'Default loop plan json encode failed'));
             }
 
-            $plan_stmt = $conn->prepare("INSERT INTO kiosk_group_loop_plans (group_id, plan_json) VALUES (?, ?)");
-            $plan_stmt->bind_param("is", $new_group_id, $plan_json);
+            $plan_version = (int)round(microtime(true) * 1000);
+            $plan_version_str = (string)$plan_version;
+            $plan_stmt = $conn->prepare("INSERT INTO kiosk_group_loop_plans (group_id, plan_json, plan_version) VALUES (?, ?, ?)");
+            $plan_stmt->bind_param("iss", $new_group_id, $plan_json, $plan_version_str);
 
             if (!$plan_stmt->execute()) {
-                throw new Exception('Default loop plan insert failed');
+                throw new Exception(t_def('groups.error.default_plan_insert_failed', 'Default loop plan insert failed'));
             }
 
             $plan_stmt->close();
             $conn->commit();
-            $success = 'Csoport sikeresen létrehozva (alap loop létrehozva)';
+            $success = t_def('groups.success.created', 'Csoport sikeresen létrehozva.');
         } catch (Exception $e) {
             if ($conn) {
                 try { $conn->rollback(); } catch (Throwable $rollbackError) {}
             }
-            $error = 'Adatbázis hiba';
-            error_log($e->getMessage());
+            if ($error === '') {
+                $error = t_def('groups.error.db', 'Adatbázis hiba');
+                error_log($e->getMessage());
+            }
         }
     }
 }
@@ -274,7 +344,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
         
         if ($group && ($is_admin || $group['company_id'] == $company_id)) {
             if ((int)$group['is_default'] === 1) {
-                $error = 'Az alapértelmezett csoport nem törölhető';
+                $error = t_def('groups.error.default_not_deletable', 'Az alapértelmezett csoport nem törölhető');
             } else {
                 if ($default_group_id) {
                     $move_stmt = $conn->prepare("INSERT IGNORE INTO kiosk_group_assignments (kiosk_id, group_id)
@@ -293,18 +363,18 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
                 $stmt->bind_param("i", $group_id);
                 
                 if ($stmt->execute()) {
-                    $success = 'Csoport sikeresen törölve, a kijelzők átkerültek az alapértelmezett csoportba';
+                    $success = t_def('groups.success.deleted_and_moved', 'Csoport sikeresen törölve, a kijelzők átkerültek az alapértelmezett csoportba');
                 } else {
-                    $error = 'A csoport törlése sikertelen';
+                    $error = t_def('groups.error.delete_failed', 'A csoport törlése sikertelen');
                 }
             }
         } else {
-            $error = 'Hozzáférés megtagadva';
+            $error = t_def('groups.error.access_denied', 'Hozzáférés megtagadva');
         }
         
         $stmt->close();
     } catch (Exception $e) {
-        $error = 'Adatbázis hiba';
+        $error = t_def('groups.error.db', 'Adatbázis hiba');
         error_log($e->getMessage());
     }
 }
@@ -312,15 +382,43 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
 // Get groups for this company
 $groups = [];
 try {
+    if (!isset($conn) || !($conn instanceof mysqli)) {
+        $conn = getDbConnection();
+    }
+
+    if ((int)$company_id <= 0) {
+        throw new Exception('Missing company_id for groups listing');
+    }
+
+    $active_filter_sql = $has_group_modules_is_active ? ' AND kgm.is_active = 1' : '';
+    $module_time_sql = 'NULL';
+    if ($has_group_modules_updated_at && $has_group_modules_created_at) {
+        $module_time_sql = 'COALESCE(kgm.updated_at, kgm.created_at)';
+    } elseif ($has_group_modules_updated_at) {
+        $module_time_sql = 'kgm.updated_at';
+    } elseif ($has_group_modules_created_at) {
+        $module_time_sql = 'kgm.created_at';
+    }
+
+    $group_fallback_sql = $has_group_created_at
+        ? "DATE_FORMAT(g.created_at, '%Y%m%d%H%i%s')"
+        : "DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')";
+
     $query = "SELECT g.*,
               (SELECT COUNT(*) FROM kiosk_group_assignments WHERE group_id = g.id) as kiosk_count,
-              (SELECT DATE_FORMAT(MAX(COALESCE(kgm.updated_at, kgm.created_at)), '%Y%m%d%H%i%s')
+                            COALESCE(
+                                (SELECT DATE_FORMAT(MAX({$module_time_sql}), '%Y%m%d%H%i%s')
                  FROM kiosk_group_modules kgm
-                WHERE kgm.group_id = g.id AND kgm.is_active = 1) as loop_version
+                                WHERE kgm.group_id = g.id{$active_filter_sql}),
+                                {$group_fallback_sql}
+                            ) as loop_version
               FROM kiosk_groups g 
               WHERE g.company_id = ? 
               ORDER BY g.priority DESC, g.name";
     $stmt = $conn->prepare($query);
+    if (!$stmt) {
+        throw new Exception('Group list query prepare failed: ' . $conn->error);
+    }
     $stmt->bind_param("i", $company_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -331,6 +429,10 @@ try {
     
     $stmt->close();
 } catch (Exception $e) {
+    $error = t_def('groups.error.db', 'Adatbázis hiba');
+    if ($is_admin) {
+        $error .= ': ' . $e->getMessage();
+    }
     error_log($e->getMessage());
 }
 
@@ -442,6 +544,8 @@ closeDbConnection($conn);
             }
         }
     </style>
+
+    <div id="groups-notifier" style="position:fixed; top:20px; right:20px; z-index:3000; min-width:280px; max-width:420px; display:none; padding:12px 14px; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.2); font-size:13px; font-weight:600;"></div>
         
         <?php if ($error): ?>
             <div class="error">⚠️ <?php echo htmlspecialchars($error); ?></div>
@@ -454,8 +558,8 @@ closeDbConnection($conn);
         <!-- Groups Table -->
         <div class="card">
             <div style="margin-bottom: 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                <div style="font-size: 14px; font-weight: 700; color: #1f2d3d;">Csoportok (<?php echo count($groups); ?>)</div>
-                <a href="group_assignment.php" class="btn btn-primary">Grafikus hozzárendelés (drag & drop)</a>
+                <div style="font-size: 14px; font-weight: 700; color: #1f2d3d;"><?php echo htmlspecialchars(t_def('groups.title', 'Csoportok')); ?> (<?php echo count($groups); ?>)</div>
+                <a href="group_kiosks.php" class="btn btn-primary"><?php echo htmlspecialchars(t_def('groups.assignment_button', 'Kijelzők hozzárendelése csoportokhoz')); ?></a>
             </div>
             
             <form method="POST" action="">
@@ -463,11 +567,11 @@ closeDbConnection($conn);
                     <thead>
                         <tr>
                             <th></th>
-                            <th>Csoport Neve</th>
-                            <th>Leírás</th>
-                            <th>Kijelzők</th>
-                            <th>Prioritás</th>
-                            <th>Műveletek</th>
+                            <th><?php echo htmlspecialchars(t_def('groups.table.name', 'Csoport neve')); ?></th>
+                            <th><?php echo htmlspecialchars(t_def('groups.table.description', 'Leírás')); ?></th>
+                            <th><?php echo htmlspecialchars(t_def('groups.table.kiosks', 'Kijelzők')); ?></th>
+                            <th><?php echo htmlspecialchars(t_def('groups.table.priority', 'Prioritás')); ?></th>
+                            <th><?php echo htmlspecialchars(t_def('groups.table.actions', 'Műveletek')); ?></th>
                         </tr>
                     </thead>
                     <tbody id="groupsTableBody">
@@ -475,9 +579,9 @@ closeDbConnection($conn);
                             <tr class="group-row <?php echo !empty($group['is_default']) ? 'not-draggable' : ''; ?>" data-group-id="<?php echo $group['id']; ?>" data-default="<?php echo !empty($group['is_default']) ? '1' : '0'; ?>">
                                 <td style="width: 32px; text-align: center;">
                                     <?php if (!empty($group['is_default'])): ?>
-                                        <span class="drag-handle" title="Alapértelmezett csoport">🔒</span>
+                                        <span class="drag-handle" title="<?php echo htmlspecialchars(t_def('groups.default_group_title', 'Alapértelmezett csoport')); ?>">🔒</span>
                                     <?php else: ?>
-                                        <span class="drag-handle" title="Húzd a sorrendhez">☰</span>
+                                        <span class="drag-handle" title="<?php echo htmlspecialchars(t_def('groups.drag_to_reorder', 'Húzd a sorrendhez')); ?>">☰</span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
@@ -490,11 +594,11 @@ closeDbConnection($conn);
                                             <?php echo htmlspecialchars($group['name']); ?>
                                         </strong>
                                         <?php if (!empty($group['is_default'])): ?>
-                                            <span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">Alapértelmezett</span>
+                                            <span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;"><?php echo htmlspecialchars(t_def('groups.default_badge', 'Alapértelmezett')); ?></span>
                                         <?php endif; ?>
                                     </div>
                                     <?php if (!$is_default_group): ?>
-                                        <div style="font-size:11px;color:#75879a;margin-top:2px;">Loop verzió: <?php echo htmlspecialchars($group_loop_version); ?></div>
+                                        <div style="font-size:11px;color:#75879a;margin-top:2px;"><?php echo htmlspecialchars(t_def('groups.loop_version', 'Loop verzió')); ?>: <?php echo htmlspecialchars($group_loop_version); ?></div>
                                     <?php endif; ?>
                                 </td>
                                 <td style="color: #666; font-size: 13px;">
@@ -502,7 +606,7 @@ closeDbConnection($conn);
                                 </td>
                                 <td>
                                     <span class="group-kiosk-chip">
-                                        <?php echo (int)$group['kiosk_count']; ?> kijelző
+                                        <?php echo (int)$group['kiosk_count']; ?> <?php echo htmlspecialchars(t_def('groups.kiosk_unit', 'kijelző')); ?>
                                     </span>
                                 </td>
                                 <td>
@@ -511,29 +615,29 @@ closeDbConnection($conn);
                                     </span>
                                 </td>
                                 <td>
-                                    <div class="group-action-row">
-                                        <a href="group_loop/index.php?id=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-primary">⚙️ Testreszabás</a>
-                                        <?php if (!empty($group['is_default'])): ?>
-                                            <span class="group-action-btn group-action-btn-danger group-action-btn-disabled">🗑️</span>
-                                        <?php else: ?>
-                                            <a href="?delete=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-danger" onclick="return confirm('Biztosan törlöd ezt a csoportot?');">🗑️</a>
-                                        <?php endif; ?>
-                                    </div>
+                                    <?php if (!empty($group['is_default'])): ?>
+                                        <span style="color:#9aa5b1; font-size:12px;">—</span>
+                                    <?php else: ?>
+                                        <div class="group-action-row">
+                                            <a href="group_loop/index.php?id=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-primary">⚙️ <?php echo htmlspecialchars(t_def('groups.customize', 'Testreszabás')); ?></a>
+                                            <a href="?delete=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-danger" onclick="return confirm('<?php echo htmlspecialchars(t_def('groups.confirm_delete', 'Biztosan törlöd ezt a csoportot?'), ENT_QUOTES, 'UTF-8'); ?>');">🗑️</a>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                     <tbody>
                         <tr class="new-group-separator">
-                            <td colspan="6">Új csoport létrehozása</td>
+                            <td colspan="6"><?php echo htmlspecialchars(t_def('groups.new_group_section', 'Új csoport létrehozása')); ?></td>
                         </tr>
                         <tr class="new-group-row">
                             <td></td>
-                            <td><input type="text" id="group_name" name="group_name" required placeholder="Csoport neve"></td>
-                            <td><input type="text" id="description" name="description" placeholder="pl. Emelet 1, Épület A"></td>
-                            <td style="color:#75879a; font-size:12px;">0 kijelző</td>
-                            <td style="color:#75879a; font-size:12px;">Automatikus</td>
-                            <td><button type="submit" name="create_group" class="btn btn-primary" style="width: 100%;">+ Létrehozás</button></td>
+                            <td><input type="text" id="group_name" name="group_name" required placeholder="<?php echo htmlspecialchars(t_def('groups.placeholder.name', 'Csoport neve')); ?>"></td>
+                            <td><input type="text" id="description" name="description" placeholder="<?php echo htmlspecialchars(t_def('groups.placeholder.description', 'pl. Emelet 1, Épület A')); ?>"></td>
+                            <td style="color:#75879a; font-size:12px;">0 <?php echo htmlspecialchars(t_def('groups.kiosk_unit', 'kijelző')); ?></td>
+                            <td style="color:#75879a; font-size:12px;"><?php echo htmlspecialchars(t_def('groups.auto', 'Automatikus')); ?></td>
+                            <td><button type="submit" name="create_group" class="btn btn-primary" style="width: 100%;">+ <?php echo htmlspecialchars(t_def('groups.create', 'Létrehozás')); ?></button></td>
                         </tr>
                     </tbody>
                 </table>
@@ -542,7 +646,37 @@ closeDbConnection($conn);
     </div>
     
     <script>
+        const groupsI18n = <?php echo json_encode([
+            'errorOccurred' => t_def('groups.error_occurred', 'Hiba történt: {error}'),
+            'serverError' => (string)$error,
+            'serverSuccess' => (string)$success
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+
         const totalGroups = <?php echo count($groups); ?>;
+
+        function showGroupsNotice(message, type = 'error') {
+            const notifier = document.getElementById('groups-notifier');
+            if (!notifier || !message) {
+                return;
+            }
+
+            notifier.textContent = message;
+            if (type === 'success') {
+                notifier.style.background = '#e8f5e9';
+                notifier.style.color = '#1b5e20';
+                notifier.style.border = '1px solid #a5d6a7';
+            } else {
+                notifier.style.background = '#ffebee';
+                notifier.style.color = '#b71c1c';
+                notifier.style.border = '1px solid #ef9a9a';
+            }
+            notifier.style.display = 'block';
+
+            window.clearTimeout(showGroupsNotice.__timer);
+            showGroupsNotice.__timer = window.setTimeout(() => {
+                notifier.style.display = 'none';
+            }, type === 'success' ? 2800 : 4200);
+        }
 
         function updatePriorityLabels() {
             const rows = Array.from(document.querySelectorAll('#groupsTableBody .group-row'));
@@ -583,11 +717,11 @@ closeDbConnection($conn);
                 if (data.success) {
                     updatePriorityLabels();
                 } else {
-                    alert('⚠️ ' + data.message);
+                    showGroupsNotice('⚠️ ' + (data.message || 'Ismeretlen hiba'), 'error');
                 }
             })
             .catch(error => {
-                alert('⚠️ Hiba történt: ' + error);
+                showGroupsNotice('⚠️ ' + groupsI18n.errorOccurred.replace('{error}', String(error)), 'error');
             });
         }
 
@@ -649,6 +783,12 @@ closeDbConnection($conn);
 
         updatePriorityLabels();
         initDragAndDrop();
+
+        if (groupsI18n.serverError) {
+            showGroupsNotice('⚠️ ' + groupsI18n.serverError, 'error');
+        } else if (groupsI18n.serverSuccess) {
+            showGroupsNotice('✓ ' + groupsI18n.serverSuccess, 'success');
+        }
     </script>
 <?php include '../admin/footer.php'; ?>
 

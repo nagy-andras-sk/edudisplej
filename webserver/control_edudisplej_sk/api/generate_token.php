@@ -6,6 +6,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 
 header('Content-Type: application/json');
 
@@ -16,7 +17,7 @@ $response = [
 
 // Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
-    $response['message'] = 'Admin access required';
+    $response['message'] = t_def('api.generate_token.admin_required', 'Admin access required');
     http_response_code(403);
     echo json_encode($response);
     exit;
@@ -29,7 +30,7 @@ try {
     $action = $input['action'] ?? 'generate'; // generate or regenerate
     
     if (empty($company_id)) {
-        $response['message'] = 'Company ID is required';
+        $response['message'] = t_def('api.generate_token.company_id_required', 'Company ID is required');
         echo json_encode($response);
         exit;
     }
@@ -43,7 +44,7 @@ try {
     $result = $stmt->get_result();
     
     if ($result->num_rows === 0) {
-        $response['message'] = 'Company not found';
+        $response['message'] = t_def('api.generate_token.company_not_found', 'Company not found');
         echo json_encode($response);
         exit;
     }
@@ -54,7 +55,7 @@ try {
     // Check if token already exists and action is generate (not regenerate)
     if (!empty($company['api_token']) && $action === 'generate') {
         $response['success'] = true;
-        $response['message'] = 'Token already exists';
+        $response['message'] = t_def('api.generate_token.already_exists', 'Token already exists');
         $response['token'] = $company['api_token'];
         $response['company_name'] = $company['name'];
         echo json_encode($response);
@@ -80,7 +81,7 @@ try {
     }
     
     if (!$update_stmt->execute()) {
-        $response['message'] = 'Failed to save token: ' . $update_stmt->error;
+        $response['message'] = t_def('api.generate_token.save_failed', 'Failed to save token') . ': ' . $update_stmt->error;
         echo json_encode($response);
         exit;
     }
@@ -89,7 +90,9 @@ try {
     $conn->close();
     
     $response['success'] = true;
-    $response['message'] = $action === 'regenerate' ? 'Token regenerated successfully' : 'Token generated successfully';
+    $response['message'] = $action === 'regenerate'
+        ? t_def('api.generate_token.regenerated', 'Token regenerated successfully')
+        : t_def('api.generate_token.generated', 'Token generated successfully');
     $response['token'] = $new_token;
     $response['company_name'] = $company['name'];
     $response['install_command'] = "curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token={$new_token}";
@@ -97,6 +100,6 @@ try {
     echo json_encode($response);
     
 } catch (Exception $e) {
-    $response['message'] = 'Error: ' . $e->getMessage();
+    $response['message'] = t_def('api.common.error', 'Error') . ': ' . $e->getMessage();
     echo json_encode($response);
 }

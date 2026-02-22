@@ -23,11 +23,11 @@ $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_language'])) {
     $new_lang = edudisplej_normalize_lang($_POST['lang'] ?? '');
     if (!$new_lang) {
-        $error = 'Érvénytelen nyelv.';
+        $error = t_def('settings.language.invalid', 'Érvénytelen nyelv.');
     } else {
         edudisplej_set_lang($new_lang, true);
         $user_lang = $new_lang;
-        $success = 'Nyelv sikeresen mentve.';
+        $success = t_def('settings.language.saved', 'Nyelv sikeresen mentve.');
     }
 }
 
@@ -52,7 +52,7 @@ include '../admin/header.php';
 
     <form method="post" class="form-row">
         <div class="form-field" style="min-width:260px;">
-            <label for="lang">Nyelv / Language / Jazyk</label>
+            <label for="lang"><?php echo htmlspecialchars(t_def('settings.language.label', 'Nyelv / Language / Jazyk')); ?></label>
             <select id="lang" name="lang">
                 <?php foreach ($supported_langs as $lang_code): ?>
                     <option value="<?php echo htmlspecialchars($lang_code); ?>" <?php echo $user_lang === $lang_code ? 'selected' : ''; ?>>
@@ -63,7 +63,7 @@ include '../admin/header.php';
         </div>
 
         <div class="form-field">
-            <button type="submit" name="save_language" class="btn btn-primary">Mentés</button>
+            <button type="submit" name="save_language" class="btn btn-primary"><?php echo htmlspecialchars(t_def('common.save', 'Mentés')); ?></button>
         </div>
     </form>
 </div>

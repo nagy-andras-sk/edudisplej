@@ -10,6 +10,43 @@ LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 INIT_BASE="https://install.edudisplej.sk/init"
 BACKUP_DIR="${TARGET_DIR}.backup.$(date +%s)"
 TOKEN_FILE="${TARGET_DIR}/lic/token"
+APT_UPDATED="false"
+
+wait_for_apt_locks() {
+    local timeout_seconds="${1:-180}"
+    local waited=0
+    while fuser /var/lib/dpkg/lock >/dev/null 2>&1 \
+        || fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+        || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 \
+        || fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+        if [ "$waited" -ge "$timeout_seconds" ]; then
+            return 1
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    return 0
+}
+
+apt_install_missing() {
+    local package="$1"
+    if command -v "$package" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo "[!] ${package} nie je nainstalovany. Instalujem..."
+    wait_for_apt_locks 240 || {
+        echo "[!] CHYBA: APT lock timeout"
+        return 1
+    }
+
+    if [ "$APT_UPDATED" != "true" ]; then
+        apt-get update -qq || return 1
+        APT_UPDATED="true"
+    fi
+
+    apt-get install -y "$package" >/dev/null 2>&1
+}
 
 # Kontrola root opravneni / Root jogok ellenorzese
 echo "[*] Kontrola opravneni root..."
@@ -26,16 +63,10 @@ if [ ! -d "$TARGET_DIR" ]; then
 fi
 
 # Kontrola curl / Curl ellenorzes
-if ! command -v curl >/dev/null 2>&1; then
-  echo "[!] curl nie je nainstalovany. Instalujem..."
-  apt-get update -qq && apt-get install -y curl >/dev/null 2>&1
-fi
+apt_install_missing "curl"
 
 # Kontrola jq / jq ellenorzes
-if ! command -v jq >/dev/null 2>&1; then
-  echo "[!] jq nie je nainstalovany. Instalujem..."
-  apt-get update -qq && apt-get install -y jq >/dev/null 2>&1
-fi
+apt_install_missing "jq"
 
 echo ""
 echo "=========================================="
@@ -91,7 +122,7 @@ if [ "$USE_STRUCTURE" = true ]; then
         if ! command -v python3 >/dev/null 2>&1; then
             echo "[!] CHYBA: Ani jq ani python3 nie su nainstalovane!"
             echo "[!] Instalujem python3..."
-            apt-get update -qq && apt-get install -y python3 >/dev/null 2>&1 || {
+            apt_install_missing "python3" || {
                 echo "[!] Nepodarilo sa nainstalovat python3"
                 echo "[!] Prepínam na staru metodu..."
                 USE_STRUCTURE=false

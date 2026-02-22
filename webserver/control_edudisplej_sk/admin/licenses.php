@@ -13,6 +13,16 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['
     exit();
 }
 
+if (isset($_GET['new_license'])) {
+    $target_company_id = (int)($_GET['new_license'] ?? 0);
+    if ($target_company_id > 0) {
+        header('Location: module_licenses.php?company_id=' . $target_company_id);
+    } else {
+        header('Location: module_licenses.php');
+    }
+    exit();
+}
+
 $error   = '';
 $success = '';
 
@@ -81,32 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($kiosk_id > 0) {
             try {
                 $conn = getDbConnection();
-                // Check slot availability
-                $stmt = $conn->prepare("SELECT k.company_id FROM kiosks k WHERE k.id = ?");
+                $stmt = $conn->prepare("UPDATE kiosks SET license_active = 1 WHERE id = ?");
                 $stmt->bind_param("i", $kiosk_id);
                 $stmt->execute();
-                $krow = $stmt->get_result()->fetch_assoc();
                 $stmt->close();
-
-                if ($krow) {
-                    $cid = (int)$krow['company_id'];
-                    $stmt = $conn->prepare("SELECT cl.device_limit, (SELECT COUNT(*) FROM kiosks WHERE company_id=? AND license_active=1) as used_slots FROM company_licenses cl WHERE cl.company_id=? AND cl.status='active' ORDER BY cl.valid_until DESC LIMIT 1");
-                    $stmt->bind_param("ii", $cid, $cid);
-                    $stmt->execute();
-                    $lic = $stmt->get_result()->fetch_assoc();
-                    $stmt->close();
-
-                    if ($lic && (int)$lic['used_slots'] >= (int)$lic['device_limit']) {
-                        $error = 'No free license slot. Deactivate one device first.';
-                    } else {
-                        $stmt = $conn->prepare("UPDATE kiosks SET license_active = 1 WHERE id = ?");
-                        $stmt->bind_param("i", $kiosk_id);
-                        $stmt->execute();
-                        $stmt->close();
-                        log_security_event('license_change', $_SESSION['user_id'], $_SESSION['username'] ?? '', $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', ['kiosk_id' => $kiosk_id, 'action' => 'activate']);
-                        $success = 'Device activated.';
-                    }
-                }
+                log_security_event('license_change', $_SESSION['user_id'], $_SESSION['username'] ?? '', $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', ['kiosk_id' => $kiosk_id, 'action' => 'activate']);
+                $success = 'Device activated.';
                 closeDbConnection($conn);
             } catch (Exception $e) {
                 $error = 'Hiba: ' . htmlspecialchars($e->getMessage());
@@ -185,6 +175,10 @@ require_once 'header.php';
 
 <h2 class="page-title">Institution Licenses</h2>
 
+<div class="alert" style="background:#eef4fb;color:#1f3f5b;border-left:4px solid #3b82f6;">
+    Modul licensz kiosztáshoz a <a href="module_licenses.php" style="font-weight:700;">Module Licenses</a> oldalt használd.
+</div>
+
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
@@ -214,7 +208,7 @@ require_once 'header.php';
                         $valid_until_ts = $c['valid_until'] ? strtotime($c['valid_until']) : 0;
                         $expired  = $valid_until_ts && $valid_until_ts < time();
                         $expiring = $valid_until_ts && $valid_until_ts < strtotime('+30 days') && !$expired;
-                        $over_limit = ($c['device_limit'] > 0) && ((int)$c['used_slots'] >= (int)$c['device_limit']);
+                        $over_limit = ($c['device_limit'] > 0) && ((int)$c['used_slots'] > (int)$c['device_limit']);
                     ?>
                     <tr>
                         <td><?php echo htmlspecialchars($c['name']); ?></td>
@@ -242,11 +236,7 @@ require_once 'header.php';
                             <?php endif; ?>
                         </td>
                         <td class="nowrap">
-                            <?php if ($c['license_id']): ?>
-                                <a href="licenses.php?edit_license=<?php echo (int)$c['license_id']; ?>" class="btn btn-small btn-secondary">Edit</a>
-                            <?php else: ?>
-                                <a href="licenses.php?new_license=<?php echo (int)$c['id']; ?>" class="btn btn-small btn-primary">Create license</a>
-                            <?php endif; ?>
+                            <a href="module_licenses.php?company_id=<?php echo (int)$c['id']; ?>" class="btn btn-small btn-primary">Module licenses</a>
                             <a href="licenses.php?company_id=<?php echo (int)$c['id']; ?>" class="btn btn-small">Devices</a>
                         </td>
                     </tr>
@@ -312,8 +302,8 @@ if ($form_company_id > 0 || $edit_license):
 ?>
 <div class="panel" style="margin-top:20px;">
     <div class="panel-title">Devices<?php echo htmlspecialchars($limit_info); ?></div>
-    <?php if ($sel_comp && (int)$sel_comp['used_slots'] >= (int)$sel_comp['device_limit'] && $sel_comp['device_limit']): ?>
-        <div class="alert error" style="margin:10px 0;">⚠️ License limit reached. No free slots.</div>
+    <?php if ($sel_comp && (int)$sel_comp['used_slots'] > (int)$sel_comp['device_limit'] && $sel_comp['device_limit']): ?>
+        <div class="alert error" style="margin:10px 0;">⚠️ Túlfelhasználás: used nagyobb mint purchased.</div>
     <?php endif; ?>
     <div class="table-wrap">
         <table>

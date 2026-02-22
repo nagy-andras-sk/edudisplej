@@ -116,18 +116,7 @@ get_loop_config() {
 download_module() {
     local device_id="$1"
     local module_name="$2"
-    local module_dir_key="$module_name"
-    case "$module_name" in
-        clock|datetime|dateclock)
-            module_dir_key="datetime"
-            ;;
-        default-logo)
-            module_dir_key="default"
-            ;;
-        *)
-            module_dir_key="$module_name"
-            ;;
-    esac
+    local module_dir_key="${3:-$module_name}"
     local module_dir="${MODULES_DIR}/${module_dir_key}"
     
     log "Downloading module: $module_name"
@@ -208,15 +197,32 @@ save_loop_config() {
     
     if command -v jq >/dev/null 2>&1; then
         # Parse loop data and add metadata
-        local loop_data=$(echo "$loop_response" | jq '.loop_config')
+        local loop_data=$(echo "$loop_response" | jq '.loop_config // []')
+        local offline_plan=$(echo "$loop_response" | jq '.offline_plan // null')
         local loop_last_update=$(echo "$loop_response" | jq -r '.loop_last_update // empty')
+        local loop_plan_version=$(echo "$loop_response" | jq -r '.loop_plan_version // 0')
+        local active_scope=$(echo "$loop_response" | jq -r '.active_scope // "base"')
+        local active_time_block_id=$(echo "$loop_response" | jq -r '.active_time_block_id // empty')
         [ -z "$loop_last_update" ] && loop_last_update="$(date '+%Y-%m-%d %H:%M:%S')"
+
+        if [ "$offline_plan" = "null" ] || [ -z "$offline_plan" ]; then
+            offline_plan=$(jq -n --argjson base "$loop_data" '{base_loop: $base, time_blocks: []}')
+        fi
+
+        local active_time_block_json="null"
+        if [ -n "$active_time_block_id" ] && [ "$active_time_block_id" != "null" ]; then
+            active_time_block_json="$active_time_block_id"
+        fi
         
         # Create loop config with timestamp
         cat > "$LOOP_FILE" <<EOF
 {
     "last_update": "$loop_last_update",
-    "loop": $loop_data
+    "loop_plan_version": $loop_plan_version,
+    "active_scope": "$active_scope",
+    "active_time_block_id": $active_time_block_json,
+    "loop": $loop_data,
+    "offline_plan": $offline_plan
 }
 EOF
         
@@ -233,7 +239,10 @@ EOF
         
         # Pretty print loop info
         local modules_count=$(echo "$loop_data" | jq -r 'length')
-        log "Loop contains $modules_count modules:"
+        local base_count=$(echo "$offline_plan" | jq -r '.base_loop | length')
+        local blocks_count=$(echo "$offline_plan" | jq -r '.time_blocks | length')
+        log "Active loop contains $modules_count modules"
+        log "Offline plan: base=$base_count modules, blocks=$blocks_count"
         
         local i=0
         while [ $i -lt $modules_count ]; do
@@ -415,6 +424,8 @@ $loop_json
         class LoopPlayer {
             constructor() {
                 this.loopConfig = null;
+                this.currentLoop = [];
+                this.currentLoopId = 'base';
                 this.currentIndex = 0;
                 this.timer = null;
                 this.frame = document.getElementById('module-frame');
@@ -424,6 +435,7 @@ $loop_json
                 this.debugModeEnabled = false;
                 this.debugModeTimer = null;
                 this.debugLogTimer = null;
+                this.enablePassiveConfigWatch = (window.EDUDISPLEJ_ENABLE_LOOP_WATCH === true);
                 
                 this.init();
             }
@@ -433,17 +445,22 @@ $loop_json
                 
                 try {
                     await this.loadLoopConfig();
-                    
-                    if (!this.loopConfig || !this.loopConfig.loop || this.loopConfig.loop.length === 0) {
+
+                    const activeLoop = this.resolveActiveLoop(new Date());
+                    if (!activeLoop.items || activeLoop.items.length === 0) {
                         this.redirectToUnconfigured('No modules configured in loop');
                         throw new Error('No modules configured in loop');
                     }
+
+                    this.switchToLoop(activeLoop, true);
                     
-                    this.log('Loaded ' + this.loopConfig.loop.length + ' modules');
+                    this.log('Loaded offline plan. Active loop modules: ' + this.currentLoop.length);
                     this.log('Last update: ' + this.loopConfig.last_update);
                     
-                    // Start periodic check for configuration updates
-                    this.startUpdateChecker();
+                    // Optional periodic check for configuration updates
+                    if (this.enablePassiveConfigWatch) {
+                        this.startUpdateChecker();
+                    }
                     this.startDebugMonitor();
                     
                     this.startLoop();
@@ -458,7 +475,7 @@ $loop_json
             }
             
             startUpdateChecker() {
-                // Check for configuration updates every 30 seconds
+                // Check for configuration updates every 5 minutes (optional)
                 setInterval(async () => {
                     try {
                         const response = await fetch('modules/loop.json', { cache: 'no-store' });
@@ -480,7 +497,7 @@ $loop_json
                         // Silently ignore errors in update check
                         this.log('Update check failed: ' + error.message);
                     }
-                }, 30000); // Check every 30 seconds
+                }, 300000); // Check every 5 minutes
             }
 
             startDebugMonitor() {
@@ -592,16 +609,34 @@ $loop_json
                     if (this.loopConfig && !this.loopConfig.loop && this.loopConfig.loop_config) {
                         this.loopConfig.loop = this.loopConfig.loop_config;
                     }
-                    
-                    // Validate loop configuration
-                    if (!this.loopConfig || !this.loopConfig.loop) {
+
+                    if (!this.loopConfig || typeof this.loopConfig !== 'object') {
                         this.redirectToUnconfigured('Invalid loop configuration');
-                        throw new Error('Invalid loop configuration format - missing "loop" or "loop_config" field');
+                        throw new Error('Invalid loop configuration format');
                     }
-                    
-                    if (!Array.isArray(this.loopConfig.loop) || this.loopConfig.loop.length === 0) {
+
+                    if (!Array.isArray(this.loopConfig.loop)) {
+                        this.loopConfig.loop = [];
+                    }
+
+                    if (!this.loopConfig.offline_plan || typeof this.loopConfig.offline_plan !== 'object') {
+                        this.loopConfig.offline_plan = {
+                            base_loop: this.loopConfig.loop,
+                            time_blocks: []
+                        };
+                    }
+
+                    if (!Array.isArray(this.loopConfig.offline_plan.base_loop)) {
+                        this.loopConfig.offline_plan.base_loop = this.loopConfig.loop;
+                    }
+
+                    if (!Array.isArray(this.loopConfig.offline_plan.time_blocks)) {
+                        this.loopConfig.offline_plan.time_blocks = [];
+                    }
+
+                    if (this.loopConfig.offline_plan.base_loop.length === 0 && this.loopConfig.loop.length === 0) {
                         this.redirectToUnconfigured('Empty loop configuration');
-                        throw new Error('Loop configuration is empty or not an array');
+                        throw new Error('Loop configuration is empty');
                     }
                     
                     this.log('Using loop configuration from file');
@@ -617,17 +652,112 @@ $loop_json
                 this.currentIndex = 0;
                 this.playCurrentModule();
             }
+
+            parseTimeToSeconds(value) {
+                const input = String(value || '00:00:00');
+                const parts = input.split(':').map((v) => parseInt(v, 10));
+                const h = Number.isFinite(parts[0]) ? parts[0] : 0;
+                const m = Number.isFinite(parts[1]) ? parts[1] : 0;
+                const s = Number.isFinite(parts[2]) ? parts[2] : 0;
+                return (h * 3600) + (m * 60) + s;
+            }
+
+            isBlockActive(block, now) {
+                if (!block || Number(block.is_active || 1) === 0) {
+                    return false;
+                }
+
+                const blockType = String(block.block_type || 'weekly').toLowerCase() === 'date' ? 'date' : 'weekly';
+                const dateKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+                if (blockType === 'date') {
+                    if (String(block.specific_date || '') !== dateKey) {
+                        return false;
+                    }
+                } else {
+                    const jsDay = now.getDay();
+                    const day = jsDay === 0 ? 7 : jsDay;
+                    const allowed = new Set(String(block.days_mask || '').split(',').map((v) => parseInt(v, 10)).filter((v) => v >= 1 && v <= 7));
+                    if (allowed.size > 0 && !allowed.has(day)) {
+                        return false;
+                    }
+                }
+
+                const nowSeconds = (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
+                const startSeconds = this.parseTimeToSeconds(block.start_time || '00:00:00');
+                const endSeconds = this.parseTimeToSeconds(block.end_time || '00:00:00');
+
+                if (startSeconds <= endSeconds) {
+                    return nowSeconds >= startSeconds && nowSeconds <= endSeconds;
+                }
+
+                return nowSeconds >= startSeconds || nowSeconds <= endSeconds;
+            }
+
+            resolveActiveLoop(now) {
+                const plan = this.loopConfig && this.loopConfig.offline_plan ? this.loopConfig.offline_plan : null;
+                const baseLoop = Array.isArray(plan && plan.base_loop) ? plan.base_loop : (Array.isArray(this.loopConfig && this.loopConfig.loop) ? this.loopConfig.loop : []);
+                const timeBlocks = Array.isArray(plan && plan.time_blocks) ? plan.time_blocks : [];
+
+                const candidates = timeBlocks.filter((block) => this.isBlockActive(block, now));
+                if (candidates.length === 0) {
+                    return { id: 'base', items: baseLoop, source: 'base' };
+                }
+
+                candidates.sort((a, b) => {
+                    const typeA = String(a.block_type || 'weekly').toLowerCase() === 'date' ? 2 : 1;
+                    const typeB = String(b.block_type || 'weekly').toLowerCase() === 'date' ? 2 : 1;
+                    if (typeA !== typeB) {
+                        return typeB - typeA;
+                    }
+
+                    const priorityA = Number(a.priority || 100);
+                    const priorityB = Number(b.priority || 100);
+                    if (priorityA !== priorityB) {
+                        return priorityB - priorityA;
+                    }
+
+                    const orderA = Number(a.display_order || 0);
+                    const orderB = Number(b.display_order || 0);
+                    if (orderA !== orderB) {
+                        return orderA - orderB;
+                    }
+
+                    return Number(a.id || 0) - Number(b.id || 0);
+                });
+
+                const winner = candidates[0];
+                const winnerLoop = Array.isArray(winner.loops) ? winner.loops : [];
+                if (winnerLoop.length === 0) {
+                    return { id: 'base', items: baseLoop, source: 'base' };
+                }
+
+                return {
+                    id: 'block:' + String(winner.id || ''),
+                    items: winnerLoop,
+                    source: 'block',
+                    block: winner
+                };
+            }
+
+            switchToLoop(loopSelection, resetIndex) {
+                this.currentLoopId = String(loopSelection.id || 'base');
+                this.currentLoop = Array.isArray(loopSelection.items) ? loopSelection.items : [];
+                if (resetIndex) {
+                    this.currentIndex = 0;
+                }
+            }
             
             playCurrentModule() {
-                if (!this.loopConfig || !this.loopConfig.loop || this.loopConfig.loop.length === 0) {
+                if (!Array.isArray(this.currentLoop) || this.currentLoop.length === 0) {
                     this.showError('Loop configuration is empty', new Error('No modules to play'));
                     return;
                 }
                 
-                const module = this.loopConfig.loop[this.currentIndex];
+                const module = this.currentLoop[this.currentIndex];
                 const duration = parseInt(module.duration_seconds) * 1000;
                 
-                this.log('Playing module ' + (this.currentIndex + 1) + '/' + this.loopConfig.loop.length + ': ' + module.module_name + ' (' + module.duration_seconds + 's)');
+                this.log('Playing module ' + (this.currentIndex + 1) + '/' + this.currentLoop.length + ': ' + module.module_name + ' (' + module.duration_seconds + 's)');
                 
                 // Build module URL
                 const moduleUrl = this.buildModuleUrl(module);
@@ -650,8 +780,9 @@ $loop_json
             
             buildModuleUrl(module) {
                 const moduleKey = module.module_key || '';
-                let basePath = '';
-                let mainFile = '';
+                const moduleRenderer = String(module.module_renderer || '').trim();
+                const moduleFolder = String(module.module_folder || moduleKey || '').trim();
+                const moduleMainFile = String(module.module_main_file || '').trim();
                 
                 // Parse settings
                 let settings = {};
@@ -665,27 +796,21 @@ $loop_json
                     this.log('Warning: Failed to parse settings for ' + module.module_name);
                 }
                 
-                // Determine module path and main file
-                switch (moduleKey) {
-                    case 'clock':
-                    case 'datetime':
-                    case 'dateclock':
-                        basePath = 'modules/datetime';
-                        mainFile = 'm_datetime.html';
-                        break;
-                    case 'default-logo':
-                        basePath = 'modules/default';
-                        mainFile = 'm_default.html';
-                        break;
-                    default:
-                        basePath = 'modules/' + moduleKey;
-                        mainFile = 'm_' + moduleKey + '.html';
-                        break;
+                // Determine module path from API runtime metadata
+                let modulePath = '';
+                if (moduleRenderer) {
+                    modulePath = moduleRenderer.replace(/^\/+/, '');
+                } else {
+                    if (!moduleFolder || !moduleMainFile) {
+                        this.log('Missing module runtime metadata for ' + (module.module_name || moduleKey));
+                        return 'unconfigured.html?reason=missing_module_runtime';
+                    }
+                    modulePath = 'modules/' + moduleFolder + '/' + moduleMainFile;
                 }
                 
                 // Build URL with parameters
                 const params = new URLSearchParams(settings);
-                const url = basePath + '/' + mainFile + (params.toString() ? '?' + params.toString() : '');
+                const url = modulePath + (params.toString() ? '?' + params.toString() : '');
                 
                 return url;
             }
@@ -694,8 +819,17 @@ $loop_json
                 this.currentIndex++;
                 
                 // Loop back to start
-                if (this.currentIndex >= this.loopConfig.loop.length) {
-                    this.currentIndex = 0;
+                if (this.currentIndex >= this.currentLoop.length) {
+                    const nextLoop = this.resolveActiveLoop(new Date());
+                    const currentLoopId = this.currentLoopId;
+
+                    if (nextLoop.id !== currentLoopId) {
+                        this.log('Schedule changed: ' + currentLoopId + ' -> ' + nextLoop.id);
+                        this.switchToLoop(nextLoop, true);
+                    } else {
+                        this.currentIndex = 0;
+                    }
+
                     this.log('Loop completed, restarting...');
                 }
                 
@@ -724,8 +858,8 @@ $loop_json
                 const errorName = (error && error.name) ? error.name : 'Error';
                 const errorMessage = (error && error.message) ? error.message : String(error);
                 const errorStack = (error && error.stack) ? error.stack : '';
-                const lastModule = (this.loopConfig && this.loopConfig.loop && this.loopConfig.loop.length > 0)
-                    ? this.loopConfig.loop[this.currentIndex] : null;
+                const lastModule = (this.currentLoop && this.currentLoop.length > 0)
+                    ? this.currentLoop[this.currentIndex] : null;
                 const lastModuleInfo = lastModule
                     ? JSON.stringify({
                         module_name: lastModule.module_name,
@@ -736,7 +870,10 @@ $loop_json
                 const loopInfo = this.loopConfig
                     ? JSON.stringify({
                         last_update: this.loopConfig.last_update,
-                        loop_count: (this.loopConfig.loop || []).length
+                        active_loop_id: this.currentLoopId,
+                        active_loop_count: (this.currentLoop || []).length,
+                        base_loop_count: (((this.loopConfig.offline_plan || {}).base_loop) || []).length,
+                        block_count: (((this.loopConfig.offline_plan || {}).time_blocks) || []).length
                     }, null, 2)
                     : 'N/A';
                 const locationInfo = JSON.stringify({
@@ -817,15 +954,30 @@ main() {
     # Save loop configuration
     save_loop_config "$loop_response"
     
-    # Extract module list (use module_key, not module_name to avoid spaces)
-    local modules=$(echo "$loop_response" | jq -r '.loop_config[].module_key' | sort -u)
-    
-    # Download each module
-    for module in $modules; do
-        download_module "$device_id" "$module" || {
+    # Extract module list from API payload (module_key + module_folder)
+    local module_entries
+    module_entries=$(echo "$loop_response" | jq -r '
+        [
+            .loop_config[]?,
+            .preload_modules[]?,
+            .offline_plan.base_loop[]?,
+            (.offline_plan.time_blocks[]?.loops[]?)
+        ]
+        | map(select((.module_key // "") != ""))
+        | unique_by(.module_key)
+        | .[]
+        | [.module_key, (.module_folder // .module_key)]
+        | @tsv
+    ')
+
+    while IFS=$'\t' read -r module module_dir_key; do
+        [ -z "${module:-}" ] && continue
+        [ -z "${module_dir_key:-}" ] && module_dir_key="$module"
+
+        download_module "$device_id" "$module" "$module_dir_key" || {
             log_error "Failed to download module: $module"
         }
-    done
+    done <<< "$module_entries"
     
     # Create unconfigured page and loop player
     create_unconfigured_page

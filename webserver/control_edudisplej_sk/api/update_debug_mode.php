@@ -5,6 +5,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 require_once 'auth.php';
 
 header('Content-Type: application/json');
@@ -23,7 +24,7 @@ $debug_mode = !empty($data['debug_mode']) ? 1 : 0;
 $company_id = $_SESSION['company_id'] ?? null;
 
 if (!$kiosk_id) {
-    $response['message'] = 'Invalid kiosk ID';
+    $response['message'] = t_def('api.common.invalid_kiosk_id', 'Invalid kiosk ID');
     echo json_encode($response);
     exit();
 }
@@ -56,7 +57,7 @@ try {
     $stmt->close();
 
     if ($result->num_rows === 0) {
-        $response['message'] = 'Kiosk not found or access denied';
+        $response['message'] = t_def('api.common.kiosk_not_found_or_denied', 'Kiosk not found or access denied');
         echo json_encode($response);
         exit();
     }
@@ -67,12 +68,12 @@ try {
     $stmt->close();
 
     $response['success'] = true;
-    $response['message'] = 'Debug mode updated';
+    $response['message'] = t_def('api.update_debug_mode.updated', 'Debug mode updated');
     $response['debug_mode'] = (bool)$debug_mode;
 
     closeDbConnection($conn);
 } catch (Exception $e) {
-    $response['message'] = 'Database error';
+    $response['message'] = t_def('api.common.database_error', 'Database error');
     error_log('update_debug_mode: ' . $e->getMessage());
 }
 

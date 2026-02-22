@@ -17,6 +17,9 @@ log "=== EduDisplej Kiosk Start ==="
 log "User: $(whoami)"
 log "TTY: $(tty)"
 
+RUN_USER="$(whoami)"
+RUN_UID="$(id -u "$RUN_USER" 2>/dev/null || echo 1000)"
+
 # First-time setup
 if [ ! -f "$FLAG" ]; then
     log "First boot - running setup"
@@ -54,7 +57,7 @@ fi
 
 # Setup XDG_RUNTIME_DIR and permissions
 log "Setting up XDG_RUNTIME_DIR..."
-XDG_RUNTIME_DIR="/run/user/1000"
+XDG_RUNTIME_DIR="/run/user/${RUN_UID}"
 if [ ! -d "$XDG_RUNTIME_DIR" ]; then
     mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || {
         log "WARNING: Could not create $XDG_RUNTIME_DIR, using /tmp instead"
@@ -64,7 +67,7 @@ fi
 
 # Fix permissions on XDG_RUNTIME_DIR
 chmod 0700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
-chown edudisplej:edudisplej "$XDG_RUNTIME_DIR" 2>/dev/null || true
+chown "$RUN_USER:$RUN_USER" "$XDG_RUNTIME_DIR" 2>/dev/null || true
 
 # Remove dconf directory if it exists (to prevent permission errors)
 rm -rf "$XDG_RUNTIME_DIR/dconf" 2>/dev/null || true

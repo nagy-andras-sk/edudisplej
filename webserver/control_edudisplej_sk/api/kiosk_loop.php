@@ -6,6 +6,7 @@
  */
 require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
+require_once '../modules/module_asset_service.php';
 
 $api_company = validate_api_token();
 
@@ -138,6 +139,84 @@ function edudisplej_get_active_block_id(mysqli $conn, int $group_id): array {
     return ['has_blocks' => true, 'active_block_id' => null];
 }
 
+function edudisplej_optimize_module_settings_for_sync(string $module_key, $settings): array {
+    $normalized = is_array($settings) ? $settings : [];
+    $key = strtolower(trim($module_key));
+    $requestToken = edudisplej_current_request_api_token();
+
+    if ($key === 'pdf') {
+        $assetId = (int)($normalized['pdfAssetId'] ?? 0);
+        $assetUrl = trim((string)($normalized['pdfAssetUrl'] ?? ''));
+        if ($assetId > 0) {
+            $normalized['pdfAssetUrl'] = edudisplej_module_asset_api_url_by_id($assetId, $requestToken);
+        } else {
+            $normalized['pdfAssetUrl'] = edudisplej_module_asset_normalize_url_for_api($assetUrl, $requestToken);
+        }
+
+        $assetUrl = trim((string)($normalized['pdfAssetUrl'] ?? ''));
+        if ($assetUrl !== '' && array_key_exists('pdfDataBase64', $normalized)) {
+            $normalized['pdfDataBase64'] = '';
+        }
+        return $normalized;
+    }
+
+    if ($key === 'image-gallery' || $key === 'gallery') {
+        $raw = (string)($normalized['imageUrlsJson'] ?? '[]');
+        $parsed = json_decode($raw, true);
+        if (is_array($parsed)) {
+            $clean = [];
+            foreach ($parsed as $item) {
+                $value = trim((string)$item);
+                if ($value !== '') {
+                    $normalizedValue = edudisplej_module_asset_normalize_url_for_api($value, $requestToken);
+                    $clean[] = $normalizedValue !== '' ? $normalizedValue : $value;
+                }
+                if (count($clean) >= 10) {
+                    break;
+                }
+            }
+            $normalized['imageUrlsJson'] = json_encode($clean, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+    }
+
+    if ($key === 'video') {
+        $assetId = (int)($normalized['videoAssetId'] ?? 0);
+        $assetUrl = trim((string)($normalized['videoAssetUrl'] ?? ''));
+        if ($assetId > 0) {
+            $normalized['videoAssetUrl'] = edudisplej_module_asset_api_url_by_id($assetId, $requestToken);
+        } else {
+            $normalized['videoAssetUrl'] = edudisplej_module_asset_normalize_url_for_api($assetUrl, $requestToken);
+        }
+        return $normalized;
+    }
+
+    return $normalized;
+}
+
+function edudisplej_module_runtime_payload_for_sync(string $module_key): array {
+    $resolved_key = strtolower(trim($module_key));
+    if ($resolved_key === '') {
+        return [
+            'module_folder' => '',
+            'module_renderer' => '',
+            'module_main_file' => '',
+        ];
+    }
+
+    $runtime = edudisplej_resolve_module_runtime($resolved_key);
+    $renderer_rel = trim((string)($runtime['renderer_rel'] ?? ''));
+    $main_file = basename($renderer_rel);
+    if ($main_file === '.' || $main_file === '/' || $main_file === '\\') {
+        $main_file = '';
+    }
+
+    return [
+        'module_folder' => (string)($runtime['folder'] ?? $resolved_key),
+        'module_renderer' => $renderer_rel,
+        'module_main_file' => $main_file,
+    ];
+}
+
 try {
     // Get device_id from POST or GET
     $device_id = $_POST['device_id'] ?? $_GET['device_id'] ?? '';
@@ -186,24 +265,41 @@ try {
     
     $loop_config = [];
     $preload_map = [];
+    $offline_plan = [
+        'base_loop' => [],
+        'time_blocks' => []
+    ];
     $config_source = 'kiosk';
     $group_id = null;
+    $loop_plan_version = 0;
+    $loop_plan_updated_at = null;
     while ($row = $result->fetch_assoc()) {
-        $loop_config[] = [
+        $runtime_payload = edudisplej_module_runtime_payload_for_sync((string)($row['module_key'] ?? ''));
+
+        $loop_item = [
             'module_id' => (int)$row['module_id'],
             'module_name' => $row['module_name'],
             'module_key' => $row['module_key'],
             'duration_seconds' => (int)$row['duration_seconds'],
             'display_order' => (int)$row['display_order'],
-            'settings' => $row['settings'] ? json_decode($row['settings'], true) : (object)[],
-            'source' => 'kiosk'
+            'settings' => edudisplej_optimize_module_settings_for_sync((string)($row['module_key'] ?? ''), $row['settings'] ? json_decode($row['settings'], true) : []),
+            'source' => 'kiosk',
+            'module_folder' => $runtime_payload['module_folder'],
+            'module_renderer' => $runtime_payload['module_renderer'],
+            'module_main_file' => $runtime_payload['module_main_file'],
         ];
+
+        $loop_config[] = $loop_item;
+        $offline_plan['base_loop'][] = $loop_item;
 
         $module_key = (string)($row['module_key'] ?? '');
         if ($module_key !== '' && !isset($preload_map[$module_key])) {
             $preload_map[$module_key] = [
                 'module_key' => $module_key,
-                'name' => (string)($row['module_name'] ?? $module_key)
+                'name' => (string)($row['module_name'] ?? $module_key),
+                'module_folder' => $runtime_payload['module_folder'],
+                'module_renderer' => $runtime_payload['module_renderer'],
+                'module_main_file' => $runtime_payload['module_main_file'],
             ];
         }
     }
@@ -220,73 +316,107 @@ try {
 
         if ($group_row) {
             $group_id = (int)$group_row['group_id'];
+
+            $plan_stmt = $conn->prepare("SELECT plan_version, updated_at FROM kiosk_group_loop_plans WHERE group_id = ? LIMIT 1");
+            $plan_stmt->bind_param("i", $group_id);
+            $plan_stmt->execute();
+            $plan_meta = $plan_stmt->get_result()->fetch_assoc();
+            $plan_stmt->close();
+
+            if ($plan_meta) {
+                $loop_plan_version = (int)($plan_meta['plan_version'] ?? 0);
+                $loop_plan_updated_at = $plan_meta['updated_at'] ?? null;
+            }
+
             $block_state = edudisplej_get_active_block_id($conn, $group_id);
             $active_block_id = $block_state['active_block_id'];
             $has_blocks = $block_state['has_blocks'];
 
-            $preload_stmt = $conn->prepare("SELECT DISTINCT m.module_key, m.name as module_name
-                                            FROM kiosk_group_modules kgm
-                                            JOIN modules m ON kgm.module_id = m.id
-                                            WHERE kgm.group_id = ? AND kgm.is_active = 1
-                                            ORDER BY m.module_key ASC");
-            $preload_stmt->bind_param("i", $group_id);
-            $preload_stmt->execute();
-            $preload_result = $preload_stmt->get_result();
-            while ($preload_row = $preload_result->fetch_assoc()) {
-                $module_key = (string)($preload_row['module_key'] ?? '');
-                if ($module_key === '') {
-                    continue;
-                }
-                $preload_map[$module_key] = [
-                    'module_key' => $module_key,
-                    'name' => (string)($preload_row['module_name'] ?? $module_key)
+            $blocks_stmt = $conn->prepare("SELECT id, block_name, block_type, specific_date, start_time, end_time, days_mask, is_active, priority, display_order
+                                           FROM kiosk_group_time_blocks
+                                           WHERE group_id = ?
+                                           ORDER BY display_order, id");
+            $blocks_stmt->bind_param("i", $group_id);
+            $blocks_stmt->execute();
+            $blocks_result = $blocks_stmt->get_result();
+
+            $block_map = [];
+            while ($block = $blocks_result->fetch_assoc()) {
+                $block_id = (int)$block['id'];
+                $block_map[$block_id] = [
+                    'id' => $block_id,
+                    'block_name' => (string)($block['block_name'] ?? ''),
+                    'block_type' => (string)($block['block_type'] ?? 'weekly'),
+                    'specific_date' => $block['specific_date'],
+                    'start_time' => (string)($block['start_time'] ?? '00:00:00'),
+                    'end_time' => (string)($block['end_time'] ?? '00:00:00'),
+                    'days_mask' => (string)($block['days_mask'] ?? '1,2,3,4,5,6,7'),
+                    'is_active' => (int)($block['is_active'] ?? 1),
+                    'priority' => (int)($block['priority'] ?? 100),
+                    'display_order' => (int)($block['display_order'] ?? 0),
+                    'loops' => []
                 ];
             }
-            $preload_stmt->close();
+            $blocks_stmt->close();
 
-            if ($has_blocks && $active_block_id !== null) {
-                $stmt = $conn->prepare(" 
-                    SELECT kgm.*, m.name as module_name, m.module_key
-                    FROM kiosk_group_modules kgm
-                    JOIN modules m ON kgm.module_id = m.id
-                    WHERE kgm.group_id = ? AND kgm.time_block_id = ?
-                    ORDER BY kgm.display_order
-                ");
-                $stmt->bind_param("ii", $group_id, $active_block_id);
-            } else {
-                $stmt = $conn->prepare(" 
-                    SELECT kgm.*, m.name as module_name, m.module_key
-                    FROM kiosk_group_modules kgm
-                    JOIN modules m ON kgm.module_id = m.id
-                    WHERE kgm.group_id = ? AND kgm.time_block_id IS NULL
-                    ORDER BY kgm.display_order
-                ");
-                $stmt->bind_param("i", $group_id);
-            }
+            $all_modules_stmt = $conn->prepare("SELECT kgm.*, m.name as module_name, m.module_key
+                                                FROM kiosk_group_modules kgm
+                                                JOIN modules m ON kgm.module_id = m.id
+                                                WHERE kgm.group_id = ? AND kgm.is_active = 1
+                                                ORDER BY COALESCE(kgm.time_block_id, 0), kgm.display_order, kgm.id");
+            $all_modules_stmt->bind_param("i", $group_id);
+            $all_modules_stmt->execute();
+            $all_modules_result = $all_modules_stmt->get_result();
 
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            while ($row = $result->fetch_assoc()) {
-                $loop_config[] = [
+            $base_loop = [];
+            while ($row = $all_modules_result->fetch_assoc()) {
+                $runtime_payload = edudisplej_module_runtime_payload_for_sync((string)($row['module_key'] ?? ''));
+                $module_item = [
                     'module_id' => (int)$row['module_id'],
                     'module_name' => $row['module_name'],
                     'module_key' => $row['module_key'],
                     'duration_seconds' => (int)$row['duration_seconds'],
                     'display_order' => (int)$row['display_order'],
-                    'settings' => $row['settings'] ? json_decode($row['settings'], true) : (object)[],
-                    'source' => 'group'
+                    'settings' => edudisplej_optimize_module_settings_for_sync((string)($row['module_key'] ?? ''), $row['settings'] ? json_decode($row['settings'], true) : []),
+                    'source' => 'group',
+                    'module_folder' => $runtime_payload['module_folder'],
+                    'module_renderer' => $runtime_payload['module_renderer'],
+                    'module_main_file' => $runtime_payload['module_main_file'],
                 ];
 
                 $module_key = (string)($row['module_key'] ?? '');
                 if ($module_key !== '' && !isset($preload_map[$module_key])) {
                     $preload_map[$module_key] = [
                         'module_key' => $module_key,
-                        'name' => (string)($row['module_name'] ?? $module_key)
+                        'name' => (string)($row['module_name'] ?? $module_key),
+                        'module_folder' => $runtime_payload['module_folder'],
+                        'module_renderer' => $runtime_payload['module_renderer'],
+                        'module_main_file' => $runtime_payload['module_main_file'],
                     ];
                 }
+
+                $time_block_id = (int)($row['time_block_id'] ?? 0);
+                if ($time_block_id > 0 && isset($block_map[$time_block_id])) {
+                    $block_map[$time_block_id]['loops'][] = $module_item;
+                } else {
+                    $base_loop[] = $module_item;
+                }
             }
-            $stmt->close();
+            $all_modules_stmt->close();
+
+            $offline_plan['base_loop'] = $base_loop;
+            $offline_plan['time_blocks'] = array_values($block_map);
+
+            if ($has_blocks && $active_block_id !== null && isset($block_map[$active_block_id])) {
+                $loop_config = $block_map[$active_block_id]['loops'];
+            } else {
+                $loop_config = $base_loop;
+            }
+
+            if (empty($loop_config) && !empty($base_loop)) {
+                $loop_config = $base_loop;
+            }
+
             $response['active_time_block_id'] = $active_block_id;
             $response['active_scope'] = $active_block_id !== null ? 'block' : 'base';
         }
@@ -300,24 +430,32 @@ try {
     // Use MAX of created_at to detect module changes
     $loop_last_update = null;
     if ($config_source === 'kiosk') {
-        $stmt = $conn->prepare("SELECT MAX(created_at) as last_update 
+        $stmt = $conn->prepare("SELECT MAX(updated_at) as updated_at, MAX(created_at) as created_at 
                                 FROM kiosk_modules 
                                 WHERE kiosk_id = ? AND is_active = 1");
         $stmt->bind_param("i", $kiosk_id);
         $stmt->execute();
         $result = $stmt->get_result();
         $row = $result->fetch_assoc();
-        $loop_last_update = $row['last_update'] ?? null;
+        $loop_last_update = $row['updated_at'] ?? $row['created_at'] ?? null;
         $stmt->close();
     } else if ($group_id) {
-        $stmt = $conn->prepare("SELECT MAX(created_at) as last_update 
-                                FROM kiosk_group_modules 
-                                WHERE group_id = ? AND is_active = 1");
-        $stmt->bind_param("i", $group_id);
+        $stmt = $conn->prepare("SELECT
+                                    MAX(kgm.updated_at) as updated_at,
+                                    MAX(kgm.created_at) as created_at,
+                                    (SELECT klp.updated_at FROM kiosk_group_loop_plans klp WHERE klp.group_id = ? LIMIT 1) as plan_updated_at
+                                FROM kiosk_group_modules kgm
+                                WHERE kgm.group_id = ? AND kgm.is_active = 1");
+        $stmt->bind_param("ii", $group_id, $group_id);
         $stmt->execute();
         $result = $stmt->get_result();
         $row = $result->fetch_assoc();
-        $loop_last_update = $row['last_update'] ?? null;
+        $module_update = $row['updated_at'] ?? $row['created_at'] ?? null;
+        $plan_update = $row['plan_updated_at'] ?? null;
+        $loop_last_update = $module_update;
+        if ($plan_update && (!$loop_last_update || strtotime($plan_update) > strtotime($loop_last_update))) {
+            $loop_last_update = $plan_update;
+        }
         $stmt->close();
     }
     if (!$loop_last_update) {
@@ -332,6 +470,9 @@ try {
     $response['loop_config'] = $loop_config;
     $response['module_count'] = count($loop_config);
     $response['preload_modules'] = array_values($preload_map);
+    $response['offline_plan'] = $offline_plan;
+    $response['loop_plan_version'] = $loop_plan_version;
+    $response['loop_plan_updated_at'] = $loop_plan_updated_at;
     if (!isset($response['active_scope'])) {
         $response['active_scope'] = 'base';
     }

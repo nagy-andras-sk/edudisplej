@@ -210,6 +210,27 @@ function edudisplej_allowed_modules_for_company(mysqli $conn, int $company_id): 
     return $allowed;
 }
 
+function edudisplej_video_duration_from_settings($settings): ?int {
+    if (!is_array($settings)) {
+        return null;
+    }
+
+    $raw = $settings['videoDurationSec'] ?? null;
+    if (!is_numeric($raw)) {
+        return null;
+    }
+
+    $duration = (int)$raw;
+    if ($duration < 1) {
+        $duration = 1;
+    }
+    if ($duration > 86400) {
+        $duration = 86400;
+    }
+
+    return $duration;
+}
+
 $user_id = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
@@ -555,9 +576,15 @@ try {
                     }
 
                     $sanitized_settings = edudisplej_sanitize_module_settings($module_key, $loop['settings'] ?? []);
+                    $video_duration = $module_key === 'video' ? edudisplej_video_duration_from_settings($sanitized_settings) : null;
                     $settings = json_encode($sanitized_settings, JSON_UNESCAPED_UNICODE);
-                    $update_stmt = $conn->prepare("UPDATE kiosk_group_modules SET settings = ? WHERE id = ? AND group_id = ?");
-                    $update_stmt->bind_param("sii", $settings, $loop_id, $group_id);
+                    if ($video_duration !== null) {
+                        $update_stmt = $conn->prepare("UPDATE kiosk_group_modules SET settings = ?, duration_seconds = ? WHERE id = ? AND group_id = ?");
+                        $update_stmt->bind_param("siii", $settings, $video_duration, $loop_id, $group_id);
+                    } else {
+                        $update_stmt = $conn->prepare("UPDATE kiosk_group_modules SET settings = ? WHERE id = ? AND group_id = ?");
+                        $update_stmt->bind_param("sii", $settings, $loop_id, $group_id);
+                    }
                     $update_stmt->execute();
                     $update_stmt->close();
                 }
@@ -648,6 +675,10 @@ try {
                 }
                 $duration = edudisplej_clamp_module_duration($module_key, $loop['duration_seconds'] ?? null);
                 $sanitized_settings = edudisplej_sanitize_module_settings($module_key, $loop['settings'] ?? []);
+                $video_duration = $module_key === 'video' ? edudisplej_video_duration_from_settings($sanitized_settings) : null;
+                if ($video_duration !== null) {
+                    $duration = $video_duration;
+                }
                 $settings = json_encode($sanitized_settings, JSON_UNESCAPED_UNICODE);
                 $display_order = $index;
                 
@@ -678,6 +709,10 @@ try {
                     }
                     $duration = edudisplej_clamp_module_duration($module_key, $loop['duration_seconds'] ?? null);
                     $sanitized_settings = edudisplej_sanitize_module_settings($module_key, $loop['settings'] ?? []);
+                    $video_duration = $module_key === 'video' ? edudisplej_video_duration_from_settings($sanitized_settings) : null;
+                    if ($video_duration !== null) {
+                        $duration = $video_duration;
+                    }
                     $settings = json_encode($sanitized_settings, JSON_UNESCAPED_UNICODE);
                     $display_order = $index;
 

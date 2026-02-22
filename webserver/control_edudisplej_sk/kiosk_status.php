@@ -5,6 +5,26 @@ declare(strict_types=1);
 const KIOSK_OFFLINE_TIMEOUT_SECONDS = 1800;
 const KIOSK_UPGRADE_ERROR_TIMEOUT_SECONDS = 1800;
 
+function kiosk_status_reference_time(array $kiosk): ?string
+{
+    $candidates = [
+        $kiosk['last_sync'] ?? null,
+        $kiosk['last_seen'] ?? null,
+        $kiosk['last_heartbeat'] ?? null,
+        $kiosk['heartbeat_at'] ?? null,
+        $kiosk['health_timestamp'] ?? null,
+        $kiosk['timestamp'] ?? null,
+    ];
+
+    foreach ($candidates as $candidate) {
+        if ($candidate !== null && $candidate !== '') {
+            return (string)$candidate;
+        }
+    }
+
+    return null;
+}
+
 function kiosk_upgrade_timed_out(array $kiosk, int $timeoutSeconds = KIOSK_UPGRADE_ERROR_TIMEOUT_SECONDS): bool
 {
     $upgradeStartedAt = $kiosk['upgrade_started_at'] ?? null;
@@ -22,10 +42,7 @@ function kiosk_upgrade_timed_out(array $kiosk, int $timeoutSeconds = KIOSK_UPGRA
 
 function kiosk_is_timed_out(array $kiosk, int $timeoutSeconds = KIOSK_OFFLINE_TIMEOUT_SECONDS): bool
 {
-    $referenceTime = $kiosk['last_sync'] ?? null;
-    if (!$referenceTime) {
-        $referenceTime = $kiosk['last_seen'] ?? null;
-    }
+    $referenceTime = kiosk_status_reference_time($kiosk);
 
     if (!$referenceTime) {
         return false;

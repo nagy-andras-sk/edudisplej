@@ -8,6 +8,8 @@ require_once '../dbkonfiguracia.php';
 require_once __DIR__ . '/db_autofix_bootstrap.php';
 require_once '../security_config.php';
 require_once '../auth_roles.php';
+require_once '../user_archive.php';
+require_once '../logging.php';
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: ../login.php');
@@ -102,16 +104,32 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
         try {
             $conn = getDbConnection();
             edudisplej_ensure_user_role_column($conn);
-            $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-            $stmt->bind_param("i", $user_id);
+            $archive_result = edudisplej_archive_user(
+                $conn,
+                $user_id,
+                (int)$_SESSION['user_id'],
+                'admin_users_delete',
+                'Archived from admin users page'
+            );
 
-            if ($stmt->execute()) {
-                $success = 'User deleted successfully';
+            if (!empty($archive_result['success'])) {
+                $success = 'User archived successfully';
+                log_security_event(
+                    'user_archived',
+                    (int)$_SESSION['user_id'],
+                    (string)($_SESSION['username'] ?? 'admin'),
+                    get_client_ip(),
+                    get_user_agent(),
+                    [
+                        'target_user_id' => $user_id,
+                        'target_username' => $archive_result['username'] ?? '',
+                        'archive_reason' => 'admin_users_delete',
+                        'archive_id' => $archive_result['archive_id'] ?? null,
+                    ]
+                );
             } else {
-                $error = 'Failed to delete user';
+                $error = $archive_result['message'] ?? 'Failed to archive user';
             }
-
-            $stmt->close();
             closeDbConnection($conn);
         } catch (Exception $e) {
             $error = 'Database error occurred';
@@ -358,7 +376,7 @@ include 'header.php';
                             <td class="nowrap"><?php echo $user['last_login'] ? date('Y-m-d H:i:s', strtotime($user['last_login'])) : '-'; ?></td>
                             <td class="nowrap">
                                 <a class="btn btn-small" href="users.php?edit=<?php echo (int)$user['id']; ?>">Szerkeszt</a>
-                                <a class="btn btn-small btn-danger" href="users.php?delete=<?php echo (int)$user['id']; ?>" onclick="return confirm('Toroljuk a felhasznalot?')">Torol</a>
+                                <a class="btn btn-small btn-danger" href="users.php?delete=<?php echo (int)$user['id']; ?>" onclick="return confirm('Archivaljuk a felhasznalot?')">Archival</a>
                                 <?php if ((int)$user['otp_enabled'] === 1): ?>
                                     <a class="btn btn-small" href="users.php?disable_otp=<?php echo (int)$user['id']; ?>" onclick="return confirm('Kikapcsoljuk a 2FA-t?')">2FA Off</a>
                                 <?php endif; ?>

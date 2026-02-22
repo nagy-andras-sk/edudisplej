@@ -5,6 +5,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 require_once 'auth.php';
 
 header('Content-Type: application/json');
@@ -24,7 +25,7 @@ $company_id = $_SESSION['company_id'] ?? null;
 
 $allowed = [10, 120, 300, 600];
 if (!$kiosk_id || !in_array($sync_interval, $allowed, true)) {
-    $response['message'] = 'Invalid kiosk ID or sync interval';
+    $response['message'] = t_def('api.update_sync_interval.invalid_input', 'Invalid kiosk ID or sync interval');
     echo json_encode($response);
     exit();
 }
@@ -49,7 +50,7 @@ try {
     $stmt->close();
     
     if ($result->num_rows === 0) {
-        $response['message'] = 'Kiosk not found or access denied';
+        $response['message'] = t_def('api.common.kiosk_not_found_or_denied', 'Kiosk not found or access denied');
         echo json_encode($response);
         exit();
     }
@@ -60,11 +61,11 @@ try {
     $stmt->close();
     
     $response['success'] = true;
-    $response['message'] = 'Sync interval updated';
+    $response['message'] = t_def('api.update_sync_interval.updated', 'Sync interval updated');
     
     closeDbConnection($conn);
 } catch (Exception $e) {
-    $response['message'] = 'Database error';
+    $response['message'] = t_def('api.common.database_error', 'Database error');
     error_log($e->getMessage());
 }
 

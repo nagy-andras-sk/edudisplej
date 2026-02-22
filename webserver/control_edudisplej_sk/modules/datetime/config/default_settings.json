@@ -1,12 +1,15 @@
 {
   "type": "digital",
   "format": "24h",
-  "dateFormat": "full",
+  "dateFormat": "dmy",
   "timeColor": "#ffffff",
   "dateColor": "#ffffff",
   "bgColor": "#000000",
   "fontSize": 120,
+  "timeFontSize": 120,
+  "dateFontSize": 36,
   "clockSize": 300,
   "showSeconds": true,
-  "language": "hu"
+  "showDate": true,
+  "language": "sk"
 }

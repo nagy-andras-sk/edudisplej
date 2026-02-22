@@ -1,6 +1,6 @@
 <?php
 /**
- * Module License Management - Minimal
+ * Module License Management - Simplified per-company editor
  */
 
 session_start();
@@ -14,56 +14,108 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['
 
 $error = '';
 $success = '';
+$selected_company_id = (int)($_GET['company_id'] ?? 0);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_license'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_company_licenses'])) {
     $company_id = (int)($_POST['company_id'] ?? 0);
-    $module_id = (int)($_POST['module_id'] ?? 0);
-    $quantity = (int)($_POST['quantity'] ?? 0);
+    $enabled_modules = isset($_POST['enabled_modules']) && is_array($_POST['enabled_modules']) ? $_POST['enabled_modules'] : [];
+    $module_quantities = isset($_POST['module_quantities']) && is_array($_POST['module_quantities']) ? $_POST['module_quantities'] : [];
+    $selected_company_id = $company_id;
 
-    if ($company_id > 0 && $module_id > 0) {
+    if ($company_id <= 0) {
+        $error = 'Invalid company';
+    } else {
         try {
             $conn = getDbConnection();
 
-            $stmt = $conn->prepare("SELECT id FROM module_licenses WHERE company_id = ? AND module_id = ?");
-            $stmt->bind_param("ii", $company_id, $module_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
+            $company_stmt = $conn->prepare('SELECT id FROM companies WHERE id = ? LIMIT 1');
+            $company_stmt->bind_param('i', $company_id);
+            $company_stmt->execute();
+            $company_exists = $company_stmt->get_result()->num_rows > 0;
+            $company_stmt->close();
 
-            if ($result->num_rows > 0) {
-                if ($quantity > 0) {
-                    $stmt = $conn->prepare("UPDATE module_licenses SET quantity = ? WHERE company_id = ? AND module_id = ?");
-                    $stmt->bind_param("iii", $quantity, $company_id, $module_id);
-                    $stmt->execute();
-                    $success = 'License updated successfully';
-                } else {
-                    $stmt = $conn->prepare("DELETE FROM module_licenses WHERE company_id = ? AND module_id = ?");
-                    $stmt->bind_param("ii", $company_id, $module_id);
-                    $stmt->execute();
-                    $success = 'License removed successfully';
-                }
+            if (!$company_exists) {
+                $error = 'Company not found';
             } else {
-                if ($quantity > 0) {
-                    $stmt = $conn->prepare("INSERT INTO module_licenses (company_id, module_id, quantity) VALUES (?, ?, ?)");
-                    $stmt->bind_param("iii", $company_id, $module_id, $quantity);
-                    $stmt->execute();
-                    $success = 'License created successfully';
+                $modules = [];
+                $module_result = $conn->query('SELECT id FROM modules WHERE is_active = 1 ORDER BY name');
+                if ($module_result) {
+                    while ($module_row = $module_result->fetch_assoc()) {
+                        $modules[] = (int)$module_row['id'];
+                    }
                 }
+
+                $enabled_lookup = [];
+                foreach ($enabled_modules as $enabled_module_id) {
+                    $enabled_lookup[(int)$enabled_module_id] = true;
+                }
+
+                $existing_lookup = [];
+                $existing_stmt = $conn->prepare('SELECT id, module_id, quantity FROM module_licenses WHERE company_id = ?');
+                $existing_stmt->bind_param('i', $company_id);
+                $existing_stmt->execute();
+                $existing_result = $existing_stmt->get_result();
+                while ($existing_row = $existing_result->fetch_assoc()) {
+                    $existing_lookup[(int)$existing_row['module_id']] = [
+                        'id' => (int)$existing_row['id'],
+                        'quantity' => (int)($existing_row['quantity'] ?? 0),
+                    ];
+                }
+                $existing_stmt->close();
+
+                $conn->begin_transaction();
+
+                $update_stmt = $conn->prepare('UPDATE module_licenses SET quantity = ? WHERE id = ?');
+                $insert_stmt = $conn->prepare('INSERT INTO module_licenses (company_id, module_id, quantity) VALUES (?, ?, ?)');
+                $delete_stmt = $conn->prepare('DELETE FROM module_licenses WHERE company_id = ? AND module_id = ?');
+
+                foreach ($modules as $module_id) {
+                    $is_enabled = isset($enabled_lookup[$module_id]);
+                    $raw_quantity = isset($module_quantities[$module_id]) ? (int)$module_quantities[$module_id] : 0;
+                    $normalized_quantity = $is_enabled ? max(1, $raw_quantity) : 0;
+                    $existing = $existing_lookup[$module_id] ?? null;
+
+                    if ($is_enabled) {
+                        if ($existing) {
+                            if ((int)$existing['quantity'] !== $normalized_quantity) {
+                                $license_id = (int)$existing['id'];
+                                $update_stmt->bind_param('ii', $normalized_quantity, $license_id);
+                                $update_stmt->execute();
+                            }
+                        } else {
+                            $insert_stmt->bind_param('iii', $company_id, $module_id, $normalized_quantity);
+                            $insert_stmt->execute();
+                        }
+                    } else {
+                        if ($existing) {
+                            $delete_stmt->bind_param('ii', $company_id, $module_id);
+                            $delete_stmt->execute();
+                        }
+                    }
+                }
+
+                $update_stmt->close();
+                $insert_stmt->close();
+                $delete_stmt->close();
+
+                $conn->commit();
+                $success = 'Company module licenses updated successfully';
             }
 
-            $stmt->close();
-            closeDbConnection($conn);
         } catch (Exception $e) {
+            if (isset($conn) && $conn instanceof mysqli) {
+                $conn->rollback();
+                closeDbConnection($conn);
+            }
             $error = 'Database error occurred';
             error_log($e->getMessage());
         }
-    } else {
-        $error = 'Invalid company or module';
     }
 }
 
 $companies = [];
 $modules = [];
-$licenses = [];
+$licenses_by_company = [];
 
 try {
     $conn = getDbConnection();
@@ -78,14 +130,17 @@ try {
         $modules[] = $row;
     }
 
-    $query = "SELECT ml.*, c.name as company_name, m.name as module_name, m.module_key 
-              FROM module_licenses ml
-              JOIN companies c ON ml.company_id = c.id
-              JOIN modules m ON ml.module_id = m.id
-              ORDER BY c.name, m.name";
+    $query = "SELECT company_id, module_id, quantity FROM module_licenses";
     $result = $conn->query($query);
     while ($row = $result->fetch_assoc()) {
-        $licenses[] = $row;
+        $cid = (int)($row['company_id'] ?? 0);
+        $mid = (int)($row['module_id'] ?? 0);
+        if ($cid > 0 && $mid > 0) {
+            if (!isset($licenses_by_company[$cid])) {
+                $licenses_by_company[$cid] = [];
+            }
+            $licenses_by_company[$cid][$mid] = (int)($row['quantity'] ?? 0);
+        }
     }
 
     closeDbConnection($conn);
@@ -106,68 +161,115 @@ include 'header.php';
 <?php endif; ?>
 
 <div class="panel">
-    <div class="panel-title">License settings</div>
-    <form method="post" class="form-row">
-        <div class="form-field">
-            <label for="company_id">Institution</label>
-            <select id="company_id" name="company_id" required>
-                <option value="">Select</option>
-                <?php foreach ($companies as $company): ?>
-                    <option value="<?php echo (int)$company['id']; ?>"><?php echo htmlspecialchars($company['name']); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="form-field">
-            <label for="module_id">Modul</label>
-            <select id="module_id" name="module_id" required>
-                <option value="">Select</option>
-                <?php foreach ($modules as $module): ?>
-                    <option value="<?php echo (int)$module['id']; ?>"><?php echo htmlspecialchars($module['name']); ?> (<?php echo htmlspecialchars($module['module_key']); ?>)</option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="form-field">
-            <label for="quantity">Quantity</label>
-            <input id="quantity" name="quantity" type="number" min="0" max="999" value="0">
-        </div>
-        <div class="form-field">
-            <button type="submit" name="update_license" class="btn btn-primary">Save</button>
-        </div>
-    </form>
+    <div class="panel-title">Company module licenses</div>
+    <div class="muted" style="margin-bottom:12px;">Open a company, check enabled modules, set quantity, then save. Checking a module auto-sets quantity to 1.</div>
+
+    <?php if (empty($companies)): ?>
+        <div class="muted">No companies.</div>
+    <?php else: ?>
+        <?php foreach ($companies as $company): ?>
+            <?php
+                $company_id = (int)($company['id'] ?? 0);
+                $company_licenses = $licenses_by_company[$company_id] ?? [];
+                $open = ($selected_company_id > 0 && $selected_company_id === $company_id);
+                $enabled_count = 0;
+                foreach ($modules as $module) {
+                    $module_id = (int)$module['id'];
+                    if (!empty($company_licenses[$module_id]) && (int)$company_licenses[$module_id] > 0) {
+                        $enabled_count++;
+                    }
+                }
+            ?>
+            <details <?php echo $open ? 'open' : ''; ?> style="margin-bottom:10px; border:1px solid #d7dde5; border-radius:6px; background:#fff;">
+                <summary style="padding:10px 12px; cursor:pointer; font-weight:600;">
+                    <?php echo htmlspecialchars((string)$company['name']); ?> (<?php echo $enabled_count; ?> enabled)
+                </summary>
+                <div style="padding:12px; border-top:1px solid #e5e7eb;">
+                    <form method="post">
+                        <input type="hidden" name="company_id" value="<?php echo $company_id; ?>">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:90px;">Enabled</th>
+                                        <th>Module</th>
+                                        <th style="width:160px;">Quantity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($modules as $module): ?>
+                                        <?php
+                                            $module_id = (int)$module['id'];
+                                            $qty = isset($company_licenses[$module_id]) ? (int)$company_licenses[$module_id] : 0;
+                                            $checked = $qty > 0;
+                                            $qty_value = $checked ? $qty : 0;
+                                            $qty_input_id = 'qty_' . $company_id . '_' . $module_id;
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <input
+                                                    type="checkbox"
+                                                    class="module-toggle"
+                                                    name="enabled_modules[]"
+                                                    value="<?php echo $module_id; ?>"
+                                                    data-qty-id="<?php echo htmlspecialchars($qty_input_id); ?>"
+                                                    <?php echo $checked ? 'checked' : ''; ?>
+                                                >
+                                            </td>
+                                            <td>
+                                                <?php echo htmlspecialchars((string)$module['name']); ?>
+                                                <span class="muted mono" style="margin-left:8px;"><?php echo htmlspecialchars((string)$module['module_key']); ?></span>
+                                            </td>
+                                            <td>
+                                                <input
+                                                    id="<?php echo htmlspecialchars($qty_input_id); ?>"
+                                                    name="module_quantities[<?php echo $module_id; ?>]"
+                                                    type="number"
+                                                    min="0"
+                                                    max="999"
+                                                    value="<?php echo $qty_value; ?>"
+                                                    <?php echo $checked ? '' : 'disabled'; ?>
+                                                >
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:10px;">
+                            <button type="submit" name="save_company_licenses" class="btn btn-primary">Save company licenses</button>
+                        </div>
+                    </form>
+                </div>
+            </details>
+        <?php endforeach; ?>
+    <?php endif; ?>
 </div>
 
-<div class="panel">
-    <div class="panel-title">Active licenses</div>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Company</th>
-                    <th>Module</th>
-                    <th>Module key</th>
-                    <th>Quantity</th>
-                    <th>Created</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($licenses)): ?>
-                    <tr>
-                        <td colspan="5" class="muted">No licenses.</td>
-                    </tr>
-                <?php else: ?>
-                    <?php foreach ($licenses as $license): ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars($license['company_name']); ?></td>
-                            <td><?php echo htmlspecialchars($license['module_name']); ?></td>
-                            <td class="mono"><?php echo htmlspecialchars($license['module_key']); ?></td>
-                            <td><?php echo (int)$license['quantity']; ?></td>
-                            <td class="nowrap"><?php echo date('Y-m-d', strtotime($license['created_at'])); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+<script>
+document.querySelectorAll('.module-toggle').forEach(function (toggle) {
+    toggle.addEventListener('change', function () {
+        var qtyId = toggle.getAttribute('data-qty-id');
+        if (!qtyId) {
+            return;
+        }
+        var qtyInput = document.getElementById(qtyId);
+        if (!qtyInput) {
+            return;
+        }
+
+        if (toggle.checked) {
+            qtyInput.disabled = false;
+            var current = parseInt(qtyInput.value || '0', 10);
+            if (isNaN(current) || current < 1) {
+                qtyInput.value = 1;
+            }
+        } else {
+            qtyInput.value = 0;
+            qtyInput.disabled = true;
+        }
+    });
+});
+</script>
 
 <?php include 'footer.php'; ?>

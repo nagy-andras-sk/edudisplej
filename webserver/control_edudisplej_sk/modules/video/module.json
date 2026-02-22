@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "module_key": "video",
+  "name": "Video Player",
+  "description": "Optimalizált videólejátszó gyenge hardverhez (MP4)",
+  "renderer": "m_video.html",
+  "config": {
+    "defaults": "config/default_settings.json"
+  }
+}

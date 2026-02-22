@@ -7,6 +7,7 @@
 session_start();
 header('Content-Type: application/json');
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 require_once 'auth.php';
 
 // Check if user is logged in and is admin, otherwise require token
@@ -24,7 +25,7 @@ try {
     $location = trim($data['location'] ?? '');
     
     if ($kiosk_id <= 0) {
-        $response['message'] = 'Invalid kiosk ID';
+        $response['message'] = t_def('api.common.invalid_kiosk_id', 'Invalid kiosk ID');
         echo json_encode($response);
         exit;
     }
@@ -48,17 +49,17 @@ try {
     
     if ($stmt->execute()) {
         $response['success'] = true;
-        $response['message'] = 'Location updated successfully';
+        $response['message'] = t_def('api.update_location.success', 'Location updated successfully');
         $response['location'] = $location;
     } else {
-        $response['message'] = 'Failed to update location';
+        $response['message'] = t_def('api.update_location.failed', 'Failed to update location');
     }
     
     $stmt->close();
     closeDbConnection($conn);
     
 } catch (Exception $e) {
-    $response['message'] = 'Server error';
+    $response['message'] = t_def('api.common.server_error', 'Server error');
     error_log($e->getMessage());
 }
 

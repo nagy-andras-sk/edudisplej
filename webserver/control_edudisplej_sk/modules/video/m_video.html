@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDisplej Video Module</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+        #root {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+        }
+        #player {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            object-fit: contain;
+        }
+        #status {
+            position: absolute;
+            left: 50%;
+            top: 14px;
+            transform: translateX(-50%);
+            z-index: 10;
+            color: #fff;
+            background: rgba(0,0,0,.75);
+            border: 1px solid rgba(255,255,255,.22);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            display: none;
+            max-width: calc(100% - 24px);
+            text-align: center;
+        }
+        #status.show { display: block; }
+    </style>
+</head>
+<body>
+<div id="root">
+    <video id="player" autoplay playsinline preload="auto"></video>
+    <div id="status"></div>
+</div>
+
+<script>
+    function parseBool(value, fallback) {
+        if (value === undefined || value === null || value === '') {
+            return fallback;
+        }
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        const normalized = String(value).trim().toLowerCase();
+        if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+        if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+        return fallback;
+    }
+
+    function parseIntSafe(value, fallback) {
+        const n = parseInt(value, 10);
+        return Number.isFinite(n) ? n : fallback;
+    }
+
+    function normalizeAssetApiUrl(inputUrl) {
+        const raw = String(inputUrl || '').trim();
+        if (!raw) {
+            return '';
+        }
+
+        if (raw.includes('module_asset_file.php')) {
+            return raw;
+        }
+
+        const appendToken = (url) => {
+            const pageParams = new URLSearchParams(window.location.search);
+            const pageToken = pageParams.get('token');
+            if (!pageToken || url.includes('token=')) {
+                return url;
+            }
+            const glue = url.includes('?') ? '&' : '?';
+            return `${url}${glue}token=${encodeURIComponent(pageToken)}`;
+        };
+
+        let candidatePath = raw;
+        try {
+            const parsed = new URL(raw, window.location.href);
+            candidatePath = String(parsed.pathname || raw);
+        } catch (_) {
+            candidatePath = raw;
+        }
+
+        candidatePath = candidatePath.replace(/\\/g, '/');
+        const marker = '/uploads/companies/';
+        const idx = candidatePath.toLowerCase().indexOf(marker);
+        if (idx === -1) {
+            return raw;
+        }
+
+        const relPath = candidatePath.slice(idx + 1);
+        const apiUrl = `../../api/group_loop/module_asset_file.php?path=${encodeURIComponent(relPath)}`;
+        return appendToken(apiUrl);
+    }
+
+    function getSettings() {
+        const defaults = {
+            videoAssetUrl: '',
+            videoAssetId: '',
+            muted: true,
+            fitMode: 'contain',
+            bgColor: '#000000'
+        };
+
+        const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS)
+            ? window.EDUDISPLEJ_SETTINGS
+            : {};
+        const params = new URLSearchParams(window.location.search);
+
+        const settings = {
+            ...defaults,
+            ...injected,
+            videoAssetUrl: params.get('videoAssetUrl') ?? injected.videoAssetUrl ?? defaults.videoAssetUrl,
+            muted: parseBool(params.get('muted') ?? injected.muted, defaults.muted),
+            fitMode: String(params.get('fitMode') ?? injected.fitMode ?? defaults.fitMode),
+            bgColor: String(params.get('bgColor') ?? injected.bgColor ?? defaults.bgColor)
+        };
+
+        settings.fitMode = ['contain', 'cover', 'fill'].includes(settings.fitMode) ? settings.fitMode : 'contain';
+        settings.bgColor = /^#[0-9a-fA-F]{6}$/.test(settings.bgColor) ? settings.bgColor : '#000000';
+        settings.videoAssetUrl = normalizeAssetApiUrl(settings.videoAssetUrl);
+
+        return settings;
+    }
+
+    const settings = getSettings();
+    const root = document.getElementById('root');
+    const player = document.getElementById('player');
+    const status = document.getElementById('status');
+
+    function showStatus(message, persist = false) {
+        status.textContent = String(message || '');
+        status.classList.add('show');
+        if (!persist) {
+            setTimeout(() => status.classList.remove('show'), 2000);
+        }
+    }
+
+    function init() {
+        root.style.backgroundColor = settings.bgColor;
+        player.style.objectFit = settings.fitMode;
+        player.muted = settings.muted;
+
+        if (!settings.videoAssetUrl) {
+            showStatus('Nincs videó forrás beállítva', true);
+            return;
+        }
+
+        player.src = settings.videoAssetUrl;
+        player.addEventListener('error', () => {
+            showStatus('Videó betöltési hiba', true);
+        });
+
+        player.addEventListener('loadedmetadata', () => {
+            const dur = parseIntSafe(player.duration, 0);
+            if (dur > 0) {
+                showStatus(`Videó hossza: ${dur}s`);
+            }
+        });
+
+        player.play().catch(() => {
+            showStatus('Automatikus lejátszás blokkolva', true);
+        });
+    }
+
+    init();
+</script>
+</body>
+</html>

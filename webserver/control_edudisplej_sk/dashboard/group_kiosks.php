@@ -44,11 +44,11 @@ try {
     }
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT k.id, k.hostname, k.friendly_name, k.status, k.location, kga.group_id
+    $stmt = $conn->prepare("SELECT k.id, k.hostname, k.friendly_name, k.status, k.location, k.last_seen, kga.group_id
                             FROM kiosks k
                             LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
                             WHERE k.company_id = ?
-                            ORDER BY k.hostname");
+                            ORDER BY COALESCE(NULLIF(k.friendly_name, ''), k.hostname)");
     $stmt->bind_param("i", $company_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -67,7 +67,7 @@ try {
     closeDbConnection($conn);
 
 } catch (Exception $e) {
-    $error = 'Adatbázis hiba';
+    $error = t_def('group_kiosks.error.db', 'Adatbázis hiba');
     error_log($e->getMessage());
 }
 
@@ -89,7 +89,7 @@ if ($focus_group_name !== '') {
     $breadcrumb_items[] = ['label' => '👥 ' . $focus_group_name, 'href' => 'group_kiosks.php?id=' . $focus_group_id];
 }
 
-$breadcrumb_items[] = ['label' => '🖥️ Kijelzők', 'current' => true];
+$breadcrumb_items[] = ['label' => '🖥️ ' . t_def('group_kiosks.kiosks', 'Kijelzők'), 'current' => true];
 
 $logout_url = '../login.php?logout=1';
 
@@ -191,13 +191,13 @@ include '../admin/header.php';
 <?php endif; ?>
 
 <div class="panel">
-    <div class="panel-title">Csoport kioszk hozzárendelés</div>
-    <p class="muted">Húzd a kijelzőket a csoportok között. A „Nincs csoport” oszlop csak forrásként működik.</p>
+    <div class="panel-title"><?php echo htmlspecialchars(t_def('group_kiosks.title', 'Csoport kioszk hozzárendelés')); ?></div>
+    <p class="muted"><?php echo htmlspecialchars(t_def('group_kiosks.help', 'Húzd a kijelzőket a csoportok között. A „Nincs csoport” oszlop csak forrásként működik.')); ?></p>
 </div>
 
 <?php if (empty($groups)): ?>
     <div class="panel">
-        <div class="muted">Nincsenek csoportok.</div>
+        <div class="muted"><?php echo htmlspecialchars(t_def('group_kiosks.no_groups', 'Nincsenek csoportok.')); ?></div>
     </div>
 <?php else: ?>
     <div class="groups-board">
@@ -212,11 +212,11 @@ include '../admin/header.php';
                     <div class="group-title">
                         👥 <?php echo htmlspecialchars($group['name']); ?>
                         <?php if (!empty($group['is_default'])): ?>
-                            <span class="default-badge">Alapértelmezett</span>
+                            <span class="default-badge"><?php echo htmlspecialchars(t_def('group_kiosks.default_badge', 'Alapértelmezett')); ?></span>
                         <?php endif; ?>
                     </div>
                     <div class="group-meta">
-                        Prioritás: <?php echo (int)$group['priority']; ?> · Kijelzők: <span id="group-count-<?php echo $group_id; ?>"><?php echo count($group_kiosks); ?></span>
+                        <?php echo htmlspecialchars(t_def('group_kiosks.priority', 'Prioritás')); ?>: <?php echo (int)$group['priority']; ?> · <?php echo htmlspecialchars(t_def('group_kiosks.kiosks', 'Kijelzők')); ?>: <span id="group-count-<?php echo $group_id; ?>"><?php echo count($group_kiosks); ?></span>
                     </div>
                 </div>
 
@@ -224,28 +224,31 @@ include '../admin/header.php';
                     <table class="minimal-table">
                         <thead>
                             <tr>
-                                <th>Hostname</th>
-                                <th>Státusz</th>
-                                <th>Hely</th>
+                                <th><?php echo htmlspecialchars(t_def('dashboard.col.name', 'Megnevezés')); ?></th>
+                                <th><?php echo htmlspecialchars(t_def('group_kiosks.status', 'Státusz')); ?></th>
+                                <th><?php echo htmlspecialchars(t_def('group_kiosks.location', 'Hely')); ?></th>
                             </tr>
                         </thead>
                         <tbody class="kiosk-list" data-group-id="<?php echo $group_id; ?>">
                             <?php if (empty($group_kiosks)): ?>
-                                <tr class="no-data-row"><td colspan="3" class="muted">Nincs kijelző</td></tr>
+                                <tr class="no-data-row"><td colspan="3" class="muted"><?php echo htmlspecialchars(t_def('group_kiosks.no_kiosk', 'Nincs kijelző')); ?></td></tr>
                             <?php else: ?>
                                 <?php foreach ($group_kiosks as $kiosk): ?>
                                     <?php
-                                        $kiosk_name = $kiosk['hostname'] ?? $kiosk['friendly_name'] ?? 'N/A';
+                                        $kiosk_name = trim((string)($kiosk['friendly_name'] ?? ''));
+                                        if ($kiosk_name === '') {
+                                            $kiosk_name = $kiosk['hostname'] ?? t_def('common.na', 'N/A');
+                                        }
                                         $is_online = ($kiosk['status'] ?? '') === 'online';
                                     ?>
                                     <tr class="kiosk-row" draggable="true" data-kiosk-id="<?php echo (int)$kiosk['id']; ?>" data-group-id="<?php echo $group_id; ?>">
                                         <td class="kiosk-name"><?php echo htmlspecialchars($kiosk_name); ?></td>
                                         <td>
                                             <span class="status-badge <?php echo $is_online ? 'status-online' : 'status-offline'; ?>">
-                                                <?php echo $is_online ? '🟢 Online' : '🔴 Offline'; ?>
+                                                <?php echo $is_online ? htmlspecialchars(t_def('common.status.online_dot', '🟢 online')) : htmlspecialchars(t_def('common.status.offline_dot', '🔴 offline')); ?>
                                             </span>
                                         </td>
-                                        <td><?php echo htmlspecialchars($kiosk['location'] ?? '—'); ?></td>
+                                        <td><?php echo htmlspecialchars($kiosk['location'] ?? t_def('common.unavailable', '—')); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -258,33 +261,36 @@ include '../admin/header.php';
         <?php if (!empty($unassigned_kiosks)): ?>
             <div class="group-panel" data-group-id="0">
                 <div class="group-panel-header">
-                    <div class="group-title">📦 Nincs csoport</div>
-                    <div class="group-meta">Kijelzők: <span id="group-count-0"><?php echo count($unassigned_kiosks); ?></span></div>
+                    <div class="group-title">📦 <?php echo htmlspecialchars(t_def('group_kiosks.no_group', 'Nincs csoport')); ?></div>
+                    <div class="group-meta"><?php echo htmlspecialchars(t_def('group_kiosks.kiosks', 'Kijelzők')); ?>: <span id="group-count-0"><?php echo count($unassigned_kiosks); ?></span></div>
                 </div>
 
                 <div class="kiosk-table-wrap">
                     <table class="minimal-table">
                         <thead>
                             <tr>
-                                <th>Hostname</th>
-                                <th>Státusz</th>
-                                <th>Hely</th>
+                                <th><?php echo htmlspecialchars(t_def('dashboard.col.name', 'Megnevezés')); ?></th>
+                                <th><?php echo htmlspecialchars(t_def('group_kiosks.status', 'Státusz')); ?></th>
+                                <th><?php echo htmlspecialchars(t_def('group_kiosks.location', 'Hely')); ?></th>
                             </tr>
                         </thead>
                         <tbody class="kiosk-list" data-group-id="0">
                             <?php foreach ($unassigned_kiosks as $kiosk): ?>
                                 <?php
-                                    $kiosk_name = $kiosk['hostname'] ?? $kiosk['friendly_name'] ?? 'N/A';
+                                    $kiosk_name = trim((string)($kiosk['friendly_name'] ?? ''));
+                                    if ($kiosk_name === '') {
+                                        $kiosk_name = $kiosk['hostname'] ?? t_def('common.na', 'N/A');
+                                    }
                                     $is_online = ($kiosk['status'] ?? '') === 'online';
                                 ?>
                                 <tr class="kiosk-row" draggable="true" data-kiosk-id="<?php echo (int)$kiosk['id']; ?>" data-group-id="0">
                                     <td class="kiosk-name"><?php echo htmlspecialchars($kiosk_name); ?></td>
                                     <td>
                                         <span class="status-badge <?php echo $is_online ? 'status-online' : 'status-offline'; ?>">
-                                            <?php echo $is_online ? '🟢 Online' : '🔴 Offline'; ?>
+                                            <?php echo $is_online ? htmlspecialchars(t_def('common.status.online_dot', '🟢 online')) : htmlspecialchars(t_def('common.status.offline_dot', '🔴 offline')); ?>
                                         </span>
                                     </td>
-                                    <td><?php echo htmlspecialchars($kiosk['location'] ?? '—'); ?></td>
+                                    <td><?php echo htmlspecialchars($kiosk['location'] ?? t_def('common.unavailable', '—')); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -296,6 +302,12 @@ include '../admin/header.php';
 <?php endif; ?>
 
 <script>
+    const i18n = <?php echo json_encode([
+        'noKiosk' => t_def('group_kiosks.no_kiosk', 'Nincs kijelző'),
+        'assignFailed' => t_def('group_kiosks.assign_failed', 'Sikertelen hozzárendelés'),
+        'errorOccurred' => t_def('group_kiosks.error_occurred', 'Hiba történt: {error}'),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+
     var draggedRow = null;
 
     function updateCounts() {
@@ -323,7 +335,7 @@ include '../admin/header.php';
             var td = document.createElement('td');
             td.colSpan = 3;
             td.className = 'muted';
-            td.textContent = 'Nincs kijelző';
+            td.textContent = i18n.noKiosk;
             tr.appendChild(td);
             list.appendChild(tr);
         }
@@ -344,7 +356,7 @@ include '../admin/header.php';
             })
             .then(function (data) {
                 if (!data.success) {
-                    alert('⚠️ ' + (data.message || 'Sikertelen hozzárendelés'));
+                    alert('⚠️ ' + (data.message || i18n.assignFailed));
                     return;
                 }
 
@@ -361,7 +373,7 @@ include '../admin/header.php';
                 updateCounts();
             })
             .catch(function (error) {
-                alert('⚠️ Hiba történt: ' + error);
+                alert('⚠️ ' + i18n.errorOccurred.replace('{error}', String(error)));
             });
     }
 

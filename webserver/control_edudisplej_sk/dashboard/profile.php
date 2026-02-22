@@ -7,6 +7,32 @@
 session_start();
 require_once '../dbkonfiguracia.php';
 require_once '../auth_roles.php';
+require_once '../modules/module_asset_service.php';
+require_once '../i18n.php';
+
+function profile_format_bytes($bytes): string {
+    $bytes = max(0, (int)$bytes);
+    if ($bytes < 1024) {
+        return $bytes . ' B';
+    }
+    $units = ['KB', 'MB', 'GB', 'TB'];
+    $size = $bytes / 1024;
+    $unit_index = 0;
+    while ($size >= 1024 && $unit_index < count($units) - 1) {
+        $size /= 1024;
+        $unit_index++;
+    }
+    return number_format($size, 2, ',', ' ') . ' ' . $units[$unit_index];
+}
+
+function profile_extract_asset_id_from_url(string $url): int {
+    $query = (string)parse_url($url, PHP_URL_QUERY);
+    if ($query === '') {
+        return 0;
+    }
+    parse_str($query, $params);
+    return (int)($params['asset_id'] ?? 0);
+}
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -22,10 +48,15 @@ $licenses = [];
 $enabled_licenses = [];
 $disabled_licenses = [];
 $company_users = [];
+$company_assets_summary = [];
+$company_assets_recent = [];
+$used_asset_ids = [];
+$used_asset_paths = [];
 $error = '';
 $success = '';
 $is_admin_user = !empty($_SESSION['isadmin']);
 $current_role = edudisplej_get_session_role();
+$current_lang = edudisplej_apply_language_preferences();
 
 if ($current_role === 'content_editor' || $current_role === 'loop_manager') {
     header('Location: index.php');
@@ -45,7 +76,7 @@ try {
         }
     }
     if (!isset($existing_company_columns['address'])) {
-        $conn->query("ALTER TABLE companies ADD COLUMN address VARCHAR(255) DEFAULT NULL AFTER name");
+        $conn->query("ALTER TABLE companies ADD COLUMN address TEXT DEFAULT NULL AFTER name");
     }
     if (!isset($existing_company_columns['tax_number'])) {
         $conn->query("ALTER TABLE companies ADD COLUMN tax_number VARCHAR(64) DEFAULT NULL AFTER address");
@@ -66,6 +97,58 @@ try {
     }
     
     $company_id = (int)($user['company_id'] ?? 0);
+    if ($is_admin_user && !empty($_SESSION['company_id'])) {
+        $company_id = (int)$_SESSION['company_id'];
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_asset']) && $is_admin_user && $company_id > 0) {
+        edudisplej_module_asset_ensure_schema($conn);
+        $delete_asset_id = (int)($_POST['delete_asset_id'] ?? 0);
+        if ($delete_asset_id <= 0) {
+            $error = t_def('profile.assets.delete_invalid', 'Érvénytelen tartalom azonosító.');
+        } else {
+            $asset_stmt = $conn->prepare('SELECT id, storage_rel_path, is_active FROM module_asset_store WHERE id = ? AND company_id = ? LIMIT 1');
+            $asset_stmt->bind_param('ii', $delete_asset_id, $company_id);
+            $asset_stmt->execute();
+            $asset_row = $asset_stmt->get_result()->fetch_assoc();
+            $asset_stmt->close();
+
+            if (!$asset_row) {
+                $error = t_def('profile.assets.delete_not_found', 'A kiválasztott tartalom nem található.');
+            } elseif ((int)($asset_row['is_active'] ?? 0) !== 1) {
+                $success = t_def('profile.assets.delete_already_done', 'A tartalom már törölt állapotban van.');
+            } else {
+                $deactivate_stmt = $conn->prepare('UPDATE module_asset_store SET is_active = 0 WHERE id = ? AND company_id = ? LIMIT 1');
+                $deactivate_stmt->bind_param('ii', $delete_asset_id, $company_id);
+                $deleted = $deactivate_stmt->execute();
+                $deactivate_stmt->close();
+
+                if (!$deleted) {
+                    $error = t_def('profile.assets.delete_failed', 'A tartalom törlése sikertelen.');
+                } else {
+                    $normalized_path = edudisplej_module_asset_extract_rel_path((string)($asset_row['storage_rel_path'] ?? ''));
+                    if ($normalized_path !== '') {
+                        $active_ref_stmt = $conn->prepare('SELECT COUNT(*) AS active_count FROM module_asset_store WHERE company_id = ? AND storage_rel_path = ? AND is_active = 1');
+                        $active_ref_stmt->bind_param('is', $company_id, $normalized_path);
+                        $active_ref_stmt->execute();
+                        $active_refs = (int)(($active_ref_stmt->get_result()->fetch_assoc()['active_count'] ?? 0));
+                        $active_ref_stmt->close();
+
+                        if ($active_refs === 0) {
+                            $root_abs = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+                            $file_abs = rtrim(str_replace('\\', '/', (string)$root_abs), '/') . '/' . $normalized_path;
+                            $resolved_file = realpath($file_abs);
+                            if ($resolved_file && is_file($resolved_file)) {
+                                @unlink($resolved_file);
+                            }
+                        }
+                    }
+
+                    $success = t_def('profile.assets.delete_success', 'Tartalom sikeresen törölve.');
+                }
+            }
+        }
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_institution']) && $is_admin_user && $company_id > 0) {
         $institution_name = trim((string)($_POST['institution_name'] ?? ''));
@@ -73,14 +156,14 @@ try {
         $tax_number = trim((string)($_POST['tax_number'] ?? ''));
 
         if ($institution_name === '') {
-            $error = 'Az intézmény neve kötelező.';
+            $error = t_def('profile.institution.name_required', 'Az intézmény neve kötelező.');
         } else {
             $update_stmt = $conn->prepare("UPDATE companies SET name = ?, address = ?, tax_number = ? WHERE id = ?");
             $update_stmt->bind_param("sssi", $institution_name, $institution_address, $tax_number, $company_id);
             if ($update_stmt->execute()) {
-                $success = 'Intézmény adatai sikeresen frissítve.';
+                $success = t_def('profile.institution.update_success', 'Intézmény adatai sikeresen frissítve.');
             } else {
-                $error = 'Az intézmény adatainak mentése sikertelen.';
+                $error = t_def('profile.institution.update_failed', 'Az intézmény adatainak mentése sikertelen.');
             }
             $update_stmt->close();
         }
@@ -92,11 +175,13 @@ try {
         $stmt->execute();
         $company_data = $stmt->get_result()->fetch_assoc() ?: [];
         $stmt->close();
-        $company_name = $company_data['name'] ?? 'Nincs intézmény';
+        $company_name = $company_data['name'] ?? t_def('profile.no_institution', 'Nincs intézmény');
     }
     
     // Get company licenses
     if ($company_id) {
+        edudisplej_module_asset_ensure_schema($conn);
+
         $stmt = $conn->prepare("
             SELECT m.id, m.name, m.description, m.module_key, 
                    COALESCE(ml.quantity, 0) as total_licenses,
@@ -117,14 +202,13 @@ try {
         $stmt->close();
 
         $filtered_licenses = [];
-        $legacy_alias_keys = ['datetime', 'dateclock'];
         foreach ($licenses as $row) {
             $module_key = strtolower(trim((string)($row['module_key'] ?? '')));
             $module_name = strtolower(trim((string)($row['name'] ?? '')));
             $is_technical_unconfigured = strpos($module_key, 'unconfigured') !== false
                 || (strpos($module_name, 'unconfigured') !== false
                     && (strpos($module_name, 'displej') !== false || strpos($module_name, 'display') !== false));
-            if ($is_technical_unconfigured || in_array($module_key, $legacy_alias_keys, true)) {
+            if ($is_technical_unconfigured) {
                 continue;
             }
             $filtered_licenses[] = $row;
@@ -143,12 +227,122 @@ try {
             $company_users[] = $row;
         }
         $stmt->close();
+
+        $stmt = $conn->prepare("
+            SELECT module_key, asset_kind, COUNT(*) AS asset_count, COALESCE(SUM(file_size), 0) AS total_bytes, MAX(created_at) AS last_upload
+            FROM module_asset_store
+            WHERE company_id = ? AND is_active = 1
+            GROUP BY module_key, asset_kind
+            ORDER BY module_key ASC, asset_kind ASC
+        ");
+        $stmt->bind_param("i", $company_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $company_assets_summary[] = $row;
+        }
+        $stmt->close();
+
+        $stmt = $conn->prepare(" 
+            SELECT id, module_key, asset_kind, original_name, mime_type, file_size, storage_rel_path, created_at
+            FROM module_asset_store
+            WHERE company_id = ? AND is_active = 1
+            ORDER BY created_at DESC
+            LIMIT 100
+        ");
+        $stmt->bind_param("i", $company_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $company_assets_recent[] = $row;
+        }
+        $stmt->close();
+
+        $stmt = $conn->prepare(" 
+            SELECT kgm.module_key, kgm.settings
+            FROM kiosk_group_modules kgm
+            INNER JOIN kiosk_groups kg ON kg.id = kgm.group_id
+            WHERE kg.company_id = ? AND kgm.is_active = 1
+        ");
+        $stmt->bind_param("i", $company_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $settings_raw = (string)($row['settings'] ?? '');
+            $settings = json_decode($settings_raw, true);
+            if (!is_array($settings)) {
+                continue;
+            }
+
+            $pdf_asset_id = (int)($settings['pdfAssetId'] ?? 0);
+            if ($pdf_asset_id > 0) {
+                $used_asset_ids[$pdf_asset_id] = true;
+            }
+
+            $pdf_asset_url = trim((string)($settings['pdfAssetUrl'] ?? ''));
+            if ($pdf_asset_url !== '') {
+                $pdf_url_asset_id = profile_extract_asset_id_from_url($pdf_asset_url);
+                if ($pdf_url_asset_id > 0) {
+                    $used_asset_ids[$pdf_url_asset_id] = true;
+                }
+                $pdf_path = edudisplej_module_asset_extract_rel_path($pdf_asset_url);
+                if ($pdf_path !== '') {
+                    $used_asset_paths[$pdf_path] = true;
+                }
+            }
+
+            $image_urls_json = (string)($settings['imageUrlsJson'] ?? '[]');
+            $image_urls = json_decode($image_urls_json, true);
+            if (is_array($image_urls)) {
+                foreach ($image_urls as $image_url_raw) {
+                    $image_url = trim((string)$image_url_raw);
+                    if ($image_url === '') {
+                        continue;
+                    }
+                    $img_asset_id = profile_extract_asset_id_from_url($image_url);
+                    if ($img_asset_id > 0) {
+                        $used_asset_ids[$img_asset_id] = true;
+                    }
+                    $img_path = edudisplej_module_asset_extract_rel_path($image_url);
+                    if ($img_path !== '') {
+                        $used_asset_paths[$img_path] = true;
+                    }
+                }
+            }
+
+            $video_asset_id = (int)($settings['videoAssetId'] ?? 0);
+            if ($video_asset_id > 0) {
+                $used_asset_ids[$video_asset_id] = true;
+            }
+
+            $video_asset_url = trim((string)($settings['videoAssetUrl'] ?? ''));
+            if ($video_asset_url !== '') {
+                $video_url_asset_id = profile_extract_asset_id_from_url($video_asset_url);
+                if ($video_url_asset_id > 0) {
+                    $used_asset_ids[$video_url_asset_id] = true;
+                }
+                $video_path = edudisplej_module_asset_extract_rel_path($video_asset_url);
+                if ($video_path !== '') {
+                    $used_asset_paths[$video_path] = true;
+                }
+            }
+        }
+        $stmt->close();
+
+        foreach ($company_assets_recent as &$asset_item) {
+            $asset_id = (int)($asset_item['id'] ?? 0);
+            $asset_path = edudisplej_module_asset_extract_rel_path((string)($asset_item['storage_rel_path'] ?? ''));
+            $asset_item['is_used'] = ($asset_id > 0 && isset($used_asset_ids[$asset_id]))
+                || ($asset_path !== '' && isset($used_asset_paths[$asset_path]));
+            $asset_item['asset_url'] = $asset_id > 0 ? edudisplej_module_asset_api_url_by_id($asset_id) : '';
+        }
+        unset($asset_item);
     }
     
     $conn->close();
     
 } catch (Exception $e) {
-    $error = 'Database error: ' . $e->getMessage();
+    $error = t_def('common.database_error', 'Adatbázis hiba:') . ' ' . $e->getMessage();
     error_log($e->getMessage());
 }
 
@@ -170,42 +364,42 @@ $logout_url = '../login.php?logout=1';
             <!-- USERS MANAGEMENT -->
             <div class="panel" style="padding: 20px; margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0;">👥 Felhasználók Kezelése</h2>
-                    <button onclick="openAddUserForm()" style="background: #1e40af; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">➠ Új felhasználó</button>
+                    <h2 style="margin: 0;"><?php echo htmlspecialchars(t_def('profile.users.title', '👥 Felhasználók kezelése')); ?></h2>
+                    <button onclick="openAddUserForm()" style="background: #1e40af; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;"><?php echo htmlspecialchars(t_def('profile.users.add', '➠ Új felhasználó')); ?></button>
                 </div>
-                <p style="color: #666; margin-bottom: 15px;">Az intézményhez tartozó felhasználók és jogosultságaik.</p>
+                <p style="color: #666; margin-bottom: 15px;"><?php echo htmlspecialchars(t_def('profile.users.subtitle', 'Az intézményhez tartozó felhasználók és jogosultságaik.')); ?></p>
                 
                 <?php if (empty($company_users)): ?>
                     <div style="text-align: center; padding: 30px; color: #999; background: #f9f9f9; border-radius: 3px;">
-                        Nincsenek felhasználók
+                        <?php echo htmlspecialchars(t_def('profile.users.empty', 'Nincsenek felhasználók')); ?>
                     </div>
                 <?php else: ?>
                     <div style="overflow-x: auto;">
                         <table style="width: 100%;">
                             <thead>
                                 <tr>
-                                    <th>Felhasználónév</th>
+                                    <th><?php echo htmlspecialchars(t_def('profile.users.col.username', 'Felhasználónév')); ?></th>
                                     <th>Email</th>
-                                    <th>Jogosultság</th>
-                                    <th>Utolsó bejelentkezés</th>
-                                    <th>Műveletek</th>
+                                    <th><?php echo htmlspecialchars(t_def('profile.users.col.role', 'Jogosultság')); ?></th>
+                                    <th><?php echo htmlspecialchars(t_def('profile.users.col.last_login', 'Utolsó bejelentkezés')); ?></th>
+                                    <th><?php echo htmlspecialchars(t_def('profile.users.col.actions', 'Műveletek')); ?></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($company_users as $u): 
                                     $is_admin = $u['isadmin'];
                                     if ($is_admin) {
-                                        $role = 'Admin';
+                                        $role = t_def('profile.role.admin', 'Admin');
                                         $role_color = '#ff9800';
                                     } else {
                                         $normalized_role = edudisplej_normalize_user_role($u['user_role'] ?? 'user', false);
-                                        $role = 'Felhasználó';
+                                        $role = t_def('profile.role.user', 'Felhasználó');
                                         $role_color = '#1e40af';
                                         if ($normalized_role === 'loop_manager') {
-                                            $role = 'Loop/modul kezelő';
+                                            $role = t_def('profile.role.loop_manager', 'Loop/modul kezelő');
                                             $role_color = '#00695c';
                                         } elseif ($normalized_role === 'content_editor') {
-                                            $role = 'Tartalom módosító';
+                                            $role = t_def('profile.role.content_editor', 'Tartalom módosító');
                                             $role_color = '#6a1b9a';
                                         }
                                     }
@@ -218,13 +412,13 @@ $logout_url = '../login.php?logout=1';
                                                 <?php echo $role; ?>
                                             </span>
                                         </td>
-                                        <td><?php echo $u['last_login'] ? date('Y-m-d H:i', strtotime($u['last_login'])) : 'Soha'; ?></td>
+                                        <td><?php echo $u['last_login'] ? date('Y-m-d H:i', strtotime($u['last_login'])) : htmlspecialchars(t_def('common.never', 'Soha')); ?></td>
                                         <td>
                                             <?php if ($u['id'] !== $user_id): ?>
-                                                <button onclick="editUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small">✏️ Szerkesztés</button>
-                                                <button onclick="deleteUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small" style="color: #d32f2f;">🗑️ Törlés</button>
+                                                <button onclick="editUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small"><?php echo htmlspecialchars(t_def('common.edit', '✏️ Szerkesztés')); ?></button>
+                                                <button onclick="deleteUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small" style="color: #d32f2f;"><?php echo htmlspecialchars(t_def('common.delete', '🗑️ Törlés')); ?></button>
                                             <?php else: ?>
-                                                <small style="color: #999;">(Saját fiók: jelszó itt nem szerkeszthető)</small>
+                                                <small style="color: #999;"><?php echo htmlspecialchars(t_def('profile.users.own_account_note', '(Saját fiók: jelszó itt nem szerkeszthető)')); ?></small>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -238,22 +432,22 @@ $logout_url = '../login.php?logout=1';
             <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start;">
                 <!-- INSTITUTION INFO -->
                 <div class="panel" style="padding: 20px; margin-bottom: 20px;">
-                    <h2 style="margin-top: 0;">🏢 Intézmény adatai</h2>
+                    <h2 style="margin-top: 0;"><?php echo htmlspecialchars(t_def('profile.institution.title', '🏢 Intézmény adatai')); ?></h2>
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px; font-weight: bold; width: 30%;">Intézmény megnevezése</td>
+                            <td style="padding: 12px; font-weight: bold; width: 30%;"><?php echo htmlspecialchars(t_def('profile.institution.name', 'Intézmény megnevezése')); ?></td>
                             <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['name'] ?? 'N/A'); ?></td>
                         </tr>
                         <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px; font-weight: bold;">Cím</td>
-                            <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['address'] ?? '—'); ?></td>
+                            <td style="padding: 12px; font-weight: bold;"><?php echo htmlspecialchars(t_def('profile.institution.address', 'Cím')); ?></td>
+                            <td style="padding: 12px;"><?php echo nl2br(htmlspecialchars((string)($company_data['address'] ?? '—'))); ?></td>
                         </tr>
                         <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px; font-weight: bold;">Adószám</td>
+                            <td style="padding: 12px; font-weight: bold;"><?php echo htmlspecialchars(t_def('profile.institution.tax_number', 'Adószám')); ?></td>
                             <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['tax_number'] ?? '—'); ?></td>
                         </tr>
                         <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px; font-weight: bold;">Regisztrációs időpont</td>
+                            <td style="padding: 12px; font-weight: bold;"><?php echo htmlspecialchars(t_def('profile.institution.registered_at', 'Regisztrációs időpont')); ?></td>
                             <td style="padding: 12px;"><?php echo $company_data['created_at'] ? date('Y-m-d H:i', strtotime($company_data['created_at'])) : 'N/A'; ?></td>
                         </tr>
                         <?php if (!empty($company_data['api_token'])): ?>
@@ -261,13 +455,13 @@ $logout_url = '../login.php?logout=1';
                             <td style="padding: 12px; font-weight: bold;">API Token</td>
                             <td style="padding: 12px;">
                                 <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px;"><?php echo htmlspecialchars($company_data['api_token']); ?></code>
-                                <button data-copy="<?php echo htmlspecialchars($company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
+                                <button data-copy="<?php echo htmlspecialchars($company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;"><?php echo htmlspecialchars(t_def('common.copy', '📋 Másolás')); ?></button>
                                 <div style="margin-top: 10px;">
-                                    <strong style="display: inline-block; margin-right: 8px;">Install parancs:</strong>
+                                    <strong style="display: inline-block; margin-right: 8px;"><?php echo htmlspecialchars(t_def('profile.install_command', 'Install parancs:')); ?></strong>
                                     <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px; display: inline-block;">
                                         <?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>
                                     </code>
-                                    <button data-copy="<?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Másolás</button>
+                                    <button data-copy="<?php echo htmlspecialchars('curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=' . $company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;"><?php echo htmlspecialchars(t_def('common.copy', '📋 Másolás')); ?></button>
                                 </div>
                             </td>
                         </tr>
@@ -279,50 +473,50 @@ $logout_url = '../login.php?logout=1';
                             <input type="hidden" name="update_institution" value="1">
                             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                                 <div>
-                                    <label for="institution_name" style="display:block; font-weight:600; margin-bottom:6px;">Intézmény megnevezése</label>
+                                    <label for="institution_name" style="display:block; font-weight:600; margin-bottom:6px;"><?php echo htmlspecialchars(t_def('profile.institution.name', 'Intézmény megnevezése')); ?></label>
                                     <input id="institution_name" name="institution_name" type="text" value="<?php echo htmlspecialchars($company_data['name'] ?? ''); ?>" required style="width:100%;">
                                 </div>
                                 <div>
-                                    <label for="institution_address" style="display:block; font-weight:600; margin-bottom:6px;">Cím</label>
-                                    <input id="institution_address" name="institution_address" type="text" value="<?php echo htmlspecialchars($company_data['address'] ?? ''); ?>" style="width:100%;">
+                                    <label for="institution_address" style="display:block; font-weight:600; margin-bottom:6px;"><?php echo htmlspecialchars(t_def('profile.institution.address', 'Cím')); ?></label>
+                                    <textarea id="institution_address" name="institution_address" rows="3" style="width:100%; resize:vertical;"><?php echo htmlspecialchars($company_data['address'] ?? ''); ?></textarea>
                                 </div>
                             </div>
                             <div style="margin-top: 12px; max-width: 420px;">
-                                <label for="tax_number" style="display:block; font-weight:600; margin-bottom:6px;">Adószám</label>
+                                <label for="tax_number" style="display:block; font-weight:600; margin-bottom:6px;"><?php echo htmlspecialchars(t_def('profile.institution.tax_number', 'Adószám')); ?></label>
                                 <input id="tax_number" name="tax_number" type="text" value="<?php echo htmlspecialchars($company_data['tax_number'] ?? ''); ?>" style="width:100%;">
                             </div>
                             <div style="margin-top: 12px;">
-                                <button type="submit" class="btn btn-primary">Intézmény adatok mentése</button>
+                                <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(t_def('profile.institution.save', 'Intézmény adatok mentése')); ?></button>
                             </div>
                         </form>
                     <?php else: ?>
-                        <p style="margin-top: 12px; color: #666;">Az intézmény adatait csak admin jogosultsággal lehet szerkeszteni.</p>
+                        <p style="margin-top: 12px; color: #666;"><?php echo htmlspecialchars(t_def('profile.institution.admin_only', 'Az intézmény adatait csak admin jogosultsággal lehet szerkeszteni.')); ?></p>
                     <?php endif; ?>
                 </div>
 
                 <!-- LICENSES -->
                 <div class="panel" style="padding: 20px; margin-bottom: 20px;">
-                    <h2 style="margin-top: 0;">📜 Licenszek kezelése</h2>
-                    <p style="color: #666;">Felül a bekapcsolt modulok, alul a kikapcsoltak.</p>
+                    <h2 style="margin-top: 0;"><?php echo htmlspecialchars(t_def('profile.licenses.title', '📜 Licenszek kezelése')); ?></h2>
+                    <p style="color: #666;"><?php echo htmlspecialchars(t_def('profile.licenses.subtitle', 'Felül a bekapcsolt modulok, alul a kikapcsoltak.')); ?></p>
                     
                     <?php if (empty($enabled_licenses) && empty($disabled_licenses)): ?>
                         <div style="text-align: center; padding: 30px; color: #999; background: #f9f9f9; border-radius: 3px;">
-                            Nincsenek elérhető modulok
+                            <?php echo htmlspecialchars(t_def('profile.licenses.empty', 'Nincsenek elérhető modulok')); ?>
                         </div>
                     <?php else: ?>
-                        <h3 style="margin-top:0;">Bekapcsolt modulok</h3>
+                        <h3 style="margin-top:0;"><?php echo htmlspecialchars(t_def('profile.licenses.enabled', 'Bekapcsolt modulok')); ?></h3>
                         <div style="overflow-x: auto; margin-bottom: 14px;">
                             <table style="width: 100%;">
                                 <thead>
                                     <tr>
-                                        <th>Modul</th>
-                                        <th>Összesen</th>
-                                        <th>Felhasználva</th>
+                                        <th><?php echo htmlspecialchars(t_def('profile.licenses.col.module', 'Modul')); ?></th>
+                                        <th><?php echo htmlspecialchars(t_def('profile.licenses.col.total', 'Összesen')); ?></th>
+                                        <th><?php echo htmlspecialchars(t_def('profile.licenses.col.used', 'Felhasználva')); ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($enabled_licenses)): ?>
-                                        <tr><td colspan="3" style="text-align:center; color:#999;">Nincs bekapcsolt modul.</td></tr>
+                                        <tr><td colspan="3" style="text-align:center; color:#999;"><?php echo htmlspecialchars(t_def('profile.licenses.enabled_empty', 'Nincs bekapcsolt modul.')); ?></td></tr>
                                     <?php endif; ?>
                                     <?php foreach ($enabled_licenses as $lic): 
                                         $total = (int)($lic['total_licenses'] ?? 0);
@@ -348,18 +542,18 @@ $logout_url = '../login.php?logout=1';
                             </table>
                         </div>
 
-                        <h3>Kikapcsolt modulok</h3>
+                        <h3><?php echo htmlspecialchars(t_def('profile.licenses.disabled', 'Kikapcsolt modulok')); ?></h3>
                         <div style="overflow-x: auto;">
                             <table style="width: 100%;">
                                 <thead>
                                     <tr>
-                                        <th>Modul</th>
-                                        <th>Állapot</th>
+                                        <th><?php echo htmlspecialchars(t_def('profile.licenses.col.module', 'Modul')); ?></th>
+                                        <th><?php echo htmlspecialchars(t_def('profile.licenses.col.state', 'Állapot')); ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($disabled_licenses)): ?>
-                                        <tr><td colspan="2" style="text-align:center; color:#999;">Nincs kikapcsolt modul.</td></tr>
+                                        <tr><td colspan="2" style="text-align:center; color:#999;"><?php echo htmlspecialchars(t_def('profile.licenses.disabled_empty', 'Nincs kikapcsolt modul.')); ?></td></tr>
                                     <?php endif; ?>
                                     <?php foreach ($disabled_licenses as $lic): 
                                         $module_link = 'https://www.edudisplej.sk/modules/' . rawurlencode((string)($lic['module_key'] ?? ''));
@@ -371,7 +565,7 @@ $logout_url = '../login.php?logout=1';
                                                 </a>
                                                 <br><small style="color:#999;"><?php echo htmlspecialchars($lic['module_key']); ?></small>
                                             </td>
-                                            <td><span style="color:#999;">Kikapcsolva</span></td>
+                                            <td><span style="color:#999;"><?php echo htmlspecialchars(t_def('profile.licenses.state.disabled', 'Kikapcsolva')); ?></span></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -380,14 +574,145 @@ $logout_url = '../login.php?logout=1';
                     <?php endif; ?>
                 </div>
             </div>
+
+            <div class="panel" style="padding: 20px; margin-bottom: 20px;">
+                <h2 style="margin-top: 0;"><?php echo htmlspecialchars(t('profile.assets.title')); ?></h2>
+                <p style="color: #666; margin-bottom: 14px;"><?php echo htmlspecialchars(t('profile.assets.subtitle')); ?></p>
+
+                <?php if (empty($company_assets_summary)): ?>
+                    <div style="text-align: center; padding: 30px; color: #999; background: #f9f9f9; border-radius: 3px;">
+                        <?php echo htmlspecialchars(t('profile.assets.empty')); ?>
+                    </div>
+                <?php else: ?>
+                    <div style="overflow-x: auto; margin-bottom: 16px;">
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.module')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.kind')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.count')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.size')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.last_upload')); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($company_assets_summary as $asset_summary): ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars((string)$asset_summary['module_key']); ?></strong></td>
+                                        <td><?php echo htmlspecialchars((string)$asset_summary['asset_kind']); ?></td>
+                                        <td style="text-align:center;"><?php echo (int)$asset_summary['asset_count']; ?></td>
+                                        <td style="text-align:right;"><?php echo htmlspecialchars(profile_format_bytes((int)$asset_summary['total_bytes'])); ?></td>
+                                        <td><?php echo !empty($asset_summary['last_upload']) ? date('Y-m-d H:i', strtotime((string)$asset_summary['last_upload'])) : '—'; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 style="margin: 12px 0;"><?php echo htmlspecialchars(t('profile.assets.latest_uploads')); ?></h3>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.time')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.module')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.file')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.kind')); ?></th>
+                                    <th><?php echo htmlspecialchars(t_def('profile.assets.col.usage', 'Használat')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.size')); ?></th>
+                                    <th><?php echo htmlspecialchars(t('profile.assets.col.storage_path')); ?></th>
+                                    <th><?php echo htmlspecialchars(t_def('profile.assets.col.actions', 'Műveletek')); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($company_assets_recent as $asset_item): ?>
+                                    <?php
+                                        $asset_is_used = !empty($asset_item['is_used']);
+                                        $asset_url = (string)($asset_item['asset_url'] ?? '');
+                                        $asset_id = (int)($asset_item['id'] ?? 0);
+                                    ?>
+                                    <tr>
+                                        <td><?php echo !empty($asset_item['created_at']) ? date('Y-m-d H:i', strtotime((string)$asset_item['created_at'])) : '—'; ?></td>
+                                        <td><?php echo htmlspecialchars((string)$asset_item['module_key']); ?></td>
+                                        <td>
+                                            <?php if ($asset_url !== ''): ?>
+                                                <a href="<?php echo htmlspecialchars($asset_url); ?>" target="_blank" rel="noopener noreferrer"><?php echo htmlspecialchars((string)$asset_item['original_name']); ?></a>
+                                            <?php else: ?>
+                                                <?php echo htmlspecialchars((string)$asset_item['original_name']); ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?php echo htmlspecialchars((string)$asset_item['asset_kind']); ?></td>
+                                        <td>
+                                            <span style="display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; <?php echo $asset_is_used ? 'background:#ecfdf3; color:#027a48; border:1px solid #abefc6;' : 'background:#fff4ed; color:#b54708; border:1px solid #fed7aa;'; ?>">
+                                                <?php echo $asset_is_used
+                                                    ? htmlspecialchars(t_def('profile.assets.used', 'Használatban'))
+                                                    : htmlspecialchars(t_def('profile.assets.unused', 'Nincs használatban')); ?>
+                                            </span>
+                                        </td>
+                                        <td style="text-align:right;"><?php echo htmlspecialchars(profile_format_bytes((int)$asset_item['file_size'])); ?></td>
+                                        <td><small><?php echo htmlspecialchars((string)$asset_item['storage_rel_path']); ?></small></td>
+                                        <td>
+                                            <?php if ($is_admin_user && $asset_id > 0): ?>
+                                                <form method="POST" onsubmit="return confirmAssetDelete(this);" style="margin:0;">
+                                                    <input type="hidden" name="delete_asset" value="1">
+                                                    <input type="hidden" name="delete_asset_id" value="<?php echo $asset_id; ?>">
+                                                    <input type="hidden" name="delete_asset_name" value="<?php echo htmlspecialchars((string)$asset_item['original_name']); ?>">
+                                                    <button type="submit" style="padding:4px 8px; border:1px solid #c43b2f; color:#c43b2f; background:#fff; border-radius:4px; cursor:pointer; font-size:12px;">🗑️ <?php echo htmlspecialchars(t_def('common.delete', 'Törlés')); ?></button>
+                                                </form>
+                                            <?php else: ?>
+                                                <span style="color:#98a2b3;">—</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
         <?php else: ?>
             <div class="panel" style="text-align: center; padding: 40px; color: #999;">
-                <p>Nem rendelt cég vagy nincs hozzáférése az adatokhoz.</p>
+                <p><?php echo htmlspecialchars(t_def('profile.no_company_access', 'Nem rendelt cég vagy nincs hozzáférése az adatokhoz.')); ?></p>
             </div>
         <?php endif; ?>
     </div>
     
     <script>
+        const PROFILE_I18N = {
+            copySuccess: <?php echo json_encode(t_def('common.copied', '✅ Másolva!'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            addUserTitle: <?php echo json_encode(t_def('profile.users.modal.add_title', '➕ Új felhasználó'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            username: <?php echo json_encode(t_def('profile.users.col.username', 'Felhasználónév'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            email: <?php echo json_encode(t_def('common.email', 'Email'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            password: <?php echo json_encode(t_def('common.password', 'Jelszó'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            role: <?php echo json_encode(t_def('profile.users.col.role', 'Jogosultság'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            roleUser: <?php echo json_encode(t_def('profile.role.user', '👤 Felhasználó'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            roleLoopManager: <?php echo json_encode(t_def('profile.role.loop_manager', '🔁 Loop/modul kezelő'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            roleContentEditor: <?php echo json_encode(t_def('profile.role.content_editor', '📝 Tartalom módosító'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            permissionsTitle: <?php echo json_encode(t_def('profile.users.permissions_title', 'Felhasználó jogosultságai:'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            permissions1: <?php echo json_encode(t_def('profile.users.permissions.item1', 'Admin jogosultság itt nem adható'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            permissions2: <?php echo json_encode(t_def('profile.users.permissions.item2', 'Szerepkör szerint eltérő dashboard hozzáférés'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            permissions3: <?php echo json_encode(t_def('profile.users.permissions.item3', 'Tartalom módosító csak modul tartalmat kezelhet'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            cancel: <?php echo json_encode(t_def('common.cancel', 'Mégsem'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            create: <?php echo json_encode(t_def('common.create', 'Létrehozás'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            requiredFields: <?php echo json_encode(t_def('profile.users.required_fields', 'Kérem töltse ki az összes szükséges mezőt!'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            passwordMinLength: <?php echo json_encode(t_def('profile.users.password_min_length', 'A jelszó legalább 6 karakter hosszú legyen!'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            createSuccess: <?php echo json_encode(t_def('profile.users.create_success', 'Felhasználó sikeresen létrehozva!'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            updateSuccess: <?php echo json_encode(t_def('profile.users.update_success', 'Felhasználó sikeresen frissítve!'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            deleteSuccess: <?php echo json_encode(t_def('profile.users.delete_success', 'Felhasználó sikeresen törölve!'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            ownPasswordNotEditable: <?php echo json_encode(t_def('profile.users.own_password_not_editable', 'A saját jelszó itt nem módosítható.'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            passwordPrompt: <?php echo json_encode(t_def('profile.users.password_prompt', 'új jelszava (hagyja üresen a jelenlegi megmaradásához):'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            confirmDeleteUser: <?php echo json_encode(t_def('profile.users.confirm_delete', 'Valóban törli a(z) "{username}" felhasználót?'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            confirmDeleteAsset: <?php echo json_encode(t_def('profile.assets.confirm_delete', 'Valóban törli ezt a tartalmat: "{name}"?'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            errorPrefix: <?php echo json_encode(t_def('common.error_prefix', 'Hiba:'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>
+        };
+
+        function confirmAssetDelete(formEl) {
+            const nameInput = formEl?.querySelector('input[name="delete_asset_name"]');
+            const assetName = nameInput?.value || 'ismeretlen fájl';
+            const message = (PROFILE_I18N.confirmDeleteAsset || 'Valóban törli ezt a tartalmat: "{name}"?').replace('{name}', assetName);
+            return window.confirm(message);
+        }
+
         function copyToClipboard(event) {
             const button = event.currentTarget;
             const textToCopy = button.getAttribute('data-copy') || '';
@@ -397,7 +722,7 @@ $logout_url = '../login.php?logout=1';
 
             const showSuccess = () => {
                 const originalText = button.textContent;
-                button.textContent = '✅ Másolva!';
+                button.textContent = PROFILE_I18N.copySuccess;
                 button.style.background = '#4caf50';
                 setTimeout(() => {
                     button.textContent = originalText;
@@ -460,7 +785,7 @@ $logout_url = '../login.php?logout=1';
                     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="margin: 0;">➕ Új Felhasználó</h2>
+                        <h2 style="margin: 0;">${PROFILE_I18N.addUserTitle}</h2>
                         <button onclick="this.closest('div').parentElement.remove()" style="
                             background: #1e40af;
                             color: white;
@@ -478,41 +803,41 @@ $logout_url = '../login.php?logout=1';
                     
                     <form id="add-user-form" style="display: grid; gap: 15px;">
                         <div>
-                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Felhasználónév *</label>
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">${PROFILE_I18N.username} *</label>
                             <input type="text" id="username" placeholder="pl. janos.kovacs" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;" required>
                         </div>
                         
                         <div>
-                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Email *</label>
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">${PROFILE_I18N.email} *</label>
                             <input type="email" id="email" placeholder="janos@example.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;" required>
                         </div>
                         
                         <div>
-                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Jelszó *</label>
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">${PROFILE_I18N.password} *</label>
                             <input type="password" id="password" placeholder="••••••••" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;" required>
                         </div>
                         
                         <div>
-                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Szerepkör</label>
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">${PROFILE_I18N.role}</label>
                             <select id="user_role" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;">
-                                <option value="user">👤 Felhasználó</option>
-                                <option value="loop_manager">🔁 Loop/modul kezelő</option>
-                                <option value="content_editor">📝 Tartalom módosító</option>
+                                <option value="user">${PROFILE_I18N.roleUser}</option>
+                                <option value="loop_manager">${PROFILE_I18N.roleLoopManager}</option>
+                                <option value="content_editor">${PROFILE_I18N.roleContentEditor}</option>
                             </select>
                         </div>
                         
                         <div style="background: #f9f9f9; padding: 12px; border-radius: 3px; border-left: 4px solid #1e40af; font-size: 12px; color: #666;">
-                            <strong>Felhasználó jogosultságai:</strong>
+                            <strong>${PROFILE_I18N.permissionsTitle}</strong>
                             <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                                <li>Admin jogosultság itt nem adható</li>
-                                <li>Szerepkör szerint eltérő dashboard hozzáférés</li>
-                                <li>Tartalom módosító csak modul tartalmat kezelhet</li>
+                                <li>${PROFILE_I18N.permissions1}</li>
+                                <li>${PROFILE_I18N.permissions2}</li>
+                                <li>${PROFILE_I18N.permissions3}</li>
                             </ul>
                         </div>
                         
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                            <button type="button" onclick="this.closest('div').parentElement.parentElement.remove()" style="background: #ddd; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Mégsem</button>
-                            <button type="button" onclick="createUser()" style="background: #1e40af; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold;">Létrehozás</button>
+                            <button type="button" onclick="this.closest('div').parentElement.parentElement.remove()" style="background: #ddd; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">${PROFILE_I18N.cancel}</button>
+                            <button type="button" onclick="createUser()" style="background: #1e40af; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold;">${PROFILE_I18N.create}</button>
                         </div>
                     </form>
                 </div>
@@ -528,12 +853,12 @@ $logout_url = '../login.php?logout=1';
             const user_role = document.getElementById('user_role').value;
             
             if (!username || !email || !password) {
-                alert('Kérem töltse ki az összes szükséges mezőt!');
+                alert(PROFILE_I18N.requiredFields);
                 return;
             }
             
             if (password.length < 6) {
-                alert('A jelszó legalább 6 karakter hosszú legyen!');
+                alert(PROFILE_I18N.passwordMinLength);
                 return;
             }
             
@@ -552,25 +877,25 @@ $logout_url = '../login.php?logout=1';
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    alert('Felhasználó sikeresen létrehozva!');
+                    alert(PROFILE_I18N.createSuccess);
                     location.reload();
                 } else {
-                    alert('Hiba: ' + data.message);
+                    alert(PROFILE_I18N.errorPrefix + ' ' + data.message);
                 }
             })
-            .catch(err => alert('Hiba: ' + err));
+            .catch(err => alert(PROFILE_I18N.errorPrefix + ' ' + err));
         }
         
         function editUser(userId, username) {
             if (Number(userId) === <?php echo (int)$user_id; ?>) {
-                alert('A saját jelszó itt nem módosítható.');
+                alert(PROFILE_I18N.ownPasswordNotEditable);
                 return;
             }
-            const password = prompt(`${username} új jelszava (hagyja üresen a jelenlegi megmaradásához):`);
+            const password = prompt(`${username} ${PROFILE_I18N.passwordPrompt}`);
             if (password === null) return;
             
             if (password && password.length < 6) {
-                alert('A jelszó legalább 6 karakter hosszú legyen!');
+                alert(PROFILE_I18N.passwordMinLength);
                 return;
             }
             
@@ -586,17 +911,17 @@ $logout_url = '../login.php?logout=1';
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    alert('Felhasználó sikeresen frissítve!');
+                    alert(PROFILE_I18N.updateSuccess);
                     location.reload();
                 } else {
-                    alert('Hiba: ' + data.message);
+                    alert(PROFILE_I18N.errorPrefix + ' ' + data.message);
                 }
             })
-            .catch(err => alert('Hiba: ' + err));
+            .catch(err => alert(PROFILE_I18N.errorPrefix + ' ' + err));
         }
         
         function deleteUser(userId, username) {
-            if (!confirm(`Valóban törli a "${username}" felhasználót?`)) return;
+            if (!confirm(PROFILE_I18N.confirmDeleteUser.replace('{username}', username))) return;
             
             fetch(`../api/manage_users.php?action=delete_user&user_id=${userId}`, {
                 method: 'DELETE'
@@ -604,13 +929,13 @@ $logout_url = '../login.php?logout=1';
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    alert('Felhasználó sikeresen törölve!');
+                    alert(PROFILE_I18N.deleteSuccess);
                     location.reload();
                 } else {
-                    alert('Hiba: ' + data.message);
+                    alert(PROFILE_I18N.errorPrefix + ' ' + data.message);
                 }
             })
-            .catch(err => alert('Hiba: ' + err));
+            .catch(err => alert(PROFILE_I18N.errorPrefix + ' ' + err));
         }
     </script>
 

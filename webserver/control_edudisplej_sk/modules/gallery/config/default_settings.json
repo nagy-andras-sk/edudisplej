@@ -1,0 +1,21 @@
+{
+  "imageUrlsJson": "[]",
+  "displayMode": "slideshow",
+  "fitMode": "cover",
+  "slideIntervalSec": 5,
+  "transitionMs": 450,
+  "collageColumns": 3,
+  "bgColor": "#000000",
+  "clockOverlayEnabled": false,
+  "clockOverlayPosition": "top",
+  "clockOverlayHeightPercent": 25,
+  "clockOverlayTimeColor": "#ffffff",
+  "clockOverlayDateColor": "#ffffff",
+  "textOverlayEnabled": false,
+  "textOverlayPosition": "bottom",
+  "textOverlayHeightPercent": 20,
+  "textOverlayText": "Sem vložte text...",
+  "textOverlayFontSize": 52,
+  "textOverlayColor": "#ffffff",
+  "textOverlaySpeedPxPerSec": 120
+}

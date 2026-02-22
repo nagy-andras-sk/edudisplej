@@ -5,6 +5,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once '../i18n.php';
 
 header('Content-Type: application/json');
 
@@ -16,7 +17,7 @@ $response = [
 // Check authentication
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
-    $response['message'] = 'Not authenticated';
+    $response['message'] = t_def('api.common.not_authenticated', 'Not authenticated');
     echo json_encode($response);
     exit();
 }
@@ -27,7 +28,7 @@ $user_id = (int)($_SESSION['user_id'] ?? 0);
 $company_id = isset($_SESSION['company_id']) ? (int)$_SESSION['company_id'] : null;
 
 if (!$kiosk_id || !$group_id) {
-    $response['message'] = 'Invalid parameters';
+    $response['message'] = t_def('api.common.invalid_parameters', 'Invalid parameters');
     echo json_encode($response);
     exit();
 }
@@ -48,7 +49,7 @@ try {
     }
 
     if (!$company_id) {
-        $response['message'] = 'Company context not found';
+        $response['message'] = t_def('api.common.company_context_not_found', 'Company context not found');
         echo json_encode($response);
         exit();
     }
@@ -59,7 +60,7 @@ try {
     $verify_stmt->execute();
     if ($verify_stmt->get_result()->num_rows === 0) {
         $verify_stmt->close();
-        $response['message'] = 'Group not found or access denied';
+        $response['message'] = t_def('api.assign_kiosk_group.group_not_found_or_denied', 'Group not found or access denied');
         echo json_encode($response);
         exit();
     }
@@ -71,7 +72,7 @@ try {
     $kiosk_verify_stmt->execute();
     if ($kiosk_verify_stmt->get_result()->num_rows === 0) {
         $kiosk_verify_stmt->close();
-        $response['message'] = 'Kiosk not found or access denied';
+        $response['message'] = t_def('api.assign_kiosk_group.kiosk_not_found_or_denied', 'Kiosk not found or access denied');
         echo json_encode($response);
         exit();
     }
@@ -89,16 +90,16 @@ try {
     
     if ($assign_stmt->execute()) {
         $response['success'] = true;
-        $response['message'] = 'Kiosk assigned to group successfully';
+        $response['message'] = t_def('api.assign_kiosk_group.success', 'Kiosk assigned to group successfully');
     } else {
-        $response['message'] = 'Failed to assign kiosk';
+        $response['message'] = t_def('api.assign_kiosk_group.failed', 'Failed to assign kiosk');
     }
     $assign_stmt->close();
     
     closeDbConnection($conn);
     
 } catch (Exception $e) {
-    $response['message'] = 'Database error: ' . $e->getMessage();
+    $response['message'] = t_def('api.common.database_error', 'Database error') . ': ' . $e->getMessage();
     error_log($e->getMessage());
 }
 

@@ -110,7 +110,19 @@ $EDUDISPLEJ_TRANSLATIONS = [
         'dashboard.screenshot.unavailable' => 'Screenshot nem elerheto',
         'dashboard.screenshot.loading' => 'Varakozas a kepernyokepre',
         'dashboard.screen.on' => 'Bekapcsolva',
-        'dashboard.screen.off' => 'Kikapcsolva'
+        'dashboard.screen.off' => 'Kikapcsolva',
+        'profile.assets.title' => '🗂️ Modul tárhely (céges)',
+        'profile.assets.subtitle' => 'A céghez tartozó feltöltött modul fájlok modulonként csoportosítva.',
+        'profile.assets.empty' => 'Még nincs feltöltött modul asset.',
+        'profile.assets.latest_uploads' => 'Legutóbbi 25 feltöltés',
+        'profile.assets.col.time' => 'Idő',
+        'profile.assets.col.module' => 'Modul',
+        'profile.assets.col.file' => 'Fájl',
+        'profile.assets.col.kind' => 'Típus',
+        'profile.assets.col.count' => 'Darab',
+        'profile.assets.col.size' => 'Méret',
+        'profile.assets.col.last_upload' => 'Utolsó feltöltés',
+        'profile.assets.col.storage_path' => 'Tárolási útvonal'
     ],
     'en' => [
         'app.title' => 'EduDisplej Control',
@@ -211,7 +223,19 @@ $EDUDISPLEJ_TRANSLATIONS = [
         'dashboard.screenshot.unavailable' => 'Screenshot not available',
         'dashboard.screenshot.loading' => 'Waiting for screenshot',
         'dashboard.screen.on' => 'On',
-        'dashboard.screen.off' => 'Off'
+        'dashboard.screen.off' => 'Off',
+        'profile.assets.title' => '🗂️ Module storage (company)',
+        'profile.assets.subtitle' => 'Uploaded module files for this company grouped by module.',
+        'profile.assets.empty' => 'No uploaded module assets yet.',
+        'profile.assets.latest_uploads' => 'Latest 25 uploads',
+        'profile.assets.col.time' => 'Time',
+        'profile.assets.col.module' => 'Module',
+        'profile.assets.col.file' => 'File',
+        'profile.assets.col.kind' => 'Type',
+        'profile.assets.col.count' => 'Count',
+        'profile.assets.col.size' => 'Size',
+        'profile.assets.col.last_upload' => 'Last upload',
+        'profile.assets.col.storage_path' => 'Storage path'
     ],
     'sk' => [
         'app.title' => 'EduDisplej Control',
@@ -312,7 +336,19 @@ $EDUDISPLEJ_TRANSLATIONS = [
         'dashboard.screenshot.unavailable' => 'Screenshot nie je dostupny',
         'dashboard.screenshot.loading' => 'Caka sa na screenshot',
         'dashboard.screen.on' => 'Zapnute',
-        'dashboard.screen.off' => 'Vypnute'
+        'dashboard.screen.off' => 'Vypnute',
+        'profile.assets.title' => '🗂️ Modulové úložisko (firma)',
+        'profile.assets.subtitle' => 'Nahrané súbory modulov tejto firmy zoskupené podľa modulu.',
+        'profile.assets.empty' => 'Zatiaľ nie sú nahrané žiadne modulové súbory.',
+        'profile.assets.latest_uploads' => 'Posledných 25 nahratí',
+        'profile.assets.col.time' => 'Čas',
+        'profile.assets.col.module' => 'Modul',
+        'profile.assets.col.file' => 'Súbor',
+        'profile.assets.col.kind' => 'Typ',
+        'profile.assets.col.count' => 'Počet',
+        'profile.assets.col.size' => 'Veľkosť',
+        'profile.assets.col.last_upload' => 'Posledné nahratie',
+        'profile.assets.col.storage_path' => 'Cesta uloženia'
     ]
 ];
 
@@ -413,6 +449,32 @@ function edudisplej_ensure_i18n_override_dir() {
     }
 }
 
+function edudisplej_seed_lang_file_from_embedded($lang) {
+    global $EDUDISPLEJ_TRANSLATIONS;
+    $normalized = edudisplej_normalize_lang($lang);
+    if (!$normalized) {
+        return false;
+    }
+
+    $seed = $EDUDISPLEJ_TRANSLATIONS[$normalized] ?? [];
+    if (!is_array($seed) || empty($seed)) {
+        return false;
+    }
+
+    edudisplej_ensure_i18n_override_dir();
+    $file = edudisplej_get_i18n_override_file($normalized);
+    if (!$file) {
+        return false;
+    }
+
+    $payload = json_encode($seed, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        return false;
+    }
+
+    return @file_put_contents($file, $payload) !== false;
+}
+
 function edudisplej_get_i18n_override_file($lang) {
     $normalized = edudisplej_normalize_lang($lang);
     if (!$normalized) {
@@ -424,6 +486,11 @@ function edudisplej_get_i18n_override_file($lang) {
 function edudisplej_load_lang_overrides($lang) {
     $file = edudisplej_get_i18n_override_file($lang);
     if (!$file || !is_file($file)) {
+        edudisplej_seed_lang_file_from_embedded($lang);
+        $file = edudisplej_get_i18n_override_file($lang);
+    }
+
+    if (!$file || !is_file($file)) {
         return [];
     }
 
@@ -434,7 +501,27 @@ function edudisplej_load_lang_overrides($lang) {
 
     $data = json_decode($json, true);
     if (!is_array($data)) {
-        return [];
+        edudisplej_seed_lang_file_from_embedded($lang);
+        $json = @file_get_contents($file);
+        if ($json === false || trim($json) === '') {
+            return [];
+        }
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            return [];
+        }
+    }
+
+    if (empty($data)) {
+        edudisplej_seed_lang_file_from_embedded($lang);
+        $json = @file_get_contents($file);
+        if ($json === false || trim($json) === '') {
+            return [];
+        }
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            return [];
+        }
     }
 
     $clean = [];
@@ -447,24 +534,46 @@ function edudisplej_load_lang_overrides($lang) {
     return $clean;
 }
 
-function edudisplej_get_translation_catalog($lang = null, $include_overrides = true) {
+function edudisplej_get_embedded_translation_catalog($lang = null) {
     global $EDUDISPLEJ_TRANSLATIONS;
+    $lang = $lang ? edudisplej_normalize_lang($lang) : EDUDISPLEJ_DEFAULT_LANG;
+    if (!$lang) {
+        $lang = EDUDISPLEJ_DEFAULT_LANG;
+    }
+
+    $base = $EDUDISPLEJ_TRANSLATIONS[$lang] ?? [];
+    if (!is_array($base) || empty($base)) {
+        $base = $EDUDISPLEJ_TRANSLATIONS['en'] ?? [];
+    }
+
+    return is_array($base) ? $base : [];
+}
+
+function edudisplej_load_lang_catalog($lang = null) {
     $lang = $lang ? edudisplej_normalize_lang($lang) : edudisplej_get_lang();
     if (!$lang) {
         $lang = EDUDISPLEJ_DEFAULT_LANG;
     }
 
-    $base = $EDUDISPLEJ_TRANSLATIONS[$lang] ?? $EDUDISPLEJ_TRANSLATIONS['en'];
-    if (!$include_overrides) {
-        return $base;
-    }
-
+    $base = edudisplej_get_embedded_translation_catalog($lang);
     $overrides = edudisplej_load_lang_overrides($lang);
-    if (empty($overrides)) {
+
+    if (!is_array($base)) {
+        $base = [];
+    }
+    if (!is_array($overrides) || empty($overrides)) {
         return $base;
     }
 
     return array_merge($base, $overrides);
+}
+
+function edudisplej_get_translation_catalog($lang = null, $include_overrides = true) {
+    $catalog = edudisplej_load_lang_catalog($lang);
+    if (!is_array($catalog)) {
+        return [];
+    }
+    return $catalog;
 }
 
 function edudisplej_save_translation_overrides($lang, $overrides) {
@@ -473,20 +582,21 @@ function edudisplej_save_translation_overrides($lang, $overrides) {
         return false;
     }
 
-    $base = edudisplej_get_translation_catalog($lang, false);
-    $filtered = [];
-    foreach ($base as $key => $base_value) {
-        if (!array_key_exists($key, $overrides)) {
+    $base = edudisplej_get_translation_catalog($lang, true);
+    if (empty($base)) {
+        $base = edudisplej_get_embedded_translation_catalog($lang);
+    }
+
+    $clean = [];
+    foreach ($base as $key => $defaultValue) {
+        if (!is_string($key) || $key === '') {
             continue;
         }
-
-        $value = trim((string)$overrides[$key]);
-        $base_text = (string)$base_value;
-        if ($value === '' || $value === $base_text) {
-            continue;
+        if (array_key_exists($key, $overrides)) {
+            $clean[$key] = trim((string)$overrides[$key]);
+        } else {
+            $clean[$key] = (string)$defaultValue;
         }
-
-        $filtered[$key] = $value;
     }
 
     edudisplej_ensure_i18n_override_dir();
@@ -495,7 +605,7 @@ function edudisplej_save_translation_overrides($lang, $overrides) {
         return false;
     }
 
-    $payload = json_encode($filtered, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    $payload = json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($payload === false) {
         return false;
     }
@@ -516,6 +626,19 @@ function t($key, $vars = []) {
         }
     }
     return $value;
+}
+
+function t_def($key, $defaultValue, $vars = []) {
+    $translated = t($key, $vars);
+    if ($translated === $key || $translated === '') {
+        $translated = (string)$defaultValue;
+        if (!empty($vars)) {
+            foreach ($vars as $name => $val) {
+                $translated = str_replace('{' . $name . '}', (string)$val, $translated);
+            }
+        }
+    }
+    return $translated;
 }
 
 function edudisplej_i18n_catalog($lang = null) {

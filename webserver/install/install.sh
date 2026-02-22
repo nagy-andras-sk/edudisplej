@@ -26,6 +26,8 @@ LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 LIC_DIR="${TARGET_DIR}/lic"
 INIT_BASE="https://install.edudisplej.sk/init"
 SERVICE_FILE="/etc/systemd/system/edudisplej-kiosk.service"
+AUTO_REBOOT="${EDUDISPLEJ_AUTO_REBOOT:-true}"
+INSTALL_LOCK_DIR="/tmp/edudisplej-install.lock"
 
 if [ -z "$API_TOKEN" ]; then
     echo "[!] CHYBA - ERROR: Chyba API token. Pouzi: --token=<API_TOKEN>"
@@ -47,6 +49,7 @@ cleanup_on_error() {
         echo ""
     fi
     stop_heartbeat
+    release_install_lock
 }
 
 trap cleanup_on_error EXIT
@@ -66,6 +69,114 @@ stop_heartbeat() {
         HEARTBEAT_PID=""
         echo ""
     fi
+}
+
+acquire_install_lock() {
+    if mkdir "$INSTALL_LOCK_DIR" 2>/dev/null; then
+        echo $$ > "${INSTALL_LOCK_DIR}/pid"
+        return 0
+    fi
+
+    local existing_pid=""
+    if [ -f "${INSTALL_LOCK_DIR}/pid" ]; then
+        existing_pid="$(cat "${INSTALL_LOCK_DIR}/pid" 2>/dev/null || true)"
+    fi
+
+    if [ -n "$existing_pid" ] && ! kill -0 "$existing_pid" 2>/dev/null; then
+        rm -rf "$INSTALL_LOCK_DIR"
+        if mkdir "$INSTALL_LOCK_DIR" 2>/dev/null; then
+            echo $$ > "${INSTALL_LOCK_DIR}/pid"
+            return 0
+        fi
+    fi
+
+    echo "[!] CHYBA - ERROR: Installer is already running (pid: ${existing_pid:-unknown})"
+    echo "[!] Dokoncite predchadzajucu instalaciu alebo odstran lock: ${INSTALL_LOCK_DIR}"
+    return 1
+}
+
+release_install_lock() {
+    if [ -d "$INSTALL_LOCK_DIR" ]; then
+        rm -rf "$INSTALL_LOCK_DIR" 2>/dev/null || true
+    fi
+}
+
+wait_for_apt_locks() {
+    local timeout_seconds="${1:-120}"
+    local waited=0
+    while fuser /var/lib/dpkg/lock >/dev/null 2>&1 \
+        || fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+        || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 \
+        || fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+        if [ "$waited" -ge "$timeout_seconds" ]; then
+            echo "[!] CHYBA - ERROR: APT lock timeout after ${timeout_seconds}s"
+            return 1
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    return 0
+}
+
+apt_install_with_retry() {
+    local max_attempts="${1:-3}"
+    shift
+    local attempt=1
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if wait_for_apt_locks 180 \
+            && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
+            && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                -o Dpkg::Options::=--force-confdef \
+                -o Dpkg::Options::=--force-confold \
+                -o Acquire::Retries=5 \
+                -o Acquire::http::Timeout=30 \
+                -o Acquire::https::Timeout=30 \
+                "$@"; then
+            return 0
+        fi
+        if [ "$attempt" -lt "$max_attempts" ]; then
+            echo "[!] VAROVANIE - WARNING: apt install attempt ${attempt}/${max_attempts} failed, retrying..."
+            sleep 5
+        fi
+        attempt=$((attempt + 1))
+    done
+    return 1
+}
+
+fetch_with_retry() {
+    local url="$1"
+    local output_file="$2"
+    local max_attempts="${3:-5}"
+    local attempt=1
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if curl -fsSL --max-time 90 --connect-timeout 10 --retry 2 --retry-delay 2 \
+            "${AUTH_HEADER[@]}" "$url" -o "$output_file"; then
+            return 0
+        fi
+        if [ "$attempt" -lt "$max_attempts" ]; then
+            echo "    [!] Pokus ${attempt}/${max_attempts} zlyhal - Attempt failed, retrying..."
+            sleep 2
+        fi
+        attempt=$((attempt + 1))
+    done
+    return 1
+}
+
+render_service_for_console_user() {
+    local source_path="$1"
+    local dest_path="$2"
+    local runtime_uid
+    runtime_uid="$(id -u "$CONSOLE_USER" 2>/dev/null || echo 1000)"
+
+    sed -e "s/User=edudisplej/User=$CONSOLE_USER/g" \
+        -e "s/Group=edudisplej/Group=$CONSOLE_USER/g" \
+        -e "s|WorkingDirectory=/home/edudisplej|WorkingDirectory=$USER_HOME|g" \
+        -e "s|Environment=HOME=/home/edudisplej|Environment=HOME=$USER_HOME|g" \
+        -e "s/Environment=USER=edudisplej/Environment=USER=$CONSOLE_USER/g" \
+        -e "s|Environment=XAUTHORITY=/home/edudisplej/.Xauthority|Environment=XAUTHORITY=$USER_HOME/.Xauthority|g" \
+        -e "s|Environment=\\\"XAUTHORITY=/home/edudisplej/.Xauthority\\\"|Environment=\\\"XAUTHORITY=$USER_HOME/.Xauthority\\\"|g" \
+        -e "s|Environment=XDG_RUNTIME_DIR=/run/user/1000|Environment=XDG_RUNTIME_DIR=/run/user/$runtime_uid|g" \
+        "$source_path" > "$dest_path"
 }
 
 # Kompletny cleanup starej instalacie - Full cleanup of previous installation
@@ -183,6 +294,10 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
+if ! acquire_install_lock; then
+    exit 1
+fi
+
 # Detekcia architektury - Architecture detection
 ARCH="$(uname -m)"
 echo "[*] Architektura - Architecture: $ARCH"
@@ -211,11 +326,21 @@ fi
 if ! command -v scrot >/dev/null 2>&1; then
   MISSING_TOOLS+=("scrot")
 fi
+if ! command -v python3 >/dev/null 2>&1; then
+    MISSING_TOOLS+=("python3")
+fi
+if ! dpkg -s ca-certificates >/dev/null 2>&1; then
+    MISSING_TOOLS+=("ca-certificates")
+fi
 
 if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
   echo "[*] Instalacia zakladnych nastroje - Installing basic tools: ${MISSING_TOOLS[*]}"
   start_heartbeat
-  apt-get update -qq && apt-get install -y "${MISSING_TOOLS[@]}" >/dev/null 2>&1
+    if ! apt_install_with_retry 3 "${MISSING_TOOLS[@]}" >/dev/null 2>&1; then
+        stop_heartbeat
+        echo "[!] CHYBA - ERROR: Failed to install required base tools"
+        exit 1
+    fi
   stop_heartbeat
   echo "[✓] Zakladne nastroje nainstalovane - Basic tools installed"
 fi
@@ -236,8 +361,19 @@ fi
 # Nacitanie zoznamu suborov - Loading file list
 echo "[*] Nacitavame zoznam suborov - Loading file list..."
 
-FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getfiles&token=${API_TOKEN}" 2>/dev/null | tr -d '\r')"
-CURL_EXIT_CODE=$?
+FILES_LIST=""
+CURL_EXIT_CODE=1
+for attempt in 1 2 3 4 5; do
+    FILES_LIST="$(curl -s --max-time 30 --connect-timeout 10 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getfiles&token=${API_TOKEN}" 2>/dev/null | tr -d '\r')"
+    CURL_EXIT_CODE=$?
+    if [ $CURL_EXIT_CODE -eq 0 ] && [ -n "$FILES_LIST" ]; then
+        break
+    fi
+    if [ $attempt -lt 5 ]; then
+        echo "[!] VAROVANIE: getfiles attempt ${attempt}/5 failed, retrying..."
+        sleep 2
+    fi
+done
 
 if [ $CURL_EXIT_CODE -ne 0 ]; then
   echo "[!] Chyba pripojenia k serveru - Server connection error (kod - code: $CURL_EXIT_CODE)"
@@ -282,14 +418,11 @@ while IFS=";" read -r NAME SIZE MODIFIED; do
     DOWNLOAD_SUCCESS=false
     
     for attempt in $(seq 1 $MAX_DOWNLOAD_ATTEMPTS); do
-        if curl -sL --max-time 60 --connect-timeout 10 \
-            "${AUTH_HEADER[@]}" \
-            "${INIT_BASE}/download.php?streamfile=${NAME}&token=${API_TOKEN}" \
-            -o "${INIT_DIR}/${NAME}" 2>&1; then
+        if fetch_with_retry "${INIT_BASE}/download.php?streamfile=${NAME}&token=${API_TOKEN}" "${INIT_DIR}/${NAME}" 3; then
             
             ACTUAL_SIZE=$(stat -c%s "${INIT_DIR}/${NAME}" 2>/dev/null || echo "0")
             
-            if [ "$ACTUAL_SIZE" -eq "$SIZE" ]; then
+            if [[ "$SIZE" =~ ^[0-9]+$ ]] && [ "$ACTUAL_SIZE" -eq "$SIZE" ]; then
                 DOWNLOAD_SUCCESS=true
                 break
             else
@@ -346,6 +479,21 @@ if [ -z "$USER_HOME" ]; then
 fi
 echo "[*] Pouzivatel - User: $CONSOLE_USER, Domov - Home: $USER_HOME"
 
+    # Validate required runtime files
+    REQUIRED_FILES=(
+        "edudisplej-init.sh"
+        "edudisplej_sync_service.sh"
+        "edudisplej-download-modules.sh"
+        "edudisplej-config-manager.sh"
+        "kiosk-start.sh"
+    )
+    for required in "${REQUIRED_FILES[@]}"; do
+        if [ ! -s "${INIT_DIR}/${required}" ]; then
+            echo "[!] CHYBA - ERROR: Required file missing or empty: ${INIT_DIR}/${required}"
+            exit 1
+        fi
+    done
+
 # Nastavenie opravneni - Set permissions
 chmod -R 755 "$TARGET_DIR"
 
@@ -400,9 +548,11 @@ install_services_from_structure() {
     
     echo "[*] Sťahujem structure.json / Downloading structure.json..."
     STRUCTURE_JSON=""
-    if curl -sf --max-time 10 --connect-timeout 5 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" >/dev/null 2>&1; then
-        STRUCTURE_JSON="$(curl -s --max-time 30 --connect-timeout 10 "${AUTH_HEADER[@]}" "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" 2>/dev/null | tr -d '\r')"
+    structure_tmp="$(mktemp)"
+    if fetch_with_retry "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" "$structure_tmp" 4; then
+        STRUCTURE_JSON="$(tr -d '\r' < "$structure_tmp")"
     fi
+    rm -f "$structure_tmp"
     
     if [ -z "$STRUCTURE_JSON" ]; then
         echo "[!] Nemozem stiahnut structure.json, pouzivam staru metodu"
@@ -437,7 +587,7 @@ except Exception as e:
         return 0
     fi
     
-    # Install each service
+    # Render and copy each service file
     SERVICE_COUNT=0
     SERVICE_TOTAL=$(echo "$SERVICES_JSON" | wc -l)
     
@@ -456,32 +606,12 @@ except Exception as e:
             continue
         fi
         
-        # For kiosk service, apply user substitution
-        if [ "$name" = "edudisplej-kiosk.service" ]; then
-            sed -e "s/User=edudisplej/User=$CONSOLE_USER/g" \
-                -e "s/Group=edudisplej/Group=$CONSOLE_USER/g" \
-                -e "s|WorkingDirectory=/home/edudisplej|WorkingDirectory=$USER_HOME|g" \
-                -e "s|Environment=HOME=/home/edudisplej|Environment=HOME=$USER_HOME|g" \
-                -e "s/Environment=USER=edudisplej/Environment=USER=$CONSOLE_USER/g" \
-                "$SOURCE_PATH" > "$DEST_PATH"
+        if render_service_for_console_user "$SOURCE_PATH" "$DEST_PATH"; then
             chmod 644 "$DEST_PATH"
-            echo "  [✓] Skopirovany s konfiguraciou pouzivatela: $DEST_PATH"
+            echo "  [✓] Service rendered for user: $CONSOLE_USER"
         else
-            # Copy service file as-is
-            if cp "$SOURCE_PATH" "$DEST_PATH" 2>/dev/null; then
-                chmod 644 "$DEST_PATH"
-                echo "  [✓] Skopirovany do: $DEST_PATH"
-            else
-                echo "  [!] CHYBA: Nepodarilo sa skopirovat service file"
-                continue
-            fi
-        fi
-        
-        # Reload systemd
-        if systemctl daemon-reload 2>/dev/null; then
-            echo "  [✓] systemd daemon-reload"
-        else
-            echo "  [!] VAROVANIE: daemon-reload zlyhal"
+            echo "  [!] CHYBA: Nepodarilo sa pripravit service file"
+            continue
         fi
         
         # Verify service exists (check if file exists first, systemctl may be slow)
@@ -500,48 +630,41 @@ except Exception as e:
             continue
         fi
         
-        # Enable service if required
+        echo ""
+        
+    done <<< "$SERVICES_JSON"
+
+    if systemctl daemon-reload 2>/dev/null; then
+        echo "[✓] systemd daemon-reload"
+    else
+        echo "[!] VAROVANIE: daemon-reload zlyhal"
+    fi
+
+    # Enable/start services in a separate pass after single daemon-reload
+    while IFS='|' read -r source name enabled autostart description; do
+        [ -z "${name:-}" ] && continue
+
         if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
             if systemctl enable "$name" 2>/dev/null; then
-                echo "  [✓] Service enabled (automaticky start pri boote)"
+                echo "  [✓] Service enabled: $name"
             else
-                echo "  [!] VAROVANIE: enable zlyhal"
+                echo "  [!] VAROVANIE: enable zlyhal pre $name"
             fi
-        else
-            echo "  [*] Service nie je enabled (manualne ovladanie)"
         fi
-        
-        # Start service if required (but not kiosk service, it will start on reboot)
+
         if [ "$autostart" = "True" ] || [ "$autostart" = "true" ]; then
             if [ "$name" != "edudisplej-kiosk.service" ]; then
-                # Stop first if already running
                 systemctl stop "$name" 2>/dev/null || true
                 sleep 1
-                
                 if systemctl start "$name" 2>/dev/null; then
-                    echo "  [✓] Service spusteny"
-                    
-                    # Wait a moment and check status
-                    sleep 2
-                    if systemctl is-active --quiet "$name"; then
-                        echo "  [✓] Service bezi aktivne"
-                    else
-                        echo "  [!] VAROVANIE: Service nie je aktivny"
-                        echo "  [!] Skontrolujte logy: journalctl -u $name -n 20"
-                    fi
+                    echo "  [✓] Service spusteny: $name"
                 else
-                    echo "  [!] CHYBA: Nepodarilo sa spustit service"
-                    echo "  [!] Skontrolujte logy: journalctl -u $name -n 20"
+                    echo "  [!] CHYBA: Nepodarilo sa spustit service: $name"
                 fi
             else
                 echo "  [*] Service sa spusti po restarte / Will start after reboot"
             fi
-        else
-            echo "  [*] Service nie je spusteny (autostart vypnuty)"
         fi
-        
-        echo ""
-        
     done <<< "$SERVICES_JSON"
     
     echo "[✓] Service instalacia dokoncena"
@@ -558,12 +681,7 @@ if ! install_services_from_structure; then
     echo "[*] Instalacia systemd sluzby - Installing systemd service..."
     
     if [ -f "${INIT_DIR}/edudisplej-kiosk.service" ]; then
-        sed -e "s/User=edudisplej/User=$CONSOLE_USER/g" \
-            -e "s/Group=edudisplej/Group=$CONSOLE_USER/g" \
-            -e "s|WorkingDirectory=/home/edudisplej|WorkingDirectory=$USER_HOME|g" \
-            -e "s|Environment=HOME=/home/edudisplej|Environment=HOME=$USER_HOME|g" \
-            -e "s/Environment=USER=edudisplej/Environment=USER=$CONSOLE_USER/g" \
-            "${INIT_DIR}/edudisplej-kiosk.service" > "$SERVICE_FILE"
+        render_service_for_console_user "${INIT_DIR}/edudisplej-kiosk.service" "$SERVICE_FILE"
         chmod 644 "$SERVICE_FILE"
         
         if [ -f "${INIT_DIR}/kiosk-start.sh" ]; then
@@ -584,18 +702,25 @@ CORE_SERVICES=(
     "edudisplej-screenshot-service.service"
 )
 
+# Copy/render service files first
 for service in "${CORE_SERVICES[@]}"; do
     source_file="${INIT_DIR}/${service}"
     target_file="/etc/systemd/system/${service}"
 
-    if [ -f "$source_file" ] && [ ! -f "$target_file" ]; then
-        cp "$source_file" "$target_file" 2>/dev/null || true
-        chmod 644 "$target_file" 2>/dev/null || true
-        echo "  [✓] Service file copied: $service"
+    if [ -f "$source_file" ]; then
+        if render_service_for_console_user "$source_file" "$target_file"; then
+            chmod 644 "$target_file" 2>/dev/null || true
+            echo "  [✓] Service file copied: $service"
+        fi
     fi
 
-    if [ -f "$target_file" ]; then
-        systemctl daemon-reload 2>/dev/null || true
+done
+
+systemctl daemon-reload 2>/dev/null || true
+
+# Enable/start services after daemon-reload
+for service in "${CORE_SERVICES[@]}"; do
+    if [ -f "/etc/systemd/system/${service}" ] || systemctl list-unit-files "$service" >/dev/null 2>&1; then
         if systemctl enable "$service" 2>/dev/null; then
             echo "  [✓] Enabled: $service"
         else
@@ -683,7 +808,10 @@ echo "=========================================="
 echo ""
 
 # Restart - Reboot
-if read -t 30 -p "Restartovat teraz? [Y/n] (automaticky za 30s) - Restart now? [Y/n] (auto in 30s): " response; then
+if [ "${AUTO_REBOOT}" = "false" ] || [ "${AUTO_REBOOT}" = "0" ]; then
+    response="n"
+    echo "[*] Auto reboot disabled via EDUDISPLEJ_AUTO_REBOOT=${AUTO_REBOOT}"
+elif read -t 30 -p "Restartovat teraz? [Y/n] (automaticky za 30s) - Restart now? [Y/n] (auto in 30s): " response; then
     :
 else
     READ_EXIT=$?

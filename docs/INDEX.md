@@ -183,6 +183,23 @@ Ez a teljes audit a **EduDisplej Control Panel** biztonsági és teljesítmény 
 
 ---
 
+### 7. 🖥️ [fake_kms.md](fake_kms.md)
+**Olvasási idő:** 4-6 perc  
+**Típus:** Telepítési kompatibilitási magyarázat
+
+🎯 **Miért állítja át az installer ARMv6-on a videó drivert?**
+
+**Tartalma:**
+- ✅ Alapfogalmak: KMS vs Full KMS vs Fake KMS
+- ✅ Tisztázás: ez nem licencelési (Microsoft KMS) mechanizmus
+- ✅ Pontos leírás arról, mit módosít az `install.sh`
+- ✅ Magyarázat az ARMv6/Pi Zero/Pi 1 fekete képernyő problémára
+- ✅ Mikor maradjon fake KMS és mikor érdemes full KMS-t használni
+
+🧩 **Hasznos, ha telepítésnél vagy bootnál kijelző problémát látsz.**
+
+---
+
 ## 🗺️ DOKUMENTUM VÁLASZTÁSI FÁ
 
 ```

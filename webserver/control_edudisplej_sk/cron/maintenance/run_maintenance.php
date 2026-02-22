@@ -57,15 +57,93 @@ $lockFile = rtrim($runtimeDir, '/\\') . '/maintenance.lock';
 $cronLog = pickCronLogPath($logDirPrimary);
 $isCli = (PHP_SAPI === 'cli');
 
-function emitMaintenanceOutput(string $line, bool $isCli): void {
+function emitMaintenanceOutput(string $line, bool $isCli, bool $isRed = false): void {
     static $httpHeadersSent = false;
+    static $httpPreOpened = false;
+
+    $ansiRed = "\033[31m";
+    $ansiReset = "\033[0m";
 
     if (!$isCli && !$httpHeadersSent && !headers_sent()) {
-        header('Content-Type: text/plain; charset=utf-8');
+        header('Content-Type: text/html; charset=utf-8');
         $httpHeadersSent = true;
     }
 
-    echo $line;
+    if ($isCli) {
+        if ($isRed) {
+            echo $ansiRed . $line . $ansiReset;
+            return;
+        }
+        echo $line;
+        return;
+    }
+
+    if (!$httpPreOpened) {
+        echo "<pre style=\"font-family:Consolas,monospace;white-space:pre-wrap;\">";
+        $httpPreOpened = true;
+    }
+
+    $safeLine = htmlspecialchars($line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    if ($isRed) {
+        echo '<span style="color:#c00000;font-weight:700;">' . $safeLine . '</span>';
+        return;
+    }
+
+    echo $safeLine;
+}
+
+function emitMaintenanceIssue(string $title, array $recommendations, bool $isCli, ?string $cronLog): void {
+    $now = date('Y-m-d H:i:s');
+    $errorLine = "[$now] [ERROR] $title\n";
+    appendCronLog($cronLog, $errorLine);
+    emitMaintenanceOutput($errorLine, $isCli, true);
+
+    foreach ($recommendations as $recommendation) {
+        $recommendationLine = "[$now] [RECOMMENDATION] $recommendation\n";
+        appendCronLog($cronLog, $recommendationLine);
+        emitMaintenanceOutput($recommendationLine, $isCli, true);
+    }
+}
+
+function checkModuleStorageHealth(string $baseDir): array {
+    $errors = [];
+    $recommendations = [];
+
+    $uploadsDir = rtrim($baseDir, '/\\') . '/uploads';
+    $companiesDir = $uploadsDir . '/companies';
+    $testModuleDir = $companiesDir . '/company_0/modules';
+
+    if (!ensureWritableDir($uploadsDir)) {
+        $errors[] = 'Module storage base directory is not writable: ' . $uploadsDir;
+    }
+
+    if (!ensureWritableDir($companiesDir)) {
+        $errors[] = 'Module storage companies directory is not writable: ' . $companiesDir;
+    }
+
+    if (!ensureWritableDir($testModuleDir)) {
+        $errors[] = 'Module storage module directory is not writable: ' . $testModuleDir;
+    } else {
+        $probeFile = $testModuleDir . '/.maintenance-write-test-' . getmypid() . '.tmp';
+        $written = @file_put_contents($probeFile, 'maintenance-write-test');
+        if ($written === false) {
+            $errors[] = 'Module storage write probe failed in: ' . $testModuleDir;
+        } else {
+            @unlink($probeFile);
+        }
+    }
+
+    if (!empty($errors)) {
+        $recommendations[] = 'Check filesystem owner/group so web and cron users can write the uploads directory.';
+        $recommendations[] = 'Linux example: chown -R www-data:www-data uploads && chmod -R 775 uploads';
+        $recommendations[] = 'Verify mount is not read-only and disk is not full.';
+    }
+
+    return [
+        'ok' => empty($errors),
+        'errors' => $errors,
+        'recommendations' => $recommendations,
+    ];
 }
 
 @set_time_limit(300);
@@ -102,6 +180,7 @@ ob_start();
 
 define('EDUDISPLEJ_DBJAVITO_NO_HTML', true);
 define('EDUDISPLEJ_DBJAVITO_ECHO', true);
+define('EDUDISPLEJ_MAINTENANCE_MIGRATE_ASSET_URLS', true);
 
 require __DIR__ . '/maintenance_task.php';
 
@@ -110,6 +189,25 @@ if ($output !== '') {
     $taskOutput = $output . "\n";
     appendCronLog($cronLog, $taskOutput);
     emitMaintenanceOutput($taskOutput, $isCli);
+
+    if (stripos($output, 'A modul tárhely nem írható') !== false || stripos($output, 'module storage is not writable') !== false) {
+        emitMaintenanceIssue(
+            'PDF upload error detected: module storage is not writable.',
+            [
+                'Fix write permissions for uploads/companies/.../modules directory.',
+                'Ensure the runtime user has write access to the module storage path.',
+            ],
+            $isCli,
+            $cronLog
+        );
+    }
+}
+
+$storageHealth = checkModuleStorageHealth($baseDir);
+if (!$storageHealth['ok']) {
+    foreach ($storageHealth['errors'] as $storageError) {
+        emitMaintenanceIssue($storageError, $storageHealth['recommendations'], $isCli, $cronLog);
+    }
 }
 
 $duration = round(microtime(true) - $start, 3);
