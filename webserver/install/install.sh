@@ -697,6 +697,7 @@ echo ""
 echo "[*] Overujem klucove sluzby - Ensuring core services..."
 
 CORE_SERVICES=(
+    "edudisplej-kiosk.service"
     "edudisplej-sync.service"
     "edudisplej-watchdog.service"
     "edudisplej-screenshot-service.service"
@@ -727,13 +728,29 @@ for service in "${CORE_SERVICES[@]}"; do
             echo "  [!] VAROVANIE: enable zlyhal pre $service"
         fi
 
-        if systemctl start "$service" 2>/dev/null; then
-            echo "  [✓] Started: $service"
+        if [ "$service" = "edudisplej-kiosk.service" ]; then
+            echo "  [*] Kiosk service enabled (will run after reboot)"
         else
-            echo "  [!] VAROVANIE: start zlyhal pre $service"
+            if systemctl start "$service" 2>/dev/null; then
+                echo "  [✓] Started: $service"
+            else
+                echo "  [!] VAROVANIE: start zlyhal pre $service"
+            fi
         fi
     fi
 done
+
+# Hard safety check for fleet installs: kiosk service must be enabled
+if systemctl is-enabled edudisplej-kiosk.service >/dev/null 2>&1; then
+    echo "[✓] Kiosk service is enabled for next boot"
+else
+    echo "[!] VAROVANIE: kiosk service was not enabled, forcing enable..."
+    if systemctl enable edudisplej-kiosk.service 2>/dev/null; then
+        echo "[✓] Kiosk service force-enabled"
+    else
+        echo "[!] CHYBA: failed to enable kiosk service"
+    fi
+fi
 
 # Sudo konfiguracia - Sudo configuration
 echo "[*] Konfiguracia sudo - Configuring sudo..."

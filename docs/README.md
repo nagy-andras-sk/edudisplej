@@ -166,6 +166,7 @@ For issues, check system status / Pri problémoch skontrolujte stav systému:
 ```bash
 sudo systemctl status edudisplej-sync.service
 sudo systemctl status edudisplej-kiosk.service
+sudo systemctl is-enabled edudisplej-kiosk.service
 ```
 
 View logs / Zobraziť logy:

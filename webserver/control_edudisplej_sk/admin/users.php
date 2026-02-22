@@ -45,10 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     $username = trim($_POST['username'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    $isadmin = isset($_POST['isadmin']) ? 1 : 0;
+    $isadmin = isset($_POST['isadmin']) && (string)$_POST['isadmin'] === '1' ? 1 : 0;
     $user_role = edudisplej_normalize_user_role($_POST['user_role'] ?? 'user', (bool)$isadmin);
     $company_id = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
-    $require_otp = isset($_POST['require_otp']) ? 1 : 0;
+    $require_otp = isset($_POST['require_otp']) && (string)$_POST['require_otp'] === '1' ? 1 : 0;
 
     if ($username === '' || $password === '') {
         $error = 'Username and password are required';
@@ -165,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
     $username = trim($_POST['username'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    $isadmin = isset($_POST['isadmin']) ? 1 : 0;
+    $isadmin = isset($_POST['isadmin']) && (string)$_POST['isadmin'] === '1' ? 1 : 0;
     $user_role = edudisplej_normalize_user_role($_POST['user_role'] ?? 'user', (bool)$isadmin);
     $company_id = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
 
@@ -388,5 +388,28 @@ include 'header.php';
         </table>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var usernameInput = document.getElementById('username');
+    var emailInput = document.getElementById('email');
+
+    if (!usernameInput || !emailInput) {
+        return;
+    }
+
+    function mirrorValue(source, target) {
+        target.value = source.value;
+    }
+
+    usernameInput.addEventListener('input', function () {
+        mirrorValue(usernameInput, emailInput);
+    });
+
+    emailInput.addEventListener('input', function () {
+        mirrorValue(emailInput, usernameInput);
+    });
+});
+</script>
 
 <?php include 'footer.php'; ?>

@@ -379,7 +379,7 @@ $logout_url = '../login.php?logout=1';
                             <thead>
                                 <tr>
                                     <th><?php echo htmlspecialchars(t_def('profile.users.col.username', 'Felhasználónév')); ?></th>
-                                    <th>Email</th>
+                                    <th><?php echo htmlspecialchars(t_def('common.email', 'Email')); ?></th>
                                     <th><?php echo htmlspecialchars(t_def('profile.users.col.role', 'Jogosultság')); ?></th>
                                     <th><?php echo htmlspecialchars(t_def('profile.users.col.last_login', 'Utolsó bejelentkezés')); ?></th>
                                     <th><?php echo htmlspecialchars(t_def('profile.users.col.actions', 'Műveletek')); ?></th>
@@ -436,7 +436,7 @@ $logout_url = '../login.php?logout=1';
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr style="border-bottom: 1px solid #eee;">
                             <td style="padding: 12px; font-weight: bold; width: 30%;"><?php echo htmlspecialchars(t_def('profile.institution.name', 'Intézmény megnevezése')); ?></td>
-                            <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['name'] ?? 'N/A'); ?></td>
+                            <td style="padding: 12px;"><?php echo htmlspecialchars($company_data['name'] ?? t_def('common.na', 'N/A')); ?></td>
                         </tr>
                         <tr style="border-bottom: 1px solid #eee;">
                             <td style="padding: 12px; font-weight: bold;"><?php echo htmlspecialchars(t_def('profile.institution.address', 'Cím')); ?></td>
@@ -448,11 +448,11 @@ $logout_url = '../login.php?logout=1';
                         </tr>
                         <tr style="border-bottom: 1px solid #eee;">
                             <td style="padding: 12px; font-weight: bold;"><?php echo htmlspecialchars(t_def('profile.institution.registered_at', 'Regisztrációs időpont')); ?></td>
-                            <td style="padding: 12px;"><?php echo $company_data['created_at'] ? date('Y-m-d H:i', strtotime($company_data['created_at'])) : 'N/A'; ?></td>
+                            <td style="padding: 12px;"><?php echo $company_data['created_at'] ? date('Y-m-d H:i', strtotime($company_data['created_at'])) : htmlspecialchars(t_def('common.na', 'N/A')); ?></td>
                         </tr>
                         <?php if (!empty($company_data['api_token'])): ?>
                         <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px; font-weight: bold;">API Token</td>
+                            <td style="padding: 12px; font-weight: bold;"><?php echo htmlspecialchars(t_def('profile.api_token', 'API Token')); ?></td>
                             <td style="padding: 12px;">
                                 <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px;"><?php echo htmlspecialchars($company_data['api_token']); ?></code>
                                 <button data-copy="<?php echo htmlspecialchars($company_data['api_token']); ?>" onclick="copyToClipboard(event)" style="margin-left: 10px; background: #4caf50; color: white; border: none; padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;"><?php echo htmlspecialchars(t_def('common.copy', '📋 Másolás')); ?></button>
@@ -680,6 +680,9 @@ $logout_url = '../login.php?logout=1';
     <script>
         const PROFILE_I18N = {
             copySuccess: <?php echo json_encode(t_def('common.copied', '✅ Másolva!'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            unknownFile: <?php echo json_encode(t_def('profile.assets.unknown_file', 'ismeretlen fájl'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            usernamePlaceholder: <?php echo json_encode(t_def('profile.users.placeholder.username', 'pl. janos.kovacs'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            emailPlaceholder: <?php echo json_encode(t_def('profile.users.placeholder.email', 'janos@example.com'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             addUserTitle: <?php echo json_encode(t_def('profile.users.modal.add_title', '➕ Új felhasználó'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             username: <?php echo json_encode(t_def('profile.users.col.username', 'Felhasználónév'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             email: <?php echo json_encode(t_def('common.email', 'Email'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
@@ -708,7 +711,7 @@ $logout_url = '../login.php?logout=1';
 
         function confirmAssetDelete(formEl) {
             const nameInput = formEl?.querySelector('input[name="delete_asset_name"]');
-            const assetName = nameInput?.value || 'ismeretlen fájl';
+            const assetName = nameInput?.value || PROFILE_I18N.unknownFile;
             const message = (PROFILE_I18N.confirmDeleteAsset || 'Valóban törli ezt a tartalmat: "{name}"?').replace('{name}', assetName);
             return window.confirm(message);
         }
@@ -804,12 +807,12 @@ $logout_url = '../login.php?logout=1';
                     <form id="add-user-form" style="display: grid; gap: 15px;">
                         <div>
                             <label style="display: block; font-weight: bold; margin-bottom: 5px;">${PROFILE_I18N.username} *</label>
-                            <input type="text" id="username" placeholder="pl. janos.kovacs" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;" required>
+                            <input type="text" id="username" placeholder="${PROFILE_I18N.usernamePlaceholder}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;" required>
                         </div>
                         
                         <div>
                             <label style="display: block; font-weight: bold; margin-bottom: 5px;">${PROFILE_I18N.email} *</label>
-                            <input type="email" id="email" placeholder="janos@example.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;" required>
+                            <input type="email" id="email" placeholder="${PROFILE_I18N.emailPlaceholder}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;" required>
                         </div>
                         
                         <div>
