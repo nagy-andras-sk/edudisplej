@@ -446,7 +446,7 @@ try {
         $device_id = generateDeviceId($mac);
         add_debug('generated_device_id', $device_id);
         
-        $insert_stmt = $conn->prepare("INSERT INTO kiosks (mac, device_id, hostname, hw_info, public_ip, status, is_configured, last_seen, company_id) VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), ?)");
+        $insert_stmt = $conn->prepare("INSERT INTO kiosks (mac, device_id, hostname, hw_info, public_ip, status, is_configured, last_seen, company_id, screenshot_enabled) VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), ?, 1)");
         
         if (!$insert_stmt) {
             $response['message'] = 'Insert query preparation failed: ' . $conn->error;

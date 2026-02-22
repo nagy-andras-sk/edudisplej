@@ -7,6 +7,7 @@
 require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
 require_once '../modules/module_asset_service.php';
+require_once '../modules/module_standard.php';
 
 $api_company = validate_api_token();
 
@@ -139,7 +140,220 @@ function edudisplej_get_active_block_id(mysqli $conn, int $group_id): array {
     return ['has_blocks' => true, 'active_block_id' => null];
 }
 
-function edudisplej_optimize_module_settings_for_sync(string $module_key, $settings): array {
+function edudisplej_sync_hydrate_text_collection_settings(mysqli $conn, int $company_id, array $settings): array {
+    $source_type = strtolower(trim((string)($settings['textSourceType'] ?? 'manual')));
+    if ($source_type !== 'collection') {
+        return $settings;
+    }
+
+    $collection_id = (int)($settings['textCollectionId'] ?? 0);
+    if ($collection_id <= 0 || $company_id <= 0) {
+        return $settings;
+    }
+
+    static $collectionCache = [];
+    $cacheKey = $company_id . ':' . $collection_id;
+    if (!array_key_exists($cacheKey, $collectionCache)) {
+        $stmt = $conn->prepare("SELECT id, title, content_html, bg_color, bg_image_data, updated_at
+                                FROM text_collections
+                                WHERE id = ? AND company_id = ? AND is_active = 1
+                                LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('ii', $collection_id, $company_id);
+            $stmt->execute();
+            $collectionCache[$cacheKey] = $stmt->get_result()->fetch_assoc() ?: null;
+            $stmt->close();
+        } else {
+            $collectionCache[$cacheKey] = null;
+        }
+    }
+
+    $collection = $collectionCache[$cacheKey] ?? null;
+    if (!$collection) {
+        return $settings;
+    }
+
+    $settings['text'] = (string)($collection['content_html'] ?? $settings['text'] ?? '');
+    $settings['bgColor'] = (string)($collection['bg_color'] ?? $settings['bgColor'] ?? '#000000');
+    $settings['bgImageData'] = (string)($collection['bg_image_data'] ?? $settings['bgImageData'] ?? '');
+    $settings['textCollectionLabel'] = (string)($collection['title'] ?? $settings['textCollectionLabel'] ?? '');
+    $versionTs = strtotime((string)($collection['updated_at'] ?? ''));
+    if ($versionTs) {
+        $settings['textCollectionVersionTs'] = $versionTs * 1000;
+    }
+
+    return $settings;
+}
+
+function edudisplej_sync_prefetch_meal_menu_payload(mysqli $conn, int $company_id, array $settings): ?array {
+    $institution_id = (int)($settings['institutionId'] ?? 0);
+    if ($institution_id <= 0 || $company_id <= 0) {
+        return null;
+    }
+
+    $source_type = strtolower(trim((string)($settings['sourceType'] ?? 'server')));
+    if ($source_type !== 'manual') {
+        $source_type = 'server';
+    }
+
+    $date_value = date('Y-m-d');
+    $showBreakfast = !empty($settings['showBreakfast']);
+    $showSnackAm = !empty($settings['showSnackAm']);
+    $showLunch = !empty($settings['showLunch']);
+    $showSnackPm = !empty($settings['showSnackPm']);
+    $showDinner = !empty($settings['showDinner']);
+
+    $inst_stmt = $conn->prepare("SELECT institution_name
+                                FROM meal_plan_institutions
+                                WHERE id = ? AND (company_id = 0 OR company_id = ?)
+                                ORDER BY company_id DESC
+                                LIMIT 1");
+    if (!$inst_stmt) {
+        return null;
+    }
+    $inst_stmt->bind_param('ii', $institution_id, $company_id);
+    $inst_stmt->execute();
+    $inst = $inst_stmt->get_result()->fetch_assoc();
+    $inst_stmt->close();
+
+    if (!$inst) {
+        return null;
+    }
+
+    $source_effective = $source_type;
+    $menu_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                FROM meal_plan_items
+                                WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date = ?
+                                    AND (
+                                        ? = ''
+                                        OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                        OR source_type = ?
+                                    )
+                                ORDER BY company_id DESC
+                                LIMIT 1");
+    if (!$menu_stmt) {
+        return null;
+    }
+    $menu_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+    $menu_stmt->execute();
+    $menu = $menu_stmt->get_result()->fetch_assoc();
+    $menu_stmt->close();
+
+    if (!$menu && $source_type === 'manual') {
+        $source_effective = 'server';
+        $menu_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                    FROM meal_plan_items
+                                    WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date = ?
+                                        AND (
+                                            ? = ''
+                                            OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                            OR source_type = ?
+                                        )
+                                    ORDER BY company_id DESC
+                                    LIMIT 1");
+        if ($menu_stmt) {
+            $menu_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $menu_stmt->execute();
+            $menu = $menu_stmt->get_result()->fetch_assoc();
+            $menu_stmt->close();
+        }
+    }
+
+    if (!$menu) {
+        $fallback_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date <= ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY menu_date DESC, company_id DESC
+                                        LIMIT 1");
+        if ($fallback_stmt) {
+            $fallback_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $fallback_stmt->execute();
+            $menu = $fallback_stmt->get_result()->fetch_assoc();
+            $fallback_stmt->close();
+        }
+    }
+
+    if (!$menu && $source_type === 'manual' && $source_effective !== 'server') {
+        $source_effective = 'server';
+        $fallback_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date <= ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY menu_date DESC, company_id DESC
+                                        LIMIT 1");
+        if ($fallback_stmt) {
+            $fallback_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $fallback_stmt->execute();
+            $menu = $fallback_stmt->get_result()->fetch_assoc();
+            $fallback_stmt->close();
+        }
+    }
+
+    if (!$menu) {
+        $future_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date >= ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY menu_date ASC, company_id DESC
+                                        LIMIT 1");
+        if ($future_stmt) {
+            $future_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $future_stmt->execute();
+            $menu = $future_stmt->get_result()->fetch_assoc();
+            $future_stmt->close();
+        }
+    }
+
+    if (!$menu && $source_type === 'manual' && $source_effective !== 'server') {
+        $source_effective = 'server';
+        $future_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date >= ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY menu_date ASC, company_id DESC
+                                        LIMIT 1");
+        if ($future_stmt) {
+            $future_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $future_stmt->execute();
+            $menu = $future_stmt->get_result()->fetch_assoc();
+            $future_stmt->close();
+        }
+    }
+
+    $meals = [];
+    if ($showBreakfast) { $meals[] = ['key' => 'breakfast', 'label' => 'Reggeli', 'text' => (string)($menu['breakfast'] ?? '')]; }
+    if ($showSnackAm) { $meals[] = ['key' => 'snack_am', 'label' => 'Tízórai', 'text' => (string)($menu['snack_am'] ?? '')]; }
+    if ($showLunch) { $meals[] = ['key' => 'lunch', 'label' => 'Ebéd', 'text' => (string)($menu['lunch'] ?? '')]; }
+    if ($showSnackPm) { $meals[] = ['key' => 'snack_pm', 'label' => 'Uzsonna', 'text' => (string)($menu['snack_pm'] ?? '')]; }
+    if ($showDinner) { $meals[] = ['key' => 'dinner', 'label' => 'Vacsora', 'text' => (string)($menu['dinner'] ?? '')]; }
+
+    return [
+        'institution_name' => (string)($inst['institution_name'] ?? ''),
+        'menu_date' => (string)($menu['menu_date'] ?? $date_value),
+        'meals' => $meals,
+        'source_type' => (string)($menu['source_type'] ?? ''),
+        'updated_at' => (string)($menu['updated_at'] ?? ''),
+    ];
+}
+
+function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company_id, string $module_key, $settings): array {
     $normalized = is_array($settings) ? $settings : [];
     $key = strtolower(trim($module_key));
     $requestToken = edudisplej_current_request_api_token();
@@ -188,6 +402,18 @@ function edudisplej_optimize_module_settings_for_sync(string $module_key, $setti
             $normalized['videoAssetUrl'] = edudisplej_module_asset_normalize_url_for_api($assetUrl, $requestToken);
         }
         return $normalized;
+    }
+
+    if ($key === 'text') {
+        return edudisplej_sync_hydrate_text_collection_settings($conn, $company_id, $normalized);
+    }
+
+    if ($key === 'meal-menu' || $key === 'meal_menu') {
+        $prefetched = edudisplej_sync_prefetch_meal_menu_payload($conn, $company_id, $normalized);
+        if ($prefetched) {
+            $normalized['offlinePrefetchedMenuData'] = $prefetched;
+            $normalized['offlinePrefetchedMenuSavedAt'] = date('c');
+        }
     }
 
     return $normalized;
@@ -282,7 +508,7 @@ try {
             'module_key' => $row['module_key'],
             'duration_seconds' => (int)$row['duration_seconds'],
             'display_order' => (int)$row['display_order'],
-            'settings' => edudisplej_optimize_module_settings_for_sync((string)($row['module_key'] ?? ''), $row['settings'] ? json_decode($row['settings'], true) : []),
+            'settings' => edudisplej_optimize_module_settings_for_sync($conn, (int)$company_id, (string)($row['module_key'] ?? ''), $row['settings'] ? json_decode($row['settings'], true) : []),
             'source' => 'kiosk',
             'module_folder' => $runtime_payload['module_folder'],
             'module_renderer' => $runtime_payload['module_renderer'],
@@ -317,7 +543,7 @@ try {
         if ($group_row) {
             $group_id = (int)$group_row['group_id'];
 
-            $plan_stmt = $conn->prepare("SELECT plan_version, updated_at FROM kiosk_group_loop_plans WHERE group_id = ? LIMIT 1");
+            $plan_stmt = $conn->prepare("SELECT plan_json, plan_version, updated_at FROM kiosk_group_loop_plans WHERE group_id = ? LIMIT 1");
             $plan_stmt->bind_param("i", $group_id);
             $plan_stmt->execute();
             $plan_meta = $plan_stmt->get_result()->fetch_assoc();
@@ -327,6 +553,170 @@ try {
                 $loop_plan_version = (int)($plan_meta['plan_version'] ?? 0);
                 $loop_plan_updated_at = $plan_meta['updated_at'] ?? null;
             }
+
+            $planner_loop_styles = [];
+            $planner_schedule_blocks = [];
+            $planner_default_loop_style_id = 0;
+
+            if (!empty($plan_meta['plan_json'])) {
+                $decoded_plan = json_decode((string)$plan_meta['plan_json'], true);
+                if (is_array($decoded_plan)) {
+                    $planner_loop_styles = is_array($decoded_plan['loop_styles'] ?? null) ? $decoded_plan['loop_styles'] : [];
+                    $planner_schedule_blocks = is_array($decoded_plan['schedule_blocks'] ?? null) ? $decoded_plan['schedule_blocks'] : [];
+                    $planner_default_loop_style_id = (int)($decoded_plan['default_loop_style_id'] ?? 0);
+                }
+            }
+
+            if (!empty($planner_loop_styles)) {
+                $style_map = [];
+                foreach ($planner_loop_styles as $style) {
+                    if (!is_array($style)) {
+                        continue;
+                    }
+                    $style_id = (int)($style['id'] ?? 0);
+                    if ($style_id === 0) {
+                        continue;
+                    }
+                    $style_map[$style_id] = is_array($style['items'] ?? null) ? $style['items'] : [];
+                }
+
+                if ($planner_default_loop_style_id === 0 && !empty($style_map)) {
+                    $style_ids = array_keys($style_map);
+                    $planner_default_loop_style_id = (int)$style_ids[0];
+                }
+
+                $base_loop = $style_map[$planner_default_loop_style_id] ?? [];
+                $planner_blocks = [];
+                foreach ($planner_schedule_blocks as $block) {
+                    if (!is_array($block)) {
+                        continue;
+                    }
+
+                    $loop_style_id = (int)($block['loop_style_id'] ?? 0);
+                    $planner_blocks[] = [
+                        'id' => (int)($block['id'] ?? 0),
+                        'block_name' => (string)($block['block_name'] ?? 'Időblokk'),
+                        'block_type' => strtolower((string)($block['block_type'] ?? 'weekly')) === 'date' ? 'date' : 'weekly',
+                        'specific_date' => !empty($block['specific_date']) ? (string)$block['specific_date'] : null,
+                        'start_time' => (string)($block['start_time'] ?? '00:00:00'),
+                        'end_time' => (string)($block['end_time'] ?? '00:00:00'),
+                        'days_mask' => (string)($block['days_mask'] ?? '1,2,3,4,5,6,7'),
+                        'is_active' => (int)($block['is_active'] ?? 1),
+                        'priority' => (int)($block['priority'] ?? 100),
+                        'display_order' => (int)($block['display_order'] ?? 0),
+                        'loops' => $style_map[$loop_style_id] ?? []
+                    ];
+                }
+
+                $offline_plan['base_loop'] = $base_loop;
+                $offline_plan['time_blocks'] = $planner_blocks;
+
+                $now_day = (int)date('N');
+                $now_time = date('H:i:s');
+                $now_date = date('Y-m-d');
+                $candidates = [];
+
+                foreach ($planner_blocks as $block) {
+                    if ((int)($block['is_active'] ?? 1) !== 1) {
+                        continue;
+                    }
+
+                    $block_type = strtolower((string)($block['block_type'] ?? 'weekly')) === 'date' ? 'date' : 'weekly';
+                    if ($block_type === 'date' && (string)($block['specific_date'] ?? '') !== $now_date) {
+                        continue;
+                    }
+
+                    if ($block_type === 'weekly') {
+                        $allowed_days = [];
+                        foreach (explode(',', (string)($block['days_mask'] ?? '')) as $part) {
+                            $val = (int)trim($part);
+                            if ($val >= 1 && $val <= 7) {
+                                $allowed_days[$val] = true;
+                            }
+                        }
+                        if (!empty($allowed_days) && !isset($allowed_days[$now_day])) {
+                            continue;
+                        }
+                    }
+
+                    $start = (string)($block['start_time'] ?? '00:00:00');
+                    $end = (string)($block['end_time'] ?? '00:00:00');
+                    $matches_time = false;
+                    if ($start <= $end) {
+                        $matches_time = ($now_time >= $start && $now_time <= $end);
+                    } else {
+                        $matches_time = ($now_time >= $start || $now_time <= $end);
+                    }
+
+                    if ($matches_time) {
+                        $candidates[] = $block;
+                    }
+                }
+
+                if (!empty($candidates)) {
+                    usort($candidates, function ($a, $b) {
+                        $typeA = strtolower((string)($a['block_type'] ?? 'weekly')) === 'date' ? 2 : 1;
+                        $typeB = strtolower((string)($b['block_type'] ?? 'weekly')) === 'date' ? 2 : 1;
+                        if ($typeA !== $typeB) {
+                            return $typeB <=> $typeA;
+                        }
+
+                        $priorityA = (int)($a['priority'] ?? 100);
+                        $priorityB = (int)($b['priority'] ?? 100);
+                        if ($priorityA !== $priorityB) {
+                            return $priorityB <=> $priorityA;
+                        }
+
+                        $orderA = (int)($a['display_order'] ?? 0);
+                        $orderB = (int)($b['display_order'] ?? 0);
+                        if ($orderA !== $orderB) {
+                            return $orderA <=> $orderB;
+                        }
+
+                        return ((int)($a['id'] ?? 0)) <=> ((int)($b['id'] ?? 0));
+                    });
+
+                    $active_block = $candidates[0];
+                    $active_block_id = (int)($active_block['id'] ?? 0);
+                    $response['active_time_block_id'] = $active_block_id > 0 ? $active_block_id : null;
+                    $response['active_scope'] = $active_block_id > 0 ? 'block' : 'base';
+                    $loop_config = !empty($active_block['loops']) ? $active_block['loops'] : $base_loop;
+                } else {
+                    $response['active_time_block_id'] = null;
+                    $response['active_scope'] = 'base';
+                    $loop_config = $base_loop;
+                }
+
+                $all_plan_modules = [];
+                foreach ($base_loop as $item) {
+                    if (is_array($item)) {
+                        $all_plan_modules[] = $item;
+                    }
+                }
+                foreach ($planner_blocks as $block) {
+                    foreach ((array)($block['loops'] ?? []) as $item) {
+                        if (is_array($item)) {
+                            $all_plan_modules[] = $item;
+                        }
+                    }
+                }
+
+                foreach ($all_plan_modules as $item) {
+                    $module_key = (string)($item['module_key'] ?? '');
+                    if ($module_key === '' || isset($preload_map[$module_key])) {
+                        continue;
+                    }
+
+                    $runtime_payload = edudisplej_module_runtime_payload_for_sync($module_key);
+                    $preload_map[$module_key] = [
+                        'module_key' => $module_key,
+                        'name' => (string)($item['module_name'] ?? $module_key),
+                        'module_folder' => (string)($item['module_folder'] ?? $runtime_payload['module_folder']),
+                        'module_renderer' => (string)($item['module_renderer'] ?? $runtime_payload['module_renderer']),
+                        'module_main_file' => (string)($item['module_main_file'] ?? $runtime_payload['module_main_file']),
+                    ];
+                }
+            } else {
 
             $block_state = edudisplej_get_active_block_id($conn, $group_id);
             $active_block_id = $block_state['active_block_id'];
@@ -377,7 +767,7 @@ try {
                     'module_key' => $row['module_key'],
                     'duration_seconds' => (int)$row['duration_seconds'],
                     'display_order' => (int)$row['display_order'],
-                    'settings' => edudisplej_optimize_module_settings_for_sync((string)($row['module_key'] ?? ''), $row['settings'] ? json_decode($row['settings'], true) : []),
+                    'settings' => edudisplej_optimize_module_settings_for_sync($conn, (int)$company_id, (string)($row['module_key'] ?? ''), $row['settings'] ? json_decode($row['settings'], true) : []),
                     'source' => 'group',
                     'module_folder' => $runtime_payload['module_folder'],
                     'module_renderer' => $runtime_payload['module_renderer'],
@@ -407,18 +797,19 @@ try {
             $offline_plan['base_loop'] = $base_loop;
             $offline_plan['time_blocks'] = array_values($block_map);
 
-            if ($has_blocks && $active_block_id !== null && isset($block_map[$active_block_id])) {
-                $loop_config = $block_map[$active_block_id]['loops'];
-            } else {
-                $loop_config = $base_loop;
-            }
+                if ($has_blocks && $active_block_id !== null && isset($block_map[$active_block_id])) {
+                    $loop_config = $block_map[$active_block_id]['loops'];
+                } else {
+                    $loop_config = $base_loop;
+                }
 
-            if (empty($loop_config) && !empty($base_loop)) {
-                $loop_config = $base_loop;
-            }
+                if (empty($loop_config) && !empty($base_loop)) {
+                    $loop_config = $base_loop;
+                }
 
-            $response['active_time_block_id'] = $active_block_id;
-            $response['active_scope'] = $active_block_id !== null ? 'block' : 'base';
+                $response['active_time_block_id'] = $active_block_id;
+                $response['active_scope'] = $active_block_id !== null ? 'block' : 'base';
+            }
         }
 
         if ($group_id) {

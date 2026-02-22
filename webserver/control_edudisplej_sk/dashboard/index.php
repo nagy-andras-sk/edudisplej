@@ -1143,6 +1143,7 @@ function buildKioskModalHTML(data) {
             + '<tr><th>' + escapeHtml(DASHBOARD_COL_NAME_TEXT) + '</th><td><input type="text" id="kiosk-edit-friendly-name" value="' + escapeHtml(data.friendly_name || data.hostname || '') + '" style="width:100%;"></td></tr>'
             + '<tr><th>' + escapeHtml(DASHBOARD_COL_LOCATION_TEXT) + '</th><td><input type="text" id="kiosk-edit-location" value="' + escapeHtml(data.location || '') + '" style="width:100%;"></td></tr>'
             + '<tr><th>' + escapeHtml(DASHBOARD_COL_GROUP_TEXT) + '</th><td><select id="kiosk-edit-group" style="width:100%;">' + groupOptions + '</select></td></tr>'
+            + '<tr><th>Screenshot</th><td><label><input type="checkbox" id="kiosk-edit-screenshot-enabled" ' + (data.screenshot_enabled ? 'checked' : '') + '> Engedélyezve</label></td></tr>'
             + '<tr><td colspan="2" style="text-align:right;"><button class="btn btn-primary" onclick="saveKioskDetails(' + escapeHtml(data.id || 0) + ')">' + escapeHtml(DASHBOARD_ACTION_SAVE_TEXT) + '</button></td></tr>'
             + '</tbody></table>';
     } else {
@@ -1179,7 +1180,8 @@ function saveKioskDetails(kioskId) {
     var friendlyName = document.getElementById('kiosk-edit-friendly-name');
     var location = document.getElementById('kiosk-edit-location');
     var group = document.getElementById('kiosk-edit-group');
-    if (!friendlyName || !location || !group) {
+    var screenshotEnabled = document.getElementById('kiosk-edit-screenshot-enabled');
+    if (!friendlyName || !location || !group || !screenshotEnabled) {
         return;
     }
 
@@ -1190,7 +1192,8 @@ function saveKioskDetails(kioskId) {
             id: parseInt(kioskId, 10),
             friendly_name: friendlyName.value,
             location: location.value,
-            group_id: group.value ? parseInt(group.value, 10) : null
+            group_id: group.value ? parseInt(group.value, 10) : null,
+            screenshot_enabled: screenshotEnabled.checked ? 1 : 0
         })
     })
     .then(function (r) { return r.json(); })

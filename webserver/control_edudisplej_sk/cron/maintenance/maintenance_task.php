@@ -295,6 +295,1507 @@ function edudisplej_maintenance_migrate_legacy_asset_urls(mysqli $conn): void {
     edudisplej_maintenance_migrate_json_column($conn, 'kiosk_group_loop_plans', 'group_id', 'plan_json');
 }
 
+function edudisplej_maintenance_ensure_job_tables(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS maintenance_job_runs (
+        job_key VARCHAR(120) PRIMARY KEY,
+        last_run_at DATETIME NULL,
+        last_status VARCHAR(20) NOT NULL DEFAULT 'idle',
+        last_message VARCHAR(1000) NOT NULL DEFAULT '',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function edudisplej_maintenance_ensure_settings_table(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS maintenance_settings (
+        setting_key VARCHAR(120) PRIMARY KEY,
+        setting_value VARCHAR(2000) NOT NULL DEFAULT '',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $defaults = [
+        'jedalen_sync_enabled' => '1',
+        'jedalen_sync_window_start' => '0',
+        'jedalen_sync_window_end' => '5',
+        'jedalen_sync_regions' => 'TT,NR,TN,BB,PO,KE,BA,ZA',
+        'jedalen_sync_every_cycle' => '0',
+    ];
+
+    $stmt = $conn->prepare("INSERT IGNORE INTO maintenance_settings (setting_key, setting_value) VALUES (?, ?)");
+    if (!$stmt) {
+        logError('Jedalen sync: failed to prepare default settings insert: ' . $conn->error);
+        return;
+    }
+
+    foreach ($defaults as $key => $value) {
+        $stmt->bind_param('ss', $key, $value);
+        $stmt->execute();
+    }
+    $stmt->close();
+}
+
+function edudisplej_maintenance_load_settings_map(mysqli $conn): array {
+    $map = [];
+    $result = $conn->query("SELECT setting_key, setting_value FROM maintenance_settings");
+    if (!$result) {
+        logError('Jedalen sync: failed to read maintenance settings: ' . $conn->error);
+        return $map;
+    }
+
+    while ($row = $result->fetch_assoc()) {
+        $map[(string)($row['setting_key'] ?? '')] = (string)($row['setting_value'] ?? '');
+    }
+
+    return $map;
+}
+
+function edudisplej_maintenance_get_jedalen_sync_config(mysqli $conn): array {
+    edudisplej_maintenance_ensure_settings_table($conn);
+    $map = edudisplej_maintenance_load_settings_map($conn);
+
+    $enabledRaw = strtolower(trim((string)($map['jedalen_sync_enabled'] ?? '1')));
+    $enabled = in_array($enabledRaw, ['1', 'true', 'yes', 'on'], true);
+
+    $windowStart = (int)($map['jedalen_sync_window_start'] ?? 0);
+    if ($windowStart < 0 || $windowStart > 23) {
+        $windowStart = 0;
+    }
+
+    $windowEnd = (int)($map['jedalen_sync_window_end'] ?? 5);
+    if ($windowEnd < 0 || $windowEnd > 23) {
+        $windowEnd = 5;
+    }
+
+    $regionsRaw = (string)($map['jedalen_sync_regions'] ?? 'TT,NR,TN,BB,PO,KE,BA,ZA');
+    $regions = [];
+    foreach (explode(',', $regionsRaw) as $part) {
+        $region = strtoupper(trim($part));
+        if ($region === '' || !preg_match('/^[A-Z]{2}$/', $region)) {
+            continue;
+        }
+        $regions[$region] = true;
+    }
+
+    if (empty($regions)) {
+        $regions = ['TT' => true, 'NR' => true, 'TN' => true, 'BB' => true, 'PO' => true, 'KE' => true, 'BA' => true, 'ZA' => true];
+    }
+
+    return [
+        'enabled' => $enabled,
+        'window_start' => $windowStart,
+        'window_end' => $windowEnd,
+        'regions' => array_values(array_keys($regions)),
+        'every_cycle' => in_array(strtolower(trim((string)($map['jedalen_sync_every_cycle'] ?? '0'))), ['1', 'true', 'yes', 'on'], true),
+    ];
+}
+
+function edudisplej_maintenance_ensure_meal_schema(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS meal_plan_sites (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        company_id INT NOT NULL DEFAULT 0,
+        site_key VARCHAR(80) NOT NULL,
+        site_name VARCHAR(150) NOT NULL,
+        base_url VARCHAR(500) NOT NULL DEFAULT '',
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_company_site_key (company_id, site_key),
+        INDEX idx_company_active (company_id, is_active)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $conn->query("CREATE TABLE IF NOT EXISTS meal_plan_institutions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        company_id INT NOT NULL DEFAULT 0,
+        site_id INT NOT NULL,
+        external_key VARCHAR(120) NOT NULL DEFAULT '',
+        institution_name VARCHAR(220) NOT NULL,
+        city VARCHAR(180) NOT NULL DEFAULT '',
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_company_site_active (company_id, site_id, is_active),
+        UNIQUE KEY uq_company_external (company_id, site_id, external_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $conn->query("CREATE TABLE IF NOT EXISTS meal_plan_items (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        company_id INT NOT NULL DEFAULT 0,
+        institution_id INT NOT NULL,
+        menu_date DATE NOT NULL,
+        breakfast TEXT NULL,
+        snack_am TEXT NULL,
+        lunch TEXT NULL,
+        snack_pm TEXT NULL,
+        dinner TEXT NULL,
+        source_type VARCHAR(20) NOT NULL DEFAULT 'manual',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_company_institution_date (company_id, institution_id, menu_date),
+        INDEX idx_company_institution_date (company_id, institution_id, menu_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $seed_check = $conn->query("SELECT id FROM meal_plan_sites WHERE company_id = 0 AND site_key = 'jedalen.sk' LIMIT 1");
+    if ($seed_check && $seed_check->num_rows === 0) {
+        $conn->query("INSERT INTO meal_plan_sites (company_id, site_key, site_name, base_url, is_active) VALUES (0, 'jedalen.sk', 'Jedalen.sk', 'https://www.jedalen.sk', 1)");
+    }
+}
+
+function edudisplej_maintenance_ensure_room_occupancy_schema(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS room_occupancy_rooms (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        company_id INT NOT NULL,
+        room_key VARCHAR(120) NOT NULL,
+        room_name VARCHAR(220) NOT NULL,
+        capacity INT NOT NULL DEFAULT 0,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_company_room_key (company_id, room_key),
+        INDEX idx_company_active (company_id, is_active)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $conn->query("CREATE TABLE IF NOT EXISTS room_occupancy_events (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        company_id INT NOT NULL,
+        room_id INT NOT NULL,
+        event_date DATE NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        event_title VARCHAR(260) NOT NULL,
+        event_note TEXT NULL,
+        source_type VARCHAR(20) NOT NULL DEFAULT 'manual',
+        external_ref VARCHAR(160) NOT NULL DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_company_room_date (company_id, room_id, event_date),
+        UNIQUE KEY uq_external_event (company_id, room_id, event_date, external_ref),
+        UNIQUE KEY uq_manual_slot (company_id, room_id, event_date, start_time, end_time, event_title)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function edudisplej_maintenance_mark_job_run(mysqli $conn, string $jobKey, string $status, string $message): void {
+    $trimmed = trim($message);
+    $safeMessage = function_exists('mb_substr')
+        ? mb_substr($trimmed, 0, 1000, 'UTF-8')
+        : substr($trimmed, 0, 1000);
+    $stmt = $conn->prepare("INSERT INTO maintenance_job_runs (job_key, last_run_at, last_status, last_message)
+                           VALUES (?, NOW(), ?, ?)
+                           ON DUPLICATE KEY UPDATE last_run_at = VALUES(last_run_at), last_status = VALUES(last_status), last_message = VALUES(last_message), updated_at = CURRENT_TIMESTAMP");
+    if (!$stmt) {
+        logError("Jedalen sync: failed to prepare job run update: " . $conn->error);
+        return;
+    }
+
+    $stmt->bind_param('sss', $jobKey, $status, $safeMessage);
+    if (!$stmt->execute()) {
+        logError("Jedalen sync: failed to persist job run state: " . $conn->error);
+    }
+    $stmt->close();
+}
+
+function edudisplej_maintenance_should_run_jedalen_today(mysqli $conn, string $jobKey, array $syncConfig = []): array {
+    $isForced = defined('EDUDISPLEJ_FORCE_JEDALEN_SYNC') && EDUDISPLEJ_FORCE_JEDALEN_SYNC;
+    if ($isForced) {
+        return ['run' => true, 'reason' => 'force_requested'];
+    }
+
+    if (array_key_exists('enabled', $syncConfig) && !$syncConfig['enabled']) {
+        return ['run' => false, 'reason' => 'disabled'];
+    }
+
+    $hour = (int)date('G');
+    $windowStart = isset($syncConfig['window_start']) ? (int)$syncConfig['window_start'] : 0;
+    $windowEnd = isset($syncConfig['window_end']) ? (int)$syncConfig['window_end'] : 5;
+    $inWindow = false;
+    if ($windowStart <= $windowEnd) {
+        $inWindow = ($hour >= $windowStart && $hour <= $windowEnd);
+    } else {
+        $inWindow = ($hour >= $windowStart || $hour <= $windowEnd);
+    }
+
+    if (!$inWindow) {
+        return ['run' => false, 'reason' => 'outside_night_window'];
+    }
+
+    $stmt = $conn->prepare("SELECT last_run_at FROM maintenance_job_runs WHERE job_key = ? LIMIT 1");
+    if (!$stmt) {
+        return ['run' => true, 'reason' => 'no_state_read'];
+    }
+    $stmt->bind_param('s', $jobKey);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row || empty($row['last_run_at'])) {
+        return ['run' => true, 'reason' => 'first_run'];
+    }
+
+    $lastRunDate = date('Y-m-d', strtotime((string)$row['last_run_at']));
+    $today = date('Y-m-d');
+    if ($lastRunDate === $today) {
+        return ['run' => false, 'reason' => 'already_ran_today'];
+    }
+
+    return ['run' => true, 'reason' => 'new_day'];
+}
+
+function edudisplej_maintenance_should_force_jedalen_sync_for_missing_data(mysqli $conn, array $targets): array {
+    if (empty($targets)) {
+        return ['run' => false, 'reason' => 'no_targets'];
+    }
+
+    $missing = [];
+    $checkedPairs = [];
+
+    $stmt = $conn->prepare("SELECT id FROM meal_plan_items WHERE company_id = ? AND institution_id = ? LIMIT 1");
+    if (!$stmt) {
+        return ['run' => false, 'reason' => 'missing_check_prepare_failed'];
+    }
+
+    foreach ($targets as $target) {
+        $siteKey = strtolower((string)($target['site_key'] ?? ''));
+        if ($siteKey !== 'jedalen.sk') {
+            continue;
+        }
+
+        $companyId = (int)($target['company_id'] ?? 0);
+        $institutionId = (int)($target['institution_id'] ?? 0);
+        if ($companyId <= 0 || $institutionId <= 0) {
+            continue;
+        }
+
+        $pairKey = $companyId . '|' . $institutionId;
+        if (isset($checkedPairs[$pairKey])) {
+            continue;
+        }
+        $checkedPairs[$pairKey] = true;
+
+        $stmt->bind_param('ii', $companyId, $institutionId);
+        if (!$stmt->execute()) {
+            continue;
+        }
+        $row = $stmt->get_result()->fetch_assoc();
+        if (!$row) {
+            $missing[] = ['company_id' => $companyId, 'institution_id' => $institutionId];
+        }
+    }
+
+    $stmt->close();
+
+    if (empty($missing)) {
+        return ['run' => false, 'reason' => 'all_targets_have_data'];
+    }
+
+    return [
+        'run' => true,
+        'reason' => 'missing_institution_data',
+        'missing_targets' => $missing,
+        'missing_count' => count($missing),
+    ];
+}
+
+function edudisplej_maintenance_should_run_jedalen_by_updated_today(mysqli $conn, array $targets): array {
+    if (empty($targets)) {
+        return ['run' => false, 'reason' => 'no_targets'];
+    }
+
+    $checkedPairs = [];
+    $missingToday = [];
+
+    $stmt = $conn->prepare("SELECT id FROM meal_plan_items
+                           WHERE company_id = ?
+                             AND institution_id = ?
+                             AND DATE(updated_at) = CURDATE()
+                           LIMIT 1");
+    if (!$stmt) {
+        return ['run' => true, 'reason' => 'updated_today_check_prepare_failed'];
+    }
+
+    foreach ($targets as $target) {
+        $siteKey = strtolower((string)($target['site_key'] ?? ''));
+        if ($siteKey !== 'jedalen.sk') {
+            continue;
+        }
+
+        $companyId = (int)($target['company_id'] ?? 0);
+        $institutionId = (int)($target['institution_id'] ?? 0);
+        if ($companyId <= 0 || $institutionId <= 0) {
+            continue;
+        }
+
+        $pairKey = $companyId . '|' . $institutionId;
+        if (isset($checkedPairs[$pairKey])) {
+            continue;
+        }
+        $checkedPairs[$pairKey] = true;
+
+        $stmt->bind_param('ii', $companyId, $institutionId);
+        if (!$stmt->execute()) {
+            $missingToday[] = ['company_id' => $companyId, 'institution_id' => $institutionId, 'reason' => 'query_failed'];
+            continue;
+        }
+
+        $row = $stmt->get_result()->fetch_assoc();
+        if (!$row) {
+            $missingToday[] = ['company_id' => $companyId, 'institution_id' => $institutionId, 'reason' => 'not_updated_today'];
+        }
+    }
+
+    $stmt->close();
+
+    if (empty($missingToday)) {
+        return ['run' => false, 'reason' => 'all_targets_updated_today'];
+    }
+
+    return [
+        'run' => true,
+        'reason' => 'some_targets_not_updated_today',
+        'missing_targets' => $missingToday,
+        'missing_count' => count($missingToday),
+    ];
+}
+
+function edudisplej_maintenance_http_get(string $url, int $timeout = 25): string {
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (EduDisplej-Maintenance/1.0)',
+            CURLOPT_HTTPHEADER => ['Accept: text/html,application/xhtml+xml'],
+        ]);
+        $body = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || $httpCode >= 400) {
+            throw new RuntimeException('HTTP request failed for ' . $url . ' (' . ($err ?: ('HTTP ' . $httpCode)) . ')');
+        }
+        return (string)$body;
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'timeout' => $timeout,
+            'header' => "User-Agent: Mozilla/5.0 (EduDisplej-Maintenance/1.0)\r\n",
+        ]
+    ]);
+    $body = @file_get_contents($url, false, $context);
+    if ($body === false) {
+        throw new RuntimeException('HTTP request failed for ' . $url);
+    }
+    return (string)$body;
+}
+
+function edudisplej_maintenance_http_post_form(string $url, array $fields, int $timeout = 25): string {
+    $payload = http_build_query($fields);
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (EduDisplej-Maintenance/1.0)',
+            CURLOPT_HTTPHEADER => [
+                'Accept: text/html,application/xhtml+xml',
+                'Content-Type: application/x-www-form-urlencoded',
+            ],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+        ]);
+        $body = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || $httpCode >= 400) {
+            throw new RuntimeException('HTTP POST request failed for ' . $url . ' (' . ($err ?: ('HTTP ' . $httpCode)) . ')');
+        }
+        return (string)$body;
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'timeout' => $timeout,
+            'header' => "User-Agent: Mozilla/5.0 (EduDisplej-Maintenance/1.0)\r\nContent-Type: application/x-www-form-urlencoded\r\n",
+            'content' => $payload,
+        ]
+    ]);
+    $body = @file_get_contents($url, false, $context);
+    if ($body === false) {
+        throw new RuntimeException('HTTP POST request failed for ' . $url);
+    }
+    return (string)$body;
+}
+
+function edudisplej_maintenance_normalize_name(string $text): string {
+    $value = trim(html_entity_decode($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+    if ($value === '') {
+        return '';
+    }
+
+    $value = function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+    $value = strtr($value, [
+        'á' => 'a', 'ä' => 'a', 'č' => 'c', 'ď' => 'd', 'é' => 'e', 'ě' => 'e', 'í' => 'i',
+        'ĺ' => 'l', 'ľ' => 'l', 'ň' => 'n', 'ó' => 'o', 'ô' => 'o', 'ö' => 'o', 'ő' => 'o',
+        'ŕ' => 'r', 'ř' => 'r', 'š' => 's', 'ť' => 't', 'ú' => 'u', 'ů' => 'u', 'ü' => 'u',
+        'ű' => 'u', 'ý' => 'y', 'ž' => 'z'
+    ]);
+    $value = preg_replace('/[^a-z0-9]+/u', ' ', $value);
+    return trim((string)$value);
+}
+
+function edudisplej_maintenance_url_join(string $base, string $href): string {
+    if (preg_match('/^https?:\/\//i', $href)) {
+        return $href;
+    }
+
+    $base = rtrim($base, '/') . '/';
+    if (strpos($href, '/') === 0) {
+        $parts = parse_url($base);
+        $scheme = (string)($parts['scheme'] ?? 'https');
+        $host = (string)($parts['host'] ?? 'www.jedalen.sk');
+        return $scheme . '://' . $host . $href;
+    }
+
+    return $base . ltrim($href, '/');
+}
+
+function edudisplej_maintenance_parse_int_csv(string $raw): array {
+    $result = [];
+    foreach (explode(',', $raw) as $part) {
+        $value = (int)trim((string)$part);
+        if ($value <= 0) {
+            continue;
+        }
+        $result[$value] = true;
+    }
+
+    return array_values(array_map('intval', array_keys($result)));
+}
+
+function edudisplej_maintenance_normalize_jedalen_menu_url(string $url): string {
+    $value = trim($url);
+    if ($value === '') {
+        return '';
+    }
+
+    if (!preg_match('/^https?:\/\//i', $value)) {
+        $value = 'https://www.jedalen.sk/' . ltrim($value, '/');
+    }
+
+    $value = preg_replace('/^http:\/\//i', 'https://', $value);
+    $parts = parse_url($value);
+    if (!$parts) {
+        return $value;
+    }
+
+    $host = strtolower((string)($parts['host'] ?? ''));
+    if ($host === 'jedalen.sk') {
+        $value = preg_replace('/^https:\/\/jedalen\.sk/i', 'https://www.jedalen.sk', $value);
+    }
+
+    if (preg_match('/(?:\?|&)Ident=([^&]+)/i', $value, $m)) {
+        $ident = trim((string)urldecode((string)$m[1]));
+        if ($ident !== '') {
+            return 'https://www.jedalen.sk/Pages/EatMenu?Ident=' . rawurlencode($ident);
+        }
+    }
+
+    return $value;
+}
+
+function edudisplej_maintenance_fetch_jedalen_institutions(array $regions): array {
+    $baseUrl = 'https://www.jedalen.sk/';
+    $items = [];
+
+    foreach ($regions as $region) {
+        $url = $baseUrl . '?RC=' . rawurlencode($region);
+        $html = edudisplej_maintenance_http_get($url);
+
+        $doc = new DOMDocument();
+        libxml_use_internal_errors(true);
+        $doc->loadHTML($html);
+        libxml_clear_errors();
+
+        $xpath = new DOMXPath($doc);
+        $anchors = $xpath->query("//a[contains(@href, 'Pages/EatMenu?Ident=') or contains(@href, 'Pages/EatMenu?ident=')]");
+        if (!$anchors) {
+            continue;
+        }
+
+        foreach ($anchors as $a) {
+            $name = trim((string)$a->textContent);
+            $href = trim((string)$a->getAttribute('href'));
+            if ($name === '' || $href === '') {
+                continue;
+            }
+
+            $menuUrl = edudisplej_maintenance_url_join($baseUrl, $href);
+            if (!preg_match('/(?:\?|&)Ident=([^&]+)/i', $menuUrl, $match)) {
+                continue;
+            }
+
+            $ident = trim((string)urldecode((string)$match[1]));
+            if ($ident === '') {
+                continue;
+            }
+
+            $canonicalMenuUrl = 'https://www.jedalen.sk/Pages/EatMenu?Ident=' . rawurlencode($ident);
+            $items[] = [
+                'region' => (string)$region,
+                'institution_ident' => $ident,
+                'institution_name' => $name,
+                'institution_name_normalized' => edudisplej_maintenance_normalize_name($name),
+                'menu_url' => $canonicalMenuUrl,
+            ];
+        }
+    }
+
+    $dedupe = [];
+    $uniqueItems = [];
+    foreach ($items as $item) {
+        $identKey = trim((string)($item['institution_ident'] ?? ''));
+        if ($identKey === '') {
+            $identKey = trim((string)($item['menu_url'] ?? ''));
+        }
+        if ($identKey === '' || isset($dedupe[$identKey])) {
+            continue;
+        }
+        $dedupe[$identKey] = true;
+        $uniqueItems[] = $item;
+    }
+
+    return $uniqueItems;
+}
+
+function edudisplej_maintenance_resolve_menu_date(string $dayText, string $monthText): ?string {
+    $day = (int)preg_replace('/[^0-9]/', '', $dayText);
+    $month = (int)preg_replace('/[^0-9]/', '', $monthText);
+
+    if ($month <= 0) {
+        $normalizedMonth = edudisplej_maintenance_normalize_name($monthText);
+        $monthMap = [
+            'januar' => 1, 'jan' => 1,
+            'februar' => 2, 'feb' => 2,
+            'marec' => 3, 'mar' => 3,
+            'april' => 4, 'apr' => 4,
+            'maj' => 5,
+            'jun' => 6, 'juni' => 6, 'junius' => 6,
+            'jul' => 7, 'juli' => 7, 'julius' => 7,
+            'august' => 8, 'aug' => 8,
+            'september' => 9, 'sep' => 9,
+            'oktober' => 10, 'okt' => 10,
+            'november' => 11, 'nov' => 11,
+            'december' => 12, 'dec' => 12,
+        ];
+        $month = (int)($monthMap[$normalizedMonth] ?? 0);
+    }
+
+    if ($day <= 0 || $month <= 0 || $month > 12 || $day > 31) {
+        return null;
+    }
+
+    $year = (int)date('Y');
+    $candidate = DateTime::createFromFormat('Y-n-j', $year . '-' . $month . '-' . $day);
+    if (!$candidate) {
+        return null;
+    }
+
+    $now = new DateTimeImmutable('now');
+    if ($candidate < $now->sub(new DateInterval('P60D'))) {
+        $candidate->modify('+1 year');
+    }
+
+    return $candidate->format('Y-m-d');
+}
+
+function edudisplej_maintenance_classify_meal_slot(string $category): string {
+    $value = edudisplej_maintenance_normalize_name($category);
+
+    if ($value === '') {
+        return 'lunch';
+    }
+    if (preg_match('/(ranajk|reggeli|breakfast)/', $value)) {
+        return 'breakfast';
+    }
+    if (preg_match('/(desiata|tizorai|snack am|snackam)/', $value)) {
+        return 'snack_am';
+    }
+    if (preg_match('/(obed|ebed|lunch)/', $value)) {
+        return 'lunch';
+    }
+    if (preg_match('/(olovrant|uzsonna|snack pm|snackpm)/', $value)) {
+        return 'snack_pm';
+    }
+    if (preg_match('/(vecera|vacsora|dinner)/', $value)) {
+        return 'dinner';
+    }
+    return 'lunch';
+}
+
+function edudisplej_maintenance_clean_jedalen_meal_text(string $text): string {
+    $value = trim(html_entity_decode($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+    if ($value === '') {
+        return '';
+    }
+
+    $value = preg_replace('/\bbody=\[[\s\S]*$/iu', '', $value);
+    $value = preg_replace('/\b(header|windowlock|cssbody|cssheader|doubleclickstop|singleclickstop|requireclick|hideselects|fade)=\[[^\]]*\]/iu', '', $value);
+    $value = preg_replace('/\be\.hod\.[^\n\r]*$/iu', '', $value);
+    $value = preg_replace('/[ \t]{2,}/u', ' ', (string)$value);
+    $value = preg_replace('/\n{3,}/u', "\n\n", (string)$value);
+
+    return trim((string)$value);
+}
+
+function edudisplej_maintenance_extract_jedalen_menu_from_html(string $html): array {
+    $doc = new DOMDocument();
+    libxml_use_internal_errors(true);
+    $doc->loadHTML($html);
+    libxml_clear_errors();
+
+    $xpath = new DOMXPath($doc);
+    $dayTables = $xpath->query("//table[contains(concat(' ', normalize-space(@class), ' '), ' menu-day ') or .//*[contains(concat(' ', normalize-space(@class), ' '), ' menu-tdmenu-title ')]]");
+
+    $result = [];
+    if (!$dayTables) {
+        return $result;
+    }
+
+    foreach ($dayTables as $table) {
+        $dayNode = $xpath->query(".//td[contains(concat(' ', normalize-space(@class), ' '), ' menu-day-date ')]//div[contains(concat(' ', normalize-space(@class), ' '), ' menu-day-date-day ')]", $table);
+        $monthNode = $xpath->query(".//td[contains(concat(' ', normalize-space(@class), ' '), ' menu-day-date ')]//div[contains(concat(' ', normalize-space(@class), ' '), ' menu-day-date-month ')]", $table);
+
+        $dayText = $dayNode && $dayNode->length > 0 ? trim((string)$dayNode->item(0)->textContent) : '';
+        $monthText = $monthNode && $monthNode->length > 0 ? trim((string)$monthNode->item(0)->textContent) : '';
+
+        if ($dayText === '' || $monthText === '') {
+            $dateNode = $xpath->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' menu-day-date ')]", $table);
+            if ($dateNode && $dateNode->length > 0) {
+                $dateText = trim((string)$dateNode->item(0)->textContent);
+                if (preg_match('/(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?/u', $dateText, $dm)) {
+                    $dayText = (string)$dm[1];
+                    $monthText = (string)$dm[2];
+                }
+            }
+        }
+
+        if ($dayText === '' || $monthText === '') {
+            $tableText = trim((string)$table->textContent);
+            if (preg_match('/(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?/u', $tableText, $dm)) {
+                $dayText = (string)$dm[1];
+                $monthText = (string)$dm[2];
+            }
+        }
+
+        $menuDate = edudisplej_maintenance_resolve_menu_date($dayText, $monthText);
+        if (!$menuDate) {
+            continue;
+        }
+
+        if (!isset($result[$menuDate])) {
+            $result[$menuDate] = [
+                'breakfast' => [],
+                'snack_am' => [],
+                'lunch' => [],
+                'snack_pm' => [],
+                'dinner' => [],
+            ];
+        }
+
+        $rows = $xpath->query('.//tr', $table);
+        if (!$rows) {
+            continue;
+        }
+
+        $currentSlot = 'lunch';
+        foreach ($rows as $tr) {
+            $titleNode = $xpath->query(".//td[contains(concat(' ', normalize-space(@class), ' '), ' menu-tdmenu-title ')] | .//span[contains(concat(' ', normalize-space(@class), ' '), ' menu-tdmenu-title ')]", $tr);
+            $categoryNode = $xpath->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' menu-kindname-td ') or contains(concat(' ', normalize-space(@class), ' '), ' menu-kindname ')]", $tr);
+            $category = ($categoryNode && $categoryNode->length > 0) ? trim((string)$categoryNode->item(0)->textContent) : '';
+            if ($category !== '') {
+                $currentSlot = edudisplej_maintenance_classify_meal_slot($category);
+            }
+
+            if (!$titleNode || $titleNode->length === 0) {
+                continue;
+            }
+
+            $mealName = edudisplej_maintenance_clean_jedalen_meal_text((string)$titleNode->item(0)->textContent);
+            if ($mealName === '') {
+                continue;
+            }
+
+            if (preg_match('/^\d+\.\s*$/u', $mealName)) {
+                continue;
+            }
+
+            $allergenNodes = $xpath->query('.//img[@title]', $tr);
+            $allergens = [];
+            if ($allergenNodes) {
+                foreach ($allergenNodes as $img) {
+                    $title = trim((string)$img->getAttribute('title'));
+                    if ($title !== '') {
+                        $allergens[] = $title;
+                    }
+                }
+            }
+
+            $allergenTextNodes = $xpath->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' eat-menu-sensitive ')]", $tr);
+            if ($allergenTextNodes) {
+                foreach ($allergenTextNodes as $node) {
+                    $text = trim((string)$node->textContent);
+                    if ($text !== '') {
+                        $allergens[] = $text;
+                    }
+                }
+            }
+
+            $slot = $category !== '' ? edudisplej_maintenance_classify_meal_slot($category) : $currentSlot;
+            $line = $mealName;
+            if (!empty($allergens)) {
+                $line .= ' (Allergének: ' . implode(', ', array_unique($allergens)) . ')';
+            }
+
+            $result[$menuDate][$slot][] = $line;
+        }
+    }
+
+    return $result;
+}
+
+function edudisplej_maintenance_jedalen_week_postback_html(string $menuUrl, string $currentHtml, string $eventTarget): ?string {
+    $doc = new DOMDocument();
+    libxml_use_internal_errors(true);
+    $doc->loadHTML($currentHtml);
+    libxml_clear_errors();
+
+    $xpath = new DOMXPath($doc);
+    $hiddenInputs = $xpath->query("//input[@type='hidden' and @name]");
+    if (!$hiddenInputs) {
+        return null;
+    }
+
+    $fields = [];
+    foreach ($hiddenInputs as $input) {
+        $name = trim((string)$input->getAttribute('name'));
+        if ($name === '') {
+            continue;
+        }
+        $fields[$name] = (string)$input->getAttribute('value');
+    }
+
+    $fields['__EVENTTARGET'] = $eventTarget;
+    $fields['__EVENTARGUMENT'] = '';
+
+    return edudisplej_maintenance_http_post_form($menuUrl, $fields);
+}
+
+function edudisplej_maintenance_parse_jedalen_menu(string $menuUrl): array {
+    $html = edudisplej_maintenance_http_get($menuUrl);
+    $result = edudisplej_maintenance_extract_jedalen_menu_from_html($html);
+    if (!empty($result)) {
+        return $result;
+    }
+
+    $eventTargets = [
+        'ctl00$MainPanel$DayItems1$lnkNextWeek',
+        'ctl00$MainPanel$DayItems1$lnkNextWeek',
+        'ctl00$MainPanel$DayItems1$lnkPreviousWeek',
+    ];
+
+    $currentHtml = $html;
+    foreach ($eventTargets as $eventTarget) {
+        try {
+            $nextHtml = edudisplej_maintenance_jedalen_week_postback_html($menuUrl, $currentHtml, $eventTarget);
+        } catch (Throwable $e) {
+            continue;
+        }
+
+        if (!is_string($nextHtml) || trim($nextHtml) === '') {
+            continue;
+        }
+
+        $currentHtml = $nextHtml;
+        $parsed = edudisplej_maintenance_extract_jedalen_menu_from_html($currentHtml);
+        if (!empty($parsed)) {
+            return $parsed;
+        }
+    }
+
+    return [];
+}
+
+function edudisplej_maintenance_get_used_meal_targets(mysqli $conn): array {
+    $targets = [];
+
+    $configuredQuery = "SELECT mi.company_id, mi.id AS institution_id, ms.site_key
+                        FROM meal_plan_institutions mi
+                        INNER JOIN meal_plan_sites ms ON ms.id = mi.site_id
+                        WHERE mi.is_active = 1
+                          AND ms.is_active = 1
+                          AND mi.company_id > 0";
+    $configuredResult = $conn->query($configuredQuery);
+    if (!$configuredResult) {
+        logError('Jedalen sync: failed to query configured meal targets: ' . $conn->error);
+    } else {
+        while ($row = $configuredResult->fetch_assoc()) {
+            $companyId = (int)($row['company_id'] ?? 0);
+            $institutionId = (int)($row['institution_id'] ?? 0);
+            $siteKey = strtolower(trim((string)($row['site_key'] ?? '')));
+
+            if ($companyId <= 0 || $institutionId <= 0 || $siteKey === '') {
+                continue;
+            }
+
+            $key = $companyId . '|' . $siteKey . '|' . $institutionId;
+            if (!isset($targets[$key])) {
+                $targets[$key] = [
+                    'company_id' => $companyId,
+                    'site_key' => $siteKey,
+                    'institution_id' => $institutionId,
+                    'group_ids' => [],
+                ];
+            }
+        }
+    }
+
+    $query = "SELECT kgm.group_id, kg.company_id, kgm.settings
+              FROM kiosk_group_modules kgm
+              INNER JOIN kiosk_groups kg ON kg.id = kgm.group_id
+              LEFT JOIN modules m ON m.id = kgm.module_id
+              WHERE kgm.is_active = 1
+                AND (LOWER(COALESCE(kgm.module_key, '')) = 'meal-menu' OR LOWER(COALESCE(m.module_key, '')) = 'meal-menu')";
+    $result = $conn->query($query);
+    if (!$result) {
+        logError('Jedalen sync: failed to query used meal targets: ' . $conn->error);
+        return [];
+    }
+
+    while ($row = $result->fetch_assoc()) {
+        $settingsRaw = (string)($row['settings'] ?? '');
+        $settings = json_decode($settingsRaw, true);
+        if (!is_array($settings)) {
+            continue;
+        }
+
+        $institutionId = (int)($settings['institutionId'] ?? 0);
+        $companyId = (int)($row['company_id'] ?? 0);
+        $groupId = (int)($row['group_id'] ?? 0);
+        $siteKey = strtolower(trim((string)($settings['siteKey'] ?? 'jedalen.sk')));
+
+        if ($institutionId <= 0 || $companyId <= 0 || $groupId <= 0 || $siteKey === '') {
+            continue;
+        }
+
+        $key = $companyId . '|' . $siteKey . '|' . $institutionId;
+        if (!isset($targets[$key])) {
+            $targets[$key] = [
+                'company_id' => $companyId,
+                'site_key' => $siteKey,
+                'institution_id' => $institutionId,
+                'group_ids' => [],
+            ];
+        }
+        $targets[$key]['group_ids'][$groupId] = true;
+    }
+
+    return array_values(array_map(static function (array $entry): array {
+        $entry['group_ids'] = array_values(array_map('intval', array_keys($entry['group_ids'])));
+        return $entry;
+    }, $targets));
+}
+
+function edudisplej_maintenance_get_meal_targets_for_institution_ids(mysqli $conn, array $institutionIds): array {
+    $institutionIds = array_values(array_unique(array_filter(array_map('intval', $institutionIds), static function (int $id): bool {
+        return $id > 0;
+    })));
+    if (empty($institutionIds)) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($institutionIds), '?'));
+    $types = str_repeat('i', count($institutionIds));
+    $sql = "SELECT mi.id AS institution_id, mi.company_id, ms.site_key
+            FROM meal_plan_institutions mi
+            INNER JOIN meal_plan_sites ms ON ms.id = mi.site_id
+            WHERE mi.id IN ($placeholders)
+              AND mi.is_active = 1
+              AND ms.is_active = 1";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new RuntimeException('Jedalen sync: selected institution lookup prepare failed: ' . $conn->error);
+    }
+
+    $stmt->bind_param($types, ...$institutionIds);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $targets = [];
+    $targetsByKey = [];
+    while ($row = $result->fetch_assoc()) {
+        $institutionId = (int)($row['institution_id'] ?? 0);
+        $companyId = (int)($row['company_id'] ?? 0);
+        $siteKey = strtolower(trim((string)($row['site_key'] ?? '')));
+
+        if ($institutionId <= 0 || $siteKey === '') {
+            continue;
+        }
+
+        $key = $companyId . '|' . $siteKey . '|' . $institutionId;
+        $targetsByKey[$key] = [
+            'company_id' => $companyId,
+            'site_key' => $siteKey,
+            'institution_id' => $institutionId,
+            'group_ids' => [],
+        ];
+    }
+    $stmt->close();
+
+    $moduleSql = "SELECT kgm.group_id, kg.company_id, kgm.settings
+                  FROM kiosk_group_modules kgm
+                  INNER JOIN kiosk_groups kg ON kg.id = kgm.group_id
+                  LEFT JOIN modules m ON m.id = kgm.module_id
+                  WHERE kgm.is_active = 1
+                    AND (LOWER(COALESCE(kgm.module_key, '')) = 'meal-menu' OR LOWER(COALESCE(m.module_key, '')) = 'meal-menu')";
+    $moduleResult = $conn->query($moduleSql);
+    if ($moduleResult) {
+        while ($row = $moduleResult->fetch_assoc()) {
+            $settings = json_decode((string)($row['settings'] ?? ''), true);
+            if (!is_array($settings)) {
+                continue;
+            }
+
+            $institutionId = (int)($settings['institutionId'] ?? 0);
+            $companyId = (int)($row['company_id'] ?? 0);
+            $groupId = (int)($row['group_id'] ?? 0);
+            $siteKey = strtolower(trim((string)($settings['siteKey'] ?? 'jedalen.sk')));
+            if ($institutionId <= 0 || $companyId <= 0 || $groupId <= 0 || $siteKey === '') {
+                continue;
+            }
+
+            $key = $companyId . '|' . $siteKey . '|' . $institutionId;
+            if (!isset($targetsByKey[$key])) {
+                continue;
+            }
+            $targetsByKey[$key]['group_ids'][$groupId] = true;
+        }
+    }
+
+    foreach ($targetsByKey as $entry) {
+        $entry['group_ids'] = array_values(array_map('intval', array_keys((array)$entry['group_ids'])));
+        $targets[] = $entry;
+    }
+
+    return $targets;
+}
+
+function edudisplej_maintenance_bootstrap_jedalen_targets(mysqli $conn, array $syncConfig): array {
+    $regions = array_values(array_unique(array_map(static function ($region) {
+        return strtoupper(trim((string)$region));
+    }, (array)($syncConfig['regions'] ?? []))));
+    if (empty($regions)) {
+        $regions = ['TT', 'NR', 'TN', 'BB', 'PO', 'KE', 'BA', 'ZA'];
+    }
+
+    $siteStmt = $conn->prepare("SELECT id FROM meal_plan_sites WHERE company_id = 0 AND site_key = 'jedalen.sk' LIMIT 1");
+    if (!$siteStmt) {
+        throw new RuntimeException('Jedalen bootstrap: site lookup prepare failed: ' . $conn->error);
+    }
+    $siteStmt->execute();
+    $siteRow = $siteStmt->get_result()->fetch_assoc();
+    $siteStmt->close();
+    $globalSiteId = (int)($siteRow['id'] ?? 0);
+    if ($globalSiteId <= 0) {
+        throw new RuntimeException('Jedalen bootstrap: global jedalen.sk site missing');
+    }
+
+    $jedalenInstitutions = edudisplej_maintenance_fetch_jedalen_institutions($regions);
+    if (empty($jedalenInstitutions)) {
+        return [
+            'targets' => [],
+            'global_stored' => 0,
+            'companies_total' => 0,
+            'companies_matched' => 0,
+        ];
+    }
+
+    $upsertGlobalStmt = $conn->prepare("INSERT INTO meal_plan_institutions (company_id, site_id, external_key, institution_name, city, is_active)
+                                        VALUES (0, ?, ?, ?, '', 1)
+                                        ON DUPLICATE KEY UPDATE
+                                            institution_name = VALUES(institution_name),
+                                            city = VALUES(city),
+                                            is_active = 1,
+                                            updated_at = CURRENT_TIMESTAMP,
+                                            id = LAST_INSERT_ID(id)");
+    if (!$upsertGlobalStmt) {
+        throw new RuntimeException('Jedalen bootstrap: global institution upsert prepare failed: ' . $conn->error);
+    }
+
+    $globalStored = 0;
+    $dedupe = [];
+    foreach ($jedalenInstitutions as $item) {
+        $menuUrl = trim((string)($item['menu_url'] ?? ''));
+        $instName = trim((string)($item['institution_name'] ?? ''));
+        if ($menuUrl === '' || $instName === '') {
+            continue;
+        }
+        if (isset($dedupe[$menuUrl])) {
+            continue;
+        }
+        $dedupe[$menuUrl] = true;
+        $upsertGlobalStmt->bind_param('iss', $globalSiteId, $menuUrl, $instName);
+        if ($upsertGlobalStmt->execute()) {
+            $globalStored++;
+        }
+    }
+    $upsertGlobalStmt->close();
+
+    $jedalenByName = [];
+    foreach ($jedalenInstitutions as $item) {
+        $norm = (string)($item['institution_name_normalized'] ?? '');
+        if ($norm === '') {
+            continue;
+        }
+        if (!isset($jedalenByName[$norm])) {
+            $jedalenByName[$norm] = [];
+        }
+        $jedalenByName[$norm][] = $item;
+    }
+
+    $companyRows = $conn->query("SELECT DISTINCT kg.company_id, kgm.group_id, c.name AS company_name
+                                 FROM kiosk_group_modules kgm
+                                 INNER JOIN kiosk_groups kg ON kg.id = kgm.group_id
+                                 INNER JOIN companies c ON c.id = kg.company_id
+                                 LEFT JOIN modules m ON m.id = kgm.module_id
+                                 WHERE kgm.is_active = 1
+                                   AND kg.company_id > 0
+                                   AND (LOWER(COALESCE(kgm.module_key, '')) = 'meal-menu' OR LOWER(COALESCE(m.module_key, '')) = 'meal-menu')");
+    if (!$companyRows) {
+        throw new RuntimeException('Jedalen bootstrap: failed to query meal-menu companies: ' . $conn->error);
+    }
+
+    $companies = [];
+    while ($row = $companyRows->fetch_assoc()) {
+        $companyId = (int)($row['company_id'] ?? 0);
+        $groupId = (int)($row['group_id'] ?? 0);
+        if ($companyId <= 0 || $groupId <= 0) {
+            continue;
+        }
+        if (!isset($companies[$companyId])) {
+            $companies[$companyId] = [
+                'company_name' => trim((string)($row['company_name'] ?? '')),
+                'group_ids' => [],
+            ];
+        }
+        $companies[$companyId]['group_ids'][$groupId] = true;
+    }
+
+    $upsertCompanyStmt = $conn->prepare("INSERT INTO meal_plan_institutions (company_id, site_id, external_key, institution_name, city, is_active)
+                                         VALUES (?, ?, ?, ?, '', 1)
+                                         ON DUPLICATE KEY UPDATE
+                                            institution_name = VALUES(institution_name),
+                                            city = VALUES(city),
+                                            is_active = 1,
+                                            updated_at = CURRENT_TIMESTAMP,
+                                            id = LAST_INSERT_ID(id)");
+    if (!$upsertCompanyStmt) {
+        throw new RuntimeException('Jedalen bootstrap: company institution upsert prepare failed: ' . $conn->error);
+    }
+
+    $targets = [];
+    $companiesMatched = 0;
+
+    foreach ($companies as $companyId => $info) {
+        $companyNorm = edudisplej_maintenance_normalize_name((string)($info['company_name'] ?? ''));
+        if ($companyNorm === '') {
+            continue;
+        }
+
+        $matched = null;
+        if (!empty($jedalenByName[$companyNorm])) {
+            $matched = $jedalenByName[$companyNorm][0];
+        } else {
+            foreach ($jedalenInstitutions as $candidate) {
+                $candNorm = (string)($candidate['institution_name_normalized'] ?? '');
+                if ($candNorm === '') {
+                    continue;
+                }
+                if ((strlen($companyNorm) >= 5 && strpos($candNorm, $companyNorm) !== false)
+                    || (strlen($candNorm) >= 5 && strpos($companyNorm, $candNorm) !== false)) {
+                    $matched = $candidate;
+                    break;
+                }
+            }
+        }
+
+        if (!$matched) {
+            continue;
+        }
+
+        $menuUrl = trim((string)($matched['menu_url'] ?? ''));
+        $instName = trim((string)($matched['institution_name'] ?? ''));
+        if ($menuUrl === '' || $instName === '') {
+            continue;
+        }
+
+        $upsertCompanyStmt->bind_param('iiss', $companyId, $globalSiteId, $menuUrl, $instName);
+        if (!$upsertCompanyStmt->execute()) {
+            continue;
+        }
+
+        $institutionId = (int)$conn->insert_id;
+        if ($institutionId <= 0) {
+            continue;
+        }
+
+        $targets[] = [
+            'company_id' => (int)$companyId,
+            'site_key' => 'jedalen.sk',
+            'institution_id' => $institutionId,
+            'group_ids' => array_values(array_map('intval', array_keys((array)$info['group_ids']))),
+        ];
+        $companiesMatched++;
+    }
+
+    $upsertCompanyStmt->close();
+
+    return [
+        'targets' => $targets,
+        'global_stored' => $globalStored,
+        'companies_total' => count($companies),
+        'companies_matched' => $companiesMatched,
+    ];
+}
+
+function edudisplej_maintenance_refresh_group_plan_versions(mysqli $conn, array $targets): int {
+    if (empty($targets)) {
+        return 0;
+    }
+
+    $maxUpdatedStmt = $conn->prepare("SELECT MAX(updated_at) AS max_updated
+                                     FROM meal_plan_items
+                                     WHERE company_id = ? AND institution_id = ?");
+    if (!$maxUpdatedStmt) {
+        logError('Jedalen sync: failed to prepare max-updated lookup: ' . $conn->error);
+        return 0;
+    }
+
+    $planStmt = $conn->prepare("SELECT plan_version FROM kiosk_group_loop_plans WHERE group_id = ? LIMIT 1");
+    if (!$planStmt) {
+        $maxUpdatedStmt->close();
+        logError('Jedalen sync: failed to prepare plan-version lookup: ' . $conn->error);
+        return 0;
+    }
+
+    $updateStmt = $conn->prepare("UPDATE kiosk_group_loop_plans SET plan_version = ?, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?");
+    if (!$updateStmt) {
+        $maxUpdatedStmt->close();
+        $planStmt->close();
+        logError('Jedalen sync: failed to prepare loop version refresh: ' . $conn->error);
+        return 0;
+    }
+
+    $groupMaxVersion = [];
+    foreach ($targets as $target) {
+        $companyId = (int)($target['company_id'] ?? 0);
+        $institutionId = (int)($target['institution_id'] ?? 0);
+        $groupIds = array_values(array_unique(array_map('intval', (array)($target['group_ids'] ?? []))));
+        if ($companyId <= 0 || $institutionId <= 0 || empty($groupIds)) {
+            continue;
+        }
+
+        $maxUpdatedStmt->bind_param('ii', $companyId, $institutionId);
+        if (!$maxUpdatedStmt->execute()) {
+            continue;
+        }
+        $row = $maxUpdatedStmt->get_result()->fetch_assoc();
+        $maxUpdated = trim((string)($row['max_updated'] ?? ''));
+        if ($maxUpdated === '') {
+            continue;
+        }
+
+        $versionToken = (int)(strtotime($maxUpdated) * 1000);
+        if ($versionToken <= 0) {
+            continue;
+        }
+
+        foreach ($groupIds as $groupId) {
+            if (!isset($groupMaxVersion[$groupId]) || $groupMaxVersion[$groupId] < $versionToken) {
+                $groupMaxVersion[$groupId] = $versionToken;
+            }
+        }
+    }
+
+    $updated = 0;
+    foreach ($groupMaxVersion as $groupId => $versionToken) {
+        $groupId = (int)$groupId;
+        if ($groupId <= 0) {
+            continue;
+        }
+
+        $planStmt->bind_param('i', $groupId);
+        $currentVersion = 0;
+        if ($planStmt->execute()) {
+            $row = $planStmt->get_result()->fetch_assoc();
+            $currentVersion = (int)($row['plan_version'] ?? 0);
+        }
+
+        if ($versionToken <= $currentVersion) {
+            continue;
+        }
+
+        $versionTokenStr = (string)$versionToken;
+        $updateStmt->bind_param('si', $versionTokenStr, $groupId);
+        if ($updateStmt->execute()) {
+            $updated++;
+        }
+    }
+
+    $maxUpdatedStmt->close();
+    $planStmt->close();
+    $updateStmt->close();
+
+    return $updated;
+}
+
+function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
+    $jobKey = 'jedalen_daily_sync';
+    edudisplej_maintenance_ensure_job_tables($conn);
+    edudisplej_maintenance_ensure_meal_schema($conn);
+
+    $syncConfig = edudisplej_maintenance_get_jedalen_sync_config($conn);
+    $institutionsOnly = defined('EDUDISPLEJ_JEDALEN_FETCH_INSTITUTIONS_ONLY') && EDUDISPLEJ_JEDALEN_FETCH_INSTITUTIONS_ONLY;
+    $menusOnly = defined('EDUDISPLEJ_JEDALEN_FETCH_MENUS_ONLY') && EDUDISPLEJ_JEDALEN_FETCH_MENUS_ONLY;
+    $selectedInstitutionIds = [];
+    if (defined('EDUDISPLEJ_JEDALEN_SELECTED_INSTITUTION_IDS_CSV')) {
+        $selectedInstitutionIds = edudisplej_maintenance_parse_int_csv((string)EDUDISPLEJ_JEDALEN_SELECTED_INSTITUTION_IDS_CSV);
+    }
+
+    $isForced = defined('EDUDISPLEJ_FORCE_JEDALEN_SYNC') && EDUDISPLEJ_FORCE_JEDALEN_SYNC;
+    if (!$isForced && empty($syncConfig['enabled'])) {
+        logResult('Jedalen sync skipped: disabled by maintenance settings.', 'info');
+        return;
+    }
+
+    if ($institutionsOnly) {
+        $bootstrap = edudisplej_maintenance_bootstrap_jedalen_targets($conn, $syncConfig);
+        $globalStored = (int)($bootstrap['global_stored'] ?? 0);
+        $companiesTotal = (int)($bootstrap['companies_total'] ?? 0);
+        $companiesMatched = (int)($bootstrap['companies_matched'] ?? 0);
+        $message = "Institution list refreshed: $globalStored, matched companies: $companiesMatched/$companiesTotal";
+        edudisplej_maintenance_mark_job_run($conn, $jobKey, 'success', $message);
+        logResult('Jedalen sync completed (institutions only): ' . $message, 'success');
+        return;
+    }
+
+    if (!empty($selectedInstitutionIds)) {
+        $targets = edudisplej_maintenance_get_meal_targets_for_institution_ids($conn, $selectedInstitutionIds);
+        logResult('Jedalen sync: selected institutions mode, requested IDs: ' . implode(',', $selectedInstitutionIds) . ', resolved targets: ' . count($targets), 'info');
+    } else {
+        $targets = edudisplej_maintenance_get_used_meal_targets($conn);
+    }
+
+    if (empty($targets)) {
+        $bootstrap = edudisplej_maintenance_bootstrap_jedalen_targets($conn, $syncConfig);
+        if (!empty($selectedInstitutionIds)) {
+            $targets = edudisplej_maintenance_get_meal_targets_for_institution_ids($conn, $selectedInstitutionIds);
+        } else {
+            $targets = is_array($bootstrap['targets'] ?? null) ? $bootstrap['targets'] : [];
+        }
+
+        $globalStored = (int)($bootstrap['global_stored'] ?? 0);
+        $companiesTotal = (int)($bootstrap['companies_total'] ?? 0);
+        $companiesMatched = (int)($bootstrap['companies_matched'] ?? 0);
+        logResult("Jedalen bootstrap: institution list stored: $globalStored, matched companies: $companiesMatched/$companiesTotal", 'info');
+
+        if (empty($targets)) {
+            if (!empty($selectedInstitutionIds)) {
+                $message = 'No matching institutions found for selected IDs.';
+                edudisplej_maintenance_mark_job_run($conn, $jobKey, 'success', $message);
+                logResult('Jedalen sync: ' . $message, 'warning');
+                return;
+            }
+
+            edudisplej_maintenance_mark_job_run($conn, $jobKey, 'success', 'No configured meal-menu targets found (bootstrap matched 0 companies).');
+            logResult('Jedalen sync: no configured targets and auto-bootstrap found no company match; skipping fetch.', 'info');
+            return;
+        }
+
+        logResult('Jedalen sync: using auto-bootstrapped targets for this run.', 'info');
+    }
+
+    $forceRun = edudisplej_maintenance_should_force_jedalen_sync_for_missing_data($conn, $targets);
+    $updatedTodayRun = edudisplej_maintenance_should_run_jedalen_by_updated_today($conn, $targets);
+    $everyCycle = !empty($syncConfig['every_cycle']);
+
+    if ($menusOnly) {
+        logResult('Jedalen sync: manual menus-only mode (selected institutions).', 'info');
+    } elseif ($everyCycle) {
+        logResult('Jedalen sync: running on every maintenance cycle for loop-linked institutions (every_cycle=1).', 'info');
+    } elseif (!empty($forceRun['run'])) {
+        logResult('Jedalen sync: running now (missing cached data for used institutions: ' . (int)($forceRun['missing_count'] ?? 0) . ').', 'info');
+    } elseif (empty($updatedTodayRun['run'])) {
+        logResult('Jedalen sync skipped: all loop-linked institutions already updated today (updated_at).', 'info');
+        return;
+    } else {
+        logResult('Jedalen sync: running now (institutions not updated today: ' . (int)($updatedTodayRun['missing_count'] ?? 0) . ').', 'info');
+    }
+
+    try {
+        $institutionIds = array_values(array_unique(array_map(static function (array $target): int {
+            return (int)$target['institution_id'];
+        }, $targets)));
+        $idPlaceholders = implode(',', array_fill(0, count($institutionIds), '?'));
+        $types = str_repeat('i', count($institutionIds));
+
+        $instSql = "SELECT mi.id, mi.company_id, mi.external_key, mi.institution_name, mi.city, ms.site_key
+                    FROM meal_plan_institutions mi
+                    INNER JOIN meal_plan_sites ms ON ms.id = mi.site_id
+                    WHERE mi.id IN ($idPlaceholders) AND mi.is_active = 1";
+        $instStmt = $conn->prepare($instSql);
+        if (!$instStmt) {
+            throw new RuntimeException('Jedalen sync: institution lookup prepare failed: ' . $conn->error);
+        }
+
+        $instStmt->bind_param($types, ...$institutionIds);
+        $instStmt->execute();
+        $instResult = $instStmt->get_result();
+        $institutionsById = [];
+        while ($row = $instResult->fetch_assoc()) {
+            $institutionsById[(int)$row['id']] = $row;
+        }
+        $instStmt->close();
+
+        $regions = array_values(array_unique(array_map(static function ($region) {
+            return strtoupper(trim((string)$region));
+        }, (array)($syncConfig['regions'] ?? []))));
+        if (empty($regions)) {
+            $regions = ['TT', 'NR', 'TN', 'BB', 'PO', 'KE', 'BA', 'ZA'];
+        }
+        $jedalenInstitutions = edudisplej_maintenance_fetch_jedalen_institutions($regions);
+        $jedalenByName = [];
+        foreach ($jedalenInstitutions as $item) {
+            $norm = (string)($item['institution_name_normalized'] ?? '');
+            if ($norm === '') {
+                continue;
+            }
+            if (!isset($jedalenByName[$norm])) {
+                $jedalenByName[$norm] = [];
+            }
+            $jedalenByName[$norm][] = $item;
+        }
+
+        $upsertStmt = $conn->prepare("INSERT INTO meal_plan_items (company_id, institution_id, menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'server')
+                                     ON DUPLICATE KEY UPDATE
+                                         breakfast = VALUES(breakfast),
+                                         snack_am = VALUES(snack_am),
+                                         lunch = VALUES(lunch),
+                                         snack_pm = VALUES(snack_pm),
+                                         dinner = VALUES(dinner),
+                                         source_type = 'server',
+                                         updated_at = CURRENT_TIMESTAMP");
+        if (!$upsertStmt) {
+            throw new RuntimeException('Jedalen sync: upsert prepare failed: ' . $conn->error);
+        }
+
+        $successTargetsForVersion = [];
+        $targetsProcessed = 0;
+        $menuDaysStored = 0;
+
+        foreach ($targets as $target) {
+            $institutionId = (int)$target['institution_id'];
+            $targetCompany = (int)$target['company_id'];
+            $siteKey = strtolower((string)($target['site_key'] ?? ''));
+
+            if ($siteKey !== 'jedalen.sk') {
+                continue;
+            }
+
+            $inst = $institutionsById[$institutionId] ?? null;
+            if (!$inst) {
+                logResult("Jedalen sync: institution #$institutionId not found in meal_plan_institutions", 'warning');
+                continue;
+            }
+
+            $nameNorm = edudisplej_maintenance_normalize_name((string)($inst['institution_name'] ?? ''));
+            $menuUrl = '';
+            $externalKey = trim((string)($inst['external_key'] ?? ''));
+            if ($externalKey !== '' && preg_match('/^https?:\/\//i', $externalKey)) {
+                $menuUrl = edudisplej_maintenance_normalize_jedalen_menu_url($externalKey);
+            }
+
+            if ($menuUrl === '' && $nameNorm !== '' && !empty($jedalenByName[$nameNorm])) {
+                $menuUrl = edudisplej_maintenance_normalize_jedalen_menu_url((string)($jedalenByName[$nameNorm][0]['menu_url'] ?? ''));
+            }
+
+            if ($menuUrl === '') {
+                logResult("Jedalen sync: no matching jedalen.sk source found for institution #$institutionId ({$inst['institution_name']})", 'warning');
+                continue;
+            }
+
+            $parsedDays = edudisplej_maintenance_parse_jedalen_menu($menuUrl);
+            if (empty($parsedDays)) {
+                logResult("Jedalen sync: no menu rows parsed for institution #$institutionId ($menuUrl)", 'warning');
+                continue;
+            }
+
+            $institutionStoredCount = 0;
+            foreach ($parsedDays as $menuDate => $dayMeals) {
+                $breakfast = implode("\n", array_values(array_unique($dayMeals['breakfast'] ?? [])));
+                $snackAm = implode("\n", array_values(array_unique($dayMeals['snack_am'] ?? [])));
+                $lunch = implode("\n", array_values(array_unique($dayMeals['lunch'] ?? [])));
+                $snackPm = implode("\n", array_values(array_unique($dayMeals['snack_pm'] ?? [])));
+                $dinner = implode("\n", array_values(array_unique($dayMeals['dinner'] ?? [])));
+
+                $upsertStmt->bind_param(
+                    'iissssss',
+                    $targetCompany,
+                    $institutionId,
+                    $menuDate,
+                    $breakfast,
+                    $snackAm,
+                    $lunch,
+                    $snackPm,
+                    $dinner
+                );
+                if ($upsertStmt->execute()) {
+                    $menuDaysStored++;
+                    $institutionStoredCount++;
+                }
+            }
+
+            if ($institutionStoredCount > 0) {
+                $successTargetsForVersion[] = [
+                    'company_id' => (int)$targetCompany,
+                    'institution_id' => (int)$institutionId,
+                    'group_ids' => array_values(array_unique(array_map('intval', (array)($target['group_ids'] ?? [])))),
+                ];
+            }
+            $targetsProcessed++;
+        }
+
+        $upsertStmt->close();
+
+        $refreshedGroups = edudisplej_maintenance_refresh_group_plan_versions($conn, $successTargetsForVersion);
+        $message = "Targets processed: $targetsProcessed, menu days stored: $menuDaysStored, refreshed groups: $refreshedGroups";
+        edudisplej_maintenance_mark_job_run($conn, $jobKey, 'success', $message);
+        logResult('Jedalen sync completed: ' . $message, 'success');
+    } catch (Throwable $e) {
+        $message = 'Jedalen sync failed: ' . $e->getMessage();
+        edudisplej_maintenance_mark_job_run($conn, $jobKey, 'error', $message);
+        logError($message);
+    }
+}
+
 try {
     @set_time_limit(240);
 
@@ -314,6 +1815,14 @@ try {
         logResult("Charset set to utf8mb4", 'success');
         $charset = 'utf8mb4';
         $collation = 'utf8mb4_unicode_ci';
+    }
+
+    $onlyJedalenSync = defined('EDUDISPLEJ_MAINTENANCE_ONLY_JEDALEN_SYNC') && EDUDISPLEJ_MAINTENANCE_ONLY_JEDALEN_SYNC;
+    if ($onlyJedalenSync) {
+        logResult('Only Jedalen sync mode enabled; skipping full maintenance pipeline.', 'info');
+        edudisplej_maintenance_run_jedalen_daily_sync($conn);
+        closeDbConnection($conn);
+        return;
     }
     
     logResult("Connected to database successfully", 'success');
@@ -385,7 +1894,7 @@ try {
                 'loop_last_update' => "datetime DEFAULT NULL",
                 'last_sync' => "datetime DEFAULT NULL",
                 'screenshot_url' => "text DEFAULT NULL",
-                'screenshot_enabled' => "tinyint(1) DEFAULT 0",
+                'screenshot_enabled' => "tinyint(1) DEFAULT 1",
                 'debug_mode' => "tinyint(1) DEFAULT 0",
                 'screenshot_requested' => "tinyint(1) DEFAULT 0",
                 'screenshot_timestamp' => "timestamp NULL DEFAULT NULL",
@@ -914,6 +2423,8 @@ try {
         ['key' => 'clock', 'name' => 'Clock & Time', 'description' => 'Display date and time with customizable formats and colors'],
         ['key' => 'default-logo', 'name' => 'Default Logo', 'description' => 'Display EduDisplej logo with version number and customizable text'],
         ['key' => 'text', 'name' => 'Text', 'description' => 'Display richly formatted text with optional scroll mode and background image'],
+        ['key' => 'meal-menu', 'name' => 'Meal Menu', 'description' => 'Display school meal plan with source/institution filtering and offline fallback'],
+        ['key' => 'room-occupancy', 'name' => 'Room Occupancy', 'description' => 'Display room occupancy schedule with manual and external API sync support'],
         ['key' => 'unconfigured', 'name' => 'Unconfigured Display', 'description' => 'Default screen for unconfigured kiosks']
     ];
     
@@ -938,11 +2449,9 @@ try {
 
         $existing_name = (string)($existing['name'] ?? '');
         $existing_description = (string)($existing['description'] ?? '');
-        $existing_active = (int)($existing['is_active'] ?? 0);
-
-        if ($existing_name !== (string)$module['name'] || $existing_description !== (string)$module['description'] || $existing_active !== 1) {
+        if ($existing_name !== (string)$module['name'] || $existing_description !== (string)$module['description']) {
             $module_id = (int)$existing['id'];
-            $stmt = $conn->prepare("UPDATE modules SET name = ?, description = ?, is_active = 1 WHERE id = ?");
+            $stmt = $conn->prepare("UPDATE modules SET name = ?, description = ? WHERE id = ?");
             $stmt->bind_param("ssi", $module['name'], $module['description'], $module_id);
             if ($stmt->execute()) {
                 logResult("Updated module metadata: " . $module['name'], 'success');
@@ -1342,6 +2851,12 @@ try {
     
     // Register core modules if not already exists
     registerCoreModules($conn);
+
+    // Ensure room occupancy schema (rooms + event slots)
+    edudisplej_maintenance_ensure_room_occupancy_schema($conn);
+
+    // Automated meal sync for used Jedalen institutions (nightly once/day, or forced when used institution has no cached data)
+    edudisplej_maintenance_run_jedalen_daily_sync($conn);
     
     closeDbConnection($conn);
     logResult("Database structure check completed", 'success');
@@ -1390,6 +2905,18 @@ function registerCoreModules(mysqli $conn): void {
             'is_active' => 1
         ],
         [
+            'module_key' => 'meal-menu',
+            'name' => 'Étrend',
+            'description' => 'Iskolai étlap megjelenítése forrás + intézmény alapú beállításokkal',
+            'is_active' => 1
+        ],
+        [
+            'module_key' => 'room-occupancy',
+            'name' => 'Terem foglaltság',
+            'description' => 'Termek napi foglaltságának megjelenítése kézi és külső API adatokkal',
+            'is_active' => 1
+        ],
+        [
             'module_key' => 'unconfigured',
             'name' => 'Beállítás nélküli',
             'description' => 'Technikai segédmodul üres loop-hoz',
@@ -1411,17 +2938,16 @@ function registerCoreModules(mysqli $conn): void {
         $stmt->close();
 
         if ($exists) {
-            $update = $conn->prepare("UPDATE modules SET name = ?, description = ?, is_active = ? WHERE module_key = ?");
+            $update = $conn->prepare("UPDATE modules SET name = ?, description = ? WHERE module_key = ?");
             if (!$update) {
                 logError("Module registration: update prepare failed for '{$module['module_key']}'");
                 continue;
             }
 
             $update->bind_param(
-                "ssis",
+                "sss",
                 $module['name'],
                 $module['description'],
-                $module['is_active'],
                 $module['module_key']
             );
             

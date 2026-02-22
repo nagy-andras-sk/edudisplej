@@ -57,6 +57,40 @@ $lockFile = rtrim($runtimeDir, '/\\') . '/maintenance.lock';
 $cronLog = pickCronLogPath($logDirPrimary);
 $isCli = (PHP_SAPI === 'cli');
 
+function maintenance_truthy($value): bool {
+    if (is_bool($value)) {
+        return $value;
+    }
+
+    $normalized = strtolower(trim((string)$value));
+    return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+}
+
+$forceJedalenSync = false;
+$onlyJedalenSync = false;
+$jedalenFetchInstitutionsOnly = false;
+$jedalenFetchMenusOnly = false;
+$jedalenInstitutionIdsCsv = '';
+if ($isCli) {
+    $argv = $_SERVER['argv'] ?? [];
+    $forceJedalenSync = in_array('--force-jedalen-sync', $argv, true);
+    $onlyJedalenSync = in_array('--only-jedalen-sync', $argv, true);
+    $jedalenFetchInstitutionsOnly = in_array('--jedalen-fetch-institutions-only', $argv, true);
+    $jedalenFetchMenusOnly = in_array('--jedalen-fetch-menus-only', $argv, true);
+    foreach ($argv as $arg) {
+        if (strpos((string)$arg, '--jedalen-institution-ids=') === 0) {
+            $jedalenInstitutionIdsCsv = (string)substr((string)$arg, strlen('--jedalen-institution-ids='));
+            break;
+        }
+    }
+} else {
+    $forceJedalenSync = maintenance_truthy($_GET['force_jedalen_sync'] ?? $_POST['force_jedalen_sync'] ?? false);
+    $onlyJedalenSync = maintenance_truthy($_GET['only_jedalen_sync'] ?? $_POST['only_jedalen_sync'] ?? false);
+    $jedalenFetchInstitutionsOnly = maintenance_truthy($_GET['jedalen_fetch_institutions_only'] ?? $_POST['jedalen_fetch_institutions_only'] ?? false);
+    $jedalenFetchMenusOnly = maintenance_truthy($_GET['jedalen_fetch_menus_only'] ?? $_POST['jedalen_fetch_menus_only'] ?? false);
+    $jedalenInstitutionIdsCsv = trim((string)($_GET['jedalen_institution_ids'] ?? $_POST['jedalen_institution_ids'] ?? ''));
+}
+
 function emitMaintenanceOutput(string $line, bool $isCli, bool $isRed = false): void {
     static $httpHeadersSent = false;
     static $httpPreOpened = false;
@@ -181,6 +215,17 @@ ob_start();
 define('EDUDISPLEJ_DBJAVITO_NO_HTML', true);
 define('EDUDISPLEJ_DBJAVITO_ECHO', true);
 define('EDUDISPLEJ_MAINTENANCE_MIGRATE_ASSET_URLS', true);
+define('EDUDISPLEJ_FORCE_JEDALEN_SYNC', $forceJedalenSync);
+define('EDUDISPLEJ_MAINTENANCE_ONLY_JEDALEN_SYNC', $onlyJedalenSync);
+define('EDUDISPLEJ_JEDALEN_FETCH_INSTITUTIONS_ONLY', $jedalenFetchInstitutionsOnly);
+define('EDUDISPLEJ_JEDALEN_FETCH_MENUS_ONLY', $jedalenFetchMenusOnly);
+define('EDUDISPLEJ_JEDALEN_SELECTED_INSTITUTION_IDS_CSV', $jedalenInstitutionIdsCsv);
+
+if ($forceJedalenSync) {
+    $forcedLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Jedalen sync forced by runtime flag\n";
+    appendCronLog($cronLog, $forcedLine);
+    emitMaintenanceOutput($forcedLine, $isCli);
+}
 
 require __DIR__ . '/maintenance_task.php';
 

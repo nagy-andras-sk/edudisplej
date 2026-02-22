@@ -814,13 +814,15 @@ $loop_json
                 
                 return url;
             }
-            
+
             nextModule() {
                 this.currentIndex++;
                 
                 // Loop back to start
                 if (this.currentIndex >= this.currentLoop.length) {
-                    const nextLoop = this.resolveActiveLoop(new Date());
+                    const boundaryNow = new Date();
+                    this.log('Loop boundary reached, evaluating local schedule at ' + boundaryNow.toISOString());
+                    const nextLoop = this.resolveActiveLoop(boundaryNow);
                     const currentLoopId = this.currentLoopId;
 
                     if (nextLoop.id !== currentLoopId) {
@@ -929,7 +931,14 @@ main() {
     # Check for jq
     if ! command -v jq >/dev/null 2>&1; then
         log_error "jq is required. Installing..."
-        apt-get update && apt-get install -y jq || {
+        DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a \
+            apt-get -o Dpkg::Use-Pty=0 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+            -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
+            update < /dev/null \
+            && DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a \
+            apt-get -y -o Dpkg::Use-Pty=0 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+            -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
+            install jq < /dev/null || {
             log_error "Failed to install jq"
             exit 1
         }

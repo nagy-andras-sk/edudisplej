@@ -4,13 +4,22 @@
  * EduDisplej Control Panel
  */
 
+function edudisplej_env_or_default(string $name, string $default): string {
+    $value = getenv($name);
+    if ($value === false) {
+        return $default;
+    }
+    $trimmed = trim((string)$value);
+    return $trimmed === '' ? $default : $trimmed;
+}
+
 // Database connection parameters
-define('DB_HOST', 'localhost');
-define('DB_USER', 'edudisplej_sk');
-define('DB_PASS', 'Pab)tB/g/PulNs)2');
-define('DB_NAME', 'edudisplej');
-define('DB_PORT', 3306); // Add this line
-define('DB_CHARSET', 'utf8mb4'); // Changed from utf8mb3
+define('DB_HOST', edudisplej_env_or_default('EDUDISPLEJ_DB_HOST', 'localhost'));
+define('DB_USER', edudisplej_env_or_default('EDUDISPLEJ_DB_USER', 'edudisplej_sk'));
+define('DB_PASS', edudisplej_env_or_default('EDUDISPLEJ_DB_PASS', 'Pab)tB/g/PulNs)2'));
+define('DB_NAME', edudisplej_env_or_default('EDUDISPLEJ_DB_NAME', 'edudisplej'));
+define('DB_PORT', (int)edudisplej_env_or_default('EDUDISPLEJ_DB_PORT', '3306'));
+define('DB_CHARSET', edudisplej_env_or_default('EDUDISPLEJ_DB_CHARSET', 'utf8mb4'));
 
 /**
  * Get database connection
@@ -19,21 +28,25 @@ define('DB_CHARSET', 'utf8mb4'); // Changed from utf8mb3
  */
 function getDbConnection() {
     try {
+        if (!extension_loaded('mysqli') || !class_exists('mysqli')) {
+            throw new RuntimeException('PHP mysqli extension is not available in this runtime.');
+        }
+
         $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
         
         if ($conn->connect_error) {
             throw new Exception("Connection failed: " . $conn->connect_error);
         }
         
-        // Try utf8mb4 first, fallback to utf8 if not supported
-        if (!$conn->set_charset("utf8mb4")) {
+        // Apply configured charset with safe fallback
+        if (!$conn->set_charset(DB_CHARSET)) {
             if (!$conn->set_charset("utf8")) {
                 throw new Exception("Cannot set UTF-8 charset");
             }
         }
         
         return $conn;
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         error_log("Database connection error: " . $e->getMessage());
         throw $e;
     }

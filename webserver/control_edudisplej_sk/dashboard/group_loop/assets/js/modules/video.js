@@ -293,16 +293,30 @@ const GroupLoopVideoModule = (() => {
         const importLibrary = document.getElementById('video-library-import');
 
         if (uploadArea && fileInput) {
-            uploadArea.addEventListener('click', () => fileInput.click());
-            uploadArea.addEventListener('dragover', (event) => {
+            uploadArea.addEventListener('click', (event) => {
                 event.preventDefault();
+                event.stopPropagation();
+                fileInput.value = '';
+                fileInput.click();
+            });
+            uploadArea.addEventListener('dragenter', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
                 uploadArea.style.backgroundColor = '#e6f0ff';
             });
-            uploadArea.addEventListener('dragleave', () => {
+            uploadArea.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                uploadArea.style.backgroundColor = '#e6f0ff';
+            });
+            uploadArea.addEventListener('dragleave', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
                 uploadArea.style.backgroundColor = '#f8f9fa';
             });
             uploadArea.addEventListener('drop', (event) => {
                 event.preventDefault();
+                event.stopPropagation();
                 uploadArea.style.backgroundColor = '#f8f9fa';
                 const files = event.dataTransfer?.files;
                 if (files && files[0]) {
@@ -362,3 +376,7 @@ const GroupLoopVideoModule = (() => {
         init
     };
 })();
+
+if (typeof window !== 'undefined') {
+    window.GroupLoopVideoModule = GroupLoopVideoModule;
+}

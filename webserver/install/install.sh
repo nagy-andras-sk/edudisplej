@@ -122,16 +122,18 @@ apt_install_with_retry() {
     local max_attempts="${1:-3}"
     shift
     local attempt=1
+    local apt_opts=(
+        "-o" "Dpkg::Use-Pty=0"
+        "-o" "Dpkg::Options::=--force-confdef"
+        "-o" "Dpkg::Options::=--force-confold"
+        "-o" "Acquire::Retries=5"
+        "-o" "Acquire::http::Timeout=30"
+        "-o" "Acquire::https::Timeout=30"
+    )
     while [ "$attempt" -le "$max_attempts" ]; do
         if wait_for_apt_locks 180 \
-            && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
-            && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-                -o Dpkg::Options::=--force-confdef \
-                -o Dpkg::Options::=--force-confold \
-                -o Acquire::Retries=5 \
-                -o Acquire::http::Timeout=30 \
-                -o Acquire::https::Timeout=30 \
-                "$@"; then
+            && DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a apt-get "${apt_opts[@]}" update -qq < /dev/null \
+            && DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a apt-get -y "${apt_opts[@]}" install "$@" < /dev/null; then
             return 0
         fi
         if [ "$attempt" -lt "$max_attempts" ]; then

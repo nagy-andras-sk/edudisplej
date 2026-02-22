@@ -109,16 +109,20 @@
             width: 100%;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 16px;
+            justify-content: center;
             line-height: 1;
             white-space: nowrap;
             font-weight: 700;
+            text-align: center;
         }
 
-        .overlay-clock-date {
-            opacity: 0.95;
-            font-weight: 600;
+        .overlay-clock-line {
+            width: 100%;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1;
         }
 
         .overlay-text {
@@ -233,20 +237,24 @@
         const defaults = {
             imageUrlsJson: '[]',
             displayMode: 'slideshow',
-            fitMode: 'cover',
+            fitMode: 'contain',
             slideIntervalSec: 5,
+            transitionEnabled: true,
             transitionMs: 450,
             collageColumns: 3,
             bgColor: '#000000',
             clockOverlayEnabled: false,
             clockOverlayPosition: 'top',
-            clockOverlayHeightPercent: 25,
+            clockOverlayHeightPercent: 40,
             clockOverlayTimeColor: '#ffffff',
             clockOverlayDateColor: '#ffffff',
             textOverlayEnabled: false,
             textOverlayPosition: 'bottom',
             textOverlayHeightPercent: 20,
+            textOverlaySourceType: 'manual',
             textOverlayText: 'Sem vložte text...',
+            textOverlayCollectionJson: '[]',
+            textOverlayExternalUrl: '',
             textOverlayFontSize: 52,
             textOverlayColor: '#ffffff',
             textOverlaySpeedPxPerSec: 120
@@ -262,6 +270,7 @@
             displayMode: String(params.get('displayMode') ?? injected.displayMode ?? defaults.displayMode),
             fitMode: String(params.get('fitMode') ?? injected.fitMode ?? defaults.fitMode),
             slideIntervalSec: parseNum(params.get('slideIntervalSec') ?? injected.slideIntervalSec, defaults.slideIntervalSec),
+            transitionEnabled: parseBool(params.get('transitionEnabled') ?? injected.transitionEnabled, defaults.transitionEnabled),
             transitionMs: parseNum(params.get('transitionMs') ?? injected.transitionMs, defaults.transitionMs),
             collageColumns: parseNum(params.get('collageColumns') ?? injected.collageColumns, defaults.collageColumns),
             bgColor: String(params.get('bgColor') ?? injected.bgColor ?? defaults.bgColor),
@@ -273,21 +282,29 @@
             textOverlayEnabled: parseBool(params.get('textOverlayEnabled') ?? injected.textOverlayEnabled, defaults.textOverlayEnabled),
             textOverlayPosition: String(params.get('textOverlayPosition') ?? injected.textOverlayPosition ?? defaults.textOverlayPosition),
             textOverlayHeightPercent: parseNum(params.get('textOverlayHeightPercent') ?? injected.textOverlayHeightPercent, defaults.textOverlayHeightPercent),
+            textOverlaySourceType: String(params.get('textOverlaySourceType') ?? injected.textOverlaySourceType ?? defaults.textOverlaySourceType),
             textOverlayText: String(params.get('textOverlayText') ?? injected.textOverlayText ?? defaults.textOverlayText),
+            textOverlayCollectionJson: String(params.get('textOverlayCollectionJson') ?? injected.textOverlayCollectionJson ?? defaults.textOverlayCollectionJson),
+            textOverlayExternalUrl: String(params.get('textOverlayExternalUrl') ?? injected.textOverlayExternalUrl ?? defaults.textOverlayExternalUrl),
             textOverlayFontSize: parseNum(params.get('textOverlayFontSize') ?? injected.textOverlayFontSize, defaults.textOverlayFontSize),
             textOverlayColor: String(params.get('textOverlayColor') ?? injected.textOverlayColor ?? defaults.textOverlayColor),
             textOverlaySpeedPxPerSec: parseNum(params.get('textOverlaySpeedPxPerSec') ?? injected.textOverlaySpeedPxPerSec, defaults.textOverlaySpeedPxPerSec)
         };
 
         settings.displayMode = ['slideshow', 'collage', 'single'].includes(settings.displayMode) ? settings.displayMode : 'slideshow';
-        settings.fitMode = ['cover', 'contain', 'fill'].includes(settings.fitMode) ? settings.fitMode : 'cover';
+        settings.fitMode = ['cover', 'contain', 'fill'].includes(settings.fitMode) ? settings.fitMode : 'contain';
         settings.slideIntervalSec = Math.max(1, Math.min(30, settings.slideIntervalSec));
-        settings.transitionMs = Math.max(100, Math.min(2000, settings.transitionMs));
+        settings.transitionEnabled = settings.transitionEnabled !== false;
+        settings.transitionMs = settings.transitionEnabled ? 450 : 0;
         settings.collageColumns = Math.max(2, Math.min(5, Math.floor(settings.collageColumns)));
         settings.clockOverlayPosition = settings.clockOverlayPosition === 'bottom' ? 'bottom' : 'top';
         settings.textOverlayPosition = settings.textOverlayPosition === 'top' ? 'top' : 'bottom';
-        settings.clockOverlayHeightPercent = Math.max(20, Math.min(40, Math.floor(settings.clockOverlayHeightPercent || 25)));
+        settings.clockOverlayHeightPercent = Math.max(20, Math.min(40, Math.floor(settings.clockOverlayHeightPercent || 40)));
         settings.textOverlayHeightPercent = Math.max(12, Math.min(40, Math.floor(settings.textOverlayHeightPercent || 20)));
+        settings.textOverlaySourceType = ['manual', 'collection', 'external'].includes(settings.textOverlaySourceType)
+            ? settings.textOverlaySourceType
+            : 'manual';
+        settings.textOverlayExternalUrl = String(settings.textOverlayExternalUrl || '').trim();
         settings.textOverlayFontSize = Math.max(18, Math.min(120, Math.floor(settings.textOverlayFontSize || 52)));
         settings.textOverlaySpeedPxPerSec = Math.max(40, Math.min(320, Math.floor(settings.textOverlaySpeedPxPerSec || 120)));
         settings.images = parseJsonArray(settings.imageUrlsJson)
@@ -405,44 +422,38 @@
         renderSlideshow(images);
     }
 
-    function formatOverlayDate(date) {
-        return date.toLocaleDateString('hu-HU', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
+    function formatOverlayClockLine(date) {
+        const day = date.getDate();
+        const month = date.getMonth() + 1;
+        const year = date.getFullYear();
+        const weekdayRaw = date.toLocaleDateString('sk-SK', { weekday: 'long' });
+        const weekday = weekdayRaw ? weekdayRaw.charAt(0).toUpperCase() + weekdayRaw.slice(1) : '';
+        const time = date.toLocaleTimeString('sk-SK', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
         });
+        return `${day}.${month}.${year} - ${weekday} - ${time}`;
     }
 
     function createClockOverlayRow() {
         const row = document.createElement('div');
         row.className = 'overlay-clock';
 
-        const time = document.createElement('div');
-        time.className = 'overlay-clock-time';
-        time.style.color = settings.clockOverlayTimeColor;
-
-        const date = document.createElement('div');
-        date.className = 'overlay-clock-date';
-        date.style.color = settings.clockOverlayDateColor;
-
-        row.appendChild(time);
-        row.appendChild(date);
+        const line = document.createElement('div');
+        line.className = 'overlay-clock-line';
+        line.style.color = settings.clockOverlayTimeColor;
+        row.appendChild(line);
 
         const applySize = () => {
             const bandHeight = row.parentElement ? row.parentElement.clientHeight : 80;
-            const base = Math.max(18, Math.floor(bandHeight * 0.42));
-            time.style.fontSize = `${base}px`;
-            date.style.fontSize = `${Math.max(14, Math.floor(base * 0.48))}px`;
+            const base = Math.max(18, Math.floor(bandHeight * 0.78));
+            line.style.fontSize = `${base}px`;
         };
 
         const tick = () => {
             const now = new Date();
-            time.textContent = now.toLocaleTimeString('hu-HU', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-            date.textContent = formatOverlayDate(now);
+            line.textContent = formatOverlayClockLine(now);
         };
 
         applySize();
@@ -452,7 +463,44 @@
         return row;
     }
 
-    function createTextOverlayRow() {
+    async function resolveTextOverlayValue() {
+        const fallback = String(settings.textOverlayText || '').trim() || 'Sem vložte text...';
+
+        if (settings.textOverlaySourceType === 'collection') {
+            try {
+                const parsed = parseJsonArray(settings.textOverlayCollectionJson || '[]')
+                    .map((entry) => String(entry || '').trim())
+                    .filter(Boolean);
+                if (parsed.length > 0) {
+                    const index = Math.floor(Math.random() * parsed.length);
+                    return parsed[index];
+                }
+            } catch (_) {
+            }
+            return fallback;
+        }
+
+        if (settings.textOverlaySourceType === 'external' && settings.textOverlayExternalUrl) {
+            try {
+                const response = await fetch(settings.textOverlayExternalUrl, {
+                    method: 'GET',
+                    cache: 'no-store'
+                });
+                if (response.ok) {
+                    const text = String(await response.text() || '').trim();
+                    if (text) {
+                        return text.slice(0, 3000);
+                    }
+                }
+            } catch (_) {
+            }
+            return fallback;
+        }
+
+        return fallback;
+    }
+
+    function createTextOverlayRow(textValueResolved) {
         const row = document.createElement('div');
         row.className = 'overlay-text';
         row.style.color = settings.textOverlayColor;
@@ -461,7 +509,7 @@
         const track = document.createElement('div');
         track.className = 'overlay-text-track';
 
-        const textValue = String(settings.textOverlayText || '').trim() || 'Sem vložte text...';
+        const textValue = String(textValueResolved || '').trim() || 'Sem vložte text...';
         const segmentA = document.createElement('span');
         segmentA.className = 'overlay-text-segment';
         segmentA.textContent = textValue;
@@ -505,7 +553,7 @@
         });
     }
 
-    function renderOverlays() {
+    async function renderOverlays() {
         const topWidgets = [];
         const bottomWidgets = [];
         let topHeight = 0;
@@ -523,7 +571,8 @@
         }
 
         if (settings.textOverlayEnabled) {
-            const textRow = createTextOverlayRow();
+            const resolvedText = await resolveTextOverlayValue();
+            const textRow = createTextOverlayRow(resolvedText);
             if (settings.textOverlayPosition === 'top') {
                 topWidgets.push(textRow);
                 topHeight = Math.max(topHeight, settings.textOverlayHeightPercent);

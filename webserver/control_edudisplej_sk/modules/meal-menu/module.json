@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "module_key": "meal-menu",
+  "name": "Étrend",
+  "description": "Iskolai étlap megjelenítése szerverről, offline cache fallbackkel",
+  "renderer": "m_meal_menu.html",
+  "config": {
+    "defaults": "config/default_settings.json"
+  }
+}

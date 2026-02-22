@@ -1,8 +1,8 @@
 <?php
 session_start();
-require_once '../../dbkonfiguracia.php';
-require_once '../../auth_roles.php';
-require_once '../../modules/module_asset_service.php';
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../../auth_roles.php';
+require_once __DIR__ . '/../../modules/module_asset_service.php';
 
 header('Content-Type: application/json; charset=utf-8');
 

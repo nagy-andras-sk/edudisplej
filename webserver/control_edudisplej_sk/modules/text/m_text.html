@@ -205,6 +205,10 @@
 
         function getSettings() {
             const defaults = {
+                textSourceType: 'manual',
+                textCollectionId: 0,
+                textCollectionLabel: '',
+                textCollectionVersionTs: 0,
                 text: 'Sem vložte text...',
                 fontFamily: 'Arial, sans-serif',
                 fontSize: 72,
@@ -232,6 +236,10 @@
             const merged = {
                 ...defaults,
                 ...injected,
+                textSourceType: String(params.get('textSourceType') ?? injected.textSourceType ?? defaults.textSourceType),
+                textCollectionId: parseNum(params.get('textCollectionId') ?? injected.textCollectionId, defaults.textCollectionId),
+                textCollectionLabel: String(params.get('textCollectionLabel') ?? injected.textCollectionLabel ?? defaults.textCollectionLabel),
+                textCollectionVersionTs: parseNum(params.get('textCollectionVersionTs') ?? injected.textCollectionVersionTs, defaults.textCollectionVersionTs),
                 text: params.get('text') ?? injected.text ?? defaults.text,
                 fontFamily: params.get('fontFamily') ?? injected.fontFamily ?? defaults.fontFamily,
                 fontSize: parseNum(params.get('fontSize') ?? injected.fontSize, defaults.fontSize),

@@ -70,14 +70,22 @@ get_mac_address() {
 
 # Read config.json to check if screenshot is enabled OR server requested one
 is_screenshot_active() {
-    # 1. Check server-side screenshot_requested flag from last sync response
+    # 1. Check server-side screenshot flags from last sync response
     if [ -f "$LAST_SYNC_RESPONSE" ]; then
+        local enabled=""
         local requested=""
         if command -v jq >/dev/null 2>&1; then
+            enabled=$(jq -r '.screenshot_enabled // false' "$LAST_SYNC_RESPONSE" 2>/dev/null)
             requested=$(jq -r '.screenshot_requested // false' "$LAST_SYNC_RESPONSE" 2>/dev/null)
         else
+            enabled=$(grep -o '"screenshot_enabled"[[:space:]]*:[[:space:]]*true' "$LAST_SYNC_RESPONSE" 2>/dev/null | head -1)
+            [ -n "$enabled" ] && enabled="true" || enabled="false"
             requested=$(grep -o '"screenshot_requested"[[:space:]]*:[[:space:]]*true' "$LAST_SYNC_RESPONSE" 2>/dev/null | head -1)
             [ -n "$requested" ] && requested="true" || requested="false"
+        fi
+        if [ "$enabled" = "true" ]; then
+            log_debug "screenshot_enabled=true from last sync response"
+            return 0
         fi
         if [ "$requested" = "true" ]; then
             log_debug "screenshot_requested=true from last sync response"

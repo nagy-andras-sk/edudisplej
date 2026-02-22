@@ -12,6 +12,40 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['
     exit();
 }
 
+function edudisplej_admin_ensure_module_present(mysqli $conn, string $moduleKey, string $name, string $description): void {
+    $stmt = $conn->prepare('SELECT id, is_active FROM modules WHERE module_key = ? LIMIT 1');
+    if (!$stmt) {
+        return;
+    }
+
+    $stmt->bind_param('s', $moduleKey);
+    $stmt->execute();
+    $existing = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$existing) {
+        $insert = $conn->prepare('INSERT INTO modules (module_key, name, description, is_active) VALUES (?, ?, ?, 1)');
+        if ($insert) {
+            $insert->bind_param('sss', $moduleKey, $name, $description);
+            $insert->execute();
+            $insert->close();
+        }
+        return;
+    }
+
+    $moduleId = (int)($existing['id'] ?? 0);
+    if ($moduleId <= 0) {
+        return;
+    }
+
+    $update = $conn->prepare('UPDATE modules SET name = ?, description = ?, is_active = 1 WHERE id = ?');
+    if ($update) {
+        $update->bind_param('ssi', $name, $description, $moduleId);
+        $update->execute();
+        $update->close();
+    }
+}
+
 $error = '';
 $success = '';
 $selected_company_id = (int)($_GET['company_id'] ?? 0);
@@ -119,6 +153,19 @@ $licenses_by_company = [];
 
 try {
     $conn = getDbConnection();
+
+    edudisplej_admin_ensure_module_present(
+        $conn,
+        'meal-menu',
+        'Meal Menu',
+        'Display school meal plan with source/institution filtering and offline fallback'
+    );
+    edudisplej_admin_ensure_module_present(
+        $conn,
+        'room-occupancy',
+        'Room Occupancy',
+        'Display room occupancy schedule with manual and external API sync support'
+    );
 
     $result = $conn->query("SELECT * FROM companies ORDER BY name");
     while ($row = $result->fetch_assoc()) {

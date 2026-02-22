@@ -62,6 +62,12 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - HTML sablon preview sandboxolt iframe-ben, kizárólag admin hozzáféréssel
 - Összes új SQL query prepared statement-tel implementálva
 
+### Fixed
+
+- Installer hardening: az összes kritikus `apt-get` hívás TTY-függetlenre frissítve (`Dpkg::Use-Pty=0`, stdin redirection `< /dev/null`, non-interactive env)
+- Tömeges (headless) telepítéseknél megszűnik az a hiba, ahol az install folyamat `apt-get ...` lépésnél `T (stopped)` állapotban megakadt
+- Screenshot service fix: a kliens már a szerver `screenshot_enabled` flagjét is figyelembe veszi a `last_sync_response.json` fájlból (nem csak a `screenshot_requested` jelet), így a periodikus screenshot feltöltés valóban elindul bekapcsolt policy esetén
+
 ---
 
 ## [2026 Q1] – Previous

@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDisplej Étrend Modul</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+        body { background: #0f172a; color: #f8fafc; font-family: var(--meal-font-family, 'Segoe UI', Tahoma, sans-serif); }
+        .root { width: 100%; height: 100%; padding: 3.2vh 3vw; display: grid; grid-template-rows: auto 1fr auto; gap: 2vh; position: relative; }
+        .root.center { justify-items: center; text-align: center; }
+        .root.center .head { width: 100%; justify-content: center; }
+        .root.center .title-wrap { display:flex; flex-direction:column; align-items:center; }
+        .root.center-left { justify-items: center; }
+        .root.center-left .head { width: 100%; justify-content: center; }
+        .root.center-left .title-wrap { display:flex; flex-direction:column; align-items:center; text-align:center; }
+        .root.center-left .cards { width: min(94vw, 1600px); margin: 0 auto; justify-items: stretch; }
+        .cards-wrap { width: 100%; height: 100%; overflow: hidden; position: relative; }
+        .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .title { font-size: clamp(34px, 4.1vw, 74px); font-weight: 700; }
+        .subtitle { font-size: clamp(20px, 2vw, 34px); color: #cbd5e1; margin-top: 6px; }
+        .status { display: none; }
+        .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6vh 1.2vw; align-content: start; }
+        .root.center .cards { justify-items: stretch; }
+        .card { background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 14px; padding: 1.6vh 1.2vw; }
+        .meal { font-size: clamp(24px, var(--meal-title-font-size, 2.1vw), 42px); font-weight: 700; color: #e2e8f0; margin-bottom: 10px; display:flex; align-items:center; gap:10px; }
+        .root.center .meal { justify-content:center; }
+        .meal-icon { width: 24px; height: 24px; display:inline-block; color:#93c5fd; }
+        .meal-text-line { display:block; margin-bottom:2px; }
+        .meal-text-line.with-icon { display:flex; align-items:flex-start; gap:8px; }
+        .line-icon { width:16px; height:16px; display:inline-block; vertical-align:middle; margin-right:8px; color:#cbd5e1; }
+        .line-text { flex:1; min-width:0; }
+        .text { font-size: clamp(20px, var(--meal-text-font-size, 1.85vw), 34px); line-height: var(--meal-line-height, 1.4); font-weight: var(--meal-text-weight, 600); color: #f8fafc; white-space: var(--meal-white-space, pre-wrap); word-break: var(--meal-word-break, break-word); overflow: hidden; text-overflow: ellipsis; }
+        .allergen-row { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .allergen-badge { font-size: clamp(12px, 1vw, 16px); line-height: 1; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 999px; padding: 4px 8px; background: rgba(15, 23, 42, 0.55); color: #e2e8f0; }
+        .empty { grid-column: 1 / -1; border: 1px dashed rgba(148,163,184,.35); border-radius: 12px; padding: 16px; color: #cbd5e1; font-size: clamp(18px, 1.7vw, 32px); }
+        .foot { font-size: clamp(16px, 1.2vw, 24px); color: #94a3b8; }
+        .root.scroll-mode { justify-items: center; text-align: center; }
+        .root.scroll-mode .head { width: 100%; justify-content: center; }
+        .root.scroll-mode .title-wrap { display:flex; flex-direction:column; align-items:center; }
+        .root.scroll-mode .cards { grid-template-columns: 1fr; width: min(96vw, 1500px); margin: 0 auto; }
+        .root.square-mode .cards { display: block; height: 100%; }
+        .dual-days { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2vw; height: 100%; }
+        .dual-days.single-day { grid-template-columns: minmax(0, 1fr); }
+        .day-square { background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 16px; padding: 1.2vh 1vw; display:flex; flex-direction:column; min-height:0; }
+        .day-title { font-size: clamp(24px, 2.2vw, 44px); font-weight: 700; color: #e2e8f0; margin-bottom: .8vh; }
+        .day-date { font-size: clamp(16px, 1.2vw, 24px); color: #94a3b8; margin-bottom: 1vh; }
+        .day-content { display:grid; gap:.9vh; align-content:start; overflow:hidden; }
+        .day-meal { border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 10px; padding: .7vh .7vw; background: rgba(15, 23, 42, 0.45); }
+        .day-meal-label { font-size: clamp(16px, 1.15vw, 22px); font-weight: 700; color: #cbd5e1; margin-bottom: .3vh; }
+        .day-meal-text { font-size: clamp(15px, 1.08vw, 20px); line-height: 1.28; color:#f8fafc; white-space: pre-wrap; word-break: break-word; }
+        .foot-line { display:block; }
+        .foot-source { display:block; margin-top:4px; font-size: clamp(12px, .95vw, 16px); opacity:.9; }
+
+        .overlay-band {
+            position: absolute;
+            left: 0;
+            right: 0;
+            z-index: 30;
+            background: rgba(0, 0, 0, 0.86);
+            display: none;
+            overflow: hidden;
+            padding: 0 2vw;
+            gap: 8px;
+            flex-direction: column;
+            justify-content: center;
+        }
+        #overlayTop { top: 0; }
+        #overlayBottom { bottom: 0; }
+        .overlay-clock { width: 100%; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; white-space:nowrap; font-weight:700; }
+        .overlay-clock-line { width:100%; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .overlay-text { width:100%; overflow:hidden; white-space:nowrap; font-weight:700; }
+        .overlay-text-track { display:inline-flex; align-items:center; white-space:nowrap; will-change:transform; }
+        .overlay-text-segment { display:inline-block; margin-right:60px; }
+    </style>
+</head>
+<body>
+<div class="root">
+    <div id="overlayTop" class="overlay-band"></div>
+    <div id="overlayBottom" class="overlay-band"></div>
+    <div class="head">
+        <div class="title-wrap">
+            <div class="title" id="title">Étrend</div>
+            <div class="subtitle" id="subtitle">Betöltés...</div>
+        </div>
+        <div class="status" id="status">🔄 Szerver lekérés</div>
+    </div>
+    <div class="cards-wrap" id="cards-wrap"><div class="cards" id="cards"></div></div>
+    <div class="foot" id="foot"></div>
+</div>
+<script>
+(function () {
+    let scrollRaf = null;
+    let overlayClockInterval = null;
+    const overlayTextState = {
+        top: { raf: null },
+        bottom: { raf: null }
+    };
+
+    function stopSlowScroll() {
+        if (scrollRaf !== null) {
+            cancelAnimationFrame(scrollRaf);
+            scrollRaf = null;
+        }
+        const cards = document.getElementById('cards');
+        if (cards) {
+            cards.style.transform = 'translateY(0px)';
+        }
+    }
+
+    function parseBool(value, fallback) {
+        if (value === null || value === undefined || value === '') return fallback;
+        if (typeof value === 'boolean') return value;
+        const normalized = String(value).toLowerCase();
+        if (['1','true','yes','on'].includes(normalized)) return true;
+        if (['0','false','no','off'].includes(normalized)) return false;
+        return fallback;
+    }
+
+    function parseNum(value, fallback) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+    }
+
+    function getSettings() {
+        const defaults = {
+            siteKey: 'jedalen.sk',
+            institutionId: 0,
+            companyId: 0,
+            sourceType: 'server',
+            showBreakfast: true,
+            showSnackAm: true,
+            showLunch: true,
+            showSnackPm: false,
+            showDinner: false,
+            language: 'hu',
+            showHeaderTitle: true,
+            customHeaderTitle: '',
+            showInstitutionName: true,
+            showMealTypeEmojis: false,
+            showMealTypeSvgIcons: true,
+            showAllergenEmojis: false,
+            centerAlign: false,
+            slowScrollOnOverflow: false,
+            slowScrollSpeedPxPerSec: 28,
+            scrollStartDelayMs: 2000,
+            scrollLoopPauseMs: 2000,
+            layoutMode: 'classic',
+            showTomorrowInSquare: true,
+            fontFamily: 'Segoe UI, Tahoma, sans-serif',
+            mealTitleFontSize: 2.1,
+            mealTextFontSize: 1.85,
+            textFontWeight: 600,
+            lineHeight: 1.4,
+            wrapText: true,
+            showAppetiteMessage: false,
+            appetiteMessageText: 'Jó étvágyat kívánunk!',
+            showSourceUrl: false,
+            sourceUrl: '',
+            clockOverlayEnabled: false,
+            clockOverlayPosition: 'top',
+            clockOverlayHeightPercent: 40,
+            clockOverlayTimeColor: '#ffffff',
+            clockOverlayDateColor: '#ffffff',
+            textOverlayEnabled: false,
+            textOverlayPosition: 'bottom',
+            textOverlayHeightPercent: 20,
+            textOverlaySourceType: 'manual',
+            textOverlayText: 'Sem vložte text...',
+            textOverlayCollectionJson: '[]',
+            textOverlayExternalUrl: '',
+            textOverlayFontSize: 52,
+            textOverlayColor: '#ffffff',
+            textOverlaySpeedPxPerSec: 120,
+            apiBaseUrl: '../../api/meal_plan.php',
+            offlinePrefetchedMenuData: null,
+            offlinePrefetchedMenuSavedAt: ''
+        };
+
+        const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS) ? window.EDUDISPLEJ_SETTINGS : {};
+        const params = new URLSearchParams(window.location.search);
+        return {
+            siteKey: String(params.get('siteKey') ?? injected.siteKey ?? defaults.siteKey),
+            institutionId: parseNum(params.get('institutionId') ?? injected.institutionId, defaults.institutionId),
+            companyId: parseNum(params.get('company_id') ?? params.get('companyId') ?? injected.companyId, defaults.companyId),
+            sourceType: (String(params.get('sourceType') ?? params.get('source_type') ?? injected.sourceType ?? defaults.sourceType).toLowerCase() === 'server') ? 'server' : 'manual',
+            showBreakfast: parseBool(params.get('showBreakfast') ?? injected.showBreakfast, defaults.showBreakfast),
+            showSnackAm: parseBool(params.get('showSnackAm') ?? injected.showSnackAm, defaults.showSnackAm),
+            showLunch: parseBool(params.get('showLunch') ?? injected.showLunch, defaults.showLunch),
+            showSnackPm: parseBool(params.get('showSnackPm') ?? injected.showSnackPm, defaults.showSnackPm),
+            showDinner: parseBool(params.get('showDinner') ?? injected.showDinner, defaults.showDinner),
+            showHeaderTitle: parseBool(params.get('showHeaderTitle') ?? injected.showHeaderTitle, defaults.showHeaderTitle),
+            customHeaderTitle: String(params.get('customHeaderTitle') ?? injected.customHeaderTitle ?? defaults.customHeaderTitle),
+            showInstitutionName: parseBool(params.get('showInstitutionName') ?? injected.showInstitutionName, defaults.showInstitutionName),
+            language: (() => {
+                const raw = String(params.get('language') ?? params.get('lang') ?? injected.language ?? defaults.language).toLowerCase().trim();
+                return ['hu', 'sk', 'en'].includes(raw) ? raw : 'hu';
+            })(),
+            showMealTypeEmojis: parseBool(params.get('showMealTypeEmojis') ?? injected.showMealTypeEmojis, defaults.showMealTypeEmojis),
+            showMealTypeSvgIcons: parseBool(params.get('showMealTypeSvgIcons') ?? injected.showMealTypeSvgIcons ?? (injected.showMealTypeEmojis === true ? true : defaults.showMealTypeSvgIcons), defaults.showMealTypeSvgIcons),
+            showAllergenEmojis: parseBool(params.get('showAllergenEmojis') ?? injected.showAllergenEmojis, defaults.showAllergenEmojis),
+            centerAlign: parseBool(params.get('centerAlign') ?? injected.centerAlign, defaults.centerAlign),
+            slowScrollOnOverflow: parseBool(params.get('slowScrollOnOverflow') ?? injected.slowScrollOnOverflow, defaults.slowScrollOnOverflow),
+            slowScrollSpeedPxPerSec: parseNum(params.get('slowScrollSpeedPxPerSec') ?? injected.slowScrollSpeedPxPerSec, defaults.slowScrollSpeedPxPerSec),
+            scrollStartDelayMs: parseNum(params.get('scrollStartDelayMs') ?? injected.scrollStartDelayMs, defaults.scrollStartDelayMs),
+            scrollLoopPauseMs: parseNum(params.get('scrollLoopPauseMs') ?? injected.scrollLoopPauseMs, defaults.scrollLoopPauseMs),
+            layoutMode: (() => {
+                const raw = String(params.get('layoutMode') ?? injected.layoutMode ?? defaults.layoutMode).trim().toLowerCase();
+                return ['classic', 'fullscreen_scroll', 'square_dual_day'].includes(raw) ? raw : 'classic';
+            })(),
+            showTomorrowInSquare: parseBool(params.get('showTomorrowInSquare') ?? injected.showTomorrowInSquare, defaults.showTomorrowInSquare),
+            fontFamily: String(params.get('fontFamily') ?? injected.fontFamily ?? defaults.fontFamily),
+            mealTitleFontSize: parseNum(params.get('mealTitleFontSize') ?? injected.mealTitleFontSize, defaults.mealTitleFontSize),
+            mealTextFontSize: parseNum(params.get('mealTextFontSize') ?? injected.mealTextFontSize, defaults.mealTextFontSize),
+            textFontWeight: parseNum(params.get('textFontWeight') ?? injected.textFontWeight, defaults.textFontWeight),
+            lineHeight: parseNum(params.get('lineHeight') ?? injected.lineHeight, defaults.lineHeight),
+            wrapText: parseBool(params.get('wrapText') ?? injected.wrapText, defaults.wrapText),
+            showAppetiteMessage: parseBool(params.get('showAppetiteMessage') ?? injected.showAppetiteMessage, defaults.showAppetiteMessage),
+            appetiteMessageText: String(params.get('appetiteMessageText') ?? injected.appetiteMessageText ?? defaults.appetiteMessageText),
+            showSourceUrl: parseBool(params.get('showSourceUrl') ?? injected.showSourceUrl, defaults.showSourceUrl),
+            sourceUrl: String(params.get('sourceUrl') ?? injected.sourceUrl ?? defaults.sourceUrl),
+            clockOverlayEnabled: parseBool(params.get('clockOverlayEnabled') ?? injected.clockOverlayEnabled, defaults.clockOverlayEnabled),
+            clockOverlayPosition: String(params.get('clockOverlayPosition') ?? injected.clockOverlayPosition ?? defaults.clockOverlayPosition),
+            clockOverlayHeightPercent: parseNum(params.get('clockOverlayHeightPercent') ?? injected.clockOverlayHeightPercent, defaults.clockOverlayHeightPercent),
+            clockOverlayTimeColor: String(params.get('clockOverlayTimeColor') ?? injected.clockOverlayTimeColor ?? defaults.clockOverlayTimeColor),
+            clockOverlayDateColor: String(params.get('clockOverlayDateColor') ?? injected.clockOverlayDateColor ?? defaults.clockOverlayDateColor),
+            textOverlayEnabled: parseBool(params.get('textOverlayEnabled') ?? injected.textOverlayEnabled, defaults.textOverlayEnabled),
+            textOverlayPosition: String(params.get('textOverlayPosition') ?? injected.textOverlayPosition ?? defaults.textOverlayPosition),
+            textOverlayHeightPercent: parseNum(params.get('textOverlayHeightPercent') ?? injected.textOverlayHeightPercent, defaults.textOverlayHeightPercent),
+            textOverlaySourceType: String(params.get('textOverlaySourceType') ?? injected.textOverlaySourceType ?? defaults.textOverlaySourceType),
+            textOverlayText: String(params.get('textOverlayText') ?? injected.textOverlayText ?? defaults.textOverlayText),
+            textOverlayCollectionJson: String(params.get('textOverlayCollectionJson') ?? injected.textOverlayCollectionJson ?? defaults.textOverlayCollectionJson),
+            textOverlayExternalUrl: String(params.get('textOverlayExternalUrl') ?? injected.textOverlayExternalUrl ?? defaults.textOverlayExternalUrl),
+            textOverlayFontSize: parseNum(params.get('textOverlayFontSize') ?? injected.textOverlayFontSize, defaults.textOverlayFontSize),
+            textOverlayColor: String(params.get('textOverlayColor') ?? injected.textOverlayColor ?? defaults.textOverlayColor),
+            textOverlaySpeedPxPerSec: parseNum(params.get('textOverlaySpeedPxPerSec') ?? injected.textOverlaySpeedPxPerSec, defaults.textOverlaySpeedPxPerSec),
+            apiBaseUrl: String(params.get('apiBaseUrl') ?? injected.apiBaseUrl ?? defaults.apiBaseUrl),
+            offlinePrefetchedMenuData: (() => {
+                const raw = params.get('offlinePrefetchedMenuData') ?? injected.offlinePrefetchedMenuData ?? null;
+                if (!raw) return null;
+                if (typeof raw === 'object') return raw;
+                try {
+                    const parsed = JSON.parse(String(raw));
+                    return parsed && typeof parsed === 'object' ? parsed : null;
+                } catch (_) {
+                    return null;
+                }
+            })(),
+            offlinePrefetchedMenuSavedAt: String(params.get('offlinePrefetchedMenuSavedAt') ?? injected.offlinePrefetchedMenuSavedAt ?? defaults.offlinePrefetchedMenuSavedAt)
+        };
+    }
+
+    function i18n(lang) {
+        const key = ['hu', 'sk', 'en'].includes(String(lang || '').toLowerCase()) ? String(lang).toLowerCase() : 'hu';
+        const pack = {
+            hu: {
+                title: 'Mai étlap',
+                noInstitution: 'Nincs kiválasztott intézmény',
+                emptyMeals: 'Nincs megjeleníthető étkezés erre a napra.',
+                updatedAt: 'Frissítve',
+                unknownUpdate: 'Frissítési idő: ismeretlen',
+                today: 'Mai menü',
+                tomorrow: 'Holnapi menü',
+                mealLabels: { breakfast: 'Reggeli', snack_am: 'Tízórai', lunch: 'Ebéd', snack_pm: 'Uzsonna', dinner: 'Vacsora' }
+            },
+            sk: {
+                title: 'Dnešné menu',
+                noInstitution: 'Nie je vybraná inštitúcia',
+                emptyMeals: 'Pre tento deň nie je dostupné žiadne jedlo.',
+                updatedAt: 'Aktualizované',
+                unknownUpdate: 'Čas aktualizácie: neznámy',
+                today: 'Dnešné menu',
+                tomorrow: 'Zajtrajšie menu',
+                mealLabels: { breakfast: 'Raňajky', snack_am: 'Desiata', lunch: 'Obed', snack_pm: 'Olovrant', dinner: 'Večera' }
+            },
+            en: {
+                title: "Today's menu",
+                noInstitution: 'No institution selected',
+                emptyMeals: 'No meals available for this date.',
+                updatedAt: 'Updated',
+                unknownUpdate: 'Update time: unknown',
+                today: "Today's menu",
+                tomorrow: "Tomorrow's menu",
+                mealLabels: { breakfast: 'Breakfast', snack_am: 'Morning snack', lunch: 'Lunch', snack_pm: 'Afternoon snack', dinner: 'Dinner' }
+            }
+        };
+        return pack[key] || pack.hu;
+    }
+
+    function iconSvg(name) {
+        const map = {
+            breakfast: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>',
+            snack_am: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 14c0-4 3-7 6-7s6 3 6 7"/><path d="M6 14h12"/><path d="M12 7v10"/></svg>',
+            lunch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"/><path d="M6 7v10h12V7"/><path d="M9 11h6"/></svg>',
+            snack_pm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16"/><path d="M7 9l2 6"/><path d="M15 9l2 6"/></svg>',
+            dinner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4a8 8 0 1 0 8 8 6 6 0 1 1-8-8z"/></svg>',
+            soup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16"/><path d="M6 12v3a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-3"/><path d="M9 8c0-1 1-1.5 1-2.5"/><path d="M13 8c0-1 1-1.5 1-2.5"/></svg>',
+            cutlery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3v8"/><path d="M10 3v8"/><path d="M8.5 11v10"/><path d="M15 3c3 2 3 6 0 8v10"/></svg>',
+            plate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+            food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4v8"/><path d="M8 4v8"/><path d="M6.5 12v8"/><path d="M13 4c3 2 3 6 0 8v8"/><path d="M18 4v16"/></svg>'
+        };
+        return map[name] || map.food;
+    }
+
+    function mealTypeSvg(key) {
+        return iconSvg(String(key || '').toLowerCase());
+    }
+
+    function mealLineSvg(lineText, mealKey, lineIndex) {
+        if (String(mealKey || '').toLowerCase() === 'lunch') {
+            if (lineIndex === 0) return iconSvg('soup');
+            if (lineIndex === 1) return iconSvg('cutlery');
+            if (lineIndex === 2) return iconSvg('plate');
+        }
+        const normalized = String(lineText || '').toLowerCase();
+        if (normalized.includes('polievka') || normalized.includes('leves')) {
+            return iconSvg('soup');
+        }
+        return iconSvg('food');
+    }
+
+    function applyVisualSettings(settings) {
+        const root = document.documentElement;
+        root.style.setProperty('--meal-font-family', String(settings.fontFamily || 'Segoe UI, Tahoma, sans-serif'));
+
+        const titleSize = Math.max(0.8, Math.min(4, Number(settings.mealTitleFontSize || 1.5)));
+        const textSize = Math.max(0.8, Math.min(4, Number(settings.mealTextFontSize || 1.35)));
+        const textWeight = Math.max(300, Math.min(800, Number(settings.textFontWeight || 600)));
+        const lineHeight = Math.max(1, Math.min(2.2, Number(settings.lineHeight || 1.35)));
+
+        root.style.setProperty('--meal-title-font-size', `${titleSize}vw`);
+        root.style.setProperty('--meal-text-font-size', `${textSize}vw`);
+        root.style.setProperty('--meal-text-weight', String(Math.round(textWeight)));
+        root.style.setProperty('--meal-line-height', String(lineHeight));
+
+        if (settings.wrapText === false) {
+            root.style.setProperty('--meal-white-space', 'nowrap');
+            root.style.setProperty('--meal-word-break', 'normal');
+        } else {
+            root.style.setProperty('--meal-white-space', 'pre-wrap');
+            root.style.setProperty('--meal-word-break', 'break-word');
+        }
+
+        const rootEl = document.querySelector('.root');
+        if (rootEl) {
+            rootEl.classList.toggle('center', settings.centerAlign === true && settings.layoutMode === 'classic');
+            rootEl.classList.toggle('center-left', settings.centerAlign === true);
+            rootEl.classList.toggle('scroll-mode', settings.layoutMode === 'fullscreen_scroll');
+            rootEl.classList.toggle('square-mode', settings.layoutMode === 'square_dual_day');
+        }
+    }
+
+    function normalizeMealLine(line) {
+        let value = String(line || '').trim();
+        value = value.replace(/^\d+\.\s*/u, '');
+        value = value.replace(/\s+\d{1,2}\.\d{3}\s*$/u, '');
+        value = value.replace(/[ \t]{2,}/g, ' ').trim();
+        return value;
+    }
+
+    function startSlowScroll(cards, cardsWrap, settings, topDownOnly) {
+        if (!cards || !cardsWrap) {
+            return;
+        }
+        const overflowPx = cards.scrollHeight - cardsWrap.clientHeight;
+        if (overflowPx <= 4) {
+            return;
+        }
+
+        const speed = Math.max(8, Math.min(120, Number(settings.slowScrollSpeedPxPerSec || 28)));
+        if (topDownOnly) {
+            let y = 0;
+            let lastTs = 0;
+            let waitUntil = performance.now() + Math.max(0, Number(settings.scrollStartDelayMs || 2000));
+            const loopPause = Math.max(0, Number(settings.scrollLoopPauseMs || settings.scrollStartDelayMs || 2000));
+
+            const tick = (ts) => {
+                if (ts < waitUntil) {
+                    cards.style.transform = `translateY(${-Math.round(y)}px)`;
+                    scrollRaf = requestAnimationFrame(tick);
+                    return;
+                }
+
+                if (!lastTs) {
+                    lastTs = ts;
+                }
+                const dt = Math.max(0, (ts - lastTs) / 1000);
+                lastTs = ts;
+                y += speed * dt;
+
+                if (y >= overflowPx) {
+                    y = 0;
+                    lastTs = 0;
+                    waitUntil = ts + loopPause;
+                }
+
+                cards.style.transform = `translateY(${-Math.round(y)}px)`;
+                scrollRaf = requestAnimationFrame(tick);
+            };
+            scrollRaf = requestAnimationFrame(tick);
+            return;
+        }
+
+        let y = 0;
+        let direction = 1;
+        let lastTs = 0;
+        const tick = (ts) => {
+            if (!lastTs) {
+                lastTs = ts;
+            }
+            const dt = Math.max(0, (ts - lastTs) / 1000);
+            lastTs = ts;
+            y += direction * speed * dt;
+            if (y >= overflowPx) {
+                y = overflowPx;
+                direction = -1;
+            } else if (y <= 0) {
+                y = 0;
+                direction = 1;
+            }
+            cards.style.transform = `translateY(${-Math.round(y)}px)`;
+            scrollRaf = requestAnimationFrame(tick);
+        };
+        scrollRaf = requestAnimationFrame(tick);
+    }
+
+    function resolveApiUrl(base, query) {
+        const hasQ = String(base).includes('?');
+        return `${base}${hasQ ? '&' : '?'}${query}`;
+    }
+
+    function appendToken(url) {
+        const pageParams = new URLSearchParams(window.location.search);
+        const pageToken = pageParams.get('token');
+        if (!pageToken || String(url).includes('token=')) {
+            return url;
+        }
+        const glue = String(url).includes('?') ? '&' : '?';
+        return `${url}${glue}token=${encodeURIComponent(pageToken)}`;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (m) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        }[m]));
+    }
+
+    function allergenMap() {
+        return {
+            1: { emoji: '🌾', label: 'Glutén' },
+            2: { emoji: '🦐', label: 'Rákfélék' },
+            3: { emoji: '🥚', label: 'Tojás' },
+            4: { emoji: '🐟', label: 'Hal' },
+            5: { emoji: '🥜', label: 'Földimogyoró' },
+            6: { emoji: '🫘', label: 'Szója' },
+            7: { emoji: '🥛', label: 'Tej' },
+            8: { emoji: '🌰', label: 'Diófélék' },
+            9: { emoji: '🥬', label: 'Zeller' },
+            10: { emoji: '🟡', label: 'Mustár' },
+            11: { emoji: '🌱', label: 'Szezámmag' },
+            12: { emoji: '🍷', label: 'Kén-dioxid/szulfitok' },
+            13: { emoji: '🌼', label: 'Csillagfürt' },
+            14: { emoji: '🦪', label: 'Puhatestűek' }
+        };
+    }
+
+    function extractAllergenLabels(text) {
+        const raw = String(text || '');
+        const labels = [];
+        const matches = raw.match(/ALERG[ÉE]NY:\s*([^\n\r)]+)/giu) || [];
+        matches.forEach((m) => {
+            const part = String(m).replace(/ALERG[ÉE]NY:\s*/iu, '').trim();
+            part.split(',').map((item) => item.trim()).filter(Boolean).forEach((item) => labels.push(item));
+        });
+        return Array.from(new Set(labels));
+    }
+
+    function normalizeAllergenLabel(label) {
+        return String(label || '')
+            .toLowerCase()
+            .replace(/[()]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function allergenIconForLabel(label) {
+        const n = normalizeAllergenLabel(label);
+        if (n.includes('lepok') || n.includes('obilnin')) return '🌾';
+        if (n.includes('vajcia') || n.includes('toj')) return '🥚';
+        if (n.includes('mlieko') || n.includes('tej')) return '🥛';
+        if (n.includes('ryb') || n.includes('hal')) return '🐟';
+        if (n.includes('horcica') || n.includes('must')) return '🟡';
+        if (n.includes('zeler')) return '🥬';
+        if (n.includes('soj')) return '🫘';
+        if (n.includes('orech') || n.includes('dio')) return '🌰';
+        if (n.includes('sezam')) return '🌱';
+        if (n.includes('siričit') || n.includes('sulfit')) return '🍷';
+        if (n.includes('rak')) return '🦐';
+        if (n.includes('makkys')) return '🥜';
+        return '⚠️';
+    }
+
+    function extractAllergenCodes(text) {
+        const raw = String(text || '');
+        const codeSet = new Set();
+        const patterns = [
+            /\((?:allerg[eé]n(?:ek)?|alerg[eé]ny(?:ek)?)\s*:\s*([^)]+)\)/giu,
+            /(?:allerg[eé]n(?:ek)?|alerg[eé]ny(?:ek)?)\s*:\s*([^\n\r;]+)/giu
+        ];
+
+        patterns.forEach((pattern) => {
+            let match;
+            while ((match = pattern.exec(raw)) !== null) {
+                const part = String(match[1] || '');
+                const nums = part.match(/\b([1-9]|1[0-4])\b/g) || [];
+                nums.forEach((numStr) => {
+                    const code = parseInt(numStr, 10);
+                    if (code >= 1 && code <= 14) {
+                        codeSet.add(code);
+                    }
+                });
+            }
+        });
+
+        return Array.from(codeSet).sort((a, b) => a - b);
+    }
+
+    function stripAllergenAnnotations(text) {
+        return String(text || '')
+            .replace(/\((?:allerg[eé]n(?:ek)?|alerg[eé]ny(?:ek)?)\s*:\s*[^)]*\)/giu, '')
+            .replace(/(?:allerg[eé]n(?:ek)?|alerg[eé]ny(?:ek)?)\s*:\s*[^\n\r;]+/giu, '')
+            .replace(/ALERG[ÉE]NY:\s*[^\n\r]+/giu, '')
+            .replace(/[ \t]{2,}/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    }
+
+    function stripSourceNoise(text) {
+        return String(text || '')
+            .replace(/\bbody=\[[\s\S]*$/giu, '')
+            .replace(/\b(header|windowlock|cssbody|cssheader|doubleclickstop|singleclickstop|requireclick|hideselects|fade)=\[[^\]]*\]/giu, '')
+            .replace(/\be\.hod\.[^\n\r]*$/giu, '')
+            .replace(/[ \t]{2,}/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    }
+
+    function mealCardHtml(meal, settings, t) {
+        const key = String(meal.key || '').trim();
+        const localized = String(t.mealLabels?.[key] || '').trim();
+        const rawName = localized || String(meal.label || key || '').trim();
+        const mealIconHtml = settings.showMealTypeSvgIcons === true
+            ? `<span class="meal-icon" aria-hidden="true">${mealTypeSvg(meal.key)}</span>`
+            : '';
+        const name = escapeHtml(rawName);
+        const originalText = stripSourceNoise(String(meal.text || '').trim());
+        const allergenCodes = settings.showAllergenEmojis ? extractAllergenCodes(originalText) : [];
+        const allergenLabels = settings.showAllergenEmojis ? extractAllergenLabels(originalText) : [];
+
+        const displayTextRaw = settings.showAllergenEmojis
+            ? (stripAllergenAnnotations(originalText) || originalText)
+            : originalText;
+        const textLines = String(displayTextRaw || '—').split(/\r?\n/).map((line) => normalizeMealLine(line)).filter((line) => line !== '');
+        const text = textLines.length > 0
+            ? textLines.map((line, idx) => {
+                const safeLine = escapeHtml(line);
+                if (settings.showMealTypeSvgIcons !== true) {
+                    return `<span class="meal-text-line">${safeLine}</span>`;
+                }
+                return `<span class="meal-text-line with-icon"><span class="line-icon" aria-hidden="true">${mealLineSvg(line, key, idx)}</span><span class="line-text">${safeLine}</span></span>`;
+            }).join('')
+            : '—';
+
+        let allergenHtml = '';
+        if (settings.showAllergenEmojis && (allergenCodes.length > 0 || allergenLabels.length > 0)) {
+            const map = allergenMap();
+            const codeBadges = allergenCodes.map((code) => {
+                const item = map[code] || { emoji: '⚠️', label: 'Allergén' };
+                const title = escapeHtml(`${item.label} (${code})`);
+                return `<span class="allergen-badge" title="${title}">${item.emoji} ${code}</span>`;
+            });
+            const labelBadges = allergenLabels.map((label) => {
+                const icon = allergenIconForLabel(label);
+                const safeLabel = escapeHtml(label);
+                return `<span class="allergen-badge" title="${safeLabel}">${icon} ${safeLabel}</span>`;
+            });
+            const badges = [...codeBadges, ...labelBadges].join('');
+            allergenHtml = `<div class="allergen-row">${badges}</div>`;
+        }
+
+        return `<div class="card"><div class="meal">${mealIconHtml}<span>${name}</span></div><div class="text">${text}</div>${allergenHtml}</div>`;
+    }
+
+    function render(data, settings) {
+        const cards = document.getElementById('cards');
+        const cardsWrap = document.getElementById('cards-wrap');
+        const subtitle = document.getElementById('subtitle');
+        const foot = document.getElementById('foot');
+        const title = document.getElementById('title');
+        const t = i18n(settings.language);
+        if (title) {
+            const customTitle = String(settings.customHeaderTitle || '').trim();
+            title.textContent = customTitle !== '' ? customTitle : t.title;
+            title.style.display = settings.showHeaderTitle === false ? 'none' : '';
+        }
+
+        const dayText = String(data?.menu_date || '').trim();
+        const institutionName = String(data?.institution_name || '').trim();
+        const subtitleParts = [];
+        if (settings.showInstitutionName !== false && institutionName) {
+            subtitleParts.push(institutionName);
+        }
+        if (dayText) {
+            subtitleParts.push(dayText);
+        }
+        subtitle.textContent = subtitleParts.join(' • ') || t.noInstitution;
+        subtitle.style.display = (subtitle.textContent || '').trim() === '' ? 'none' : '';
+
+        const meals = Array.isArray(data?.meals) ? data.meals : [];
+        stopSlowScroll();
+        if (!meals.length) {
+            cards.innerHTML = `<div class="empty">${escapeHtml(t.emptyMeals)}</div>`;
+        } else {
+            cards.innerHTML = meals.map((meal) => mealCardHtml(meal, settings, t)).join('');
+
+            const topDownMode = settings.layoutMode === 'fullscreen_scroll';
+            if ((settings.slowScrollOnOverflow === true || topDownMode === true) && cardsWrap) {
+                startSlowScroll(cards, cardsWrap, settings, topDownMode === true);
+            }
+        }
+
+        const serverTs = String(data?.updated_at || '').trim();
+        const appetiteText = String(settings.appetiteMessageText || '').trim();
+        const sourceUrl = String(settings.sourceUrl || '').trim();
+        const lines = [];
+        lines.push(`<span class="foot-line">${escapeHtml(serverTs ? `${t.updatedAt}: ${serverTs}` : t.unknownUpdate)}</span>`);
+        if (settings.showAppetiteMessage === true && appetiteText !== '') {
+            lines.push(`<span class="foot-line">${escapeHtml(appetiteText)}</span>`);
+        }
+        if (settings.showSourceUrl === true && sourceUrl !== '') {
+            lines.push(`<span class="foot-source">${escapeHtml('Étrend forrása: ' + sourceUrl)}</span>`);
+        }
+        foot.innerHTML = lines.join('');
+    }
+
+    function renderSquareDual(todayData, tomorrowData, settings) {
+        const cards = document.getElementById('cards');
+        const subtitle = document.getElementById('subtitle');
+        const foot = document.getElementById('foot');
+        const title = document.getElementById('title');
+        const t = i18n(settings.language);
+
+        if (title) {
+            const customTitle = String(settings.customHeaderTitle || '').trim();
+            title.textContent = customTitle !== '' ? customTitle : t.title;
+            title.style.display = settings.showHeaderTitle === false ? 'none' : '';
+        }
+
+        const institutionName = String(todayData?.institution_name || tomorrowData?.institution_name || '').trim();
+        subtitle.textContent = settings.showInstitutionName === false ? '' : (institutionName || t.noInstitution);
+        subtitle.style.display = (subtitle.textContent || '').trim() === '' ? 'none' : '';
+
+        const dayBlocks = [
+            { key: 'today', title: t.today, data: todayData }
+        ];
+        if (settings.showTomorrowInSquare !== false) {
+            dayBlocks.push({ key: 'tomorrow', title: t.tomorrow, data: tomorrowData });
+        }
+
+        const daysHtml = dayBlocks.map((day) => {
+            const dayMeals = Array.isArray(day.data?.meals) ? day.data.meals : [];
+            const mealHtml = dayMeals.length > 0
+                ? dayMeals.map((meal) => {
+                    const key = String(meal.key || '').trim();
+                    const localized = String(t.mealLabels?.[key] || '').trim();
+                    const rawName = localized || String(meal.label || key || '').trim();
+                    const safeName = escapeHtml(rawName);
+                    const textRaw = stripSourceNoise(String(meal.text || '').trim());
+                    const displayText = (stripAllergenAnnotations(textRaw) || textRaw || '—')
+                        .split(/\r?\n/)
+                        .map((line) => normalizeMealLine(line))
+                        .filter(Boolean)
+                        .join('\n');
+                    const safeText = escapeHtml(displayText);
+                    return `<div class="day-meal"><div class="day-meal-label">${safeName}</div><div class="day-meal-text">${safeText}</div></div>`;
+                }).join('')
+                : `<div class="empty">${escapeHtml(t.emptyMeals)}</div>`;
+
+            const dateText = escapeHtml(String(day.data?.menu_date || '').trim());
+            return `<div class="day-square"><div class="day-title">${escapeHtml(day.title)}</div><div class="day-date">${dateText}</div><div class="day-content">${mealHtml}</div></div>`;
+        }).join('');
+
+        cards.innerHTML = `<div class="dual-days ${dayBlocks.length === 1 ? 'single-day' : ''}">${daysHtml}</div>`;
+
+        const tsCandidates = [String(todayData?.updated_at || '').trim(), String(tomorrowData?.updated_at || '').trim()].filter(Boolean);
+        const ts = tsCandidates.length > 0 ? tsCandidates.sort().slice(-1)[0] : '';
+        const appetiteText = String(settings.appetiteMessageText || '').trim();
+        const sourceUrl = String(settings.sourceUrl || '').trim();
+        const lines = [];
+        lines.push(`<span class="foot-line">${escapeHtml(ts ? `${t.updatedAt}: ${ts}` : t.unknownUpdate)}</span>`);
+        if (settings.showAppetiteMessage === true && appetiteText !== '') {
+            lines.push(`<span class="foot-line">${escapeHtml(appetiteText)}</span>`);
+        }
+        if (settings.showSourceUrl === true && sourceUrl !== '') {
+            lines.push(`<span class="foot-source">${escapeHtml('Étrend forrása: ' + sourceUrl)}</span>`);
+        }
+        foot.innerHTML = lines.join('');
+    }
+
+    function clearOverlayTextAnimation(position) {
+        const state = overlayTextState[position];
+        if (!state) return;
+        if (state.raf !== null) {
+            cancelAnimationFrame(state.raf);
+            state.raf = null;
+        }
+    }
+
+    function clearOverlays() {
+        if (overlayClockInterval !== null) {
+            clearInterval(overlayClockInterval);
+            overlayClockInterval = null;
+        }
+        clearOverlayTextAnimation('top');
+        clearOverlayTextAnimation('bottom');
+
+        ['overlayTop', 'overlayBottom'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = 'none';
+                el.innerHTML = '';
+            }
+        });
+    }
+
+    function overlayDateText(now, lang) {
+        const locale = String(lang || 'hu') === 'sk' ? 'sk-SK' : (String(lang || 'hu') === 'en' ? 'en-US' : 'hu-HU');
+        try {
+            return now.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        } catch (_) {
+            return now.toISOString().slice(0, 10);
+        }
+    }
+
+    function applyOverlays(settings) {
+        clearOverlays();
+
+        const root = document.querySelector('.root');
+        if (!root) return;
+
+        const topBand = document.getElementById('overlayTop');
+        const bottomBand = document.getElementById('overlayBottom');
+        if (!topBand || !bottomBand) return;
+
+        const chooseBand = (pos) => (String(pos || '').toLowerCase() === 'bottom' ? bottomBand : topBand);
+
+        if (settings.clockOverlayEnabled === true) {
+            const band = chooseBand(settings.clockOverlayPosition);
+            const height = Math.max(20, Math.min(40, Number(settings.clockOverlayHeightPercent || 40)));
+            band.style.display = 'flex';
+            band.style.height = `${height}%`;
+
+            const renderClock = () => {
+                const now = new Date();
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(now.getMinutes()).padStart(2, '0');
+                const ss = String(now.getSeconds()).padStart(2, '0');
+                const timeLine = `${hh}:${mm}:${ss}`;
+                const dateLine = overlayDateText(now, settings.language);
+                band.innerHTML = `<div class="overlay-clock"><div class="overlay-clock-line" style="color:${escapeHtml(String(settings.clockOverlayTimeColor || '#ffffff'))}; font-size:clamp(30px,6.2vw,132px);">${escapeHtml(timeLine)}</div><div class="overlay-clock-line" style="color:${escapeHtml(String(settings.clockOverlayDateColor || '#ffffff'))}; font-size:clamp(16px,2.2vw,48px); margin-top:6px;">${escapeHtml(dateLine)}</div></div>`;
+            };
+
+            renderClock();
+            overlayClockInterval = setInterval(renderClock, 1000);
+        }
+
+        if (settings.textOverlayEnabled === true) {
+            const band = chooseBand(settings.textOverlayPosition);
+            const height = Math.max(12, Math.min(40, Number(settings.textOverlayHeightPercent || 20)));
+            band.style.display = 'flex';
+            band.style.height = `${height}%`;
+
+            let segments = [];
+            const sourceType = String(settings.textOverlaySourceType || 'manual').toLowerCase();
+            if (sourceType === 'collection') {
+                try {
+                    const parsed = JSON.parse(String(settings.textOverlayCollectionJson || '[]'));
+                    if (Array.isArray(parsed)) {
+                        segments = parsed.map((item) => String(item || '').trim()).filter(Boolean);
+                    }
+                } catch (_) {
+                    segments = [];
+                }
+            } else {
+                const txt = String(settings.textOverlayText || '').trim();
+                if (txt) segments = [txt];
+            }
+
+            if (segments.length === 0) {
+                segments = [''];
+            }
+
+            const color = String(settings.textOverlayColor || '#ffffff');
+            const size = Math.max(18, Math.min(120, Number(settings.textOverlayFontSize || 52)));
+            const speed = Math.max(40, Math.min(320, Number(settings.textOverlaySpeedPxPerSec || 120)));
+
+            band.innerHTML = `<div class="overlay-text" style="color:${escapeHtml(color)}; font-size:${Math.round(size)}px;"><div class="overlay-text-track">${segments.map((s) => `<span class=\"overlay-text-segment\">${escapeHtml(s)}</span>`).join('')}</div></div>`;
+
+            const state = overlayTextState[String(settings.textOverlayPosition || '').toLowerCase() === 'bottom' ? 'bottom' : 'top'];
+            const textEl = band.querySelector('.overlay-text');
+            const track = band.querySelector('.overlay-text-track');
+            if (state && textEl && track) {
+                let x = textEl.clientWidth;
+                let lastTs = 0;
+                const tick = (ts) => {
+                    if (!lastTs) lastTs = ts;
+                    const dt = Math.max(0, (ts - lastTs) / 1000);
+                    lastTs = ts;
+                    x -= speed * dt;
+                    const resetAt = -track.scrollWidth;
+                    if (x < resetAt) {
+                        x = textEl.clientWidth;
+                    }
+                    track.style.transform = `translateX(${Math.round(x)}px)`;
+                    state.raf = requestAnimationFrame(tick);
+                };
+                state.raf = requestAnimationFrame(tick);
+            }
+        }
+    }
+
+    function isoDateOffset(days) {
+        const now = new Date();
+        const base = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, 12, 0, 0, 0);
+        const y = base.getFullYear();
+        const m = String(base.getMonth() + 1).padStart(2, '0');
+        const d = String(base.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    async function fetchMenuData(settings, dateValue, exactDate) {
+        const queryParams = new URLSearchParams({
+            action: 'menu',
+            site_key: settings.siteKey,
+            institution_id: String(parseInt(settings.institutionId, 10) || 0),
+            date: dateValue,
+            exact_date: exactDate ? '1' : '0',
+            show_breakfast: settings.showBreakfast ? '1' : '0',
+            show_snack_am: settings.showSnackAm ? '1' : '0',
+            show_lunch: settings.showLunch ? '1' : '0',
+            show_snack_pm: settings.showSnackPm ? '1' : '0',
+            show_dinner: settings.showDinner ? '1' : '0',
+            source_type: settings.sourceType === 'server' ? 'server' : 'manual'
+        });
+
+        const requestedCompanyId = parseInt(settings.companyId, 10) || 0;
+        if (requestedCompanyId > 0) {
+            queryParams.set('company_id', String(requestedCompanyId));
+        }
+
+        const url = appendToken(resolveApiUrl(settings.apiBaseUrl, queryParams.toString()));
+        const response = await fetchWithTimeout(url, 6000);
+        const payload = await response.json();
+        if (!response.ok || !payload || payload.success !== true) {
+            return null;
+        }
+        return payload.data || null;
+    }
+
+    async function fetchWithTimeout(url, timeoutMs) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { method: 'GET', cache: 'no-store', signal: controller.signal });
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    async function init() {
+        const settings = getSettings();
+        applyVisualSettings(settings);
+        applyOverlays(settings);
+        const cacheKey = `meal_menu_cache_${settings.companyId}_${settings.siteKey}_${settings.institutionId}`;
+
+        let rendered = false;
+
+        try {
+            if (settings.layoutMode === 'square_dual_day') {
+                const todayDate = isoDateOffset(0);
+                const tomorrowDate = isoDateOffset(1);
+                const [todayData, tomorrowData] = await Promise.all([
+                    fetchMenuData(settings, todayDate, false),
+                    settings.showTomorrowInSquare !== false ? fetchMenuData(settings, tomorrowDate, true) : Promise.resolve(null)
+                ]);
+
+                if (todayData || tomorrowData) {
+                    renderSquareDual(todayData || { institution_name: '', menu_date: todayDate, meals: [] }, tomorrowData || { institution_name: '', menu_date: tomorrowDate, meals: [] }, settings);
+                    rendered = true;
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayData, tomorrow: tomorrowData } }));
+                    } catch (_) {
+                    }
+                }
+            } else {
+                const data = await fetchMenuData(settings, isoDateOffset(0), false);
+                if (data) {
+                    render(data, settings);
+                    rendered = true;
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data }));
+                    } catch (_) {
+                    }
+                }
+            }
+        } catch (_) {
+        }
+
+        if (!rendered) {
+            const prefetched = settings.offlinePrefetchedMenuData;
+            if (settings.layoutMode === 'square_dual_day') {
+                const todayPref = prefetched && typeof prefetched === 'object' ? (prefetched.today || null) : null;
+                const tomorrowPref = prefetched && typeof prefetched === 'object' ? (prefetched.tomorrow || null) : null;
+                if (todayPref || tomorrowPref) {
+                    renderSquareDual(todayPref || { institution_name: '', menu_date: isoDateOffset(0), meals: [] }, tomorrowPref || { institution_name: '', menu_date: isoDateOffset(1), meals: [] }, settings);
+                    rendered = true;
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayPref, tomorrow: tomorrowPref } }));
+                    } catch (_) {
+                    }
+                }
+            } else if (prefetched && Array.isArray(prefetched.meals)) {
+                render(prefetched, settings);
+                rendered = true;
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: prefetched }));
+                } catch (_) {
+                }
+            }
+        }
+
+        if (!rendered) {
+            try {
+                const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+                if (cached && cached.data) {
+                    if (settings.layoutMode === 'square_dual_day') {
+                        const todayCached = cached.data.today || null;
+                        const tomorrowCached = cached.data.tomorrow || null;
+                        if (todayCached || tomorrowCached) {
+                            renderSquareDual(todayCached || { institution_name: '', menu_date: isoDateOffset(0), meals: [] }, tomorrowCached || { institution_name: '', menu_date: isoDateOffset(1), meals: [] }, settings);
+                            rendered = true;
+                        }
+                    } else if (cached.data.meals || cached.mode === 'single') {
+                        render(cached.data, settings);
+                        rendered = true;
+                    }
+                }
+            } catch (_) {
+            }
+        }
+
+        if (!rendered) {
+            if (settings.layoutMode === 'square_dual_day') {
+                renderSquareDual(
+                    { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
+                    { institution_name: '', menu_date: isoDateOffset(1), meals: [] },
+                    settings
+                );
+            } else {
+                render({ institution_name: '', menu_date: isoDateOffset(0), meals: [] }, settings);
+            }
+        }
+    }
+
+    init();
+})();
+</script>
+</body>
+</html>

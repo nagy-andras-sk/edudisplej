@@ -25,6 +25,8 @@ if (!isset($_SESSION['user_id'])) {
     $company_id = $_SESSION['company_id'] ?? null;
 }
 
+$is_super_admin_session = isset($_SESSION['isadmin']) && $_SESSION['isadmin'] && empty($_SESSION['admin_acting_company_id']);
+
 try {
     $data = json_decode(file_get_contents('php://input'), true);
     
@@ -41,6 +43,9 @@ try {
     // Verify kiosk belongs to user's company or token company
     if ($api_company && !api_is_admin_session($api_company)) {
         $stmt = $conn->prepare("SELECT id, screenshot_enabled, company_id FROM kiosks WHERE id = ?");
+        $stmt->bind_param("i", $kiosk_id);
+    } elseif ($is_super_admin_session) {
+        $stmt = $conn->prepare("SELECT id, screenshot_enabled FROM kiosks WHERE id = ?");
         $stmt->bind_param("i", $kiosk_id);
     } else {
         $stmt = $conn->prepare("SELECT id, screenshot_enabled FROM kiosks WHERE id = ? AND company_id = ?");

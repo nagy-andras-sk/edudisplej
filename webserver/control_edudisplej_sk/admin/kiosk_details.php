@@ -134,11 +134,30 @@ include 'header.php';
                 <tr><th>Installed</th><td><?php echo $kiosk['installed'] ? date('Y-m-d H:i:s', strtotime($kiosk['installed'])) : '-'; ?></td></tr>
                 <tr><th>Last seen</th><td><?php echo $kiosk['last_seen'] ? date('Y-m-d H:i:s', strtotime($kiosk['last_seen'])) : '-'; ?></td></tr>
                 <tr><th>Sync interval</th><td><?php echo htmlspecialchars((string)$kiosk['sync_interval']); ?> sec</td></tr>
+                <tr><th>Screenshot policy</th><td><?php echo !empty($kiosk['screenshot_enabled']) ? 'Bekapcsolva' : 'Kikapcsolva'; ?></td></tr>
                 <tr><th>Debug mód</th><td><?php echo !empty($kiosk['debug_mode']) ? 'Bekapcsolva' : 'Kikapcsolva'; ?></td></tr>
                 <tr><th>Status</th><td><?php echo htmlspecialchars($kiosk['status'] ?? '-'); ?></td></tr>
                 <tr><th>Comment</th><td><?php echo htmlspecialchars($kiosk['comment'] ?? '-'); ?></td></tr>
             </tbody>
         </table>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Screenshot policy</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;">
+        A kijelző folyamatos screenshot küldése itt kapcsolható.
+    </p>
+    <div>
+        <button id="btn-screenshot-on" onclick="setScreenshotEnabled(<?php echo (int)$kiosk['id']; ?>, true)"
+            style="background:#059669;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;margin-right:8px;">
+            📸 Screenshot BE
+        </button>
+        <button id="btn-screenshot-off" onclick="setScreenshotEnabled(<?php echo (int)$kiosk['id']; ?>, false)"
+            style="background:#6b7280;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">
+            🚫 Screenshot KI
+        </button>
+        <span id="screenshot-policy-msg" style="margin-left:10px;font-size:13px;color:#555;"></span>
     </div>
 </div>
 
@@ -362,6 +381,33 @@ function setDebugMode(kioskId, enable) {
         }
     })
     .catch(function() {
+        msg.textContent = '⚠ Hálózati hiba';
+        msg.style.color = '#b91c1c';
+    });
+}
+
+function setScreenshotEnabled(kioskId, enable) {
+    var msg = document.getElementById('screenshot-policy-msg');
+    msg.textContent = 'Küldés...';
+    msg.style.color = '#555';
+
+    fetch('../api/update_screenshot_settings.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({kiosk_id: kioskId, screenshot_enabled: enable ? 1 : 0})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            msg.textContent = enable ? '✓ Screenshot policy bekapcsolva' : '✓ Screenshot policy kikapcsolva';
+            msg.style.color = '#166534';
+            setTimeout(function() { window.location.reload(); }, 700);
+        } else {
+            msg.textContent = '⚠ Hiba: ' + (data.message || 'Ismeretlen hiba');
+            msg.style.color = '#b91c1c';
+        }
+    })
+    .catch(function(e) {
         msg.textContent = '⚠ Hálózati hiba';
         msg.style.color = '#b91c1c';
     });

@@ -27,6 +27,7 @@ KIOSK_ID=""
 # Global APT hardening options (non-interactive + config conflict safety)
 APT_COMMON_OPTS=(
     "-y"
+    "-o" "Dpkg::Use-Pty=0"
     "-o" "Dpkg::Options::=--force-confdef"
     "-o" "Dpkg::Options::=--force-confold"
     "-o" "Acquire::Retries=3"
@@ -137,7 +138,7 @@ apt_exec_with_stream() {
     set +e
     timeout "${timeout_seconds}s" \
         env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a UCF_FORCE_CONFFOLD=1 \
-        apt-get "${APT_COMMON_OPTS[@]}" "$@" 2>&1 \
+        apt-get "${APT_COMMON_OPTS[@]}" "$@" < /dev/null 2>&1 \
         | sed -u 's/^/[APT] /' \
         | tee -a "$APT_LOG"
     status=${PIPESTATUS[0]}

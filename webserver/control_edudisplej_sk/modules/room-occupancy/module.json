@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "module_key": "room-occupancy",
+  "name": "Terem foglaltság",
+  "description": "Terem állapot és napi foglaltság megjelenítése, kézi és külső API adatokkal",
+  "renderer": "m_room_occupancy.html",
+  "config": {
+    "defaults": "config/default_settings.json"
+  }
+}

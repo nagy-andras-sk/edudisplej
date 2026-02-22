@@ -42,7 +42,7 @@ function edudisplej_module_registry(): array
                 'config_dir' => 'modules/text/config',
                 'default_settings_file' => 'modules/text/config/default_settings.json',
                 'functions' => ['formattedText', 'scrollMode', 'backgroundImage'],
-                'settings_schema' => ['text', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'textAlign', 'textColor', 'bgColor', 'bgImageData', 'scrollMode', 'scrollStartPauseMs', 'scrollEndPauseMs', 'scrollSpeedPxPerSec'],
+                'settings_schema' => ['textSourceType', 'textCollectionId', 'textCollectionLabel', 'textCollectionVersionTs', 'text', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'textAlign', 'textColor', 'bgColor', 'bgImageData', 'scrollMode', 'scrollStartPauseMs', 'scrollEndPauseMs', 'scrollSpeedPxPerSec'],
             ],
             'unconfigured' => [
                 'folder_key' => 'default',
@@ -69,7 +69,7 @@ function edudisplej_module_registry(): array
                 'config_dir' => 'modules/gallery/config',
                 'default_settings_file' => 'modules/gallery/config/default_settings.json',
                 'functions' => ['slideshow', 'collage', 'fitMode', 'imageOptimization'],
-                'settings_schema' => ['imageUrlsJson', 'displayMode', 'fitMode', 'slideIntervalSec', 'transitionMs', 'collageColumns', 'bgColor', 'clockOverlayEnabled', 'clockOverlayPosition', 'clockOverlayHeightPercent', 'clockOverlayTimeColor', 'clockOverlayDateColor', 'textOverlayEnabled', 'textOverlayPosition', 'textOverlayHeightPercent', 'textOverlayText', 'textOverlayFontSize', 'textOverlayColor', 'textOverlaySpeedPxPerSec'],
+                'settings_schema' => ['imageUrlsJson', 'displayMode', 'fitMode', 'slideIntervalSec', 'transitionEnabled', 'transitionMs', 'collageColumns', 'bgColor', 'clockOverlayEnabled', 'clockOverlayPosition', 'clockOverlayHeightPercent', 'clockOverlayTimeColor', 'clockOverlayDateColor', 'textOverlayEnabled', 'textOverlayPosition', 'textOverlayHeightPercent', 'textOverlaySourceType', 'textOverlayText', 'textOverlayCollectionJson', 'textOverlayExternalUrl', 'textOverlayFontSize', 'textOverlayColor', 'textOverlaySpeedPxPerSec'],
             ],
             'video' => [
                 'folder_key' => 'video',
@@ -79,6 +79,24 @@ function edudisplej_module_registry(): array
                 'default_settings_file' => 'modules/video/config/default_settings.json',
                 'functions' => ['mp4Playback', 'hardwareFriendly', 'autoDuration'],
                 'settings_schema' => ['videoAssetUrl', 'videoAssetId', 'videoDurationSec', 'muted', 'fitMode', 'bgColor'],
+            ],
+            'meal-menu' => [
+                'folder_key' => 'meal-menu',
+                'folder' => 'meal-menu',
+                'renderer' => 'modules/meal-menu/m_meal_menu.html',
+                'config_dir' => 'modules/meal-menu/config',
+                'default_settings_file' => 'modules/meal-menu/config/default_settings.json',
+                'functions' => ['remoteMealFetch', 'offlineFallback', 'mealTypeFiltering'],
+                'settings_schema' => ['companyId', 'siteKey', 'institutionId', 'language', 'showHeaderTitle', 'customHeaderTitle', 'showInstitutionName', 'showBreakfast', 'showSnackAm', 'showLunch', 'showSnackPm', 'showDinner', 'showMealTypeEmojis', 'showMealTypeSvgIcons', 'showAllergenEmojis', 'centerAlign', 'slowScrollOnOverflow', 'slowScrollSpeedPxPerSec', 'scrollStartDelayMs', 'scrollLoopPauseMs', 'layoutMode', 'showTomorrowInSquare', 'fontFamily', 'mealTitleFontSize', 'mealTextFontSize', 'textFontWeight', 'lineHeight', 'wrapText', 'showAppetiteMessage', 'appetiteMessageText', 'showSourceUrl', 'sourceUrl', 'clockOverlayEnabled', 'clockOverlayPosition', 'clockOverlayHeightPercent', 'clockOverlayTimeColor', 'clockOverlayDateColor', 'textOverlayEnabled', 'textOverlayPosition', 'textOverlayHeightPercent', 'textOverlaySourceType', 'textOverlayText', 'textOverlayCollectionJson', 'textOverlayExternalUrl', 'textOverlayFontSize', 'textOverlayColor', 'textOverlaySpeedPxPerSec', 'apiBaseUrl'],
+            ],
+            'room-occupancy' => [
+                'folder_key' => 'room-occupancy',
+                'folder' => 'room-occupancy',
+                'renderer' => 'modules/room-occupancy/m_room_occupancy.html',
+                'config_dir' => 'modules/room-occupancy/config',
+                'default_settings_file' => 'modules/room-occupancy/config/default_settings.json',
+                'functions' => ['roomScheduleFetch', 'manualAndExternalData', 'currentOccupancyState'],
+                'settings_schema' => ['companyId', 'roomId', 'showOnlyCurrent', 'showNextCount', 'apiBaseUrl'],
             ],
         ],
     ];

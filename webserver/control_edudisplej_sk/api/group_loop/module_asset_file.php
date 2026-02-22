@@ -1,7 +1,19 @@
 <?php
-require_once '../../dbkonfiguracia.php';
-require_once '../auth.php';
-require_once '../../modules/module_asset_service.php';
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
+require_once __DIR__ . '/../../modules/module_asset_service.php';
+
+$asset_file_debug = static function (string $message, array $context = []): void {
+    $pairs = [];
+    foreach ($context as $key => $value) {
+        if (is_scalar($value) || $value === null) {
+            $pairs[] = $key . '=' . var_export($value, true);
+        } else {
+            $pairs[] = $key . '=' . json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+    error_log('module_asset_file debug: ' . $message . ($pairs ? ' | ' . implode(' ', $pairs) : ''));
+};
 
 $api_company = validate_api_token();
 
@@ -19,6 +31,26 @@ if ($asset_id <= 0 && $normalized_path === '') {
 try {
     $conn = getDbConnection();
     edudisplej_module_asset_ensure_schema($conn);
+
+    $api_company_id = (int)($api_company['id'] ?? 0);
+    $api_is_admin = !empty($api_company['is_admin']);
+    $session_user_id = (int)($_SESSION['user_id'] ?? 0);
+
+    if ($api_company_id <= 0 && $session_user_id > 0) {
+        $company_stmt = $conn->prepare('SELECT company_id FROM users WHERE id = ? LIMIT 1');
+        if ($company_stmt) {
+            $company_stmt->bind_param('i', $session_user_id);
+            $company_stmt->execute();
+            $company_row = $company_stmt->get_result()->fetch_assoc();
+            $company_stmt->close();
+
+            $resolved_company_id = (int)($company_row['company_id'] ?? 0);
+            if ($resolved_company_id > 0) {
+                $api_company['id'] = $resolved_company_id;
+                $api_company_id = $resolved_company_id;
+            }
+        }
+    }
 
     if ($asset_id > 0) {
         $stmt = $conn->prepare("SELECT id, company_id, mime_type, original_name, storage_rel_path, is_active FROM module_asset_store WHERE id = ? LIMIT 1");
@@ -59,7 +91,20 @@ try {
         ?: (rtrim(str_replace('\\', '/', (string)$root_abs), '/') . '/uploads/companies');
     $uploads_root = rtrim(str_replace('\\', '/', (string)$uploads_root_abs), '/') . '/';
     $resolved_file_normalized = str_replace('\\', '/', (string)$resolved_file);
-    if ($resolved_file === false || strpos($resolved_file_normalized, $uploads_root) !== 0 || !is_file($resolved_file)) {
+    $is_windows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    $path_in_upload_root = $is_windows
+        ? (strpos(strtolower($resolved_file_normalized), strtolower($uploads_root)) === 0)
+        : (strpos($resolved_file_normalized, $uploads_root) === 0);
+
+    if ($resolved_file === false || !$path_in_upload_root || !is_file($resolved_file)) {
+        $asset_file_debug('asset file validation failed', [
+            'asset_id' => (int)($asset['id'] ?? 0),
+            'storage_rel_path' => $storage_rel_path,
+            'resolved_file' => $resolved_file_normalized,
+            'uploads_root' => $uploads_root,
+            'path_in_upload_root' => $path_in_upload_root,
+            'is_file' => $resolved_file !== false ? is_file($resolved_file) : false,
+        ]);
         $conn->close();
         http_response_code(404);
         header('Content-Type: application/json; charset=utf-8');
@@ -102,13 +147,44 @@ try {
 
     $conn->close();
 
+    if (function_exists('session_write_close')) {
+        session_write_close();
+    }
+
+    if (function_exists('ob_get_level')) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+    }
+
+    clearstatcache(true, $resolved_file);
+    $file_size = filesize($resolved_file);
+
+    $asset_file_debug('streaming asset response', [
+        'asset_id' => (int)($asset['id'] ?? 0),
+        'company_id' => (int)($asset['company_id'] ?? 0),
+        'mime_type' => $mime_type,
+        'file_size' => $file_size,
+        'resolved_file' => $resolved_file,
+    ]);
+
     header('Content-Type: ' . $mime_type);
-    header('Content-Length: ' . (string)filesize($resolved_file));
+    if ($file_size !== false && $file_size > 0) {
+        header('Content-Length: ' . (string)$file_size);
+    }
     header('X-Content-Type-Options: nosniff');
-    header('Cache-Control: private, max-age=300');
+    header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     header('Content-Disposition: inline; filename="' . str_replace('"', '', $original_name) . '"');
 
-    readfile($resolved_file);
+    $bytes_sent = readfile($resolved_file);
+    if ($bytes_sent === false) {
+        $asset_file_debug('readfile failed', [
+            'asset_id' => (int)($asset['id'] ?? 0),
+            'resolved_file' => $resolved_file,
+        ]);
+    }
     exit;
 } catch (Throwable $e) {
     error_log('module_asset_file error: ' . $e->getMessage());

@@ -1,0 +1,6 @@
+{
+  "roomId": 0,
+  "showOnlyCurrent": false,
+  "showNextCount": 4,
+  "apiBaseUrl": "../../api/room_occupancy.php"
+}

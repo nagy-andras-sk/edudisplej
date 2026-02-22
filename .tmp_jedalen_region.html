@@ -1,0 +1,578 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><link rel="icon" href="/favicon.ico?fetag=0254F22A45A774C346F056357566B859" type="image/x-icon" /><meta http-equiv="content-language" content="sk" /><meta http-equiv="Content-Type" content="text/html;charset=utf-8" /><meta name="cache-control" content="private" /><meta http-equiv="pragma" content="no-cache" />
+
+<!-- Google Ads -->    
+<script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+<script>
+    window.onload = function () {
+        (adsbygoogle = window.adsbygoogle || []).onload = function () {
+            [].forEach.call(document.getElementsByClassName('adsbygoogle'), function () {
+                adsbygoogle.push({})
+            })
+        }
+    };
+</script>
+<!-- Google Ads -->
+
+<!-- Google Tag Manager -->
+<script>
+    // Initialize the data layer for Google Tag Manager (this should mandatorily be done before the Cookie Solution is loaded)
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+    // Default consent mode is "denied" for both ads and analytics, but delay for 2 seconds until the Cookie Solution is loaded
+    gtag("consent", "default", {
+        ad_storage: "denied",
+        analytics_storage: "denied",
+        wait_for_update: 2000 // milliseconds
+    });
+    // Improve ad click measurement quality (optional)
+    gtag('set', 'url_passthrough', true);
+    // Further redact your ads data (optional)
+    gtag("set", "ads_data_redaction", true);
+
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || []; w[l].push({
+            'gtm.start':
+                new Date().getTime(), event: 'gtm.js'
+        }); var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+                'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+    })(window, document, 'script', 'dataLayer', 'GTM-PK8NPQ');</script>
+<!-- End Google Tag Manager -->
+
+<link href="App_Themes/Nellis/nellis.css?fetag=F1CB555DED73ADB01D720E0A8D8234C4" type="text/css" rel="stylesheet" /><meta name="author" content="Abiset s.r.o." />
+<meta name="copyright" content="(c) 2008 - 2026 Abiset s.r.o." />
+<meta name="publisher" content="iKelp Webová Jedáleň v.1.12.28" />
+<meta name="generator" content="iKelp Webová Jedáleň v.1.12.28" />
+<meta name="description" content="iKelp Webová jedáleň je portál, kde si môžete objednávať a odhlasovať svoju stravu a sledovať svoje financie." />
+<meta name="keywords" content="jedáleň, webová jedáleň, stravovací portál, prihlasovnie stravy, odhlasovanie stravy, evidencia stravy" />
+<script type="text/javascript" src="//ajax.aspnetcdn.com/ajax/jQuery/jquery-1.11.0.min.js"></script>
+<script type="text/javascript" src="/App_Themes/Nellis/js/nellis.js"></script>
+<title>
+	iKelp Jedáleň - stravovací portál vašej jedálne
+</title></head>   
+<body class="login-body" >
+    
+    <!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PK8NPQ"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+<script language="javascript" type="text/javascript">
+
+    function changeTab(to) {
+
+        if (to == 'toSend') {
+            document.getElementById('showtab').value = "contactform";
+
+            //            document.getElementById('send-message-div').style.display = "block";
+            //            document.getElementById('send-rec-pass').style.display = "none";
+            //            
+            //            if (document.getElementById('upload-menufile') != null) document.getElementById('upload-menufile').style.display = "none";
+            //            if (document.getElementById('eat-menu-div1') != null) document.getElementById('eat-menu-div1').style.display = "none";
+            //            if (document.getElementById('eat-menu-div2') != null) document.getElementById('eat-menu-div2').style.display = "none";
+
+            document.getElementById('send-message-div').style.display = "none";
+            document.getElementById('send-rec-pass').style.display = "none";
+
+            if (document.getElementById('upload-menufile') != null) document.getElementById('upload-menufile').style.display = "none";
+            if (document.getElementById('eat-menu-div1') != null) document.getElementById('eat-menu-div1').style.display = "block";
+            if (document.getElementById('eat-menu-div2') != null) document.getElementById('eat-menu-div2').style.display = "block";
+
+            if (document.getElementById('map-contact') != null) document.getElementById('map-contact').style.display = "block";
+            if (document.getElementById('map-menu') != null) document.getElementById('map-menu').style.display = "none";
+        }
+        if (to == 'toMap') {
+            document.getElementById('showtab').value = "map";
+            document.getElementById('send-message-div').style.display = "none";
+            document.getElementById('send-rec-pass').style.display = "none";
+
+            if (document.getElementById('upload-menufile') != null) document.getElementById('upload-menufile').style.display = "none";
+            if (document.getElementById('eat-menu-div1') != null) document.getElementById('eat-menu-div1').style.display = "block";
+            if (document.getElementById('eat-menu-div2') != null) document.getElementById('eat-menu-div2').style.display = "block";
+
+            if (document.getElementById('map-contact') != null) document.getElementById('map-contact').style.display = "none";
+            if (document.getElementById('map-menu') != null) document.getElementById('map-menu').style.display = "block";
+        }
+        if (to == 'toPassRec') {
+            document.getElementById('showtab').value = "pass_rec";
+            document.getElementById('send-rec-pass').style.display = "block";
+
+            if (document.getElementById('upload-menufile') != null) document.getElementById('upload-menufile').style.display = "none";
+            if (document.getElementById('send-message-div') != null) document.getElementById('send-message-div').style.display = "none";
+            if (document.getElementById('eat-menu-div1') != null) document.getElementById('eat-menu-div1').style.display = "none";
+            if (document.getElementById('eat-menu-div2') != null) document.getElementById('eat-menu-div2').style.display = "none";
+        }
+        if (to == 'toMenuUpload') {
+            document.getElementById('showtab').value = "menuupload";
+            document.getElementById('upload-menufile').style.display = "block";
+
+            document.getElementById('send-rec-pass').style.display = "none";
+            if (document.getElementById('send-message-div') != null) document.getElementById('send-message-div').style.display = "none";
+            if (document.getElementById('eat-menu-div1') != null) document.getElementById('eat-menu-div1').style.display = "none";
+            if (document.getElementById('eat-menu-div2') != null) document.getElementById('eat-menu-div2').style.display = "none";
+        }
+
+
+    }
+
+
+
+    function CheckRegion() { //v1.0 
+
+        var beforeText = "";
+        var showedtab = getURLParam("tab");
+        switch (showedtab) {
+            case "contactform":
+                changeTab('toSend');
+                beforeText = "Kontaktovať jedáleň - ";
+                break;
+            default:
+                break;
+        }
+        var regicode = getURLParam("RC");
+        switch (regicode) {
+            case "ba":
+                document.getElementById('mapa').src = "App_Themes/Nellis/images/maps/1.gif";
+                document.getElementById('jedalny-listok-h2').innerHTML = beforeText + "Bratislavský kraj";
+                break;
+            case "tt":
+                document.getElementById('mapa').src = "App_Themes/Nellis/images/maps/2.gif";
+                document.getElementById('jedalny-listok-h2').innerHTML = beforeText + "Trnavský kraj";
+                break;
+            case "tn":
+                document.getElementById('mapa').src = "App_Themes/Nellis/images/maps/3.gif";
+                document.getElementById('jedalny-listok-h2').innerHTML = beforeText + "Trenčiansky kraj";
+                break;
+            case "nr":
+                document.getElementById('mapa').src = "App_Themes/Nellis/images/maps/4.gif";
+                document.getElementById('jedalny-listok-h2').innerHTML = beforeText + "Nitriansky kraj";
+                break;
+            case "za":
+                document.getElementById('mapa').src = "App_Themes/Nellis/images/maps/5.gif";
+                document.getElementById('jedalny-listok-h2').innerHTML = beforeText + "Žilinský kraj";
+                break;
+            case "bb":
+                document.getElementById('mapa').src = "App_Themes/Nellis/images/maps/6.gif";
+                document.getElementById('jedalny-listok-h2').innerHTML = beforeText + "Banskobystrický kraj";
+                break;
+            case "po":
+                document.getElementById('mapa').src = "App_Themes/Nellis/images/maps/7.gif";
+                document.getElementById('jedalny-listok-h2').innerHTML = beforeText + "Prešovský kraj";
+                break;
+            case "ke":
+                document.getElementById('mapa').src = "App_Themes/Nellis/images/maps/8.gif";
+                document.getElementById('jedalny-listok-h2').innerHTML = beforeText + "Košický kraj";
+                break;
+            default:
+                switch (showedtab) {
+                    case "contactform":
+                        if (document.getElementById('jedalny-listok-h2') != null) {
+                            document.getElementById('jedalny-listok-h2').innerHTML = "Vyberte kraj a potom jedáleň";
+                        }
+                        break;
+                    default:
+                        
+                        if (document.getElementById('jedalny-listok-h2') != null)
+                            document.getElementById('jedalny-listok-h2').style.display = "none";
+                        
+                        break;
+                }
+                break;
+        }
+    }
+
+    function getURLParam(strParamName) {
+        var strReturn = "";
+        var strHref = window.location.href;
+        if (strHref.indexOf("?") > -1) {
+            var strQueryString = strHref.substr(strHref.indexOf("?")).toLowerCase();
+            var aQueryString = strQueryString.split("&");
+            for (var iParam = 0; iParam < aQueryString.length; iParam++) {
+                if (
+                    aQueryString[iParam].indexOf(strParamName.toLowerCase() + "=") > -1) {
+                    var aParam = aQueryString[iParam].split("=");
+                    strReturn = aParam[1];
+                    break;
+                }
+            }
+        }
+        return unescape(strReturn);
+    }
+
+    function MM_swapImgRestore() { //v3.0
+        var i, x, a = document.MM_sr; for (i = 0; a && i < a.length && (x = a[i]) && x.oSrc; i++) x.src = x.oSrc;
+    }
+
+    function MM_preloadImages() { //v3.0
+        var d = document; if (d.images) {
+            if (!d.MM_p) d.MM_p = new Array();
+            var i, j = d.MM_p.length, a = MM_preloadImages.arguments; for (i = 0; i < a.length; i++)
+                if (a[i].indexOf("#") != 0) { d.MM_p[j] = new Image; d.MM_p[j++].src = a[i]; }
+        }
+    }
+
+    function MM_findObj(n, d) { //v4.0
+        var p, i, x; if (!d) d = document; if ((p = n.indexOf("?")) > 0 && parent.frames.length) {
+            d = parent.frames[n.substring(p + 1)].document; n = n.substring(0, p);
+        }
+        if (!(x = d[n]) && d.all) x = d.all[n]; for (i = 0; !x && i < d.forms.length; i++) x = d.forms[i][n];
+        for (i = 0; !x && d.layers && i < d.layers.length; i++) x = MM_findObj(n, d.layers[i].document);
+        if (!x && document.getElementById) x = document.getElementById(n); return x;
+    }
+
+    function MM_swapImage() { //v3.0
+        var i, j = 0, x, a = MM_swapImage.arguments; document.MM_sr = new Array; for (i = 0; i < (a.length - 2); i += 3)
+            if ((x = MM_findObj(a[i])) != null) { document.MM_sr[j++] = x; if (!x.oSrc) x.oSrc = x.src; x.src = a[i + 2]; }
+    }
+</script>
+
+
+    <form name="form1" method="post" action="./?RC=TT" onsubmit="javascript:return WebForm_OnSubmit();" id="form1" enctype="multipart/form-data">
+<div>
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['form1'];
+if (!theForm) {
+    theForm = document.form1;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/WebResource.axd?d=pynGkmcFUV13He1Qd6_TZFt4rBLM2-f6bQvszFTGP98nQcvfN66qcf391-jwQSZ4zIyRoQ2&amp;t=638942282819057530" type="text/javascript"></script>
+
+
+<script src="/ScriptResource.axd?d=nv7asgRUU0tRmHNR2D6t1KAxY8i3msDYDWuCV2-0cpSkWa02GX4FiFsMnWahJKZ88LEVAoytY9l8JLmLIFNoALDjjKZ9AOZKxYrHnwvH83ZNNSj8VK52PuufUI2fV-mAePYE5A2&amp;t=fffffffff2f92c66" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=NJmAwtEo3Ipnlaxl6CMhvqG5DIhkXV0_TzfemY2xhlovEKDPG2MZn_wxDwx69m2YWVlUfbu0L284ywFr750vY-ZWhddNbhky_adw8XMXke3f8aimr6-kAwqb18dhazbZE3qwMYMWutcKrOLQ5tsTrApModM1&amp;t=32e5dfca" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=dwY9oWetJoJoVpgL6Zq8OGHlrvIC5xnGcQ0pJj9yjaR_ftl1L0b2kTWXpcMzQEmDuADAEvduT5h44YC1r07bNZFbOcEbiECOie31XHS-89aowIF8BveTKiiLkeCX8EZopWDvA6cZ25-VHSmHRaTEfvyCx3g1&amp;t=32e5dfca" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=Xz2vUBiw-iW_eTyhK3lS4S13f4cVz-U7Cg6gVXFW184IkhvPTW5h6MVnnv6e157pWmwJo29XpfDIWDNwEHqmnEIeVpUwG65s5S_zouGs8COax5sZ80ePP7Tk9-rS0R3F2BzPeOatIq9-8wSMg4QD5nDdxzQ1&amp;t=32e5dfca" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+function WebForm_OnSubmit() {
+if (typeof(ValidatorOnSubmit) == "function" && ValidatorOnSubmit() == false) return false;
+return true;
+}
+//]]>
+</script>
+
+<div>
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="CA0B0334" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="gmSTlbok19IhbkfDCWJwOGUdj/jDlvBJu6ARzXwGMywX0wJA+wTMWlC+553XqTwQBS4b8rC8SgnMZR3A9EJN6nmfKqA0ZeKTJW3E7pPeiktJVUrKu7vHfJyElqoaoSILk4Mt5KyvwRbVUCai/ckxk6HFqvv79MWqfDr691Xgtd4KsnFX" />
+</div>
+    <script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ScriptManager1', 'form1', ['tglobMsgBox$upnlMessage','','tupnlForgotMyPassword','','tmsgForgotPassword$upnlMessage','','tFileUpload1$MessageBox1$upnlMessage',''], [], [], 90, '');
+//]]>
+</script>
+
+  
+    <input type="hidden" id="showtab" />
+    <div class="login-maincontainer">
+        <div id="globMsgBox_upnlMessage">
+	
+        
+        <span id="globMsgBox_Timer1" style="visibility:hidden;display:none;"></span>
+        <div style="line-height:1%; font-size:1px; color:White; display:none" class="messgebox-hidden">div</div>
+    
+</div>
+<div id="globMsgBox_uprgMessage" style="display:none;">
+	
+    
+</div>
+
+        <div class="login-leftcontainer">
+           
+                <h2>Prihlásenie</h2>
+             
+            <div class="login-table">Pre prihl&#225;senie najsk&#244;r vyberte jed&#225;lny l&#237;stok.</div>
+            <h2>Registrácia</h2>
+                <div class="login-table">Pre registr&#225;ciu najsk&#244;r vyberte jed&#225;lny l&#237;stok.</div>
+                <h2>Na stránke nájdete</h2>
+                <div class="login-leftcontainer-middle-text">
+                    <ul class="login-why">
+                        <li>Jedálny lístok</li>
+                        <li>Vaše financie v jedálni</li>
+                        <li>Či bol odbery stravy</li>
+                        <li>Prihlásenie / odhlásenie stravy</li>
+                    </ul>
+                    <div style="padding: 0.25em 0 0 0.4375em;">Majte prehľad a šetrite si čas.</div>
+                </div>
+        </div>
+        
+        
+        <div class="login-rightcontainer" id="send-message-div" style="display:none" >             
+                <h2>
+                    Kontaktný formulár                
+                    <a href="#map" onclick="changeTab('toMap');" title="Jedálny lístok" class="button-back1">
+                    <img id="Image2" src="App_Themes/Nellis/images/login/login-back.png" style="border-width:0px;" />
+                    </a>
+                </h2>                
+
+              
+                                
+            
+        </div>     
+        
+        
+        
+        <div class="login-rightcontainer" id="send-rec-pass" style="display:none" >
+            
+                <h2>
+                    Zabudol som heslo
+                    <a href="#map" onclick="changeTab('toMap');" title="Jedálny lístok" class="button-back2">
+                    <img id="Image1" src="App_Themes/Nellis/images/login/login-back.png" style="border-width:0px;" />
+                    </a>
+                </h2>   
+                
+                <div class="lost-passw">
+                    Zadajte svoj prihlasovací email alebo prihlasovacie meno a portál Vám vygenerujeme nové heslo.
+                    <br /><br />
+                 
+                    <div id="upnlForgotMyPassword">
+	 
+      
+                        Váš email: <input name="txtForgotPasswordEmail" type="text" id="txtForgotPasswordEmail" />
+                        <input type="submit" name="btnForgotPassword" value="Spracuj" id="btnForgotPassword" />
+                    
+                     <div id="uprgForgotMyPassword" style="display:none;">
+		
+                        <input type="image" name="ImageButton1" id="ImageButton1" disabled="disabled" title="Nahrávam..." class="ajax-progress-img" src="App_Themes/Nellis/images/design/ajax-loading.gif" style="height:16px;width:16px;border-width:0px;" />
+                    
+	</div>
+                
+                </div>
+                
+            
+</div>
+                
+                
+                
+              
+                <div id="msgForgotPassword_upnlMessage">
+	
+        
+        <span id="msgForgotPassword_Timer1" style="visibility:hidden;display:none;"></span>
+        <div style="line-height:1%; font-size:1px; color:White; display:none" class="messgebox-hidden">div</div>
+    
+</div>
+<div id="msgForgotPassword_uprgMessage" style="display:none;">
+	
+    
+</div>
+  
+                                
+                
+        
+        </div>      
+        
+        
+         
+
+        
+        <div class="login-rightcontainer" id="upload-menufile" style="display:none" >
+            
+                <h2>
+                    Nahranie lístka
+                    <a href="#map" onclick="changeTab('toMap');" title="Jedálny lístok" class="button-back3">
+                    <img id="Image3" src="App_Themes/Nellis/images/login/login-back.png" style="border-width:0px;" />
+                    </a>
+                </h2>   
+                
+                <div class="upload">
+                    
+
+<table class="menu-day" cellpadding="0" cellspacing="0">
+        <tr class="menu-day-bg-top">
+            <td>
+            </td>
+        </tr>
+        <tr class="menu-day-bg-down menu-day-date-bg-uploadbox">
+            <td>
+                <div class="menu-day-date-box ie6-menu-day-date-bg-uploadbox">
+                    <img id="FileUpload1_Image1" class="menu-day-img-transparent" src="App_Themes/Nellis/images/menu/menu-day-img-transparent.png" alt="transparent" style="border-width:0px;" />
+                    <table class="menu-day-innertable" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td class="menu-day-date">
+                            </td>
+                            <td>
+                                
+                                    <div id="FileUpload1_MessageBox1_upnlMessage">
+	
+        
+        <span id="FileUpload1_MessageBox1_Timer1" style="visibility:hidden;display:none;"></span>
+        <div style="line-height:1%; font-size:1px; color:White; display:none" class="messgebox-hidden">div</div>
+    
+</div>
+<div id="FileUpload1_MessageBox1_uprgMessage" style="display:none;">
+	
+    
+</div>
+
+                                    Nahrávanie jedálneho lístka slúži najmä pre stravovacie zariadenia, ktoré nemajú prístup na internet a chcú zverejňovať jedálny lístok pre svojich stravníkov na internete. 
+<br />
+Taktiež aj stravovacie zariadenia, ktoré majú internet, no aktuálne je ich internet 'mimo prevádzku', môžu týmto spôsobom nahrať svoj jedálny lístok, aby ho stravníci videli.
+<br /><br />
+Jedálny lístok exportujete z aplikácie iKelp Jedáleň tak, že kliknete pravým tlačidlom do tabuľky zoznamu jedálnych lístkov a vyberiete možnosť 'Export lístka do súboru'.
+                                    <br />
+                                    <a id="FileUpload1_hlnkHelpExportEatMenuFile" href="http://help.ikelp.com/go/?key=jedalen.web-export-listka&amp;wver=1.12.28.26200">Návod 'Ako exportovať jedálny lístok'</a>
+                                    
+
+
+                                    
+                                    <br />
+                                    Súbor jedálneho lístka:
+                                    <input type="file" name="FileUpload1$FileUpload1" id="FileUpload1_FileUpload1" />
+                                    <input type="submit" name="FileUpload1$btnUpload" value="Nahrať" id="FileUpload1_btnUpload" />
+                                    <br />
+                                  
+                                    
+                                    <br />
+                                    
+                                     <br />
+                                        Nahraním jedálneho lístka zároveň súhlasíte s licenčnými podmienkami: 
+                                        <a id="FileUpload1_HyperLink1" href="http://help.ikelp.com/go/?key=jedalen.licencie.online">Licenčné podmienky zverejňovania jedálneho lístka.</a>
+                                    
+                                    
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
+    
+    
+    
+                </div>
+                                
+            
+        
+        </div>    
+         
+
+        <div class="login-rightcontainer" id="eat-menu-div1" >
+           
+
+            
+             <div id="map-menu" class="login-rightcontainer-middle">
+                <h2>Jedálny lístok</h2>
+                <div class="select-region-text">kliknutím na mapku vyberte kraj</div>
+                    
+                    <img src="/App_Themes/Nellis/images/maps/2.gif" class="login-mapa" title="Mapa Jedální" id="mapa" name="skmap" width="376" height="183" border="0" usemap="#full_map" /><map id="Map1" name="full_map">
+                    <area alt="Bratislavský kraj" shape="poly" coords="26,141,28,142,33,138,33,136,33,133,36,133,38,128,40,130,41,131,45,129,44,125,45,122,46,120,43,118,44,112,41,107,36,104,35,102,35,100,36,98,36,96,35,95,37,91,40,90,40,88,40,86,37,88,33,91,29,94,26,94,24,92,20,92,17,94,14,94,10,101,9,108,11,112,12,116,15,125,18,130,20,134,20,141" href="?RC=BA" onMouseOut="MM_swapImgRestore()" onMouseOver="MM_swapImage('skmap','','App_Themes/Nellis/images/maps/1.gif',1)">
+                    <area alt="Trnavský kraj" shape="poly" coords="53,168,55,168,56,165,58,164,60,164,60,161,65,159,67,149,67,142,63,142,64,138,62,135,64,131,65,129,67,130,68,129,68,120,73,109,76,107,75,104,70,99,72,94,78,94,72,90,69,88,66,88,62,84,57,84,57,87,51,88,48,81,48,77,46,73,42,73,40,73,42,70,35,64,32,64,26,71,21,77,18,85,15,86,15,90,18,90,20,89,26,91,31,90,38,85,40,84,42,86,42,89,39,94,39,97,38,102,43,106,46,112,47,118,47,124,47,130,38,136,34,136,35,137,36,138,30,143,31,145,35,147,43,159,48,161,52,165" href='?RC=TT' onMouseOut="MM_swapImgRestore()" onMouseOver="MM_swapImage('skmap','','App_Themes/Nellis/images/maps/2.gif',1)">
+                    <area alt="Trenčiansky kraj" shape="poly" coords="60,68,65,68,72,63,77,62,82,54,90,54,99,32,108,28,110,30,117,44,120,46,120,54,121,54,120,57,114,60,113,63,116,64,122,62,126,64,126,74,130,79,132,82,128,90,126,93,121,93,118,96,114,98,108,99,102,103,96,96,96,92,89,83,81,81,80,83,81,87,80,90,71,87,63,82,59,82,53,84,50,77,48,72,49,68,55,72" href="?RC=TN" onMouseOut="MM_swapImgRestore()" onMouseOver="MM_swapImage('skmap','','App_Themes/Nellis/images/maps/3.gif',1)">
+                    <area alt="Nitriansky kraj" shape="poly" coords="91,174,97,176,101,173,108,173,115,173,122,170,127,170,122,165,123,161,121,156,126,153,129,148,139,148,143,142,142,137,137,139,133,140,126,138,129,129,131,126,127,116,125,114,122,118,120,121,117,121,113,122,111,122,113,116,113,112,111,106,110,102,109,101,103,107,99,105,97,102,97,100,93,98,94,93,88,86,84,83,82,84,83,86,83,90,80,93,78,96,74,96,74,99,78,104,78,105,76,111,70,120,70,130,67,132,66,135,66,136,67,141,69,142,69,148,68,160,64,162,58,169,60,171,81,172" href="?RC=NR" onMouseOut="MM_swapImgRestore()" onMouseOver="MM_swapImage('skmap','','App_Themes/Nellis/images/maps/4.gif',1)">
+                    <area alt="Žilinský kraj" shape="poly" coords="146,23,156,24,162,24,169,13,173,13,178,7,181,9,183,20,187,25,192,29,196,28,197,38,194,42,197,48,202,48,203,54,210,56,209,61,207,66,209,70,202,73,193,71,183,68,168,69,164,74,161,74,162,70,148,70,143,78,144,82,139,82,131,76,128,67,130,62,122,60,122,56,124,52,122,44,114,32,110,26,122,17,124,12,132,14,144,12,147,12" href="?RC=ZA" onMouseOut="MM_swapImgRestore()" onMouseOver="MM_swapImage('skmap','','App_Themes/Nellis/images/maps/5.gif',1)">
+                    <area alt="Banskobystrický kraj" shape="poly" coords="158,147,170,146,173,136,184,132,186,137,201,144,214,137,220,131,225,132,232,119,224,116,224,110,228,106,224,101,221,92,218,92,219,82,222,81,220,76,210,76,194,74,191,74,184,70,171,71,164,76,160,76,158,73,147,74,146,84,139,86,135,84,126,97,120,97,114,101,115,111,116,116,118,117,124,113,128,114,133,122,132,130,132,136,138,136,146,136,144,146,147,148,162,146,161,146" href="?RC=BB" onMouseOut="MM_swapImgRestore()" onMouseOver="MM_swapImage('skmap','','App_Themes/Nellis/images/maps/6.gif',1)">
+                    <area alt="Prešovský kraj" shape="poly" coords="258,35,262,36,264,37,269,42,274,41,281,34,281,29,286,32,290,29,296,30,304,32,312,30,318,35,322,37,326,36,332,41,335,50,351,60,364,65,367,66,364,73,358,82,352,82,348,76,340,81,339,84,332,84,321,78,318,78,319,88,315,91,306,88,301,80,294,78,294,81,288,84,286,78,274,76,271,71,264,70,258,66,253,67,248,70,240,66,234,66,226,70,226,75,220,73,212,72,210,64,213,55,205,50,206,45,210,45,212,48,217,50,223,38,232,36,233,29,246,32,250,34,252,30,256,30" href="?RC=PO" onMouseOut="MM_swapImgRestore()" onMouseOver="MM_swapImage('skmap','','App_Themes/Nellis/images/maps/7.gif',1)">
+                    <area alt="Košický kraj" shape="poly" coords="319,131,325,131,336,128,340,128,340,111,350,103,353,102,353,95,355,89,355,84,348,84,346,80,342,84,339,87,330,87,326,83,322,81,322,89,316,94,314,94,304,90,299,82,293,83,288,88,284,86,283,81,274,79,266,74,258,71,252,71,250,72,246,72,243,70,235,69,228,72,230,73,229,77,221,86,223,92,226,94,228,101,230,104,228,112,228,114,235,116,237,110,248,108,259,106,265,110,274,113,287,113,296,108,300,110,303,114,306,115,310,115,312,125,313,131" href="?RC=KE" onMouseOut="MM_swapImgRestore()" onMouseOver="MM_swapImage('skmap','','App_Themes/Nellis/images/maps/8.gif',1)">
+                    </map>
+                     
+                     <h2 id="jedalny-listok-h2"  >Trnavský kraj</h2>
+                     <div class='div-companies'><a href='/Pages/EatMenu?Ident=R5L4cGx3Lr' title='Materská škola' >BIELY KOSTOL, Materská škola, Cintorínska 5</a><br /><a href='/Pages/EatMenu?Ident=2XXkqCTOTS' title='Školská jedáleň MŠ Čakany' >ČAKANY, Školská jedáleň MŠ Čakany, Hlavná č. 115</a><br /><a href='/Pages/EatMenu?Ident=sTyyqepnu4' title='Školská jedáleň pri ZŠ Čáry' >ČÁRY, Školská jedáleň pri ZŠ Čáry, Školská 285</a><br /><a href='/Pages/EatMenu?Ident=xMBxPg7COi' title='Školská jedáleň pri MŠ Častkov' >ČASTKOV, Školská jedáleň pri MŠ Častkov, </a><br /><a href='/Pages/EatMenu?Ident=8aWHJT60cC' title='Obec Dubovce' >DUBOVCE, Obec Dubovce, 49</a><br /><a href='/Pages/EatMenu?Ident=DjnXJ7KLuA' title='METRANS /Danubia/, a.s.' >DUNAJSKÁ STREDA, METRANS /Danubia/, a.s., Povodská cesta 18</a><br /><a href='/Pages/EatMenu?Ident=kIrdOjlEqv' title='Školská jedáleň' >HLBOKÉ, Školská jedáleň, Športová</a><br /><a href='/Pages/EatMenu?Ident=5ACjxDLdCO' title='Školská jedáleň ako súčasť Materskej školy - Óvoda' >JELKA, Školská jedáleň ako súčasť Materskej školy - Óvoda, Mierová 960/18</a><br /><a href='/Pages/EatMenu?Ident=XKyxc8yGtT' title='Základná škola' >JELKA, Základná škola, Školská 399/1</a><br /><a href='/Pages/EatMenu?Ident=faF9j8lJ8j' title='OBEC KOPČANY' >KOPČANY, OBEC KOPČANY, Štefánikovo námestie 610</a><br /><a href='/Pages/EatMenu?Ident=8rg1QA3J7S' title='ZŠ s MŠ s VJM' >KRÁĽOV BROD, ZŠ s MŠ s VJM, 6</a><br /><a href='/Pages/EatMenu?Ident=S77kbKFibr' title='Obec Kuklov' >KUKLOV, Obec Kuklov, Kuklov 203</a><br /><a href='/Pages/EatMenu?Ident=qicoQ1YCnb' title='Materská škola' >KÚTY, Materská škola, Dr.Štefana Heska 921</a><br /><a href='/Pages/EatMenu?Ident=DHGY51j9x6' title='Školská jedáleň pri ZŠ' >KÚTY, Školská jedáleň pri ZŠ, Školská 694</a><br /><a href='/Pages/EatMenu?Ident=2hMmM9RS5t' title='Obec Moravský Svätý Ján' >MORAVSKÝ SVÄTÝ JÁN, Obec Moravský Svätý Ján, Moravský Svätý Ján 803</a><br /><a href='/Pages/EatMenu?Ident=r6BXFYhkWs' title='Základná škola s materskou školou' >MOSTOVÁ, Základná škola s materskou školou, Hlavná 210</a><br /><a href='/Pages/EatMenu?Ident=isKSj6ygAB' title='Škôlkárik a Školáčik, n.o.' >NIŽNÁ, Škôlkárik a Školáčik, n.o., Nižná 4</a><br /><a href='/Pages/EatMenu?Ident=71oF9tlmtS' title='Materská škola' >OPOJ 247, Materská škola, </a><br /><a href='/Pages/EatMenu?Ident=LPXX4MaHvC' title='ŠJ pri MŠ Oreské' >ORESKÉ, ŠJ pri MŠ Oreské, </a><br /><a href='/Pages/EatMenu?Ident=7yD7Xc002y' title='Obec Popudinské Močidľany' >POPUDINSKÉ MOČIDĽANY, Obec Popudinské Močidľany, </a><br /><a href='/Pages/EatMenu?Ident=z0amMkA5fc' title='Obec Prietržka' >PRIETRŽKA, Obec Prietržka, Prietržka 57</a><br /><a href='/Pages/EatMenu?Ident=pbECtv7BaC' title='Obec Radimov' >RADIMOV, Obec Radimov, Radimov 44</a><br /><a href='/Pages/EatMenu?Ident=S080ftHjcq' title='Školská jedáleň MŠ' >RADOŠOVCE, Školská jedáleň MŠ, </a><br /><a href='/Pages/EatMenu?Ident=mkSdYcL0ob' title='Materská škola' >SENICA, Materská škola, L. Novomeského 1209/2</a><br /><a href='/Pages/EatMenu?Ident=zD2CbxAU8s' title='Spojená škola' >SLÁDKOVIČOVO, Spojená škola, Richterová 1144</a><br /><a href='/Pages/EatMenu?Ident=KYAV3EftdR' title='ZŠ s MŠ Smolinské' >SMOLINSKÉ, ZŠ s MŠ Smolinské, Smolinské 407</a><br /><a href='/Pages/EatMenu?Ident=N3HixifIr1' title='Školská jedáleň pri MŠ Trebatice' >TREBATICE, Školská jedáleň pri MŠ Trebatice, Štúrova 197/53</a><br /><a href='/Pages/EatMenu?Ident=PccTegJaOi' title='Obec Trstice' >TRSTICE, Obec Trstice, Trstice 667</a><br /><a href='/Pages/EatMenu?Ident=wPyvA1ysIg' title='ZŠ s MŠ s VJM Trstice' >TRSTICE, ZŠ s MŠ s VJM Trstice, 1072</a><br /><a href='/Pages/EatMenu?Ident=18nAarpgRy' title='ZÁKLADNÁ ŠKOLA s MŠ' >UNÍN, ZÁKLADNÁ ŠKOLA s MŠ, Unín 420</a><br /><a href='/Pages/EatMenu?Ident=i2peXwO7rm' title='Základná škola Veľká Mača' >VEĽKÁ MAČA, Základná škola Veľká Mača, </a><br /><a href='/Pages/EatMenu?Ident=KTeb5d3upu' title='ŠKOLSKÁ JEDÁLEŇ' >VEĽKÉ ÚĽANY, ŠKOLSKÁ JEDÁLEŇ, Štefana Majora 1444/83</a><br /><a href='/Pages/EatMenu?Ident=AHbmhq2Irp' title='Obec Vozokany' >VOZOKANY, Obec Vozokany, Hlavná</a><br /></div>
+            </div>
+            
+                
+       
+        </div> 
+        
+        
+
+            <div class="google-banner" style="clear: both;margin: 10px auto 10px auto;padding: 10px 0px;text-align: center;">
+    
+<div class="google-advr-b" style="text-align:center; margin:3px 0px;">
+
+<ins class="adsbygoogle"
+     style="display:inline-block;width:728px;height:90px"
+     data-ad-client="ca-pub-3690689954732423"
+     data-ad-slot="1602456140"></ins>
+
+    </div>
+
+
+</div>
+
+        <div class="copyright"> Copyright © 2008 - 2026
+         <a id="HyperLink2" title="Abiset s.r.o." href="//www.abiset.sk" target="_blank">Abiset s.r.o.</a> | 
+         <a id="HyperLink1" title="iKelp Jedáleň" href="//aplikacia.jedalen.sk" target="_blank">iKelp Jedáleň</a> |
+         <a id="HyperLink5" href="Pages/SendMessageFree">Kontaktovať</a> |
+         <a id="HyperLink6" href="Pages/TermConditions">Podmienky používania</a> |
+         <a id="HyperLink3" href="Pages/PrivacyPolicy">Ochrana osobných údajov</a> |
+         <a id="HyperLink4" href="Pages/Advertisements">Prečo reklamy?</a>
+         
+       
+                          
+                          
+        </div>
+    </div>  
+    
+    
+     
+     
+       
+    
+
+<script type="text/javascript">
+//<![CDATA[
+
+var Page_ValidationActive = false;
+if (typeof(ValidatorOnLoad) == "function") {
+    ValidatorOnLoad();
+}
+
+function ValidatorOnSubmit() {
+    if (Page_ValidationActive) {
+        return ValidatorCommonOnSubmit();
+    }
+    else {
+        return true;
+    }
+}
+        Sys.Application.add_init(function() {
+    $create(Sys.UI._Timer, {"enabled":false,"interval":10000,"uniqueID":"globMsgBox$Timer1"}, null, null, $get("globMsgBox_Timer1"));
+});
+Sys.Application.add_init(function() {
+    $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":"globMsgBox_upnlMessage","displayAfter":500,"dynamicLayout":true}, null, null, $get("globMsgBox_uprgMessage"));
+});
+Sys.Application.add_init(function() {
+    $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":"upnlForgotMyPassword","displayAfter":500,"dynamicLayout":true}, null, null, $get("uprgForgotMyPassword"));
+});
+Sys.Application.add_init(function() {
+    $create(Sys.UI._Timer, {"enabled":false,"interval":10000,"uniqueID":"msgForgotPassword$Timer1"}, null, null, $get("msgForgotPassword_Timer1"));
+});
+Sys.Application.add_init(function() {
+    $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":"msgForgotPassword_upnlMessage","displayAfter":500,"dynamicLayout":true}, null, null, $get("msgForgotPassword_uprgMessage"));
+});
+Sys.Application.add_init(function() {
+    $create(Sys.UI._Timer, {"enabled":false,"interval":10000,"uniqueID":"FileUpload1$MessageBox1$Timer1"}, null, null, $get("FileUpload1_MessageBox1_Timer1"));
+});
+Sys.Application.add_init(function() {
+    $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":"FileUpload1_MessageBox1_upnlMessage","displayAfter":500,"dynamicLayout":true}, null, null, $get("FileUpload1_MessageBox1_uprgMessage"));
+});
+//]]>
+</script>
+</form>
+     
+</body>
+</html>
+

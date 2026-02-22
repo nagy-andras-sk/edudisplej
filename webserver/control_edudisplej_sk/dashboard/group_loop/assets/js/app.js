@@ -8,6 +8,7 @@
         let scheduleWeekOffset = 0;
         let nextTempTimeBlockId = -1;
         const groupId = parseInt(groupLoopBootstrap.groupId || 0, 10);
+        const companyId = parseInt(groupLoopBootstrap.companyId || 0, 10);
         const isDefaultGroup = !!groupLoopBootstrap.isDefaultGroup;
         const isContentOnlyMode = !!groupLoopBootstrap.isContentOnlyMode;
         const technicalModule = groupLoopBootstrap.technicalModule || null;
@@ -52,6 +53,8 @@
         let scheduleGridStepMinutes = 60;
         let groupResolutionChoices = [];
         let groupDefaultResolution = '1920x1080';
+        let textCollectionsCacheDetailed = [];
+        let textCollectionsCacheLoadedAt = 0;
 
         function showAutosaveToast(message, isError = false) {
             const toast = document.getElementById('autosave-toast');
@@ -193,21 +196,12 @@
             }
 
             const styles = Array.isArray(payload.loop_styles) ? payload.loop_styles : [];
-            const nowTs = Date.now();
-            const parsedStyles = styles.length > 0
-                ? styles.map((style, idx) => ({
-                    id: parseInt(style.id ?? -(idx + 1), 10),
-                    name: String(style.name || `Loop ${idx + 1}`),
-                    items: Array.isArray(style.items) ? style.items : [],
-                    last_modified_ms: Number.isFinite(Number(style.last_modified_ms))
-                        ? Number(style.last_modified_ms)
-                        : (Date.parse(String(style.updated_at || style.modified_at || '')) || (nowTs - idx))
-                }))
-                : [createFallbackLoopStyle('DEFAULT', Array.isArray(payload.base_loop) ? payload.base_loop : [])];
+            const parsedStyles = normalizeLoopStyles(styles, Array.isArray(payload.base_loop) ? payload.base_loop : []);
 
             loopStyles = parsedStyles;
             defaultLoopStyleId = parseInt(payload.default_loop_style_id ?? loopStyles[0]?.id ?? 0, 10) || loopStyles[0]?.id || null;
             timeBlocks = normalizeTimeBlocks(payload.schedule_blocks || payload.time_blocks || []);
+            syncNextTempIdCursor();
 
             ensureSingleDefaultLoopStyle();
             activeLoopStyleId = parseInt(defaultLoopStyleId || loopStyles[0]?.id || 0, 10) || (loopStyles[0]?.id ?? null);
@@ -317,7 +311,10 @@
             }
 
             return rawBlocks.map((block) => ({
-                id: block.id != null ? parseInt(block.id, 10) : nextTempTimeBlockId--,
+                id: (() => {
+                    const parsedId = parseInt(block?.id, 10);
+                    return Number.isFinite(parsedId) && parsedId !== 0 ? parsedId : nextTempTimeBlockId--;
+                })(),
                 block_name: String(block.block_name || 'Időblokk'),
                 block_type: String(block.block_type || 'weekly') === 'date' ? 'date' : 'weekly',
                 specific_date: block.specific_date ? String(block.specific_date).slice(0, 10) : null,
@@ -330,6 +327,62 @@
                 is_locked: parseInt(block.is_locked || block.is_fixed_plan || 0, 10) ? 1 : 0,
                 loops: Array.isArray(block.loops) ? block.loops : []
             }));
+        }
+
+        function normalizeLoopStyles(rawStyles, fallbackItems = []) {
+            const styles = Array.isArray(rawStyles) ? rawStyles : [];
+            const nowTs = Date.now();
+            const usedIds = new Set();
+            let nextGeneratedId = -1;
+
+            if (styles.length === 0) {
+                return [createFallbackLoopStyle('DEFAULT', Array.isArray(fallbackItems) ? fallbackItems : [])];
+            }
+
+            return styles.map((style, idx) => {
+                const parsedId = parseInt(style?.id, 10);
+                let resolvedId = Number.isFinite(parsedId) ? parsedId : 0;
+
+                if (!resolvedId || usedIds.has(resolvedId)) {
+                    while (usedIds.has(nextGeneratedId) || nextGeneratedId === 0) {
+                        nextGeneratedId -= 1;
+                    }
+                    resolvedId = nextGeneratedId;
+                    nextGeneratedId -= 1;
+                }
+
+                usedIds.add(resolvedId);
+
+                return {
+                    id: resolvedId,
+                    name: String(style?.name || `Loop ${idx + 1}`),
+                    items: Array.isArray(style?.items) ? style.items : [],
+                    last_modified_ms: Number.isFinite(Number(style?.last_modified_ms))
+                        ? Number(style.last_modified_ms)
+                        : (Date.parse(String(style?.updated_at || style?.modified_at || '')) || (nowTs - idx))
+                };
+            });
+        }
+
+        function syncNextTempIdCursor() {
+            const usedIds = [];
+
+            (Array.isArray(loopStyles) ? loopStyles : []).forEach((style) => {
+                const styleId = parseInt(style?.id, 10);
+                if (Number.isFinite(styleId) && styleId !== 0) {
+                    usedIds.push(styleId);
+                }
+            });
+
+            (Array.isArray(timeBlocks) ? timeBlocks : []).forEach((block) => {
+                const blockId = parseInt(block?.id, 10);
+                if (Number.isFinite(blockId) && blockId !== 0) {
+                    usedIds.push(blockId);
+                }
+            });
+
+            const minUsedId = usedIds.length > 0 ? Math.min(...usedIds) : 0;
+            nextTempTimeBlockId = minUsedId <= -1 ? (minUsedId - 1) : -1;
         }
 
         function createFallbackLoopStyle(name, items) {
@@ -443,6 +496,121 @@
             if (inlineName) {
                 inlineName.textContent = styleName;
             }
+
+            const inlineSchedule = document.getElementById('active-loop-inline-schedule');
+            if (inlineSchedule) {
+                inlineSchedule.textContent = getActiveLoopWeeklyScheduleSummary();
+            }
+        }
+
+        function scheduleDayNameSk(day) {
+            const names = {
+                1: 'po',
+                2: 'ut',
+                3: 'st',
+                4: 'št',
+                5: 'pia',
+                6: 'so',
+                7: 'ne'
+            };
+            return names[day] || '?';
+        }
+
+        function formatSummaryTimeToken(hhmmss) {
+            const raw = String(hhmmss || '00:00:00').slice(0, 5);
+            const [hourPart, minutePart] = raw.split(':');
+            const hour = parseInt(hourPart || '0', 10);
+            if (String(minutePart || '00') === '00') {
+                return String(hour);
+            }
+            return `${String(hour).padStart(2, '0')}:${String(minutePart || '00').padStart(2, '0')}`;
+        }
+
+        function compactDaysLabel(daysList) {
+            const values = Array.from(new Set((Array.isArray(daysList) ? daysList : [])
+                .map((v) => parseInt(v, 10))
+                .filter((v) => v >= 1 && v <= 7)))
+                .sort((a, b) => a - b);
+
+            if (values.length === 0) {
+                return '';
+            }
+
+            const groups = [];
+            let start = values[0];
+            let prev = values[0];
+
+            for (let i = 1; i < values.length; i += 1) {
+                const current = values[i];
+                if (current === prev + 1) {
+                    prev = current;
+                    continue;
+                }
+                groups.push([start, prev]);
+                start = current;
+                prev = current;
+            }
+            groups.push([start, prev]);
+
+            return groups.map(([groupStart, groupEnd]) => {
+                if (groupStart === groupEnd) {
+                    return scheduleDayNameSk(groupStart);
+                }
+                if (groupEnd === groupStart + 1) {
+                    return `${scheduleDayNameSk(groupStart)},${scheduleDayNameSk(groupEnd)}`;
+                }
+                return `${scheduleDayNameSk(groupStart)}-${scheduleDayNameSk(groupEnd)}`;
+            }).join(',');
+        }
+
+        function getActiveLoopWeeklyScheduleSummary() {
+            const styleId = parseInt(activeLoopStyleId || 0, 10);
+            if (!styleId || parseInt(defaultLoopStyleId || 0, 10) === styleId) {
+                return '';
+            }
+
+            const weeklyBlocks = timeBlocks
+                .filter((block) => String(block.block_type || 'weekly') === 'weekly')
+                .filter((block) => parseInt(block.loop_style_id || 0, 10) === styleId);
+
+            if (weeklyBlocks.length === 0) {
+                return '';
+            }
+
+            const rangeMap = new Map();
+            weeklyBlocks.forEach((block) => {
+                const start = String(block.start_time || '00:00:00');
+                const end = String(block.end_time || '00:00:00');
+                const key = `${start}|${end}`;
+                if (!rangeMap.has(key)) {
+                    rangeMap.set(key, new Set());
+                }
+                const daySet = rangeMap.get(key);
+                String(block.days_mask || '')
+                    .split(',')
+                    .map((v) => parseInt(v, 10))
+                    .filter((v) => v >= 1 && v <= 7)
+                    .forEach((day) => daySet.add(day));
+            });
+
+            const segments = Array.from(rangeMap.entries())
+                .map(([key, daySet]) => {
+                    const [start, end] = key.split('|');
+                    const dayLabel = compactDaysLabel(Array.from(daySet.values()));
+                    const timeLabel = `${formatSummaryTimeToken(start)}-${formatSummaryTimeToken(end)}`;
+                    if (!dayLabel) {
+                        return timeLabel;
+                    }
+                    return `${dayLabel} ${timeLabel}`;
+                })
+                .filter((label) => !!label)
+                .sort((a, b) => a.localeCompare(b));
+
+            if (segments.length === 0) {
+                return '';
+            }
+
+            return `(${segments.join(' • ')})`;
         }
 
         function toggleLoopDetailVisibility() {
@@ -603,7 +771,8 @@
             const deleteBtn = document.getElementById('loop-style-delete-btn');
             if (deleteBtn) {
                 const activeIdValue = parseInt(activeLoopStyleId || 0, 10);
-                const canDelete = !isDefaultGroup && !isContentOnlyMode && activeIdValue > 0 && activeIdValue !== defaultId;
+                const hasActiveStyle = !!getLoopStyleById(activeIdValue);
+                const canDelete = !isDefaultGroup && !isContentOnlyMode && hasActiveStyle && activeIdValue !== defaultId;
                 deleteBtn.disabled = !canDelete;
                 deleteBtn.style.opacity = canDelete ? '1' : '0.5';
                 deleteBtn.style.cursor = canDelete ? 'pointer' : 'not-allowed';
@@ -1488,6 +1657,8 @@
                 return;
             }
 
+            updateActiveLoopVisualState();
+
             scheduleWeekOffset = Number.isFinite(scheduleWeekOffset) ? parseInt(scheduleWeekOffset, 10) : 0;
 
             const weekLabel = document.getElementById('schedule-week-label');
@@ -2268,6 +2439,67 @@
             elapsed += (Date.now() - currentModuleStartTime) / 1000;
             return elapsed;
         }
+
+        function resolveLoopStylesAndBlocksFromConfig(data) {
+            const plannerStyles = Array.isArray(data.loop_styles) ? data.loop_styles : [];
+            if (plannerStyles.length > 0) {
+                return {
+                    styles: normalizeLoopStyles(plannerStyles),
+                    defaultStyleId: parseInt(data.default_loop_style_id ?? plannerStyles[0]?.id ?? 0, 10) || plannerStyles[0]?.id || null,
+                    blocks: normalizeTimeBlocks(data.schedule_blocks || data.time_blocks || [])
+                };
+            }
+
+            const hasStructuredPayload = Array.isArray(data.base_loop) || Array.isArray(data.time_blocks);
+            const baseItems = hasStructuredPayload
+                ? (Array.isArray(data.base_loop) ? data.base_loop : [])
+                : (Array.isArray(data.loops) ? data.loops : []);
+            const styles = [createFallbackLoopStyle('DEFAULT', baseItems)];
+
+            let blocks = normalizeTimeBlocks(data.time_blocks || []);
+            blocks = blocks.map((block, index) => {
+                const style = createFallbackLoopStyle(block.block_name || `Idősáv ${index + 1}`, Array.isArray(block.loops) ? block.loops : []);
+                styles.push(style);
+                return { ...block, loop_style_id: style.id };
+            });
+
+            return {
+                styles,
+                defaultStyleId: styles[0].id,
+                blocks
+            };
+        }
+
+        function applyLoadedLoopConfig(data) {
+            const resolved = resolveLoopStylesAndBlocksFromConfig(data);
+            loopStyles = resolved.styles;
+            defaultLoopStyleId = resolved.defaultStyleId;
+            timeBlocks = resolved.blocks;
+            syncNextTempIdCursor();
+
+            planVersionToken = String(data.plan_version || data.plan_version_token || data.loop_version || '');
+
+            ensureSingleDefaultLoopStyle();
+
+            activeLoopStyleId = parseInt(defaultLoopStyleId || loopStyles[0]?.id || 0, 10) || (loopStyles[0]?.id ?? null);
+            loopItems = deepClone(getLoopStyleById(activeLoopStyleId)?.items || []);
+            normalizeLoopItems();
+            persistActiveLoopStyleItems();
+            activeScope = 'base';
+            setActiveScope('base', false);
+            lastSavedSnapshot = getLoopSnapshot();
+            lastPublishedPayload = JSON.parse(lastSavedSnapshot);
+            hasLoadedInitialLoop = true;
+            tryRestoreDraftFromCache();
+            updatePendingSaveBar();
+            renderLoopStyleSelector();
+            renderScopeSelector();
+            renderLoop();
+
+            if (loopItems.length > 0) {
+                setTimeout(() => startPreview(), 500);
+            }
+        }
         
         // Load existing loop configuration
         function loadLoop() {
@@ -2312,68 +2544,153 @@
                         return;
                     }
 
-                    const plannerStyles = Array.isArray(data.loop_styles) ? data.loop_styles : [];
-                    if (plannerStyles.length > 0) {
-                        loopStyles = plannerStyles.map((style, idx) => ({
-                            id: parseInt(style.id ?? -(idx + 1), 10),
-                            name: String(style.name || `Loop ${idx + 1}`),
-                            items: Array.isArray(style.items) ? style.items : []
-                        }));
-                        defaultLoopStyleId = parseInt(data.default_loop_style_id ?? loopStyles[0]?.id ?? 0, 10) || loopStyles[0]?.id || null;
-                        timeBlocks = normalizeTimeBlocks(data.schedule_blocks || data.time_blocks || []);
-                    } else {
-                        const hasStructuredPayload = Array.isArray(data.base_loop) || Array.isArray(data.time_blocks);
-                        const baseItems = hasStructuredPayload
-                            ? (Array.isArray(data.base_loop) ? data.base_loop : [])
-                            : (Array.isArray(data.loops) ? data.loops : []);
-                        loopStyles = [createFallbackLoopStyle('DEFAULT', baseItems)];
-                        defaultLoopStyleId = loopStyles[0].id;
-
-                        timeBlocks = normalizeTimeBlocks(data.time_blocks || []);
-                        timeBlocks = timeBlocks.map((block, index) => {
-                            const style = createFallbackLoopStyle(block.block_name || `Idősáv ${index + 1}`, Array.isArray(block.loops) ? block.loops : []);
-                            loopStyles.push(style);
-                            return { ...block, loop_style_id: style.id };
-                        });
-                    }
-
-                    planVersionToken = String(data.plan_version || data.plan_version_token || data.loop_version || '');
-
-                    ensureSingleDefaultLoopStyle();
-
-                    activeLoopStyleId = parseInt(defaultLoopStyleId || loopStyles[0]?.id || 0, 10) || (loopStyles[0]?.id ?? null);
-                    loopItems = deepClone(getLoopStyleById(activeLoopStyleId)?.items || []);
-                    normalizeLoopItems();
-                    persistActiveLoopStyleItems();
-                    activeScope = 'base';
-                    setActiveScope('base', false);
-                    lastSavedSnapshot = getLoopSnapshot();
-                    lastPublishedPayload = JSON.parse(lastSavedSnapshot);
-                    hasLoadedInitialLoop = true;
-                    tryRestoreDraftFromCache();
-                    updatePendingSaveBar();
-                    renderLoopStyleSelector();
-                    renderScopeSelector();
-                    renderLoop();
-                    
-                    // Automatikus preview indítás ha van loop
-                    if (loopItems.length > 0) {
-                        setTimeout(() => startPreview(), 500);
-                    }
+                    applyLoadedLoopConfig(data);
                 })
                 .catch(error => {
                     console.error('Error loading loop:', error);
                     showAutosaveToast('⚠️ Hálózati hiba, DEFAULT loop használatban', true);
                 });
         }
+
+        function isLoopEditingBlocked() {
+            return isDefaultGroup || isContentOnlyMode;
+        }
+
+        function ensureActiveLoopStyleSelected() {
+            if (!getLoopStyleById(activeLoopStyleId)) {
+                showAutosaveToast('⚠️ Nincs aktív loop kiválasztva', true);
+                return false;
+            }
+            return true;
+        }
+
+        function normalizeRenderAndAutosaveLoop() {
+            normalizeLoopItems();
+            renderLoop();
+            scheduleAutoSave();
+        }
+
+        function refreshDurationAndRestartPreviewIfNeeded() {
+            updateTotalDuration();
+            scheduleAutoSave();
+            if (loopItems.length > 0) {
+                startPreview();
+            }
+        }
+
+        function buildLoopItemForModule(moduleId, moduleName, moduleDesc, moduleKey) {
+            const normalizedKey = String(moduleKey || '').toLowerCase();
+            const defaultDuration = normalizedKey === 'unconfigured' || normalizedKey === 'meal-menu' ? 60 : 10;
+            return {
+                module_id: moduleId,
+                module_name: moduleName,
+                description: moduleDesc,
+                module_key: moduleKey || null,
+                duration_seconds: defaultDuration,
+                settings: getDefaultSettings(moduleKey || '')
+            };
+        }
+
+        function parseModuleCatalogPayload(rawPayload) {
+            try {
+                const data = JSON.parse(rawPayload || '{}');
+                const moduleId = parseInt(data.id || 0, 10);
+                const moduleName = String(data.name || '').trim();
+                const moduleDesc = String(data.description || '');
+                if (!moduleId || !moduleName) {
+                    return null;
+                }
+
+                return {
+                    id: moduleId,
+                    name: moduleName,
+                    description: moduleDesc
+                };
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function getLoopTargetIndexFromDropEvent(event) {
+            const targetLoopItem = event?.target?.closest ? event.target.closest('.loop-item') : null;
+            const targetIndex = parseInt(targetLoopItem?.dataset?.index || '-1', 10);
+            if (!Number.isFinite(targetIndex) || targetIndex < 0 || !loopItems[targetIndex]) {
+                return -1;
+            }
+            return targetIndex;
+        }
+
+        function tryApplyOverlayPresetFromDrop(targetIndex, droppedModuleKey) {
+            if (targetIndex < 0) {
+                return false;
+            }
+
+            if (droppedModuleKey !== 'clock' && droppedModuleKey !== 'text') {
+                return false;
+            }
+
+            const targetItem = loopItems[targetIndex];
+            const targetModuleKey = targetItem?.module_key || getModuleKeyById(targetItem?.module_id);
+            if (!isOverlayCarrierModule(targetModuleKey)) {
+                return false;
+            }
+
+            targetItem.settings = applyOverlayPresetToSettings(targetItem.settings || {}, droppedModuleKey);
+            renderLoop();
+            scheduleAutoSave();
+            showAutosaveToast(droppedModuleKey === 'clock'
+                ? '✓ Óra overlay hozzáadva a modulhoz'
+                : '✓ Szöveg overlay hozzáadva a modulhoz');
+            return true;
+        }
+
+        function reorderLoopItems(draggedIndex, targetIndex) {
+            if (!Number.isFinite(draggedIndex) || !Number.isFinite(targetIndex)) {
+                return false;
+            }
+            if (draggedIndex < 0 || targetIndex < 0) {
+                return false;
+            }
+            if (!loopItems[draggedIndex] || !loopItems[targetIndex]) {
+                return false;
+            }
+
+            const item = loopItems.splice(draggedIndex, 1)[0];
+            loopItems.splice(targetIndex, 0, item);
+            return true;
+        }
+
+        function applyDurationUpdateForSpecialModule(index, moduleKey) {
+            if (isTechnicalLoopItem(loopItems[index])) {
+                loopItems[index].duration_seconds = 60;
+                refreshDurationAndRestartPreviewIfNeeded();
+                return true;
+            }
+
+            if (moduleKey === 'video') {
+                const fixedDuration = parseInt(loopItems[index]?.settings?.videoDurationSec || 0, 10);
+                if (fixedDuration > 0) {
+                    loopItems[index].duration_seconds = fixedDuration;
+                    refreshDurationAndRestartPreviewIfNeeded();
+                }
+                return true;
+            }
+
+            if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
+                loopItems[index].duration_seconds = getGalleryLoopDurationSeconds(loopItems[index]?.settings || {}, loopItems[index]?.duration_seconds);
+                refreshDurationAndRestartPreviewIfNeeded();
+                return true;
+            }
+
+            return false;
+        }
         
         function addModuleToLoop(moduleId, moduleName, moduleDesc) {
-            if (isDefaultGroup || isContentOnlyMode) {
+            if (isLoopEditingBlocked()) {
                 return;
             }
 
-            if (!getLoopStyleById(activeLoopStyleId)) {
-                showAutosaveToast('⚠️ Nincs aktív loop kiválasztva', true);
+            if (!ensureActiveLoopStyleSelected()) {
                 return;
             }
 
@@ -2385,18 +2702,8 @@
                 return;
             }
 
-            loopItems.push({
-                module_id: moduleId,
-                module_name: moduleName,
-                description: moduleDesc,
-                module_key: moduleKey || null,
-                duration_seconds: moduleKey === 'unconfigured' ? 60 : 10,
-                settings: getDefaultSettings(moduleKey || '')
-            });
-
-            normalizeLoopItems();
-            renderLoop();
-            scheduleAutoSave();
+            loopItems.push(buildLoopItemForModule(moduleId, moduleName, moduleDesc, moduleKey));
+            normalizeRenderAndAutosaveLoop();
         }
 
         function getCatalogModuleDataFromElement(element) {
@@ -2491,12 +2798,11 @@
                 container.classList.remove('catalog-drop-active');
             }
 
-            if (isDefaultGroup || isContentOnlyMode || !event.dataTransfer) {
+            if (isLoopEditingBlocked() || !event.dataTransfer) {
                 return;
             }
 
-            if (!getLoopStyleById(activeLoopStyleId)) {
-                showAutosaveToast('⚠️ Nincs aktív loop kiválasztva', true);
+            if (!ensureActiveLoopStyleSelected()) {
                 return;
             }
 
@@ -2505,53 +2811,32 @@
                 return;
             }
 
-            try {
-                const data = JSON.parse(raw);
-                const moduleId = parseInt(data.id || 0, 10);
-                const moduleName = String(data.name || '').trim();
-                const moduleDesc = String(data.description || '');
-                if (!moduleId || !moduleName) {
-                    return;
-                }
-
-                const droppedModuleKey = getModuleKeyById(moduleId);
-                const targetLoopItem = event.target?.closest ? event.target.closest('.loop-item') : null;
-                const targetIndex = parseInt(targetLoopItem?.dataset?.index || '-1', 10);
-                const hasTarget = Number.isFinite(targetIndex) && targetIndex >= 0 && !!loopItems[targetIndex];
-
-                if (hasTarget && (droppedModuleKey === 'clock' || droppedModuleKey === 'text')) {
-                    const targetItem = loopItems[targetIndex];
-                    const targetModuleKey = targetItem?.module_key || getModuleKeyById(targetItem?.module_id);
-                    if (isOverlayCarrierModule(targetModuleKey)) {
-                        targetItem.settings = applyOverlayPresetToSettings(targetItem.settings || {}, droppedModuleKey);
-                        renderLoop();
-                        scheduleAutoSave();
-                        showAutosaveToast(droppedModuleKey === 'clock'
-                            ? '✓ Óra overlay hozzáadva a modulhoz'
-                            : '✓ Szöveg overlay hozzáadva a modulhoz');
-                        return;
-                    }
-                }
-
-                addModuleToLoop(moduleId, moduleName, moduleDesc);
-            } catch (error) {
-                console.error('Invalid module drop payload', error);
+            const payload = parseModuleCatalogPayload(raw);
+            if (!payload) {
+                console.error('Invalid module drop payload');
+                return;
             }
+
+            const droppedModuleKey = getModuleKeyById(payload.id);
+            const targetIndex = getLoopTargetIndexFromDropEvent(event);
+            if (tryApplyOverlayPresetFromDrop(targetIndex, droppedModuleKey)) {
+                return;
+            }
+
+            addModuleToLoop(payload.id, payload.name, payload.description);
         }
         
         function removeFromLoop(index) {
-            if (isDefaultGroup || isContentOnlyMode) {
+            if (isLoopEditingBlocked()) {
                 return;
             }
 
             loopItems.splice(index, 1);
-            normalizeLoopItems();
-            renderLoop();
-            scheduleAutoSave();
+            normalizeRenderAndAutosaveLoop();
         }
 
         function duplicateLoopItem(index) {
-            if (isDefaultGroup || isContentOnlyMode) {
+            if (isLoopEditingBlocked()) {
                 return;
             }
 
@@ -2572,52 +2857,35 @@
             };
 
             loopItems.splice(index + 1, 0, duplicatedItem);
-            normalizeLoopItems();
-            renderLoop();
-            scheduleAutoSave();
+            normalizeRenderAndAutosaveLoop();
             showAutosaveToast('✓ Elem duplikálva');
         }
         
         function updateDuration(index, value) {
-            if (isDefaultGroup || isContentOnlyMode) {
+            if (isLoopEditingBlocked()) {
                 return;
             }
 
             const moduleKey = loopItems[index]?.module_key || getModuleKeyById(loopItems[index]?.module_id);
 
-            if (isTechnicalLoopItem(loopItems[index])) {
-                loopItems[index].duration_seconds = 60;
-                updateTotalDuration();
-                scheduleAutoSave();
-                if (loopItems.length > 0) {
-                    startPreview();
-                }
+            if (applyDurationUpdateForSpecialModule(index, moduleKey)) {
                 return;
             }
 
-            if (moduleKey === 'video') {
-                const fixedDuration = parseInt(loopItems[index]?.settings?.videoDurationSec || 0, 10);
-                if (fixedDuration > 0) {
-                    loopItems[index].duration_seconds = fixedDuration;
-                    updateTotalDuration();
-                    scheduleAutoSave();
-                    if (loopItems.length > 0) {
-                        startPreview();
-                    }
-                }
-                return;
-            }
-
+            const durationBounds = getDurationBoundsForModule(moduleKey);
             const parsedValue = parseInt(value, 10);
-            const safeValue = Number.isFinite(parsedValue) ? parsedValue : 10;
-            const steppedValue = Math.round(safeValue / 5) * 5;
-            const clampedValue = Math.max(5, Math.min(300, steppedValue || 10));
+            const safeValue = Number.isFinite(parsedValue) ? parsedValue : durationBounds.default;
+            const clampedValue = Math.max(durationBounds.min, Math.min(durationBounds.max, safeValue || durationBounds.default));
             loopItems[index].duration_seconds = clampedValue;
-            updateTotalDuration();
-            scheduleAutoSave();
-            if (loopItems.length > 0) {
-                startPreview();
+            refreshDurationAndRestartPreviewIfNeeded();
+        }
+
+        function getDurationBoundsForModule(moduleKey) {
+            const key = String(moduleKey || '').toLowerCase();
+            if (key === 'meal-menu' || key === 'room-occupancy') {
+                return { min: 5, max: 3600, step: 1, default: 10 };
             }
+            return { min: 1, max: 3600, step: 1, default: 10 };
         }
         
         let draggedElement = null;
@@ -2649,12 +2917,11 @@
             if (draggedElement !== this) {
                 const draggedIndex = parseInt(draggedElement.dataset.index);
                 const targetIndex = parseInt(this.dataset.index);
-                
-                const item = loopItems.splice(draggedIndex, 1)[0];
-                loopItems.splice(targetIndex, 0, item);
-                
-                renderLoop();
-                scheduleAutoSave();
+
+                if (reorderLoopItems(draggedIndex, targetIndex)) {
+                    renderLoop();
+                    scheduleAutoSave();
+                }
             }
             
             return false;
@@ -2672,15 +2939,67 @@
         }
         
         function clearLoop() {
-            if (isDefaultGroup || isContentOnlyMode) {
+            if (isLoopEditingBlocked()) {
                 return;
             }
 
             if (confirm('Biztosan törölni szeretnéd az összes elemet?')) {
                 loopItems = [];
-                normalizeLoopItems();
-                renderLoop();
-                scheduleAutoSave();
+                normalizeRenderAndAutosaveLoop();
+            }
+        }
+
+        function getLoopPayloadItemCount(payload) {
+            return (payload.base_loop || []).length + (payload.time_blocks || []).reduce((sum, block) => {
+                return sum + (Array.isArray(block.loops) ? block.loops.length : 0);
+            }, 0);
+        }
+
+        function shouldAbortSaveLoop(opts, payload, currentSnapshot) {
+            if (isDefaultGroup) {
+                if (!opts.silent) {
+                    alert('⚠️ A default csoport loopja nem szerkeszthető.');
+                }
+                return true;
+            }
+
+            if (getLoopPayloadItemCount(payload) === 0) {
+                if (!opts.silent) {
+                    alert('⚠️ A loop üres! Adj hozzá legalább egy modult.');
+                }
+                return true;
+            }
+
+            if (currentSnapshot === lastSavedSnapshot) {
+                return true;
+            }
+
+            if (autoSaveInFlight) {
+                autoSaveQueued = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        function handleSaveLoopSuccess(data, currentSnapshot) {
+            lastSavedSnapshot = currentSnapshot;
+            lastPublishedPayload = JSON.parse(currentSnapshot);
+            planVersionToken = String(data.plan_version || data.plan_version_token || data.loop_version || planVersionToken || '');
+            clearDraftCache();
+            setDraftDirty(false);
+            showAutosaveToast('✓ Mentés sikeres');
+        }
+
+        function handleSaveLoopFailure(data) {
+            showAutosaveToast('⚠️ ' + (data.message || 'Mentési hiba'), true);
+        }
+
+        function finalizeSaveLoopRequest() {
+            autoSaveInFlight = false;
+            if (autoSaveQueued) {
+                autoSaveQueued = false;
+                queueDraftPersist(150);
             }
         }
         
@@ -2691,32 +3010,10 @@
                 ...options
             };
 
-            if (isDefaultGroup) {
-                if (!opts.silent) {
-                    alert('⚠️ A default csoport loopja nem szerkeszthető.');
-                }
-                return;
-            }
-
             const payload = buildLoopPayload();
-            const totalItemCount = (payload.base_loop || []).length + (payload.time_blocks || []).reduce((sum, block) => {
-                return sum + (Array.isArray(block.loops) ? block.loops.length : 0);
-            }, 0);
-
-            if (totalItemCount === 0) {
-                if (!opts.silent) {
-                    alert('⚠️ A loop üres! Adj hozzá legalább egy modult.');
-                }
-                return;
-            }
-
             const currentSnapshot = getLoopSnapshot();
-            if (currentSnapshot === lastSavedSnapshot) {
-                return;
-            }
 
-            if (autoSaveInFlight) {
-                autoSaveQueued = true;
+            if (shouldAbortSaveLoop(opts, payload, currentSnapshot)) {
                 return;
             }
 
@@ -2732,25 +3029,16 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    lastSavedSnapshot = currentSnapshot;
-                    lastPublishedPayload = JSON.parse(currentSnapshot);
-                    planVersionToken = String(data.plan_version || data.plan_version_token || data.loop_version || planVersionToken || '');
-                    clearDraftCache();
-                    setDraftDirty(false);
-                    showAutosaveToast('✓ Mentés sikeres');
+                    handleSaveLoopSuccess(data, currentSnapshot);
                 } else {
-                    showAutosaveToast('⚠️ ' + (data.message || 'Mentési hiba'), true);
+                    handleSaveLoopFailure(data);
                 }
             })
             .catch(error => {
                 showAutosaveToast('⚠️ Hiba történt: ' + error, true);
             })
             .finally(() => {
-                autoSaveInFlight = false;
-                if (autoSaveQueued) {
-                    autoSaveQueued = false;
-                    queueDraftPersist(150);
-                }
+                finalizeSaveLoopRequest();
             });
         }
 
@@ -3151,14 +3439,14 @@
         }
 
         function isOverlayCarrierModule(moduleKey) {
-            return moduleKey === 'image-gallery' || moduleKey === 'gallery';
+            return moduleKey === 'image-gallery' || moduleKey === 'gallery' || moduleKey === 'meal-menu';
         }
 
         function getClockOverlayDefaults() {
             return {
                 clockOverlayEnabled: false,
                 clockOverlayPosition: 'top',
-                clockOverlayHeightPercent: 25,
+                clockOverlayHeightPercent: 40,
                 clockOverlayTimeColor: '#ffffff',
                 clockOverlayDateColor: '#ffffff'
             };
@@ -3169,7 +3457,10 @@
                 textOverlayEnabled: false,
                 textOverlayPosition: 'bottom',
                 textOverlayHeightPercent: 20,
+                textOverlaySourceType: 'manual',
                 textOverlayText: 'Sem vložte text...',
+                textOverlayCollectionJson: '[]',
+                textOverlayExternalUrl: '',
                 textOverlayFontSize: 52,
                 textOverlayColor: '#ffffff',
                 textOverlaySpeedPxPerSec: 120
@@ -3204,7 +3495,7 @@
             if (merged.clockOverlayEnabled) {
                 params.append('clockOverlayEnabled', 'true');
                 params.append('clockOverlayPosition', merged.clockOverlayPosition || 'top');
-                params.append('clockOverlayHeightPercent', String(merged.clockOverlayHeightPercent || 25));
+                params.append('clockOverlayHeightPercent', String(merged.clockOverlayHeightPercent || 40));
                 params.append('clockOverlayTimeColor', merged.clockOverlayTimeColor || '#ffffff');
                 params.append('clockOverlayDateColor', merged.clockOverlayDateColor || '#ffffff');
             }
@@ -3212,7 +3503,10 @@
                 params.append('textOverlayEnabled', 'true');
                 params.append('textOverlayPosition', merged.textOverlayPosition || 'bottom');
                 params.append('textOverlayHeightPercent', String(merged.textOverlayHeightPercent || 20));
+                params.append('textOverlaySourceType', merged.textOverlaySourceType || 'manual');
                 params.append('textOverlayText', merged.textOverlayText || '');
+                params.append('textOverlayCollectionJson', merged.textOverlayCollectionJson || '[]');
+                params.append('textOverlayExternalUrl', merged.textOverlayExternalUrl || '');
                 params.append('textOverlayFontSize', String(merged.textOverlayFontSize || 52));
                 params.append('textOverlayColor', merged.textOverlayColor || '#ffffff');
                 params.append('textOverlaySpeedPxPerSec', String(merged.textOverlaySpeedPxPerSec || 120));
@@ -3223,14 +3517,24 @@
             const merged = ensureOverlayDefaults(baseSettings);
             merged.clockOverlayEnabled = document.getElementById('setting-clockOverlayEnabled')?.checked === true;
             merged.clockOverlayPosition = document.getElementById('setting-clockOverlayPosition')?.value || 'top';
-            merged.clockOverlayHeightPercent = Math.max(20, Math.min(40, parseInt(document.getElementById('setting-clockOverlayHeightPercent')?.value || '25', 10) || 25));
+            merged.clockOverlayHeightPercent = Math.max(20, Math.min(40, parseInt(document.getElementById('setting-clockOverlayHeightPercent')?.value || '40', 10) || 40));
             merged.clockOverlayTimeColor = document.getElementById('setting-clockOverlayTimeColor')?.value || '#ffffff';
             merged.clockOverlayDateColor = document.getElementById('setting-clockOverlayDateColor')?.value || '#ffffff';
 
             merged.textOverlayEnabled = document.getElementById('setting-textOverlayEnabled')?.checked === true;
             merged.textOverlayPosition = document.getElementById('setting-textOverlayPosition')?.value || 'bottom';
             merged.textOverlayHeightPercent = Math.max(12, Math.min(40, parseInt(document.getElementById('setting-textOverlayHeightPercent')?.value || '20', 10) || 20));
+            const sourceType = String(document.getElementById('setting-textOverlaySourceType')?.value || 'manual');
+            merged.textOverlaySourceType = ['manual', 'collection', 'external'].includes(sourceType) ? sourceType : 'manual';
             merged.textOverlayText = document.getElementById('setting-textOverlayText')?.value || 'Sem vložte text...';
+            const collectionRaw = String(document.getElementById('setting-textOverlayCollection')?.value || '');
+            const collectionLines = collectionRaw
+                .split(/\r?\n/)
+                .map((line) => String(line || '').trim())
+                .filter(Boolean)
+                .slice(0, 400);
+            merged.textOverlayCollectionJson = JSON.stringify(collectionLines);
+            merged.textOverlayExternalUrl = String(document.getElementById('setting-textOverlayExternalUrl')?.value || '').trim();
             merged.textOverlayFontSize = Math.max(18, Math.min(120, parseInt(document.getElementById('setting-textOverlayFontSize')?.value || '52', 10) || 52));
             merged.textOverlayColor = document.getElementById('setting-textOverlayColor')?.value || '#ffffff';
             merged.textOverlaySpeedPxPerSec = Math.max(40, Math.min(320, parseInt(document.getElementById('setting-textOverlaySpeedPxPerSec')?.value || '120', 10) || 120));
@@ -3255,12 +3559,12 @@
                     language: 'sk'
                 },
                 'default-logo': {
-                    text: 'EDUDISPLEJ',
+                    text: 'edudisplej.sk',
                     fontSize: 120,
                     textColor: '#ffffff',
                     bgColor: '#000000',
-                    showVersion: true,
-                    version: 'v1.0'
+                    showVersion: false,
+                    version: ''
                 },
                 'text': {
                     text: 'Sem vložte text...',
@@ -3289,13 +3593,53 @@
                 'image-gallery': {
                     imageUrlsJson: '[]',
                     displayMode: 'slideshow',
-                    fitMode: 'cover',
+                    fitMode: 'contain',
                     slideIntervalSec: 5,
+                    transitionEnabled: true,
                     transitionMs: 450,
                     collageColumns: 3,
                     bgColor: '#000000',
                     ...getClockOverlayDefaults(),
                     ...getTextOverlayDefaults()
+                },
+                'meal-menu': {
+                    siteKey: 'jedalen.sk',
+                    institutionId: 0,
+                    sourceType: 'server',
+                    language: 'hu',
+                    showHeaderTitle: true,
+                    customHeaderTitle: '',
+                    showInstitutionName: true,
+                    showBreakfast: true,
+                    showSnackAm: true,
+                    showLunch: true,
+                    showSnackPm: false,
+                    showDinner: false,
+                    showMealTypeEmojis: false,
+                    showMealTypeSvgIcons: true,
+                    showAllergenEmojis: false,
+                    centerAlign: false,
+                    slowScrollOnOverflow: false,
+                    slowScrollSpeedPxPerSec: 28,
+                    showAppetiteMessage: false,
+                    appetiteMessageText: 'Jó étvágyat kívánunk!',
+                    showSourceUrl: false,
+                    sourceUrl: '',
+                    fontFamily: 'Segoe UI, Tahoma, sans-serif',
+                    mealTitleFontSize: 2.1,
+                    mealTextFontSize: 1.85,
+                    textFontWeight: 600,
+                    lineHeight: 1.4,
+                    wrapText: true,
+                    apiBaseUrl: '../../api/meal_plan.php',
+                    ...getClockOverlayDefaults(),
+                    ...getTextOverlayDefaults()
+                },
+                'room-occupancy': {
+                    roomId: 0,
+                    showOnlyCurrent: false,
+                    showNextCount: 4,
+                    apiBaseUrl: '../../api/room_occupancy.php'
                 }
             };
             
@@ -3499,6 +3843,297 @@
             });
         }
 
+        async function loadTextCollectionsDetailed(forceReload = false) {
+            const now = Date.now();
+            if (!forceReload && Array.isArray(textCollectionsCacheDetailed) && textCollectionsCacheDetailed.length > 0 && (now - textCollectionsCacheLoadedAt) < 20000) {
+                return textCollectionsCacheDetailed;
+            }
+
+            const response = await fetch('../../api/text_collections.php?action=list&include_content=1', {
+                credentials: 'same-origin'
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) {
+                throw new Error(payload?.message || 'Nem sikerült betölteni a slide gyűjteményt');
+            }
+
+            textCollectionsCacheDetailed = Array.isArray(payload.items) ? payload.items : [];
+            textCollectionsCacheLoadedAt = now;
+            return textCollectionsCacheDetailed;
+        }
+
+        function getTextCollectionById(collectionId) {
+            const wantedId = parseInt(collectionId, 10) || 0;
+            if (wantedId <= 0 || !Array.isArray(textCollectionsCacheDetailed)) {
+                return null;
+            }
+            return textCollectionsCacheDetailed.find((entry) => (parseInt(entry?.id, 10) || 0) === wantedId) || null;
+        }
+
+        async function loadMealSitesForModal() {
+            const query = new URLSearchParams({ action: 'sites' });
+            if (companyId > 0) {
+                query.append('company_id', String(companyId));
+            }
+
+            const response = await fetch(`../../api/meal_plan.php?${query.toString()}`, {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) {
+                throw new Error(payload?.message || 'Nem sikerült betölteni a forrás oldalak listáját.');
+            }
+            return Array.isArray(payload.items) ? payload.items : [];
+        }
+
+        async function loadMealInstitutionsForModal(siteKey) {
+            const cleanedSiteKey = String(siteKey || '').trim();
+            if (!cleanedSiteKey) {
+                return [];
+            }
+
+            const query = new URLSearchParams({
+                action: 'institutions',
+                site_key: cleanedSiteKey
+            });
+            if (companyId > 0) {
+                query.append('company_id', String(companyId));
+            }
+
+            const response = await fetch(`../../api/meal_plan.php?${query.toString()}`, {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) {
+                throw new Error(payload?.message || 'Nem sikerült betölteni az intézményeket.');
+            }
+
+            return Array.isArray(payload.items) ? payload.items : [];
+        }
+
+        function bindMealModuleModalEvents(initialSettings) {
+            const siteSelect = document.getElementById('setting-mealSiteKey');
+            const institutionSelect = document.getElementById('setting-mealInstitutionId');
+            const siteRefreshBtn = document.getElementById('setting-mealReloadSites');
+            const institutionRefreshBtn = document.getElementById('setting-mealReloadInstitutions');
+            const statusEl = document.getElementById('setting-mealStatus');
+
+            if (!siteSelect || !institutionSelect) {
+                return;
+            }
+
+            const selectedSite = String(initialSettings.siteKey || 'jedalen.sk');
+            const selectedInstitutionId = parseInt(initialSettings.institutionId || 0, 10) || 0;
+
+            const setStatus = (message, isError = false) => {
+                if (!statusEl) {
+                    return;
+                }
+                statusEl.textContent = message;
+                statusEl.style.color = isError ? '#b91c1c' : '#475569';
+            };
+
+            const renderSiteOptions = (sites) => {
+                const options = ['<option value="">-- Válassz forrás oldalt --</option>'];
+                sites.forEach((site) => {
+                    const key = String(site?.site_key || '').trim();
+                    if (!key) {
+                        return;
+                    }
+                    const label = String(site?.site_name || key).trim();
+                    options.push(`<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`);
+                });
+                siteSelect.innerHTML = options.join('');
+            };
+
+            const renderInstitutionOptions = (institutions, preferredInstitutionId = 0) => {
+                const options = ['<option value="0">-- Válassz intézményt --</option>'];
+                institutions.forEach((institution) => {
+                    const id = parseInt(institution?.id || 0, 10) || 0;
+                    if (id <= 0) {
+                        return;
+                    }
+                    const name = String(institution?.institution_name || '').trim();
+                    const city = String(institution?.city || '').trim();
+                    const label = city ? `${name} (${city})` : name;
+                    options.push(`<option value="${id}">${escapeHtml(label)}</option>`);
+                });
+                institutionSelect.innerHTML = options.join('');
+
+                const wanted = parseInt(preferredInstitutionId || 0, 10) || 0;
+                institutionSelect.value = wanted > 0 ? String(wanted) : '0';
+                if (wanted > 0 && institutionSelect.value !== String(wanted)) {
+                    institutionSelect.value = '0';
+                }
+            };
+
+            const refreshInstitutions = async (preferredInstitutionId = 0) => {
+                const siteKey = String(siteSelect.value || '').trim();
+                if (!siteKey) {
+                    renderInstitutionOptions([], 0);
+                    setStatus('Válassz előbb forrás oldalt.');
+                    return;
+                }
+
+                setStatus('Intézmények betöltése...');
+                try {
+                    const institutions = await loadMealInstitutionsForModal(siteKey);
+                    renderInstitutionOptions(institutions, preferredInstitutionId);
+                    setStatus(`Intézmények: ${institutions.length} db`);
+                } catch (error) {
+                    renderInstitutionOptions([], 0);
+                    setStatus(error.message || 'Intézmény betöltési hiba.', true);
+                }
+            };
+
+            const refreshSites = async () => {
+                setStatus('Forrás oldalak betöltése...');
+                try {
+                    const sites = await loadMealSitesForModal();
+                    renderSiteOptions(sites);
+
+                    const availableSiteKeys = new Set(sites.map((site) => String(site?.site_key || '').trim()).filter(Boolean));
+                    const effectiveSite = availableSiteKeys.has(selectedSite)
+                        ? selectedSite
+                        : (sites[0]?.site_key ? String(sites[0].site_key) : '');
+
+                    siteSelect.value = effectiveSite;
+                    if (effectiveSite) {
+                        await refreshInstitutions(selectedInstitutionId);
+                    } else {
+                        renderInstitutionOptions([], 0);
+                        setStatus('Nincs elérhető forrás oldal.', true);
+                    }
+                } catch (error) {
+                    setStatus(error.message || 'Forrás oldal betöltési hiba.', true);
+                }
+            };
+
+            siteSelect.addEventListener('change', () => {
+                refreshInstitutions(0);
+            });
+
+            if (siteRefreshBtn) {
+                siteRefreshBtn.addEventListener('click', () => {
+                    refreshSites();
+                });
+            }
+
+            if (institutionRefreshBtn) {
+                institutionRefreshBtn.addEventListener('click', () => {
+                    refreshInstitutions(parseInt(institutionSelect.value || '0', 10) || 0);
+                });
+            }
+
+            refreshSites();
+        }
+
+        async function loadRoomOccupancyRoomsForModal() {
+            const query = new URLSearchParams({ action: 'rooms' });
+            if (companyId > 0) {
+                query.append('company_id', String(companyId));
+            }
+
+            const response = await fetch(`../../api/room_occupancy.php?${query.toString()}`, {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) {
+                throw new Error(payload?.message || 'Nem sikerült betölteni a termek listáját.');
+            }
+            return Array.isArray(payload.items) ? payload.items : [];
+        }
+
+        function bindRoomOccupancyModuleModalEvents(initialSettings) {
+            const roomSelect = document.getElementById('setting-roomOccRoomId');
+            const roomRefreshBtn = document.getElementById('setting-roomOccReloadRooms');
+            const statusEl = document.getElementById('setting-roomOccStatus');
+            if (!roomSelect) {
+                return;
+            }
+
+            const selectedRoomId = parseInt(initialSettings.roomId || 0, 10) || 0;
+
+            const setStatus = (message, isError = false) => {
+                if (!statusEl) {
+                    return;
+                }
+                statusEl.textContent = message;
+                statusEl.style.color = isError ? '#b91c1c' : '#475569';
+            };
+
+            const renderRoomOptions = (rooms) => {
+                const options = ['<option value="0">-- Válassz termet --</option>'];
+                rooms.forEach((room) => {
+                    const id = parseInt(room?.id || 0, 10) || 0;
+                    if (id <= 0) {
+                        return;
+                    }
+                    const roomName = String(room?.room_name || '').trim();
+                    const roomKey = String(room?.room_key || '').trim();
+                    const label = roomKey ? `${roomName} (${roomKey})` : roomName;
+                    options.push(`<option value="${id}">${escapeHtml(label)}</option>`);
+                });
+                roomSelect.innerHTML = options.join('');
+
+                roomSelect.value = selectedRoomId > 0 ? String(selectedRoomId) : '0';
+                if (selectedRoomId > 0 && roomSelect.value !== String(selectedRoomId)) {
+                    roomSelect.value = '0';
+                }
+            };
+
+            const refreshRooms = async () => {
+                setStatus('Termek betöltése...');
+                try {
+                    const rooms = await loadRoomOccupancyRoomsForModal();
+                    renderRoomOptions(rooms);
+                    setStatus(`Termek: ${rooms.length} db`);
+                } catch (error) {
+                    setStatus(error.message || 'Terem betöltési hiba.', true);
+                }
+            };
+
+            if (roomRefreshBtn) {
+                roomRefreshBtn.addEventListener('click', () => {
+                    refreshRooms();
+                });
+            }
+
+            refreshRooms();
+        }
+
+        function applyTextCollectionToTextModuleForm(collection) {
+            if (!collection) {
+                return;
+            }
+
+            const editor = document.getElementById('text-editor-area');
+            const hiddenHtml = document.getElementById('setting-text');
+            const bgColorInput = document.getElementById('setting-bgColor');
+            const bgImageDataInput = document.getElementById('setting-bgImageData');
+            const bgStatus = document.getElementById('setting-bgImageStatus');
+
+            const safeHtml = sanitizeRichTextHtml(collection.content_html || '');
+            if (editor) {
+                editor.innerHTML = safeHtml;
+            }
+            if (hiddenHtml) {
+                hiddenHtml.value = safeHtml;
+            }
+            if (bgColorInput) {
+                bgColorInput.value = collection.bg_color || '#000000';
+            }
+            if (bgImageDataInput) {
+                bgImageDataInput.value = String(collection.bg_image_data || '');
+            }
+            if (bgStatus) {
+                bgStatus.textContent = String(collection.bg_image_data || '').trim() ? 'Háttérkép gyűjteményből' : 'Nincs kiválasztott kép';
+            }
+        }
+
         function updateTextModuleMiniPreview() {
             const previewFrame = document.getElementById('text-preview-frame');
             const previewIframe = document.getElementById('text-live-preview-iframe');
@@ -3508,13 +4143,29 @@
 
             const editor = document.getElementById('text-editor-area');
             const hiddenHtml = document.getElementById('setting-text');
+            const sourceType = String(document.getElementById('setting-textSourceType')?.value || 'manual');
+            const selectedCollectionId = parseInt(document.getElementById('setting-textCollectionId')?.value || '0', 10) || 0;
             const sanitizedHtml = sanitizeRichTextHtml(editor ? editor.innerHTML : (hiddenHtml?.value || ''));
             if (hiddenHtml) {
                 hiddenHtml.value = sanitizedHtml;
             }
 
-            const bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
-            const bgImageData = document.getElementById('setting-bgImageData')?.value || '';
+            let previewTextHtml = sanitizedHtml;
+            let bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
+            let bgImageData = document.getElementById('setting-bgImageData')?.value || '';
+
+            if (sourceType === 'collection') {
+                const selectedCollection = getTextCollectionById(selectedCollectionId);
+                if (selectedCollection) {
+                    previewTextHtml = sanitizeRichTextHtml(selectedCollection.content_html || '');
+                    bgColor = selectedCollection.bg_color || bgColor;
+                    bgImageData = selectedCollection.bg_image_data || '';
+                    if (hiddenHtml) {
+                        hiddenHtml.value = previewTextHtml;
+                    }
+                }
+            }
+
             const fontFamily = document.getElementById('setting-richFontFamily')?.value || 'Arial, sans-serif';
             const fontSize = Math.max(8, parseInt(document.getElementById('setting-richFontSize')?.value || '72', 10) || 72);
             const lineHeight = Math.max(0.8, Math.min(2.5, parseFloat(document.getElementById('setting-richLineHeight')?.value || '1.2') || 1.2));
@@ -3538,7 +4189,10 @@
                 module_key: 'text',
                 duration_seconds: parseInt(document.getElementById('setting-previewDurationSec')?.value || '10', 10) || 10,
                 settings: {
-                    text: sanitizedHtml || 'Sem vložte text...',
+                    textSourceType: sourceType,
+                    textCollectionId: sourceType === 'collection' ? selectedCollectionId : 0,
+                    textCollectionLabel: sourceType === 'collection' ? (getTextCollectionById(selectedCollectionId)?.title || '') : '',
+                    text: previewTextHtml || 'Sem vložte text...',
                     fontFamily,
                     fontSize,
                     fontWeight: '700',
@@ -3639,6 +4293,98 @@
                 'setting-bgColor',
                 'setting-previewResolution'
             ];
+
+            const textSourceSelect = document.getElementById('setting-textSourceType');
+            const textCollectionWrap = document.getElementById('textCollectionSelectorWrap');
+            const textManualWrap = document.getElementById('textManualEditorWrap');
+            const textCollectionSelect = document.getElementById('setting-textCollectionId');
+
+            const updateTextSourceVisibility = () => {
+                const source = String(textSourceSelect?.value || 'manual');
+                if (textCollectionWrap) {
+                    textCollectionWrap.style.display = source === 'collection' ? 'block' : 'none';
+                }
+                if (textManualWrap) {
+                    textManualWrap.style.display = source === 'manual' ? 'block' : 'none';
+                }
+            };
+
+            const renderTextCollectionOptions = (items) => {
+                if (!textCollectionSelect) {
+                    return;
+                }
+
+                const selectedBefore = parseInt(textCollectionSelect.value || String(parseInt(settings.textCollectionId, 10) || 0), 10) || 0;
+                textCollectionSelect.innerHTML = '<option value="0">-- Válassz slide elemet --</option>';
+
+                (Array.isArray(items) ? items : []).forEach((entry) => {
+                    const option = document.createElement('option');
+                    option.value = String(parseInt(entry.id, 10) || 0);
+                    option.textContent = String(entry.title || `Elem #${entry.id}`);
+                    textCollectionSelect.appendChild(option);
+                });
+
+                textCollectionSelect.value = String(selectedBefore);
+                if (textCollectionSelect.value !== String(selectedBefore)) {
+                    textCollectionSelect.value = '0';
+                }
+            };
+
+            if (textSourceSelect) {
+                textSourceSelect.addEventListener('change', () => {
+                    updateTextSourceVisibility();
+                    if (String(textSourceSelect.value) === 'collection') {
+                        const selectedCollection = getTextCollectionById(textCollectionSelect?.value || 0);
+                        if (selectedCollection) {
+                            applyTextCollectionToTextModuleForm(selectedCollection);
+                            applyTextEditorBackground();
+                        }
+                    }
+                    updateTextModuleMiniPreview();
+                });
+            }
+
+            if (textCollectionSelect) {
+                textCollectionSelect.addEventListener('change', () => {
+                    const selectedCollection = getTextCollectionById(textCollectionSelect.value || 0);
+                    if (selectedCollection) {
+                        applyTextCollectionToTextModuleForm(selectedCollection);
+                        applyTextEditorBackground();
+                    }
+                    updateTextModuleMiniPreview();
+                });
+            }
+
+            const textCollectionRefreshBtn = document.getElementById('setting-textCollectionRefresh');
+            if (textCollectionRefreshBtn) {
+                textCollectionRefreshBtn.addEventListener('click', async () => {
+                    try {
+                        const items = await loadTextCollectionsDetailed(true);
+                        renderTextCollectionOptions(items);
+                        showAutosaveToast('✓ Slide gyűjtemény frissítve');
+                    } catch (error) {
+                        showAutosaveToast('⚠️ A slide gyűjtemény frissítése sikertelen', true);
+                    }
+                });
+            }
+
+            loadTextCollectionsDetailed(false)
+                .then((items) => {
+                    renderTextCollectionOptions(items);
+                    if ((String(textSourceSelect?.value || 'manual') === 'collection') && textCollectionSelect) {
+                        const selectedCollection = getTextCollectionById(textCollectionSelect.value || 0);
+                        if (selectedCollection) {
+                            applyTextCollectionToTextModuleForm(selectedCollection);
+                            applyTextEditorBackground();
+                        }
+                    }
+                    updateTextModuleMiniPreview();
+                })
+                .catch(() => {
+                    renderTextCollectionOptions([]);
+                });
+
+            updateTextSourceVisibility();
 
             const previewResolutionSelect = document.getElementById('setting-previewResolution');
             if (previewResolutionSelect) {
@@ -3961,648 +4707,32 @@
             
             // Generate form based on module type
             if (moduleKey === 'clock') {
-                formHtml = `
-                    <div style="display: grid; gap: 15px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Típus:</label>
-                            <select id="setting-type" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                                <option value="digital" ${settings.type === 'digital' ? 'selected' : ''}>Digitális</option>
-                                <option value="analog" ${settings.type === 'analog' ? 'selected' : ''}>Analóg</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Formátum:</label>
-                            <select id="setting-format" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                                <option value="24h" selected>24 órás</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum formátum:</label>
-                            <select id="setting-dateFormat" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                                <option value="full" ${settings.dateFormat === 'full' ? 'selected' : ''}>Teljes (év, hónap, nap, napnév)</option>
-                                <option value="short" ${settings.dateFormat === 'short' ? 'selected' : ''}>Rövid (év, hónap, nap)</option>
-                                <option value="dmy" ${settings.dateFormat === 'dmy' ? 'selected' : ''}>Nap.Hónap.Év (NN.HH.ÉÉÉÉ)</option>
-                                <option value="numeric" ${settings.dateFormat === 'numeric' ? 'selected' : ''}>Numerikus (ÉÉÉÉ.HH.NN)</option>
-                                <option value="none" ${settings.dateFormat === 'none' ? 'selected' : ''}>Nincs dátum</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nyelv:</label>
-                            <select id="setting-language" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                                <option value="hu" ${settings.language === 'hu' ? 'selected' : ''}>Magyar</option>
-                                <option value="sk" ${settings.language === 'sk' ? 'selected' : ''}>Szlovák</option>
-                                <option value="en" ${settings.language === 'en' ? 'selected' : ''}>Angol</option>
-                            </select>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra szín:</label>
-                                <input type="color" id="setting-timeColor" value="${settings.timeColor || '#ffffff'}" style="width: 100%; height: 40px; border-radius: 5px;">
-                            </div>
-                            
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum szín:</label>
-                                <input type="color" id="setting-dateColor" value="${settings.dateColor || '#ffffff'}" style="width: 100%; height: 40px; border-radius: 5px;">
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Háttérszín:</label>
-                            <input type="color" id="setting-bgColor" value="${settings.bgColor || '#000000'}" style="width: 100%; height: 40px; border-radius: 5px;">
-                        </div>
-                        
-                        <div id="digitalSettings" style="${settings.type === 'analog' ? 'display: none;' : ''}">
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra betűméret (px):</label>
-                                    <input type="number" id="setting-timeFontSize" value="${settings.timeFontSize || settings.fontSize || 120}" min="40" max="320" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum betűméret (px):</label>
-                                    <input type="number" id="setting-dateFontSize" value="${settings.dateFontSize || Math.max(16, Math.round((settings.timeFontSize || settings.fontSize || 120) * 0.3))}" min="14" max="180" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div id="analogSettings" style="${settings.type === 'digital' ? 'display: none;' : ''}">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra mérete (px):</label>
-                            <input type="number" id="setting-clockSize" value="${settings.clockSize || 300}" min="200" max="600" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                        </div>
-                        
-                        <div>
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                <input type="checkbox" id="setting-showSeconds" ${settings.showSeconds !== false ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                <span style="font-weight: bold;">Másodpercek mutatása</span>
-                            </label>
-                        </div>
-
-                        <div>
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                <input type="checkbox" id="setting-showDate" ${(settings.showDate !== false && settings.dateFormat !== 'none') ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                <span style="font-weight: bold;">Dátum megjelenítése</span>
-                            </label>
-                        </div>
-                    </div>
-                `;
+                formHtml = buildClockCustomizationHtml(settings);
             } else if (moduleKey === 'default-logo') {
-                formHtml = `
-                    <div style="display: grid; gap: 15px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szöveg:</label>
-                            <input type="text" id="setting-text" value="${settings.text || 'EDUDISPLEJ'}" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                        </div>
-                        
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Betűméret (px):</label>
-                            <input type="number" id="setting-fontSize" value="${settings.fontSize || 120}" min="50" max="300" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                        </div>
-                        
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szöveg szín:</label>
-                            <input type="color" id="setting-textColor" value="${settings.textColor || '#ffffff'}" style="width: 100%; height: 40px; border-radius: 5px;">
-                        </div>
-                        
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Háttérszín:</label>
-                            <input type="color" id="setting-bgColor" value="${settings.bgColor || '#000000'}" style="width: 100%; height: 40px; border-radius: 5px;">
-                        </div>
-                        
-                        <div>
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                <input type="checkbox" id="setting-showVersion" ${settings.showVersion !== false ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                <span style="font-weight: bold;">Verzió mutatása</span>
-                            </label>
-                        </div>
-                        
-                        <div id="versionSettings" style="${settings.showVersion === false ? 'display: none;' : ''}">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Verzió szöveg:</label>
-                            <input type="text" id="setting-version" value="${settings.version || 'v1.0'}" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                        </div>
-                    </div>
-                `;
+                formHtml = buildDefaultLogoCustomizationHtml();
             } else if (moduleKey === 'text') {
-                const safeTextHtml = sanitizeRichTextHtml(settings.text || '');
-                const safeTextInput = escapeHtml(safeTextHtml);
-                const safeBgImageData = escapeHtml(settings.bgImageData || '');
-                const resolvedFontFamily = String(settings.fontFamily || 'Arial, sans-serif');
-                const resolvedFontSize = Math.max(8, parseInt(settings.fontSize, 10) || 72);
-                const resolvedLineHeight = Math.max(0.8, Math.min(2.5, parseFloat(settings.lineHeight) || 1.2));
-                const scrollStartSec = Math.max(0, Math.min(5, (parseInt(settings.scrollStartPauseMs, 10) || 3000) / 1000));
-                const scrollEndSec = Math.max(0, Math.min(5, (parseInt(settings.scrollEndPauseMs, 10) || 3000) / 1000));
-                const scrollSpeed = Math.max(5, Math.min(200, parseInt(settings.scrollSpeedPxPerSec, 10) || 35));
-                const textAnimationEntry = settings.textAnimationEntry || 'none';
-
-                formHtml = `
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
-                        <div style="display: grid; gap: 10px; min-width:0;">
-                            <div style="display: grid; gap: 6px;">
-                                <label style="display: block; font-weight: bold; margin-bottom: 0;">Szerkesztő:</label>
-                                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
-                                    <button type="button" data-richcmd="bold" style="padding:5px 9px;">B</button>
-                                    <button type="button" data-richcmd="italic" style="padding:5px 9px; font-style:italic;">I</button>
-                                    <button type="button" data-richcmd="underline" style="padding:5px 9px; text-decoration:underline;">U</button>
-                                    <button type="button" data-richcmd="insertUnorderedList" style="padding:5px 9px;">• Lista</button>
-                                    <button type="button" data-richcmd="justifyLeft" style="padding:5px 9px;">Bal</button>
-                                    <button type="button" data-richcmd="justifyCenter" style="padding:5px 9px;">Közép</button>
-                                    <button type="button" data-richcmd="justifyRight" style="padding:5px 9px;">Jobb</button>
-                                    <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Szín <input type="color" id="setting-richColor" value="#ffffff"></label>
-                                    <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Háttér <input type="color" id="setting-richBgColor" value="#ffd54f"></label>
-                                    <select id="setting-richFontFamily" style="padding:4px 6px; border:1px solid #ccc; border-radius:4px; max-width:180px;">
-                                        <option value="Arial, sans-serif" ${resolvedFontFamily === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option>
-                                        <option value="Verdana, sans-serif" ${resolvedFontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option>
-                                        <option value="Tahoma, sans-serif" ${resolvedFontFamily === 'Tahoma, sans-serif' ? 'selected' : ''}>Tahoma</option>
-                                        <option value="Trebuchet MS, sans-serif" ${resolvedFontFamily === 'Trebuchet MS, sans-serif' ? 'selected' : ''}>Trebuchet</option>
-                                        <option value="Georgia, serif" ${resolvedFontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option>
-                                        <option value="Times New Roman, serif" ${resolvedFontFamily === 'Times New Roman, serif' ? 'selected' : ''}>Times New Roman</option>
-                                        <option value="Courier New, monospace" ${resolvedFontFamily === 'Courier New, monospace' ? 'selected' : ''}>Courier New</option>
-                                    </select>
-                                    <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Méret
-                                        <input type="number" id="setting-richFontSize" value="${resolvedFontSize}" min="8" max="260" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
-                                    </label>
-                                    <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Sorköz
-                                        <input type="number" id="setting-richLineHeight" value="${resolvedLineHeight}" min="0.8" max="2.5" step="0.1" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
-                                    </label>
-                                </div>
-                                <style>
-                                    #text-editor-area ul,#text-editor-area ol{margin:.25em 0 .25em 1.2em;padding-left:1em;list-style-position:outside;}
-                                    #text-editor-area li{margin:.1em 0;}
-                                </style>
-                                <div id="text-editor-area" contenteditable="true" style="min-height:360px; border:1px solid #ccc; border-radius:6px; padding:10px; background:#000; color:#fff; overflow:auto; white-space:pre-wrap; word-wrap:break-word; word-break:break-word; outline:none;">${safeTextHtml}</div>
-                                <input type="hidden" id="setting-text" value="${safeTextInput}">
-                                <div style="display:flex; gap:6px; align-items:center; margin-top:8px;">
-                                    <button type="button" id="text-preview-play" style="padding:5px 10px; border:1px solid #0d5f2e; background:#1f7a3f; color:#fff; border-radius:4px; cursor:pointer;">▶ Play</button>
-                                    <button type="button" id="text-preview-stop" style="padding:5px 10px; border:1px solid #8a1f1f; background:#b02a2a; color:#fff; border-radius:4px; cursor:pointer;">■ Stop</button>
-                                    <small id="text-preview-time-label" style="color:#444; font-weight:600;">0.0s / ${(parseInt(item.duration_seconds || 10, 10) || 10).toFixed(1)}s</small>
-                                </div>
-                                <div style="height:10px; border:1px solid #cdd3da; border-radius:4px; overflow:hidden; background:#edf1f5;">
-                                    <div id="text-preview-progress" style="height:100%; width:0%; background:#1f3e56;"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; gap: 14px; min-width:0;">
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                                <label style="display: block; margin-bottom: 0; font-weight: bold;">Élő előnézet:</label>
-                                <select id="setting-previewResolution" style="padding:6px 8px; border-radius:5px; border:1px solid #ccc; max-width:220px;">
-                                </select>
-                            </div>
-                            <div id="text-preview-frame" style="height:360px; border:1px solid #d0d0d0; border-radius:8px; background:#f4f4f4; overflow:hidden; position:relative;">
-                                <iframe id="text-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
-                            </div>
-
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Háttérszín:</label>
-                                <input type="color" id="setting-bgColor" value="${settings.bgColor || '#000000'}" style="width: 100%; height: 40px; border-radius: 5px;">
-                            </div>
-
-                            <div style="padding: 10px; background: #f7f7f7; border-radius: 8px; border: 1px solid #e5e5e5;">
-                                <label style="display: block; margin-bottom: 6px; font-weight: bold;">Háttérkép feltöltés:</label>
-                                <input type="file" id="setting-bgImageFile" accept="image/*" style="width: 100%;">
-                                <input type="hidden" id="setting-bgImageData" value="${safeBgImageData}">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px;">
-                                    <small id="setting-bgImageStatus" style="color: #555;">${settings.bgImageData ? 'Kép beállítva' : 'Nincs kiválasztott kép'}</small>
-                                    <button type="button" id="setting-removeBgImage" style="padding: 5px 10px; border: none; border-radius: 4px; background: #dc3545; color: #fff; cursor: pointer;">Kép törlése</button>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megjelenítési animáció:</label>
-                                <select id="setting-textAnimationEntry" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                                    <option value="none" ${textAnimationEntry === 'none' ? 'selected' : ''}>Nincs animáció</option>
-                                    <option value="fadeIn" ${textAnimationEntry === 'fadeIn' ? 'selected' : ''}>Fade In (Halványulás)</option>
-                                    <option value="slideUp" ${textAnimationEntry === 'slideUp' ? 'selected' : ''}>Slide Up (Felsúslás)</option>
-                                    <option value="zoomIn" ${textAnimationEntry === 'zoomIn' ? 'selected' : ''}>Zoom In (Nagyítás)</option>
-                                </select>
-                            </div>
-
-                            <div style="padding: 10px; border-radius: 8px; border: 1px solid #e5e5e5;">
-                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 10px;">
-                                    <input type="checkbox" id="setting-scrollMode" ${(settings.scrollMode === true) ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                    <span style="font-weight: bold;">Scroll mode (ha a szöveg nem fér ki)</span>
-                                </label>
-                                <div id="textScrollSettings" style="display: ${(settings.scrollMode === true) ? 'grid' : 'none'}; gap: 10px; grid-template-columns: 1fr;">
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Indulás előtti várakozás (s): <span id="setting-scrollStartPauseSecValue">${scrollStartSec.toFixed(1)}</span></label>
-                                        <input type="range" id="setting-scrollStartPauseSec" value="${scrollStartSec}" min="0" max="5" step="0.1" style="width: 100%;">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Végi várakozás (s): <span id="setting-scrollEndPauseSecValue">${scrollEndSec.toFixed(1)}</span></label>
-                                        <input type="range" id="setting-scrollEndPauseSec" value="${scrollEndSec}" min="0" max="5" step="0.1" style="width: 100%;">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Scroll sebesség (px/s): <span id="setting-scrollSpeedPxPerSecValue">${scrollSpeed}</span></label>
-                                        <input type="range" id="setting-scrollSpeedPxPerSec" value="${scrollSpeed}" min="5" max="200" step="1" style="width: 100%;">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                    <input type="hidden" id="setting-previewDurationSec" value="${parseInt(item.duration_seconds || 10, 10) || 10}">
-                `;
+                formHtml = buildTextCustomizationHtml(item, settings);
+            } else if (moduleKey === 'meal-menu') {
+                formHtml = buildMealMenuCustomizationHtml(settings);
+            } else if (moduleKey === 'room-occupancy') {
+                formHtml = buildRoomOccupancyCustomizationHtml(settings);
             } else if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
-                let galleryImages = [];
-                try {
-                    const parsed = JSON.parse(String(settings.imageUrlsJson || '[]'));
-                    galleryImages = Array.isArray(parsed)
-                        ? parsed.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
-                        : [];
-                } catch (_) {
-                    galleryImages = [];
-                }
-                const safeGalleryJson = escapeHtml(JSON.stringify(galleryImages));
-
-                formHtml = `
-                    <div style="display:grid; gap:14px;">
-                        <div>
-                            <label style="display:block; margin-bottom:6px; font-weight:bold;">🖼️ Képek feltöltése</label>
-                            <div id="gallery-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
-                                <input type="file" id="gallery-file-input" accept="image/*" multiple style="display:none;">
-                                <div style="font-size:14px; color:#425466;">Húzz ide képeket vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
-                                <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Max 10 kép, képenként max 15 MB</div>
-                            </div>
-                            <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
-                                <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
-                                    <strong style="font-size:13px; color:#1f2a37;">☁️ Korábban feltöltött képek (Company Cloud)</strong>
-                                    <button type="button" id="gallery-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">Frissítés</button>
-                                </div>
-                                <div id="gallery-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">Betöltés...</div>
-                                <div id="gallery-library-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px;"></div>
-                                <button type="button" id="gallery-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">Kijelöltek importálása</button>
-                            </div>
-                            <input type="hidden" id="gallery-image-urls-json" value='${safeGalleryJson}'>
-                            <div id="gallery-upload-status" style="font-size:12px; color:#425466; margin-top:6px;"></div>
-                            <div id="gallery-upload-progress-wrap" style="display:none; margin-top:6px;">
-                                <div style="height:8px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
-                                    <div id="gallery-upload-progress-bar" style="height:100%; width:0%; background:#1e40af; transition:width .2s ease;"></div>
-                                </div>
-                                <div id="gallery-upload-progress-text" style="font-size:11px; color:#475569; margin-top:4px;">0%</div>
-                            </div>
-                            <div id="gallery-image-list" style="display:grid; gap:6px; margin-top:8px;"></div>
-                        </div>
-
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Megjelenítési mód</label>
-                                <select id="gallery-display-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="slideshow" ${(settings.displayMode || 'slideshow') === 'slideshow' ? 'selected' : ''}>Slideshow</option>
-                                    <option value="collage" ${settings.displayMode === 'collage' ? 'selected' : ''}>Kollázs</option>
-                                    <option value="single" ${settings.displayMode === 'single' ? 'selected' : ''}>Egy kép</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Kép igazítás</label>
-                                <select id="gallery-fit-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="cover" ${(settings.fitMode || 'cover') === 'cover' ? 'selected' : ''}>Cover</option>
-                                    <option value="contain" ${settings.fitMode === 'contain' ? 'selected' : ''}>Contain</option>
-                                    <option value="fill" ${settings.fitMode === 'fill' ? 'selected' : ''}>Fill</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Slideshow váltás (s)</label>
-                                <input type="number" id="gallery-slide-interval" value="${settings.slideIntervalSec || 5}" min="1" max="30" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Transition (ms)</label>
-                                <input type="number" id="gallery-transition-ms" value="${settings.transitionMs || 450}" min="100" max="2000" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Kollázs oszlopok</label>
-                                <input type="number" id="gallery-collage-columns" value="${settings.collageColumns || 3}" min="2" max="5" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Háttérszín</label>
-                                <input type="color" id="gallery-bg-color" value="${settings.bgColor || '#000000'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
-                            </div>
-                        </div>
-
-                        <div style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
-                            <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
-                            <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
-                                <iframe id="gallery-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
-                            </div>
-                            <div id="gallery-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${galleryImages.length ? 'none' : 'block'};">Tölts fel legalább 1 képet az előnézethez.</div>
-                        </div>
-                    </div>
-                `;
+                formHtml = buildGalleryCustomizationHtml(settings);
             } else if (moduleKey === 'pdf') {
-                const pdfDataBase64 = item.settings?.pdfDataBase64 || '';
-                const pdfAssetUrl = item.settings?.pdfAssetUrl || '';
-                const fileSizeKB = pdfDataBase64 ? Math.round(pdfDataBase64.length / 1024) : 0;
-                const hasPdfSource = !!pdfAssetUrl || !!pdfDataBase64;
-                const autoScrollEnabled = settings.autoScrollEnabled === true || settings.navigationMode === 'auto';
-                const pauseAtPercent = Number.isFinite(parseInt(settings.pauseAtPercent, 10))
-                    ? parseInt(settings.pauseAtPercent, 10)
-                    : -1;
-                
-                formHtml = `
-                    <div style="display: grid; gap: 16px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">📄 PDF Feltöltés</label>
-                            <div id="pdf-upload-area" style="
-                                border: 2px dashed #1e40af;
-                                border-radius: 8px;
-                                padding: 30px;
-                                text-align: center;
-                                cursor: pointer;
-                                transition: background-color 0.2s;
-                                background-color: #f8f9fa;
-                            ">
-                                <input type="file" id="pdf-file-input" accept=".pdf" style="display: none;">
-                                <div style="font-size: 14px; color: #425466;">
-                                    Húzd ide a PDF-et vagy <span style="color: #1e40af; font-weight: bold; text-decoration: underline;">kattints a kiválasztáshoz</span>
-                                </div>
-                                <div style="font-size: 12px; color: #8a97a6; margin-top: 8px;">Max. 50 MB</div>
-                                ${hasPdfSource ? `<div style="color: #28a745; margin-top: 8px; font-size: 13px;">✓ PDF betöltve${fileSizeKB > 0 ? ` (${fileSizeKB} KB)` : ''}</div>` : ''}
-                            </div>
-                        </div>
-                        <div style="display:grid; gap:12px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fix zoom (%):</label>
-                                <input type="number" id="pdf-zoomLevel" value="${settings.zoomLevel || 100}" min="50" max="250" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                            </div>
-                            <div>
-                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                    <input type="checkbox" id="pdf-autoScrollEnabled" ${autoScrollEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                    <span style="font-weight: bold;">Automatikus görgetés</span>
-                                </label>
-                            </div>
-                            <div class="pdf-scroll-settings" style="display:${autoScrollEnabled ? 'grid' : 'none'}; gap:12px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Görgetési sebesség (px/s):</label>
-                                    <input type="number" id="pdf-scrollSpeed" value="${settings.autoScrollSpeedPxPerSec || 30}" min="5" max="300" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Indulás előtti várakozás (ms):</label>
-                                    <input type="number" id="pdf-startPause" value="${settings.autoScrollStartPauseMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ciklus végi várakozás (ms):</label>
-                                    <input type="number" id="pdf-endPause" value="${settings.autoScrollEndPauseMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megállás pozíció (%):</label>
-                                    <input type="number" id="pdf-pauseAtPercent" value="${pauseAtPercent}" min="-1" max="100" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                    <div style="font-size:12px; color:#8a97a6; margin-top:4px;">-1 = nincs köztes megállás</div>
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megállás hossza (ms):</label>
-                                    <input type="number" id="pdf-pauseDurationMs" value="${settings.pauseDurationMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                </div>
-                            </div>
-                        </div>
-                        <div id="pdf-preview-area" style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
-                            <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
-                            <div style="height:360px; overflow:auto; border:1px solid #e0e6ed; border-radius:6px; background:#fff; padding:8px;">
-                                <iframe id="pdf-live-preview-iframe" style="width:100%; height:100%; border:0; background:#fff;"></iframe>
-                            </div>
-                            <div id="pdf-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${hasPdfSource ? 'none' : 'block'};">Tölts fel PDF-et az előnézethez.</div>
-                        </div>
-                    </div>
-                `;
+                formHtml = buildPdfCustomizationHtml(item, settings);
             } else if (moduleKey === 'video') {
-                const durationSec = parseInt(settings.videoDurationSec || item.duration_seconds || 10, 10) || 10;
-                formHtml = `
-                    <div style="display:grid; gap:14px;">
-                        <div>
-                            <label style="display:block; margin-bottom:6px; font-weight:bold;">🎬 Videó feltöltés (MP4)</label>
-                            <div id="video-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
-                                <input type="file" id="video-file-input" accept="video/mp4,.mp4" style="display:none;">
-                                <div style="font-size:14px; color:#425466;">Húzz ide videót vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
-                                <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Csak MP4 (H.264/AAC), max 80 MB</div>
-                            </div>
-                            <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
-                                <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
-                                    <strong style="font-size:13px; color:#1f2a37;">☁️ Korábban feltöltött videók</strong>
-                                    <button type="button" id="video-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">Frissítés</button>
-                                </div>
-                                <div id="video-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">Betöltés...</div>
-                                <div id="video-library-list" style="display:grid; gap:6px;"></div>
-                                <button type="button" id="video-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">Kiválasztott importálása</button>
-                            </div>
-                            <div id="video-upload-status" style="font-size:12px; color:#425466; margin-top:8px;"></div>
-                        </div>
-
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Kitöltés</label>
-                                <select id="video-fit-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="contain" ${(settings.fitMode || 'contain') === 'contain' ? 'selected' : ''}>Contain</option>
-                                    <option value="cover" ${settings.fitMode === 'cover' ? 'selected' : ''}>Cover</option>
-                                    <option value="fill" ${settings.fitMode === 'fill' ? 'selected' : ''}>Fill</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Némítás</label>
-                                <label style="display:flex; align-items:center; gap:8px; border:1px solid #d1d5db; border-radius:5px; padding:8px;">
-                                    <input type="checkbox" id="video-muted" ${(settings.muted !== false) ? 'checked' : ''}>
-                                    <span style="font-size:13px;">Lejátszás némítva</span>
-                                </label>
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Háttérszín</label>
-                                <input type="color" id="video-bg-color" value="${settings.bgColor || '#000000'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
-                            </div>
-                        </div>
-
-                        <div id="video-duration-badge" style="padding:10px; border:1px solid #c7e7d2; background:#ecfdf3; border-radius:8px; color:#0f5132; font-size:13px;">
-                            Loop időtartam: ${durationSec} s (fix, videó hossza)
-                        </div>
-
-                        <div style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
-                            <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
-                            <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
-                                <iframe id="video-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
-                            </div>
-                            <div id="video-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${settings.videoAssetUrl ? 'none' : 'block'};">Tölts fel MP4 videót az előnézethez.</div>
-                        </div>
-                    </div>
-                `;
+                formHtml = buildVideoCustomizationHtml(item, settings);
             } else {
                 formHtml = '<p style="text-align: center; color: #999;">Ez a modul nem rendelkezik testreszabási lehetőségekkel.</p>';
             }
 
             if (isOverlayCarrierModule(moduleKey)) {
-                formHtml += `
-                    <div style="display:grid; gap:12px; margin-top:16px; border:1px solid #d6dde8; border-radius:8px; padding:12px; background:#f8fafc;">
-                        <div style="font-weight:700; color:#1f2a37;">🧩 Overlay modulok (ráhúzható óra/szöveg)</div>
-
-                        <div style="padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; display:grid; gap:10px;">
-                            <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                                <input type="checkbox" id="setting-clockOverlayEnabled" ${overlaySettings.clockOverlayEnabled ? 'checked' : ''} style="width:20px; height:20px;">
-                                <span style="font-weight:600;">Óra overlay bekapcsolása</span>
-                            </label>
-                            <div id="clockOverlaySettings" style="display:${overlaySettings.clockOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
-                                <div>
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Pozíció</label>
-                                    <select id="setting-clockOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                        <option value="top" ${overlaySettings.clockOverlayPosition === 'top' ? 'selected' : ''}>FENT</option>
-                                        <option value="bottom" ${overlaySettings.clockOverlayPosition === 'bottom' ? 'selected' : ''}>LENT</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Sáv magasság (%)</label>
-                                    <input type="number" id="setting-clockOverlayHeightPercent" value="${overlaySettings.clockOverlayHeightPercent || 25}" min="20" max="40" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                </div>
-                                <div>
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Óra szín</label>
-                                    <input type="color" id="setting-clockOverlayTimeColor" value="${overlaySettings.clockOverlayTimeColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
-                                </div>
-                                <div>
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Dátum szín</label>
-                                    <input type="color" id="setting-clockOverlayDateColor" value="${overlaySettings.clockOverlayDateColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; display:grid; gap:10px;">
-                            <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                                <input type="checkbox" id="setting-textOverlayEnabled" ${overlaySettings.textOverlayEnabled ? 'checked' : ''} style="width:20px; height:20px;">
-                                <span style="font-weight:600;">Szöveg overlay bekapcsolása</span>
-                            </label>
-                            <div id="textOverlaySettings" style="display:${overlaySettings.textOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
-                                <div>
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Pozíció</label>
-                                    <select id="setting-textOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                        <option value="top" ${overlaySettings.textOverlayPosition === 'top' ? 'selected' : ''}>FENT</option>
-                                        <option value="bottom" ${overlaySettings.textOverlayPosition === 'bottom' ? 'selected' : ''}>LENT</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Sáv magasság (%)</label>
-                                    <input type="number" id="setting-textOverlayHeightPercent" value="${overlaySettings.textOverlayHeightPercent || 20}" min="12" max="40" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                </div>
-                                <div>
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Betűméret (px)</label>
-                                    <input type="number" id="setting-textOverlayFontSize" value="${overlaySettings.textOverlayFontSize || 52}" min="18" max="120" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                </div>
-                                <div>
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Szín</label>
-                                    <input type="color" id="setting-textOverlayColor" value="${overlaySettings.textOverlayColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
-                                </div>
-                                <div style="grid-column:1 / span 2;">
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Gördülési sebesség (px/s)</label>
-                                    <input type="number" id="setting-textOverlaySpeedPxPerSec" value="${overlaySettings.textOverlaySpeedPxPerSec || 120}" min="40" max="320" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                </div>
-                                <div style="grid-column:1 / span 2;">
-                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg</label>
-                                    <input type="text" id="setting-textOverlayText" value="${escapeHtml(overlaySettings.textOverlayText || 'Sem vložte text...')}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                formHtml += buildOverlayCustomizationHtml(overlaySettings);
             }
-            
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                display: flex;
-                position: fixed;
-                z-index: 2000;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.5);
-                align-items: center;
-                justify-content: center;
-            `;
-            
-            const modalWidthStyle = (moduleKey === 'text' || moduleKey === 'image-gallery' || moduleKey === 'gallery' || moduleKey === 'video')
-                ? 'max-width: 94vw; width: 94vw;'
-                : 'max-width: 600px; width: 90%;';
 
-            modal.innerHTML = `
-                <div style="
-                    background: white;
-                    padding: 30px;
-                    border-radius: 12px;
-                    ${modalWidthStyle}
-                    max-height: 80vh;
-                    overflow-y: auto;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-                ">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="margin: 0;">⚙️ ${item.module_name} - Testreszabás</h2>
-                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
-                            background: #1e40af;
-                            color: white;
-                            border: none;
-                            font-size: 16px;
-                            cursor: pointer;
-                            width: 36px;
-                            height: 36px;
-                            border-radius: 50%;
-                        ">✕</button>
-                    </div>
-                    
-                    ${formHtml}
-                    
-                    <div style="margin-top: 30px; display: flex; gap: 10px; justify-content: flex-end;">
-                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
-                            padding: 10px 20px;
-                            background: #6c757d;
-                            color: white;
-                            border: none;
-                            border-radius: 5px;
-                            cursor: pointer;
-                        ">Mégse</button>
-                        <button onclick="saveCustomization(${index})" style="
-                            padding: 10px 20px;
-                            background: #28a745;
-                            color: white;
-                            border: none;
-                            border-radius: 5px;
-                            cursor: pointer;
-                        ">💾 Mentés</button>
-                    </div>
-                </div>
-            `;
-            
+            const modal = createCustomizationModalElement(item, index, formHtml, moduleKey);
             document.body.appendChild(modal);
-            
-            // Initialize module-specific UI
-            if (moduleKey === 'pdf') {
-                window.currentPdfBase64 = item.settings?.pdfDataBase64 || '';
-                window.pdfModuleSettings = {
-                    ...item.settings,
-                    pdfDataBase64: window.currentPdfBase64
-                };
-                // Initialize PDF module UI after modal is added to DOM
-                setTimeout(() => {
-                    GroupLoopPdfModule.init();
-                }, 0);
-            } else if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
-                window.galleryModuleSettings = { ...item.settings };
-                setTimeout(() => {
-                    const galleryModuleApi =
-                        window.GroupLoopGalleryModule ||
-                        (typeof GroupLoopGalleryModule !== 'undefined' ? GroupLoopGalleryModule : null);
-
-                    if (galleryModuleApi?.init) {
-                        galleryModuleApi.init();
-                    }
-                }, 0);
-            } else if (moduleKey === 'video') {
-                window.videoModuleSettings = {
-                    videoAssetUrl: '',
-                    videoAssetId: '',
-                    videoDurationSec: parseInt(item.duration_seconds || 10, 10) || 10,
-                    muted: true,
-                    fitMode: 'contain',
-                    bgColor: '#000000',
-                    ...item.settings
-                };
-                setTimeout(() => {
-                    if (window.GroupLoopVideoModule?.init) {
-                        window.GroupLoopVideoModule.init();
-                    }
-                }, 0);
-            }
+            initializeCustomizationModuleUi(moduleKey, item, settings);
             
             // Add event listeners for dynamic form changes
             const typeSelect = document.getElementById('setting-type');
@@ -4661,12 +4791,1124 @@
                     if (section) {
                         section.style.display = this.checked ? 'grid' : 'none';
                     }
+                    updateTextOverlaySourceVisibility();
                 });
             }
+
+            const textOverlaySourceSelect = document.getElementById('setting-textOverlaySourceType');
+            const updateTextOverlaySourceVisibility = () => {
+                const section = document.getElementById('textOverlaySettings');
+                const manualWrap = document.getElementById('textOverlayManualWrap');
+                const collectionWrap = document.getElementById('textOverlayCollectionWrap');
+                const externalWrap = document.getElementById('textOverlayExternalWrap');
+                const enabled = document.getElementById('setting-textOverlayEnabled')?.checked === true;
+                const sourceType = String(document.getElementById('setting-textOverlaySourceType')?.value || 'manual');
+
+                if (section) {
+                    section.style.display = enabled ? 'grid' : 'none';
+                }
+
+                if (manualWrap) {
+                    manualWrap.style.display = enabled && sourceType === 'manual' ? 'block' : 'none';
+                }
+                if (collectionWrap) {
+                    collectionWrap.style.display = enabled && sourceType === 'collection' ? 'block' : 'none';
+                }
+                if (externalWrap) {
+                    externalWrap.style.display = enabled && sourceType === 'external' ? 'block' : 'none';
+                }
+            };
+
+            if (textOverlaySourceSelect) {
+                textOverlaySourceSelect.addEventListener('change', updateTextOverlaySourceVisibility);
+            }
+            updateTextOverlaySourceVisibility();
 
             if (moduleKey === 'text') {
                 bindTextModuleModalEvents(settings);
             }
+        }
+
+        function isWideCustomizationModule(moduleKey) {
+            return moduleKey === 'text'
+                || moduleKey === 'image-gallery'
+                || moduleKey === 'gallery'
+                || moduleKey === 'video'
+                || moduleKey === 'meal-menu'
+                || moduleKey === 'room-occupancy';
+        }
+
+        function buildDefaultLogoCustomizationHtml() {
+            return `
+                <div style="display: grid; gap: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fix tartalom:</label>
+                        <div style="padding:10px; border:1px solid #d1d5db; border-radius:6px; background:#f8fafc; color:#1f2937;">
+                            <div style="font-weight:700;">EDUdisplej.sk</div>
+                            <div style="margin-top:4px; opacity:0.85;">With heart for education.</div>
+                        </div>
+                    </div>
+                    <div class="muted" style="font-size:12px;">
+                        A default logo modul tartalma nem szerkeszthető.
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildClockCustomizationHtml(settings) {
+            return `
+                <div style="display: grid; gap: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Típus:</label>
+                        <select id="setting-type" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="digital" ${settings.type === 'digital' ? 'selected' : ''}>Digitális</option>
+                            <option value="analog" ${settings.type === 'analog' ? 'selected' : ''}>Analóg</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Formátum:</label>
+                        <select id="setting-format" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="24h" selected>24 órás</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum formátum:</label>
+                        <select id="setting-dateFormat" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="full" ${settings.dateFormat === 'full' ? 'selected' : ''}>Teljes (év, hónap, nap, napnév)</option>
+                            <option value="short" ${settings.dateFormat === 'short' ? 'selected' : ''}>Rövid (év, hónap, nap)</option>
+                            <option value="dmy" ${settings.dateFormat === 'dmy' ? 'selected' : ''}>Nap.Hónap.Év (NN.HH.ÉÉÉÉ)</option>
+                            <option value="numeric" ${settings.dateFormat === 'numeric' ? 'selected' : ''}>Numerikus (ÉÉÉÉ.HH.NN)</option>
+                            <option value="none" ${settings.dateFormat === 'none' ? 'selected' : ''}>Nincs dátum</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nyelv:</label>
+                        <select id="setting-language" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="hu" ${settings.language === 'hu' ? 'selected' : ''}>Magyar</option>
+                            <option value="sk" ${settings.language === 'sk' ? 'selected' : ''}>Szlovák</option>
+                            <option value="en" ${settings.language === 'en' ? 'selected' : ''}>Angol</option>
+                        </select>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra szín:</label>
+                            <input type="color" id="setting-timeColor" value="${settings.timeColor || '#ffffff'}" style="width: 100%; height: 40px; border-radius: 5px;">
+                        </div>
+                        
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum szín:</label>
+                            <input type="color" id="setting-dateColor" value="${settings.dateColor || '#ffffff'}" style="width: 100%; height: 40px; border-radius: 5px;">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Háttérszín:</label>
+                        <input type="color" id="setting-bgColor" value="${settings.bgColor || '#000000'}" style="width: 100%; height: 40px; border-radius: 5px;">
+                    </div>
+                    
+                    <div id="digitalSettings" style="${settings.type === 'analog' ? 'display: none;' : ''}">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra betűméret (px):</label>
+                                <input type="number" id="setting-timeFontSize" value="${settings.timeFontSize || settings.fontSize || 120}" min="40" max="320" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum betűméret (px):</label>
+                                <input type="number" id="setting-dateFontSize" value="${settings.dateFontSize || Math.max(16, Math.round((settings.timeFontSize || settings.fontSize || 120) * 0.3))}" min="14" max="180" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="analogSettings" style="${settings.type === 'digital' ? 'display: none;' : ''}">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra mérete (px):</label>
+                        <input type="number" id="setting-clockSize" value="${settings.clockSize || 300}" min="200" max="600" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                    </div>
+                    
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="setting-showSeconds" ${settings.showSeconds !== false ? 'checked' : ''} style="width: 20px; height: 20px;">
+                            <span style="font-weight: bold;">Másodpercek mutatása</span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="setting-showDate" ${(settings.showDate !== false && settings.dateFormat !== 'none') ? 'checked' : ''} style="width: 20px; height: 20px;">
+                            <span style="font-weight: bold;">Dátum megjelenítése</span>
+                        </label>
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildTextCustomizationHtml(item, settings) {
+            const safeTextHtml = sanitizeRichTextHtml(settings.text || '');
+            const safeTextInput = escapeHtml(safeTextHtml);
+            const safeBgImageData = escapeHtml(settings.bgImageData || '');
+            const textSourceType = String(settings.textSourceType || 'manual') === 'collection' ? 'collection' : 'manual';
+            const textCollectionId = parseInt(settings.textCollectionId, 10) || 0;
+            const resolvedFontFamily = String(settings.fontFamily || 'Arial, sans-serif');
+            const resolvedFontSize = Math.max(8, parseInt(settings.fontSize, 10) || 72);
+            const resolvedLineHeight = Math.max(0.8, Math.min(2.5, parseFloat(settings.lineHeight) || 1.2));
+            const scrollStartSec = Math.max(0, Math.min(5, (parseInt(settings.scrollStartPauseMs, 10) || 3000) / 1000));
+            const scrollEndSec = Math.max(0, Math.min(5, (parseInt(settings.scrollEndPauseMs, 10) || 3000) / 1000));
+            const scrollSpeed = Math.max(5, Math.min(200, parseInt(settings.scrollSpeedPxPerSec, 10) || 35));
+            const textAnimationEntry = settings.textAnimationEntry || 'none';
+
+            return `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
+                    <div style="display: grid; gap: 10px; min-width:0;">
+                        <div style="display:grid; gap:8px; border:1px solid #d9e2ec; border-radius:8px; padding:10px; background:#f8fafc;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg forrása</label>
+                                <select id="setting-textSourceType" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="manual" ${textSourceType === 'manual' ? 'selected' : ''}>Kézi szerkesztés</option>
+                                    <option value="collection" ${textSourceType === 'collection' ? 'selected' : ''}>Slide gyűjtemény</option>
+                                </select>
+                            </div>
+                            <div id="textCollectionSelectorWrap" style="display:${textSourceType === 'collection' ? 'block' : 'none'};">
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Slide elem</label>
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <select id="setting-textCollectionId" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                        <option value="${textCollectionId}">${textCollectionId > 0 ? 'Betöltés...' : '-- Válassz slide elemet --'}</option>
+                                    </select>
+                                    <button type="button" id="setting-textCollectionRefresh" style="padding:7px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">Frissít</button>
+                                </div>
+                                <div style="margin-top:6px; font-size:12px;">
+                                    <a href="../text_collections.php" target="_blank" rel="noopener">Slide gyűjtemény kezelése</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="textManualEditorWrap" style="display:${textSourceType === 'manual' ? 'block' : 'none'};">
+                        <div style="display: grid; gap: 6px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 0;">Szerkesztő:</label>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                                <button type="button" data-richcmd="bold" style="padding:5px 9px;">B</button>
+                                <button type="button" data-richcmd="italic" style="padding:5px 9px; font-style:italic;">I</button>
+                                <button type="button" data-richcmd="underline" style="padding:5px 9px; text-decoration:underline;">U</button>
+                                <button type="button" data-richcmd="insertUnorderedList" style="padding:5px 9px;">• Lista</button>
+                                <button type="button" data-richcmd="justifyLeft" style="padding:5px 9px;">Bal</button>
+                                <button type="button" data-richcmd="justifyCenter" style="padding:5px 9px;">Közép</button>
+                                <button type="button" data-richcmd="justifyRight" style="padding:5px 9px;">Jobb</button>
+                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Szín <input type="color" id="setting-richColor" value="#ffffff"></label>
+                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Háttér <input type="color" id="setting-richBgColor" value="#ffd54f"></label>
+                                <select id="setting-richFontFamily" style="padding:4px 6px; border:1px solid #ccc; border-radius:4px; max-width:180px;">
+                                    <option value="Arial, sans-serif" ${resolvedFontFamily === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option>
+                                    <option value="Verdana, sans-serif" ${resolvedFontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option>
+                                    <option value="Tahoma, sans-serif" ${resolvedFontFamily === 'Tahoma, sans-serif' ? 'selected' : ''}>Tahoma</option>
+                                    <option value="Trebuchet MS, sans-serif" ${resolvedFontFamily === 'Trebuchet MS, sans-serif' ? 'selected' : ''}>Trebuchet</option>
+                                    <option value="Georgia, serif" ${resolvedFontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option>
+                                    <option value="Times New Roman, serif" ${resolvedFontFamily === 'Times New Roman, serif' ? 'selected' : ''}>Times New Roman</option>
+                                    <option value="Courier New, monospace" ${resolvedFontFamily === 'Courier New, monospace' ? 'selected' : ''}>Courier New</option>
+                                </select>
+                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Méret
+                                    <input type="number" id="setting-richFontSize" value="${resolvedFontSize}" min="8" max="260" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
+                                </label>
+                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Sorköz
+                                    <input type="number" id="setting-richLineHeight" value="${resolvedLineHeight}" min="0.8" max="2.5" step="0.1" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
+                                </label>
+                            </div>
+                            <style>
+                                #text-editor-area ul,#text-editor-area ol{margin:.25em 0 .25em 1.2em;padding-left:1em;list-style-position:outside;}
+                                #text-editor-area li{margin:.1em 0;}
+                            </style>
+                            <div id="text-editor-area" contenteditable="true" style="min-height:360px; border:1px solid #ccc; border-radius:6px; padding:10px; background:#000; color:#fff; overflow:auto; white-space:pre-wrap; word-wrap:break-word; word-break:break-word; outline:none;">${safeTextHtml}</div>
+                            <input type="hidden" id="setting-text" value="${safeTextInput}">
+                            <div style="display:flex; gap:6px; align-items:center; margin-top:8px;">
+                                <button type="button" id="text-preview-play" style="padding:5px 10px; border:1px solid #0d5f2e; background:#1f7a3f; color:#fff; border-radius:4px; cursor:pointer;">▶ Play</button>
+                                <button type="button" id="text-preview-stop" style="padding:5px 10px; border:1px solid #8a1f1f; background:#b02a2a; color:#fff; border-radius:4px; cursor:pointer;">■ Stop</button>
+                                <small id="text-preview-time-label" style="color:#444; font-weight:600;">0.0s / ${(parseInt(item.duration_seconds || 10, 10) || 10).toFixed(1)}s</small>
+                            </div>
+                            <div style="height:10px; border:1px solid #cdd3da; border-radius:4px; overflow:hidden; background:#edf1f5;">
+                                <div id="text-preview-progress" style="height:100%; width:0%; background:#1f3e56;"></div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; gap: 14px; min-width:0;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                            <label style="display: block; margin-bottom: 0; font-weight: bold;">Élő előnézet:</label>
+                            <select id="setting-previewResolution" style="padding:6px 8px; border-radius:5px; border:1px solid #ccc; max-width:220px;">
+                            </select>
+                        </div>
+                        <div id="text-preview-frame" style="height:360px; border:1px solid #d0d0d0; border-radius:8px; background:#f4f4f4; overflow:hidden; position:relative;">
+                            <iframe id="text-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
+                        </div>
+
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Háttérszín:</label>
+                            <input type="color" id="setting-bgColor" value="${settings.bgColor || '#000000'}" style="width: 100%; height: 40px; border-radius: 5px;">
+                        </div>
+
+                        <div style="padding: 10px; background: #f7f7f7; border-radius: 8px; border: 1px solid #e5e5e5;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: bold;">Háttérkép feltöltés:</label>
+                            <input type="file" id="setting-bgImageFile" accept="image/*" style="width: 100%;">
+                            <input type="hidden" id="setting-bgImageData" value="${safeBgImageData}">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px;">
+                                <small id="setting-bgImageStatus" style="color: #555;">${settings.bgImageData ? 'Kép beállítva' : 'Nincs kiválasztott kép'}</small>
+                                <button type="button" id="setting-removeBgImage" style="padding: 5px 10px; border: none; border-radius: 4px; background: #dc3545; color: #fff; cursor: pointer;">Kép törlése</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megjelenítési animáció:</label>
+                            <select id="setting-textAnimationEntry" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                                <option value="none" ${textAnimationEntry === 'none' ? 'selected' : ''}>Nincs animáció</option>
+                                <option value="fadeIn" ${textAnimationEntry === 'fadeIn' ? 'selected' : ''}>Fade In (Halványulás)</option>
+                                <option value="slideUp" ${textAnimationEntry === 'slideUp' ? 'selected' : ''}>Slide Up (Felsúslás)</option>
+                                <option value="zoomIn" ${textAnimationEntry === 'zoomIn' ? 'selected' : ''}>Zoom In (Nagyítás)</option>
+                            </select>
+                        </div>
+
+                        <div style="padding: 10px; border-radius: 8px; border: 1px solid #e5e5e5;">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 10px;">
+                                <input type="checkbox" id="setting-scrollMode" ${(settings.scrollMode === true) ? 'checked' : ''} style="width: 20px; height: 20px;">
+                                <span style="font-weight: bold;">Scroll mode (ha a szöveg nem fér ki)</span>
+                            </label>
+                            <div id="textScrollSettings" style="display: ${(settings.scrollMode === true) ? 'grid' : 'none'}; gap: 10px; grid-template-columns: 1fr;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Indulás előtti várakozás (s): <span id="setting-scrollStartPauseSecValue">${scrollStartSec.toFixed(1)}</span></label>
+                                    <input type="range" id="setting-scrollStartPauseSec" value="${scrollStartSec}" min="0" max="5" step="0.1" style="width: 100%;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Végi várakozás (s): <span id="setting-scrollEndPauseSecValue">${scrollEndSec.toFixed(1)}</span></label>
+                                    <input type="range" id="setting-scrollEndPauseSec" value="${scrollEndSec}" min="0" max="5" step="0.1" style="width: 100%;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Scroll sebesség (px/s): <span id="setting-scrollSpeedPxPerSecValue">${scrollSpeed}</span></label>
+                                    <input type="range" id="setting-scrollSpeedPxPerSec" value="${scrollSpeed}" min="5" max="200" step="1" style="width: 100%;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <input type="hidden" id="setting-previewDurationSec" value="${parseInt(item.duration_seconds || 10, 10) || 10}">
+            `;
+        }
+
+        function buildMealMenuCustomizationHtml(settings) {
+            const siteKey = escapeHtml(String(settings.siteKey || 'jedalen.sk'));
+            const institutionId = parseInt(settings.institutionId || 0, 10) || 0;
+            const sourceType = String(settings.sourceType || 'manual').toLowerCase() === 'server' ? 'server' : 'manual';
+            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'hu';
+            const fontFamily = escapeHtml(String(settings.fontFamily || 'Segoe UI, Tahoma, sans-serif'));
+            const customHeaderTitle = escapeHtml(String(settings.customHeaderTitle || ''));
+            const appetiteMessageText = escapeHtml(String(settings.appetiteMessageText || 'Jó étvágyat kívánunk!'));
+            const sourceUrl = escapeHtml(String(settings.sourceUrl || ''));
+            const mealTitleFontSize = Number(settings.mealTitleFontSize || 1.5);
+            const mealTextFontSize = Number(settings.mealTextFontSize || 1.35);
+            const textFontWeight = parseInt(settings.textFontWeight || 600, 10) || 600;
+            const lineHeight = Number(settings.lineHeight || 1.35);
+
+            return `
+                <div style="display:grid; gap:14px;">
+                    <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#f8fafc; display:grid; gap:10px;">
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Adatforrás</label>
+                            <select id="setting-mealSourceType" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                <option value="manual" ${sourceType === 'manual' ? 'selected' : ''}>Manuális naptár</option>
+                                <option value="server" ${sourceType === 'server' ? 'selected' : ''}>Szerver (szinkron)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Statikus nyelv</label>
+                            <select id="setting-mealLanguage" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                <option value="hu" ${language === 'hu' ? 'selected' : ''}>Magyar</option>
+                                <option value="sk" ${language === 'sk' ? 'selected' : ''}>Slovenčina</option>
+                                <option value="en" ${language === 'en' ? 'selected' : ''}>English</option>
+                            </select>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Forrás oldal</label>
+                                <select id="setting-mealSiteKey" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="${siteKey}">${siteKey || '-- Válassz forrás oldalt --'}</option>
+                                </select>
+                            </div>
+                            <button type="button" id="setting-mealReloadSites" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">Frissít</button>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Intézmény</label>
+                                <select id="setting-mealInstitutionId" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="${institutionId}">${institutionId > 0 ? 'Betöltés...' : '-- Válassz intézményt --'}</option>
+                                </select>
+                            </div>
+                            <button type="button" id="setting-mealReloadInstitutions" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">Frissít</button>
+                        </div>
+
+                        <div id="setting-mealStatus" style="font-size:12px; color:#475569;">Források betöltése...</div>
+                    </div>
+
+                    <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#fff; display:grid; gap:8px;">
+                        <div style="font-weight:700; color:#1f2937;">Megjelenítendő étkezések</div>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showHeaderTitle" ${settings.showHeaderTitle !== false ? 'checked' : ''}> Főcím megjelenítése (Dnešné menu)</label>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Egyedi főcím (opcionális)</label>
+                            <input type="text" id="setting-customHeaderTitle" value="${customHeaderTitle}" placeholder="pl. Dnešné menu" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showInstitutionName" ${settings.showInstitutionName !== false ? 'checked' : ''}> Étkezde neve megjelenítése</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showBreakfast" ${settings.showBreakfast !== false ? 'checked' : ''}> Reggeli</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackAm" ${settings.showSnackAm !== false ? 'checked' : ''}> Tízórai</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showLunch" ${settings.showLunch !== false ? 'checked' : ''}> Ebéd</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackPm" ${settings.showSnackPm === true ? 'checked' : ''}> Uzsonna</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showDinner" ${settings.showDinner === true ? 'checked' : ''}> Vacsora</label>
+                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showMealTypeSvgIcons" ${settings.showMealTypeSvgIcons !== false ? 'checked' : ''}> Étkezés SVG ikonok megjelenítése</label>
+                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showAllergenEmojis" ${settings.showAllergenEmojis === true ? 'checked' : ''}> Allergén emoji-k megjelenítése</label>
+                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-mealCenterAlign" ${settings.centerAlign === true ? 'checked' : ''}> Középre igazított elrendezés</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mealSlowScrollOnOverflow" ${settings.slowScrollOnOverflow === true ? 'checked' : ''}> Lassú auto-scroll, ha nem fér ki</label>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Scroll sebesség (px/s)</label>
+                            <input type="number" id="setting-mealSlowScrollSpeedPxPerSec" min="8" max="120" step="1" value="${Math.max(8, Math.min(120, parseInt(settings.slowScrollSpeedPxPerSec || 28, 10) || 28))}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                    </div>
+
+                    <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#fff; display:grid; gap:10px;">
+                        <div style="font-weight:700; color:#1f2937;">Szöveg megjelenés</div>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Betűtípus</label>
+                            <input type="text" id="setting-mealFontFamily" value="${fontFamily}" placeholder="Segoe UI, Tahoma, sans-serif" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Címsor méret (vw)</label>
+                                <input type="number" id="setting-mealTitleFontSize" min="0.8" max="4" step="0.05" value="${Number.isFinite(mealTitleFontSize) ? mealTitleFontSize : 1.5}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg méret (vw)</label>
+                                <input type="number" id="setting-mealTextFontSize" min="0.8" max="4" step="0.05" value="${Number.isFinite(mealTextFontSize) ? mealTextFontSize : 1.35}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Vastagság</label>
+                                <select id="setting-mealTextFontWeight" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="400" ${textFontWeight <= 450 ? 'selected' : ''}>Normál (400)</option>
+                                    <option value="500" ${textFontWeight > 450 && textFontWeight < 650 ? 'selected' : ''}>Közepes (500)</option>
+                                    <option value="700" ${textFontWeight >= 650 ? 'selected' : ''}>Félkövér (700)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Sorköz</label>
+                                <input type="number" id="setting-mealLineHeight" min="1" max="2.2" step="0.05" value="${Number.isFinite(lineHeight) ? lineHeight : 1.35}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                        </div>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mealWrapText" ${settings.wrapText !== false ? 'checked' : ''}> Szövegtördelés engedélyezése</label>
+                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showAppetiteMessage" ${settings.showAppetiteMessage === true ? 'checked' : ''}> „Jó étvágyat kívánunk” sor megjelenítése</label>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Jó étvágyat szöveg</label>
+                            <input type="text" id="setting-appetiteMessageText" value="${appetiteMessageText}" placeholder="Jó étvágyat kívánunk!" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSourceUrl" ${settings.showSourceUrl === true ? 'checked' : ''}> Forrás URL megjelenítése alul</label>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Forrás URL</label>
+                            <input type="url" id="setting-sourceUrl" value="${sourceUrl}" placeholder="https://www.jedalen.sk/Pages/EatMenu?Ident=..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildRoomOccupancyCustomizationHtml(settings) {
+            const roomId = parseInt(settings.roomId || 0, 10) || 0;
+            const showNextCount = parseInt(settings.showNextCount || 4, 10) || 4;
+
+            return `
+                <div style="display:grid; gap:14px;">
+                    <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#f8fafc; display:grid; gap:10px;">
+                        <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Terem</label>
+                                <select id="setting-roomOccRoomId" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="${roomId}">${roomId > 0 ? 'Betöltés...' : '-- Válassz termet --'}</option>
+                                </select>
+                            </div>
+                            <button type="button" id="setting-roomOccReloadRooms" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">Frissít</button>
+                        </div>
+                        <div id="setting-roomOccStatus" style="font-size:12px; color:#475569;">Termek betöltése...</div>
+                    </div>
+
+                    <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#fff; display:grid; gap:8px;">
+                        <div style="font-weight:700; color:#1f2937;">Megjelenítés</div>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-roomOccShowOnlyCurrent" ${settings.showOnlyCurrent === true ? 'checked' : ''}> Csak aktuális foglaltság</label>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Következő események száma</label>
+                            <input type="number" id="setting-roomOccShowNextCount" min="1" max="12" value="${showNextCount}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildGalleryCustomizationHtml(settings) {
+            let galleryImages = [];
+            try {
+                const parsed = JSON.parse(String(settings.imageUrlsJson || '[]'));
+                galleryImages = Array.isArray(parsed)
+                    ? parsed.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+                    : [];
+            } catch (_) {
+                galleryImages = [];
+            }
+            const safeGalleryJson = escapeHtml(JSON.stringify(galleryImages));
+
+            return `
+                <div style="display:grid; gap:14px;">
+                    <div>
+                        <label style="display:block; margin-bottom:6px; font-weight:bold;">🖼️ Képek feltöltése</label>
+                        <div id="gallery-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
+                            <input type="file" id="gallery-file-input" accept="image/*" multiple style="display:none;">
+                            <div style="font-size:14px; color:#425466;">Húzz ide képeket vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
+                            <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Max 10 kép, képenként max 15 MB</div>
+                        </div>
+                        <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
+                            <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
+                                <strong style="font-size:13px; color:#1f2a37;">☁️ Korábban feltöltött képek (Company Cloud)</strong>
+                                <button type="button" id="gallery-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">Frissítés</button>
+                            </div>
+                            <div id="gallery-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">Betöltés...</div>
+                            <div id="gallery-library-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px;"></div>
+                            <button type="button" id="gallery-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">Kijelöltek importálása</button>
+                        </div>
+                        <input type="hidden" id="gallery-image-urls-json" value='${safeGalleryJson}'>
+                        <div id="gallery-upload-status" style="font-size:12px; color:#425466; margin-top:6px;"></div>
+                        <div id="gallery-upload-progress-wrap" style="display:none; margin-top:6px;">
+                            <div style="height:8px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
+                                <div id="gallery-upload-progress-bar" style="height:100%; width:0%; background:#1e40af; transition:width .2s ease;"></div>
+                            </div>
+                            <div id="gallery-upload-progress-text" style="font-size:11px; color:#475569; margin-top:4px;">0%</div>
+                        </div>
+                        <div id="gallery-image-list" style="display:grid; gap:6px; margin-top:8px;"></div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Megjelenítési mód</label>
+                            <select id="gallery-display-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                <option value="slideshow" ${(settings.displayMode || 'slideshow') === 'slideshow' ? 'selected' : ''}>Slideshow</option>
+                                <option value="collage" ${settings.displayMode === 'collage' ? 'selected' : ''}>Kollázs</option>
+                                <option value="single" ${settings.displayMode === 'single' ? 'selected' : ''}>Egy kép</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Kép igazítás</label>
+                            <select id="gallery-fit-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                <option value="cover" ${settings.fitMode === 'cover' ? 'selected' : ''}>Cover</option>
+                                <option value="contain" ${(settings.fitMode || 'contain') === 'contain' ? 'selected' : ''}>Contain</option>
+                                <option value="fill" ${settings.fitMode === 'fill' ? 'selected' : ''}>Fill</option>
+                            </select>
+                        </div>
+                        <div id="gallery-slide-interval-wrap">
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Slideshow váltás (s)</label>
+                            <input type="number" id="gallery-slide-interval" value="${settings.slideIntervalSec || 5}" min="1" max="30" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                        <div id="gallery-transition-toggle-wrap" style="display:flex; align-items:flex-end;">
+                            <label style="display:flex; align-items:center; gap:8px; font-weight:bold; margin-bottom:4px; cursor:pointer;">
+                                <input type="checkbox" id="gallery-transition-enabled" ${(settings.transitionEnabled !== false && Number(settings.transitionMs || 450) !== 0) ? 'checked' : ''}>
+                                <span>Áttűnés bekapcsolva</span>
+                            </label>
+                        </div>
+                        <div id="gallery-collage-columns-wrap">
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Kollázs oszlopok</label>
+                            <input type="number" id="gallery-collage-columns" value="${settings.collageColumns || 3}" min="2" max="5" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Háttérszín</label>
+                            <input type="color" id="gallery-bg-color" value="${settings.bgColor || '#000000'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                    </div>
+
+                    <div style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
+                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                        <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
+                            <iframe id="gallery-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
+                        </div>
+                        <div id="gallery-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${galleryImages.length ? 'none' : 'block'};">Tölts fel legalább 1 képet az előnézethez.</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildPdfCustomizationHtml(item, settings) {
+            const pdfDataBase64 = item.settings?.pdfDataBase64 || '';
+            const pdfAssetUrl = item.settings?.pdfAssetUrl || '';
+            const fileSizeKB = pdfDataBase64 ? Math.round(pdfDataBase64.length / 1024) : 0;
+            const hasPdfSource = !!pdfAssetUrl || !!pdfDataBase64;
+            const autoScrollEnabled = settings.autoScrollEnabled === true || settings.navigationMode === 'auto';
+            const pauseAtPercent = Number.isFinite(parseInt(settings.pauseAtPercent, 10))
+                ? parseInt(settings.pauseAtPercent, 10)
+                : -1;
+
+            return `
+                <div style="display: grid; gap: 16px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 10px; font-weight: bold;">📄 PDF Feltöltés</label>
+                        <div id="pdf-upload-area" style="
+                            border: 2px dashed #1e40af;
+                            border-radius: 8px;
+                            padding: 30px;
+                            text-align: center;
+                            cursor: pointer;
+                            transition: background-color 0.2s;
+                            background-color: #f8f9fa;
+                        ">
+                            <input type="file" id="pdf-file-input" accept=".pdf" style="display: none;">
+                            <div style="font-size: 14px; color: #425466;">
+                                Húzd ide a PDF-et vagy <span style="color: #1e40af; font-weight: bold; text-decoration: underline;">kattints a kiválasztáshoz</span>
+                            </div>
+                            <div style="font-size: 12px; color: #8a97a6; margin-top: 8px;">Max. 50 MB</div>
+                            ${hasPdfSource ? `<div style="color: #28a745; margin-top: 8px; font-size: 13px;">✓ PDF betöltve${fileSizeKB > 0 ? ` (${fileSizeKB} KB)` : ''}</div>` : ''}
+                        </div>
+                    </div>
+                    <div style="display:grid; gap:12px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fix zoom (%):</label>
+                            <input type="number" id="pdf-zoomLevel" value="${settings.zoomLevel || 100}" min="50" max="250" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                        </div>
+                        <div>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="pdf-autoScrollEnabled" ${autoScrollEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
+                                <span style="font-weight: bold;">Automatikus görgetés</span>
+                            </label>
+                        </div>
+                        <div class="pdf-scroll-settings" style="display:${autoScrollEnabled ? 'grid' : 'none'}; gap:12px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Görgetési sebesség (px/s):</label>
+                                <input type="number" id="pdf-scrollSpeed" value="${settings.autoScrollSpeedPxPerSec || 30}" min="5" max="300" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Indulás előtti várakozás (ms):</label>
+                                <input type="number" id="pdf-startPause" value="${settings.autoScrollStartPauseMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ciklus végi várakozás (ms):</label>
+                                <input type="number" id="pdf-endPause" value="${settings.autoScrollEndPauseMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megállás pozíció (%):</label>
+                                <input type="number" id="pdf-pauseAtPercent" value="${pauseAtPercent}" min="-1" max="100" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                                <div style="font-size:12px; color:#8a97a6; margin-top:4px;">-1 = nincs köztes megállás</div>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megállás hossza (ms):</label>
+                                <input type="number" id="pdf-pauseDurationMs" value="${settings.pauseDurationMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="pdf-preview-area" style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
+                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                        <div style="height:360px; overflow:auto; border:1px solid #e0e6ed; border-radius:6px; background:#fff; padding:8px;">
+                            <iframe id="pdf-live-preview-iframe" style="width:100%; height:100%; border:0; background:#fff;"></iframe>
+                        </div>
+                        <div id="pdf-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${hasPdfSource ? 'none' : 'block'};">Tölts fel PDF-et az előnézethez.</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildVideoCustomizationHtml(item, settings) {
+            const durationSec = parseInt(settings.videoDurationSec || item.duration_seconds || 10, 10) || 10;
+
+            return `
+                <div style="display:grid; gap:14px;">
+                    <div>
+                        <label style="display:block; margin-bottom:6px; font-weight:bold;">🎬 Videó feltöltés (MP4)</label>
+                        <div id="video-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
+                            <input type="file" id="video-file-input" accept="video/mp4,.mp4" style="display:none;">
+                            <div style="font-size:14px; color:#425466;">Húzz ide videót vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
+                            <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Csak MP4 (H.264/AAC), max 80 MB</div>
+                        </div>
+                        <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
+                            <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
+                                <strong style="font-size:13px; color:#1f2a37;">☁️ Korábban feltöltött videók</strong>
+                                <button type="button" id="video-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">Frissítés</button>
+                            </div>
+                            <div id="video-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">Betöltés...</div>
+                            <div id="video-library-list" style="display:grid; gap:6px;"></div>
+                            <button type="button" id="video-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">Kiválasztott importálása</button>
+                        </div>
+                        <div id="video-upload-status" style="font-size:12px; color:#425466; margin-top:8px;"></div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Kitöltés</label>
+                            <select id="video-fit-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                <option value="contain" ${(settings.fitMode || 'contain') === 'contain' ? 'selected' : ''}>Contain</option>
+                                <option value="cover" ${settings.fitMode === 'cover' ? 'selected' : ''}>Cover</option>
+                                <option value="fill" ${settings.fitMode === 'fill' ? 'selected' : ''}>Fill</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Némítás</label>
+                            <label style="display:flex; align-items:center; gap:8px; border:1px solid #d1d5db; border-radius:5px; padding:8px;">
+                                <input type="checkbox" id="video-muted" ${(settings.muted !== false) ? 'checked' : ''}>
+                                <span style="font-size:13px;">Lejátszás némítva</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Háttérszín</label>
+                            <input type="color" id="video-bg-color" value="${settings.bgColor || '#000000'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                    </div>
+
+                    <div id="video-duration-badge" style="padding:10px; border:1px solid #c7e7d2; background:#ecfdf3; border-radius:8px; color:#0f5132; font-size:13px;">
+                        Loop időtartam: ${durationSec} s (fix, videó hossza)
+                    </div>
+
+                    <div style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
+                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                        <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
+                            <iframe id="video-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
+                        </div>
+                        <div id="video-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${settings.videoAssetUrl ? 'none' : 'block'};">Tölts fel MP4 videót az előnézethez.</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildOverlayCustomizationHtml(overlaySettings) {
+            const overlayCollectionText = (() => {
+                try {
+                    const parsed = JSON.parse(String(overlaySettings.textOverlayCollectionJson || '[]'));
+                    return Array.isArray(parsed)
+                        ? parsed.map((entry) => String(entry || '').trim()).filter(Boolean).join('\n')
+                        : '';
+                } catch (_) {
+                    return '';
+                }
+            })();
+
+            return `
+                <div style="display:grid; gap:12px; margin-top:16px; border:1px solid #d6dde8; border-radius:8px; padding:12px; background:#f8fafc;">
+                    <div style="font-weight:700; color:#1f2a37;">🧩 Overlay modulok (ráhúzható óra/szöveg)</div>
+
+                    <div style="padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; display:grid; gap:10px;">
+                        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                            <input type="checkbox" id="setting-clockOverlayEnabled" ${overlaySettings.clockOverlayEnabled ? 'checked' : ''} style="width:20px; height:20px;">
+                            <span style="font-weight:600;">Óra overlay bekapcsolása</span>
+                        </label>
+                        <div id="clockOverlaySettings" style="display:${overlaySettings.clockOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Pozíció</label>
+                                <select id="setting-clockOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="top" ${overlaySettings.clockOverlayPosition === 'top' ? 'selected' : ''}>FENT</option>
+                                    <option value="bottom" ${overlaySettings.clockOverlayPosition === 'bottom' ? 'selected' : ''}>LENT</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Sáv magasság (%)</label>
+                                <input type="number" id="setting-clockOverlayHeightPercent" value="${overlaySettings.clockOverlayHeightPercent || 40}" min="20" max="40" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Óra szín</label>
+                                <input type="color" id="setting-clockOverlayTimeColor" value="${overlaySettings.clockOverlayTimeColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Dátum szín</label>
+                                <input type="color" id="setting-clockOverlayDateColor" value="${overlaySettings.clockOverlayDateColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; display:grid; gap:10px;">
+                        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                            <input type="checkbox" id="setting-textOverlayEnabled" ${overlaySettings.textOverlayEnabled ? 'checked' : ''} style="width:20px; height:20px;">
+                            <span style="font-weight:600;">Szöveg overlay bekapcsolása</span>
+                        </label>
+                        <div id="textOverlaySettings" style="display:${overlaySettings.textOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Pozíció</label>
+                                <select id="setting-textOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="top" ${overlaySettings.textOverlayPosition === 'top' ? 'selected' : ''}>FENT</option>
+                                    <option value="bottom" ${overlaySettings.textOverlayPosition === 'bottom' ? 'selected' : ''}>LENT</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Sáv magasság (%)</label>
+                                <input type="number" id="setting-textOverlayHeightPercent" value="${overlaySettings.textOverlayHeightPercent || 20}" min="12" max="40" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div style="grid-column:1 / span 2;">
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg forrása</label>
+                                <select id="setting-textOverlaySourceType" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="manual" ${(overlaySettings.textOverlaySourceType || 'manual') === 'manual' ? 'selected' : ''}>Kézi szöveg</option>
+                                    <option value="collection" ${overlaySettings.textOverlaySourceType === 'collection' ? 'selected' : ''}>Szöveggyűjtemény</option>
+                                    <option value="external" ${overlaySettings.textOverlaySourceType === 'external' ? 'selected' : ''}>Külső forrás (URL)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Betűméret (px)</label>
+                                <input type="number" id="setting-textOverlayFontSize" value="${overlaySettings.textOverlayFontSize || 52}" min="18" max="120" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szín</label>
+                                <input type="color" id="setting-textOverlayColor" value="${overlaySettings.textOverlayColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div style="grid-column:1 / span 2;">
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Gördülési sebesség (px/s)</label>
+                                <input type="number" id="setting-textOverlaySpeedPxPerSec" value="${overlaySettings.textOverlaySpeedPxPerSec || 120}" min="40" max="320" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div id="textOverlayManualWrap" style="grid-column:1 / span 2;">
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg</label>
+                                <input type="text" id="setting-textOverlayText" value="${escapeHtml(overlaySettings.textOverlayText || 'Sem vložte text...')}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <div id="textOverlayCollectionWrap" style="grid-column:1 / span 2;">
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveggyűjtemény (1 sor = 1 elem)</label>
+                                <textarea id="setting-textOverlayCollection" rows="5" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px; resize:vertical;">${escapeHtml(overlayCollectionText)}</textarea>
+                            </div>
+                            <div id="textOverlayExternalWrap" style="grid-column:1 / span 2;">
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Külső forrás URL</label>
+                                <input type="url" id="setting-textOverlayExternalUrl" value="${escapeHtml(overlaySettings.textOverlayExternalUrl || '')}" placeholder="https://..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getCustomizationModalWidthStyle(moduleKey) {
+            return isWideCustomizationModule(moduleKey)
+                ? 'max-width: 94vw; width: 94vw;'
+                : 'max-width: 600px; width: 90%;';
+        }
+
+        function createCustomizationModalElement(item, index, formHtml, moduleKey) {
+            const modal = document.createElement('div');
+            modal.className = 'module-customization-modal';
+            modal.style.cssText = `
+                display: flex;
+                position: fixed;
+                z-index: 4000;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                align-items: center;
+                justify-content: center;
+            `;
+
+            const modalWidthStyle = getCustomizationModalWidthStyle(moduleKey);
+
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 30px;
+                    border-radius: 12px;
+                    ${modalWidthStyle}
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">⚙️ ${item.module_name} - Testreszabás</h2>
+                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
+                            background: #1e40af;
+                            color: white;
+                            border: none;
+                            font-size: 16px;
+                            cursor: pointer;
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 50%;
+                        ">✕</button>
+                    </div>
+
+                    ${formHtml}
+
+                    <div style="margin-top: 30px; display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
+                            padding: 10px 20px;
+                            background: #6c757d;
+                            color: white;
+                            border: none;
+                            border-radius: 5px;
+                            cursor: pointer;
+                        ">Mégse</button>
+                        <button onclick="saveCustomization(${index})" style="
+                            padding: 10px 20px;
+                            background: #28a745;
+                            color: white;
+                            border: none;
+                            border-radius: 5px;
+                            cursor: pointer;
+                        ">💾 Mentés</button>
+                    </div>
+                </div>
+            `;
+
+            return modal;
+        }
+
+        function initializeCustomizationModuleUi(moduleKey, item, settings) {
+            if (moduleKey === 'pdf') {
+                window.currentPdfBase64 = item.settings?.pdfDataBase64 || '';
+                window.pdfModuleSettings = {
+                    ...item.settings,
+                    pdfDataBase64: window.currentPdfBase64
+                };
+                setTimeout(() => {
+                    GroupLoopPdfModule.init();
+                }, 0);
+                return;
+            }
+
+            if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
+                window.galleryModuleSettings = { ...item.settings };
+                setTimeout(() => {
+                    const galleryModuleApi =
+                        window.GroupLoopGalleryModule ||
+                        (typeof GroupLoopGalleryModule !== 'undefined' ? GroupLoopGalleryModule : null);
+
+                    if (galleryModuleApi?.init) {
+                        galleryModuleApi.init();
+                    }
+                }, 0);
+                return;
+            }
+
+            if (moduleKey === 'video') {
+                window.videoModuleSettings = {
+                    videoAssetUrl: '',
+                    videoAssetId: '',
+                    videoDurationSec: parseInt(item.duration_seconds || 10, 10) || 10,
+                    muted: true,
+                    fitMode: 'contain',
+                    bgColor: '#000000',
+                    ...item.settings
+                };
+                setTimeout(() => {
+                    const videoModuleApi =
+                        window.GroupLoopVideoModule ||
+                        (typeof GroupLoopVideoModule !== 'undefined' ? GroupLoopVideoModule : null);
+
+                    if (videoModuleApi?.init) {
+                        videoModuleApi.init();
+                    }
+                }, 0);
+                return;
+            }
+
+            if (moduleKey === 'meal-menu') {
+                bindMealModuleModalEvents(settings);
+                return;
+            }
+
+            if (moduleKey === 'room-occupancy') {
+                bindRoomOccupancyModuleModalEvents(settings);
+            }
+        }
+
+        function collectClockSettingsFromForm() {
+            const settings = {};
+            settings.type = document.getElementById('setting-type')?.value || 'digital';
+            settings.format = '24h';
+            settings.dateFormat = document.getElementById('setting-dateFormat')?.value || 'full';
+            settings.timeColor = document.getElementById('setting-timeColor')?.value || '#ffffff';
+            settings.dateColor = document.getElementById('setting-dateColor')?.value || '#ffffff';
+            settings.bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
+            settings.timeFontSize = parseInt(document.getElementById('setting-timeFontSize')?.value, 10) || parseInt(document.getElementById('setting-fontSize')?.value, 10) || 120;
+            settings.dateFontSize = parseInt(document.getElementById('setting-dateFontSize')?.value, 10) || Math.max(16, Math.round(settings.timeFontSize * 0.3));
+            settings.fontSize = settings.timeFontSize;
+            settings.clockSize = parseInt(document.getElementById('setting-clockSize')?.value) || 300;
+            settings.showSeconds = document.getElementById('setting-showSeconds')?.checked !== false;
+            settings.showDate = document.getElementById('setting-showDate')?.checked !== false;
+            if (!settings.showDate) {
+                settings.dateFormat = 'none';
+            }
+            settings.language = document.getElementById('setting-language')?.value || 'sk';
+            return settings;
+        }
+
+        function collectDefaultLogoSettings() {
+            return {
+                text: 'edudisplej.sk',
+                fontSize: 120,
+                textColor: '#ffffff',
+                bgColor: '#000000',
+                showVersion: false,
+                version: ''
+            };
+        }
+
+        function collectTextSettingsFromForm() {
+            const settings = {};
+            const richEditor = document.getElementById('text-editor-area');
+            const sourceType = String(document.getElementById('setting-textSourceType')?.value || 'manual');
+            const selectedCollectionId = parseInt(document.getElementById('setting-textCollectionId')?.value || '0', 10) || 0;
+            const textHtml = sanitizeRichTextHtml(richEditor ? richEditor.innerHTML : (document.getElementById('setting-text')?.value || ''));
+            const selectedCollection = sourceType === 'collection' ? getTextCollectionById(selectedCollectionId) : null;
+
+            settings.textSourceType = sourceType === 'collection' ? 'collection' : 'manual';
+            settings.textCollectionId = sourceType === 'collection' ? selectedCollectionId : 0;
+            settings.textCollectionLabel = sourceType === 'collection' ? String(selectedCollection?.title || '') : '';
+            settings.textCollectionVersionTs = sourceType === 'collection' ? Date.now() : 0;
+
+            if (sourceType === 'collection' && selectedCollection) {
+                settings.text = sanitizeRichTextHtml(selectedCollection.content_html || '') || 'Sem vložte text...';
+            } else {
+                settings.text = textHtml;
+            }
+            settings.fontFamily = document.getElementById('setting-richFontFamily')?.value || 'Arial, sans-serif';
+            settings.fontSize = Math.max(8, parseInt(document.getElementById('setting-richFontSize')?.value || '72', 10) || 72);
+            settings.fontWeight = '700';
+            settings.fontStyle = 'normal';
+            settings.lineHeight = Math.max(0.8, Math.min(2.5, parseFloat(document.getElementById('setting-richLineHeight')?.value || '1.2') || 1.2));
+            settings.textAlign = 'left';
+            settings.textColor = '#ffffff';
+            settings.bgColor = sourceType === 'collection' && selectedCollection
+                ? (selectedCollection.bg_color || '#000000')
+                : (document.getElementById('setting-bgColor')?.value || '#000000');
+            settings.bgImageData = sourceType === 'collection' && selectedCollection
+                ? String(selectedCollection.bg_image_data || '')
+                : (document.getElementById('setting-bgImageData')?.value || '');
+            settings.textAnimationEntry = document.getElementById('setting-textAnimationEntry')?.value || 'none';
+            settings.scrollMode = document.getElementById('setting-scrollMode')?.checked === true;
+            settings.scrollStartPauseMs = Math.round((parseFloat(document.getElementById('setting-scrollStartPauseSec')?.value || '3') || 3) * 1000);
+            settings.scrollEndPauseMs = Math.round((parseFloat(document.getElementById('setting-scrollEndPauseSec')?.value || '3') || 3) * 1000);
+            settings.scrollSpeedPxPerSec = parseInt(document.getElementById('setting-scrollSpeedPxPerSec')?.value, 10) || 35;
+            return settings;
+        }
+
+        function collectPdfSettingsFromForm(item) {
+            const settings = {};
+            const pdfBase64 = window.pdfModuleSettings?.pdfDataBase64 || (item.settings?.pdfDataBase64 || '');
+            const pdfAssetUrl = window.pdfModuleSettings?.pdfAssetUrl || (item.settings?.pdfAssetUrl || '');
+            const pdfAssetId = window.pdfModuleSettings?.pdfAssetId || (item.settings?.pdfAssetId || '');
+
+            settings.pdfAssetUrl = pdfAssetUrl;
+            if (pdfAssetId) {
+                settings.pdfAssetId = parseInt(pdfAssetId, 10) || String(pdfAssetId);
+            }
+            settings.pdfDataBase64 = pdfAssetUrl ? '' : pdfBase64;
+            settings.zoomLevel = parseInt(document.getElementById('pdf-zoomLevel')?.value, 10) || 100;
+            settings.autoScrollEnabled = document.getElementById('pdf-autoScrollEnabled')?.checked === true;
+            settings.autoScrollSpeedPxPerSec = parseInt(document.getElementById('pdf-scrollSpeed')?.value) || 30;
+            settings.autoScrollStartPauseMs = parseInt(document.getElementById('pdf-startPause')?.value) || 2000;
+            settings.autoScrollEndPauseMs = parseInt(document.getElementById('pdf-endPause')?.value) || 2000;
+            settings.pauseAtPercent = parseInt(document.getElementById('pdf-pauseAtPercent')?.value, 10);
+            if (!Number.isFinite(settings.pauseAtPercent)) {
+                settings.pauseAtPercent = -1;
+            }
+            settings.pauseDurationMs = parseInt(document.getElementById('pdf-pauseDurationMs')?.value, 10) || 2000;
+            return settings;
+        }
+
+        function collectGallerySettingsFromForm(item) {
+            const rawJson = document.getElementById('gallery-image-urls-json')?.value || '[]';
+            let normalizedImages = [];
+            try {
+                const parsed = JSON.parse(rawJson);
+                normalizedImages = Array.isArray(parsed)
+                    ? parsed.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+                    : [];
+            } catch (_) {
+                normalizedImages = [];
+            }
+
+            const displayMode = document.getElementById('gallery-display-mode')?.value || 'slideshow';
+            if (displayMode === 'single' && normalizedImages.length > 1) {
+                normalizedImages = normalizedImages.slice(0, 1);
+            }
+
+            const rawSlideInterval = parseInt(document.getElementById('gallery-slide-interval')?.value, 10);
+            const slideIntervalSec = Math.max(1, Math.min(30, Number.isFinite(rawSlideInterval) ? rawSlideInterval : 5));
+            const transitionEnabled = document.getElementById('gallery-transition-enabled')?.checked !== false;
+            const rawCollageColumns = parseInt(document.getElementById('gallery-collage-columns')?.value, 10);
+            const collageColumns = Math.max(2, Math.min(5, Number.isFinite(rawCollageColumns) ? rawCollageColumns : 3));
+
+            const settings = {
+                imageUrlsJson: JSON.stringify(normalizedImages),
+                displayMode,
+                fitMode: document.getElementById('gallery-fit-mode')?.value || 'contain',
+                slideIntervalSec,
+                transitionEnabled,
+                transitionMs: transitionEnabled ? 450 : 0,
+                collageColumns,
+                bgColor: document.getElementById('gallery-bg-color')?.value || '#000000'
+            };
+
+            return {
+                settings,
+                durationSeconds: getGalleryLoopDurationSeconds(settings, item.duration_seconds)
+            };
+        }
+
+        function collectVideoSettingsFromForm(item) {
+            const source = window.videoModuleSettings || item.settings || {};
+            const videoDurationSec = Math.max(1, parseInt(source.videoDurationSec || item.duration_seconds || 10, 10) || 10);
+
+            const settings = {
+                videoAssetUrl: String(source.videoAssetUrl || ''),
+                videoAssetId: source.videoAssetId ? parseInt(source.videoAssetId, 10) || String(source.videoAssetId) : '',
+                videoDurationSec,
+                muted: source.muted !== false,
+                fitMode: ['contain', 'cover', 'fill'].includes(String(source.fitMode || 'contain'))
+                    ? String(source.fitMode)
+                    : 'contain',
+                bgColor: String(source.bgColor || '#000000')
+            };
+
+            return {
+                settings,
+                durationSeconds: videoDurationSec
+            };
+        }
+
+        function collectMealMenuSettingsFromForm() {
+            return {
+                siteKey: String(document.getElementById('setting-mealSiteKey')?.value || 'jedalen.sk').trim() || 'jedalen.sk',
+                institutionId: parseInt(document.getElementById('setting-mealInstitutionId')?.value || '0', 10) || 0,
+                sourceType: (String(document.getElementById('setting-mealSourceType')?.value || 'manual').toLowerCase() === 'server') ? 'server' : 'manual',
+                language: (() => {
+                    const raw = String(document.getElementById('setting-mealLanguage')?.value || 'hu').toLowerCase().trim();
+                    return ['hu', 'sk', 'en'].includes(raw) ? raw : 'hu';
+                })(),
+                showHeaderTitle: document.getElementById('setting-showHeaderTitle')?.checked !== false,
+                customHeaderTitle: String(document.getElementById('setting-customHeaderTitle')?.value || '').trim(),
+                showInstitutionName: document.getElementById('setting-showInstitutionName')?.checked !== false,
+                showBreakfast: document.getElementById('setting-showBreakfast')?.checked === true,
+                showSnackAm: document.getElementById('setting-showSnackAm')?.checked === true,
+                showLunch: document.getElementById('setting-showLunch')?.checked === true,
+                showSnackPm: document.getElementById('setting-showSnackPm')?.checked === true,
+                showDinner: document.getElementById('setting-showDinner')?.checked === true,
+                showMealTypeEmojis: false,
+                showMealTypeSvgIcons: document.getElementById('setting-showMealTypeSvgIcons')?.checked !== false,
+                showAllergenEmojis: document.getElementById('setting-showAllergenEmojis')?.checked === true,
+                centerAlign: document.getElementById('setting-mealCenterAlign')?.checked === true,
+                slowScrollOnOverflow: document.getElementById('setting-mealSlowScrollOnOverflow')?.checked === true,
+                slowScrollSpeedPxPerSec: Math.max(8, Math.min(120, parseInt(document.getElementById('setting-mealSlowScrollSpeedPxPerSec')?.value || '28', 10) || 28)),
+                fontFamily: String(document.getElementById('setting-mealFontFamily')?.value || 'Segoe UI, Tahoma, sans-serif').trim() || 'Segoe UI, Tahoma, sans-serif',
+                mealTitleFontSize: Math.max(0.8, Math.min(4, parseFloat(document.getElementById('setting-mealTitleFontSize')?.value || '1.5') || 1.5)),
+                mealTextFontSize: Math.max(0.8, Math.min(4, parseFloat(document.getElementById('setting-mealTextFontSize')?.value || '1.35') || 1.35)),
+                textFontWeight: parseInt(document.getElementById('setting-mealTextFontWeight')?.value || '600', 10) || 600,
+                lineHeight: Math.max(1, Math.min(2.2, parseFloat(document.getElementById('setting-mealLineHeight')?.value || '1.35') || 1.35)),
+                wrapText: document.getElementById('setting-mealWrapText')?.checked !== false,
+                showAppetiteMessage: document.getElementById('setting-showAppetiteMessage')?.checked === true,
+                appetiteMessageText: String(document.getElementById('setting-appetiteMessageText')?.value || 'Jó étvágyat kívánunk!').trim(),
+                showSourceUrl: document.getElementById('setting-showSourceUrl')?.checked === true,
+                sourceUrl: String(document.getElementById('setting-sourceUrl')?.value || '').trim(),
+                apiBaseUrl: '../../api/meal_plan.php'
+            };
+        }
+
+        function collectRoomOccupancySettingsFromForm() {
+            return {
+                roomId: parseInt(document.getElementById('setting-roomOccRoomId')?.value || '0', 10) || 0,
+                showOnlyCurrent: document.getElementById('setting-roomOccShowOnlyCurrent')?.checked === true,
+                showNextCount: Math.max(1, Math.min(12, parseInt(document.getElementById('setting-roomOccShowNextCount')?.value || '4', 10) || 4)),
+                apiBaseUrl: '../../api/room_occupancy.php'
+            };
         }
         
         function saveCustomization(index) {
@@ -4681,101 +5923,25 @@
             
             // Collect all settings from form
             if (moduleKey === 'clock') {
-                newSettings.type = document.getElementById('setting-type')?.value || 'digital';
-                newSettings.format = '24h';
-                newSettings.dateFormat = document.getElementById('setting-dateFormat')?.value || 'full';
-                newSettings.timeColor = document.getElementById('setting-timeColor')?.value || '#ffffff';
-                newSettings.dateColor = document.getElementById('setting-dateColor')?.value || '#ffffff';
-                newSettings.bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
-                newSettings.timeFontSize = parseInt(document.getElementById('setting-timeFontSize')?.value, 10) || parseInt(document.getElementById('setting-fontSize')?.value, 10) || 120;
-                newSettings.dateFontSize = parseInt(document.getElementById('setting-dateFontSize')?.value, 10) || Math.max(16, Math.round(newSettings.timeFontSize * 0.3));
-                newSettings.fontSize = newSettings.timeFontSize;
-                newSettings.clockSize = parseInt(document.getElementById('setting-clockSize')?.value) || 300;
-                newSettings.showSeconds = document.getElementById('setting-showSeconds')?.checked !== false;
-                newSettings.showDate = document.getElementById('setting-showDate')?.checked !== false;
-                if (!newSettings.showDate) {
-                    newSettings.dateFormat = 'none';
-                }
-                newSettings.language = document.getElementById('setting-language')?.value || 'sk';
+                Object.assign(newSettings, collectClockSettingsFromForm());
             } else if (moduleKey === 'default-logo') {
-                newSettings.text = document.getElementById('setting-text')?.value || 'EDUDISPLEJ';
-                newSettings.fontSize = parseInt(document.getElementById('setting-fontSize')?.value) || 120;
-                newSettings.textColor = document.getElementById('setting-textColor')?.value || '#ffffff';
-                newSettings.bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
-                newSettings.showVersion = document.getElementById('setting-showVersion')?.checked !== false;
-                newSettings.version = document.getElementById('setting-version')?.value || 'v1.0';
+                Object.assign(newSettings, collectDefaultLogoSettings());
             } else if (moduleKey === 'text') {
-                const richEditor = document.getElementById('text-editor-area');
-                const textHtml = sanitizeRichTextHtml(richEditor ? richEditor.innerHTML : (document.getElementById('setting-text')?.value || ''));
-                newSettings.text = textHtml;
-                newSettings.fontFamily = document.getElementById('setting-richFontFamily')?.value || 'Arial, sans-serif';
-                newSettings.fontSize = Math.max(8, parseInt(document.getElementById('setting-richFontSize')?.value || '72', 10) || 72);
-                newSettings.fontWeight = '700';
-                newSettings.fontStyle = 'normal';
-                newSettings.lineHeight = Math.max(0.8, Math.min(2.5, parseFloat(document.getElementById('setting-richLineHeight')?.value || '1.2') || 1.2));
-                newSettings.textAlign = 'left';
-                newSettings.textColor = '#ffffff';
-                newSettings.bgColor = document.getElementById('setting-bgColor')?.value || '#000000';
-                newSettings.bgImageData = document.getElementById('setting-bgImageData')?.value || '';
-                newSettings.textAnimationEntry = document.getElementById('setting-textAnimationEntry')?.value || 'none';
-                newSettings.scrollMode = document.getElementById('setting-scrollMode')?.checked === true;
-                newSettings.scrollStartPauseMs = Math.round((parseFloat(document.getElementById('setting-scrollStartPauseSec')?.value || '3') || 3) * 1000);
-                newSettings.scrollEndPauseMs = Math.round((parseFloat(document.getElementById('setting-scrollEndPauseSec')?.value || '3') || 3) * 1000);
-                newSettings.scrollSpeedPxPerSec = parseInt(document.getElementById('setting-scrollSpeedPxPerSec')?.value, 10) || 35;
+                Object.assign(newSettings, collectTextSettingsFromForm());
             } else if (moduleKey === 'pdf') {
-                // PDF module settings
-                const pdfBase64 = window.pdfModuleSettings?.pdfDataBase64 || (item.settings?.pdfDataBase64 || '');
-                const pdfAssetUrl = window.pdfModuleSettings?.pdfAssetUrl || (item.settings?.pdfAssetUrl || '');
-                const pdfAssetId = window.pdfModuleSettings?.pdfAssetId || (item.settings?.pdfAssetId || '');
-                
-                newSettings.pdfAssetUrl = pdfAssetUrl;
-                if (pdfAssetId) {
-                    newSettings.pdfAssetId = parseInt(pdfAssetId, 10) || String(pdfAssetId);
-                }
-                newSettings.pdfDataBase64 = pdfAssetUrl ? '' : pdfBase64;
-                newSettings.zoomLevel = parseInt(document.getElementById('pdf-zoomLevel')?.value, 10) || 100;
-                newSettings.autoScrollEnabled = document.getElementById('pdf-autoScrollEnabled')?.checked === true;
-                newSettings.autoScrollSpeedPxPerSec = parseInt(document.getElementById('pdf-scrollSpeed')?.value) || 30;
-                newSettings.autoScrollStartPauseMs = parseInt(document.getElementById('pdf-startPause')?.value) || 2000;
-                newSettings.autoScrollEndPauseMs = parseInt(document.getElementById('pdf-endPause')?.value) || 2000;
-                newSettings.pauseAtPercent = parseInt(document.getElementById('pdf-pauseAtPercent')?.value, 10);
-                if (!Number.isFinite(newSettings.pauseAtPercent)) {
-                    newSettings.pauseAtPercent = -1;
-                }
-                newSettings.pauseDurationMs = parseInt(document.getElementById('pdf-pauseDurationMs')?.value, 10) || 2000;
+                Object.assign(newSettings, collectPdfSettingsFromForm(item));
             } else if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
-                const rawJson = document.getElementById('gallery-image-urls-json')?.value || '[]';
-                let normalizedImages = [];
-                try {
-                    const parsed = JSON.parse(rawJson);
-                    normalizedImages = Array.isArray(parsed)
-                        ? parsed.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
-                        : [];
-                } catch (_) {
-                    normalizedImages = [];
-                }
-
-                newSettings.imageUrlsJson = JSON.stringify(normalizedImages);
-                newSettings.displayMode = document.getElementById('gallery-display-mode')?.value || 'slideshow';
-                newSettings.fitMode = document.getElementById('gallery-fit-mode')?.value || 'cover';
-                newSettings.slideIntervalSec = parseInt(document.getElementById('gallery-slide-interval')?.value, 10) || 5;
-                newSettings.transitionMs = parseInt(document.getElementById('gallery-transition-ms')?.value, 10) || 450;
-                newSettings.collageColumns = parseInt(document.getElementById('gallery-collage-columns')?.value, 10) || 3;
-                newSettings.bgColor = document.getElementById('gallery-bg-color')?.value || '#000000';
+                const galleryResult = collectGallerySettingsFromForm(item);
+                Object.assign(newSettings, galleryResult.settings);
+                loopItems[index].duration_seconds = galleryResult.durationSeconds;
             } else if (moduleKey === 'video') {
-                const source = window.videoModuleSettings || item.settings || {};
-                const videoDurationSec = Math.max(1, parseInt(source.videoDurationSec || item.duration_seconds || 10, 10) || 10);
-
-                newSettings.videoAssetUrl = String(source.videoAssetUrl || '');
-                newSettings.videoAssetId = source.videoAssetId ? parseInt(source.videoAssetId, 10) || String(source.videoAssetId) : '';
-                newSettings.videoDurationSec = videoDurationSec;
-                newSettings.muted = source.muted !== false;
-                newSettings.fitMode = ['contain', 'cover', 'fill'].includes(String(source.fitMode || 'contain'))
-                    ? String(source.fitMode)
-                    : 'contain';
-                newSettings.bgColor = String(source.bgColor || '#000000');
-
-                loopItems[index].duration_seconds = videoDurationSec;
+                const videoResult = collectVideoSettingsFromForm(item);
+                Object.assign(newSettings, videoResult.settings);
+                loopItems[index].duration_seconds = videoResult.durationSeconds;
+            } else if (moduleKey === 'meal-menu') {
+                Object.assign(newSettings, collectMealMenuSettingsFromForm());
+            } else if (moduleKey === 'room-occupancy') {
+                Object.assign(newSettings, collectRoomOccupancySettingsFromForm());
             }
 
             if (isOverlayCarrierModule(moduleKey)) {
@@ -4788,21 +5954,67 @@
             
             loopItems[index].settings = newSettings;
             
-            // Close modal
-            document.querySelectorAll('body > div').forEach(el => {
-                if (el.style.position === 'fixed' && el.style.zIndex === '2000') {
-                    el.remove();
-                }
-            });
+            // Close customization modal immediately
+            document.querySelectorAll('.module-customization-modal').forEach((el) => el.remove());
             
             showAutosaveToast('✓ Beállítások mentve');
             scheduleAutoSave(250);
-            if (loopItems.length > 0) {
-                startPreview();
-            }
+            renderLoop();
         }
         
         // ===== LIVE PREVIEW FUNCTIONS =====
+
+        function clearPreviewPlaybackTimers() {
+            clearTimeout(previewTimeout);
+            clearInterval(previewInterval);
+        }
+
+        function updatePreviewLoopCountDisplay() {
+            document.getElementById('loopCount').textContent = loopCycleCount;
+        }
+
+        function updatePreviewModuleInfo(module) {
+            document.getElementById('currentModule').textContent = `${currentPreviewIndex + 1}. ${module.module_name}`;
+            document.getElementById('navInfo').textContent = `${currentPreviewIndex + 1} / ${loopItems.length}`;
+        }
+
+        function loadPreviewModuleIntoIframe(moduleUrl) {
+            const iframe = document.getElementById('previewIframe');
+            const emptyDiv = document.getElementById('previewEmpty');
+
+            iframe.src = moduleUrl;
+            iframe.style.display = 'block';
+            emptyDiv.style.display = 'none';
+            syncLoopPreviewIframeScale();
+        }
+
+        function advancePreviewIndexForward() {
+            currentPreviewIndex++;
+            if (currentPreviewIndex >= loopItems.length) {
+                currentPreviewIndex = 0;
+                loopCycleCount++;
+                totalLoopStartTime = Date.now();
+                updatePreviewLoopCountDisplay();
+            }
+        }
+
+        function advancePreviewIndexBackward() {
+            currentPreviewIndex--;
+            if (currentPreviewIndex < 0) {
+                currentPreviewIndex = loopItems.length - 1;
+                if (loopCycleCount > 0) {
+                    loopCycleCount--;
+                }
+            }
+            updatePreviewLoopCountDisplay();
+        }
+
+        function scheduleNextPreviewModule(durationSeconds) {
+            previewTimeout = setTimeout(() => {
+                advancePreviewIndexForward();
+                playCurrentModule();
+            }, durationSeconds * 1000);
+        }
         
         function startPreview() {
             if (loopItems.length === 0) {
@@ -4835,8 +6047,7 @@
                 isPaused = true;
                 document.getElementById('btnPause').innerHTML = '▶️ Folytatás';
                 document.getElementById('loopStatus').textContent = 'Szüneteltetve';
-                clearTimeout(previewTimeout);
-                clearInterval(previewInterval);
+                clearPreviewPlaybackTimers();
             }
         }
         
@@ -4844,9 +6055,8 @@
             isPaused = false;
             currentPreviewIndex = 0;
             loopCycleCount = 0;
-            
-            clearTimeout(previewTimeout);
-            clearInterval(previewInterval);
+
+            clearPreviewPlaybackTimers();
             
             document.getElementById('btnPlay').style.display = 'inline-block';
             document.getElementById('btnPause').style.display = 'none';
@@ -4864,43 +6074,22 @@
         
         function previousModule() {
             if (loopItems.length === 0) return;
-            
-            // Stop current playback
-            clearTimeout(previewTimeout);
-            clearInterval(previewInterval);
-            
-            // Go to previous module
-            currentPreviewIndex--;
-            if (currentPreviewIndex < 0) {
-                currentPreviewIndex = loopItems.length - 1;
-                if (loopCycleCount > 0) loopCycleCount--;
-            }
-            
-            // Update cycle count display
-            document.getElementById('loopCount').textContent = loopCycleCount;
-            
-            // Play the module
+
+            clearPreviewPlaybackTimers();
+            advancePreviewIndexBackward();
             playCurrentModule();
         }
         
         function nextModule() {
             if (loopItems.length === 0) return;
-            
-            // Stop current playback
-            clearTimeout(previewTimeout);
-            clearInterval(previewInterval);
-            
-            // Go to next module
+
+            clearPreviewPlaybackTimers();
             currentPreviewIndex++;
             if (currentPreviewIndex >= loopItems.length) {
                 currentPreviewIndex = 0;
                 loopCycleCount++;
             }
-            
-            // Update cycle count display
-            document.getElementById('loopCount').textContent = loopCycleCount;
-            
-            // Play the module
+            updatePreviewLoopCountDisplay();
             playCurrentModule();
         }
         
@@ -4916,41 +6105,20 @@
             // Ha csak 1 elem van, akkor is loopoljon
             const module = loopItems[currentPreviewIndex];
             const duration = parseInt(module.duration_seconds) || 10;
-            
-            // Update info
-            document.getElementById('currentModule').textContent = `${currentPreviewIndex + 1}. ${module.module_name}`;
-            document.getElementById('navInfo').textContent = `${currentPreviewIndex + 1} / ${loopItems.length}`;
+
+            updatePreviewModuleInfo(module);
             
             // Build module URL with settings
             const moduleUrl = buildModuleUrl(module);
-            
-            // Load module in iframe
-            const iframe = document.getElementById('previewIframe');
-            const emptyDiv = document.getElementById('previewEmpty');
-            
-            iframe.src = moduleUrl;
-            iframe.style.display = 'block';
-            emptyDiv.style.display = 'none';
-            syncLoopPreviewIframeScale();
+
+            loadPreviewModuleIntoIframe(moduleUrl);
             
             // Start progress bar
             currentModuleStartTime = Date.now();
             updateProgressBar(duration);
-            
+
             // MINDIG schedule-ölj következő modult (még 1 elem esetén is loop)
-            previewTimeout = setTimeout(() => {
-                currentPreviewIndex++;
-                
-                if (currentPreviewIndex >= loopItems.length) {
-                    currentPreviewIndex = 0;
-                    loopCycleCount++;
-                    totalLoopStartTime = Date.now(); // Reset total loop timer
-                    document.getElementById('loopCount').textContent = loopCycleCount;
-                }
-                
-                // Rekurzív hívás - MINDIG fut tovább
-                playCurrentModule();
-            }, duration * 1000);
+            scheduleNextPreviewModule(duration);
         }
         
         function updateProgressBar(duration) {
@@ -4973,142 +6141,216 @@
             }, 100);
         }
         
+        function createPdfDataPreviewKey(pdfDataBase64) {
+            const key = `pdf_preview_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+            window.__edudisplejPdfPreviewStore = window.__edudisplejPdfPreviewStore || {};
+            window.__edudisplejPdfPreviewStore[key] = String(pdfDataBase64 || '');
+
+            const keys = Object.keys(window.__edudisplejPdfPreviewStore);
+            if (keys.length > 30) {
+                keys.slice(0, keys.length - 30).forEach((staleKey) => {
+                    delete window.__edudisplejPdfPreviewStore[staleKey];
+                });
+            }
+
+            return key;
+        }
+
+        function appendClockPreviewParams(params, settings) {
+            if (settings.type) params.append('type', settings.type);
+            if (settings.format) params.append('format', settings.format);
+            if (settings.dateFormat) params.append('dateFormat', settings.dateFormat);
+            if (settings.timeColor) params.append('timeColor', settings.timeColor);
+            if (settings.dateColor) params.append('dateColor', settings.dateColor);
+            if (settings.bgColor) params.append('bgColor', settings.bgColor);
+            if (settings.fontSize) params.append('fontSize', settings.fontSize);
+            if (settings.timeFontSize) params.append('timeFontSize', settings.timeFontSize);
+            if (settings.dateFontSize) params.append('dateFontSize', settings.dateFontSize);
+            if (settings.clockSize) params.append('clockSize', settings.clockSize);
+            if (settings.showSeconds !== undefined) params.append('showSeconds', settings.showSeconds);
+            if (settings.showDate !== undefined) params.append('showDate', settings.showDate);
+            if (settings.language) params.append('language', settings.language);
+        }
+
+        function appendDefaultLogoPreviewParams(params) {
+            params.append('text', 'edudisplej.sk');
+            params.append('showVersion', 'false');
+        }
+
+        function appendTextPreviewParams(params, settings, module) {
+            if (settings.textSourceType) params.append('textSourceType', settings.textSourceType);
+            if (settings.textCollectionId !== undefined) params.append('textCollectionId', settings.textCollectionId);
+            if (settings.textCollectionLabel) params.append('textCollectionLabel', settings.textCollectionLabel);
+            if (settings.textCollectionVersionTs !== undefined) params.append('textCollectionVersionTs', settings.textCollectionVersionTs);
+            params.append('text', settings.text || '');
+            params.append('durationSeconds', String(parseInt(module.duration_seconds || 10, 10) || 10));
+            if (settings.fontFamily) params.append('fontFamily', settings.fontFamily);
+            if (settings.fontSize) params.append('fontSize', settings.fontSize);
+            if (settings.fontWeight) params.append('fontWeight', settings.fontWeight);
+            if (settings.fontStyle) params.append('fontStyle', settings.fontStyle);
+            if (settings.lineHeight) params.append('lineHeight', settings.lineHeight);
+            if (settings.textAlign) params.append('textAlign', settings.textAlign);
+            if (settings.textColor) params.append('textColor', settings.textColor);
+            if (settings.bgColor) params.append('bgColor', settings.bgColor);
+            if (settings.textAnimationEntry) params.append('textAnimationEntry', settings.textAnimationEntry);
+            if (settings.scrollMode !== undefined) params.append('scrollMode', settings.scrollMode);
+            if (settings.scrollStartPauseMs !== undefined) params.append('scrollStartPauseMs', settings.scrollStartPauseMs);
+            if (settings.scrollEndPauseMs !== undefined) params.append('scrollEndPauseMs', settings.scrollEndPauseMs);
+            if (settings.scrollSpeedPxPerSec !== undefined) params.append('scrollSpeedPxPerSec', settings.scrollSpeedPxPerSec);
+            if (settings.bgImageData) {
+                try {
+                    const storageKey = `text_bg_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+                    localStorage.setItem(storageKey, settings.bgImageData);
+                    params.append('bgImageStorageKey', storageKey);
+                } catch (error) {
+                    params.append('bgImageData', settings.bgImageData);
+                }
+            }
+        }
+
+        function appendPdfPreviewParams(params, settings) {
+            if (settings.pdfAssetUrl) {
+                params.append('pdfAssetUrl', settings.pdfAssetUrl);
+            } else if (settings.pdfDataBase64) {
+                const dataKey = createPdfDataPreviewKey(settings.pdfDataBase64);
+                params.append('pdfDataKey', dataKey);
+            }
+            if (settings.zoomLevel !== undefined) params.append('zoomLevel', settings.zoomLevel);
+
+            const autoScrollEnabled = settings.autoScrollEnabled === true || settings.navigationMode === 'auto';
+            params.append('autoScrollEnabled', autoScrollEnabled ? 'true' : 'false');
+            if (settings.autoScrollSpeedPxPerSec !== undefined) params.append('autoScrollSpeedPxPerSec', settings.autoScrollSpeedPxPerSec);
+            if (settings.autoScrollStartPauseMs !== undefined) params.append('autoScrollStartPauseMs', settings.autoScrollStartPauseMs);
+            if (settings.autoScrollEndPauseMs !== undefined) params.append('autoScrollEndPauseMs', settings.autoScrollEndPauseMs);
+
+            if (settings.pauseAtPercent !== undefined) {
+                params.append('pauseAtPercent', settings.pauseAtPercent);
+            } else {
+                params.append('pauseAtPercent', '-1');
+            }
+
+            if (settings.pauseDurationMs !== undefined) {
+                params.append('pauseDurationMs', settings.pauseDurationMs);
+            }
+        }
+
+        function appendGalleryPreviewParams(params, settings) {
+            params.append('imageUrlsJson', settings.imageUrlsJson || '[]');
+            params.append('displayMode', settings.displayMode || 'slideshow');
+            params.append('fitMode', settings.fitMode || 'contain');
+            params.append('slideIntervalSec', settings.slideIntervalSec || 5);
+            params.append('transitionEnabled', settings.transitionEnabled === false ? 'false' : 'true');
+            params.append('transitionMs', settings.transitionEnabled === false ? 0 : 450);
+            params.append('collageColumns', settings.collageColumns || 3);
+            params.append('bgColor', settings.bgColor || '#000000');
+        }
+
+        function appendVideoPreviewParams(params, settings) {
+            if (settings.videoAssetUrl) params.append('videoAssetUrl', settings.videoAssetUrl);
+            params.append('muted', settings.muted === false ? 'false' : 'true');
+            params.append('fitMode', settings.fitMode || 'contain');
+            params.append('bgColor', settings.bgColor || '#000000');
+        }
+
+        function appendMealMenuPreviewParams(params, settings) {
+            params.append('siteKey', String(settings.siteKey || 'jedalen.sk'));
+            params.append('institutionId', String(parseInt(settings.institutionId || 0, 10) || 0));
+            params.append('language', ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'hu');
+            params.append('showHeaderTitle', settings.showHeaderTitle === false ? 'false' : 'true');
+            params.append('customHeaderTitle', String(settings.customHeaderTitle || ''));
+            params.append('showInstitutionName', settings.showInstitutionName === false ? 'false' : 'true');
+            params.append('showBreakfast', settings.showBreakfast === false ? 'false' : 'true');
+            params.append('showSnackAm', settings.showSnackAm === false ? 'false' : 'true');
+            params.append('showLunch', settings.showLunch === false ? 'false' : 'true');
+            params.append('showSnackPm', settings.showSnackPm === true ? 'true' : 'false');
+            params.append('showDinner', settings.showDinner === true ? 'true' : 'false');
+            params.append('showMealTypeSvgIcons', settings.showMealTypeSvgIcons === false ? 'false' : 'true');
+            params.append('showAllergenEmojis', settings.showAllergenEmojis === true ? 'true' : 'false');
+            params.append('centerAlign', settings.centerAlign === true ? 'true' : 'false');
+            params.append('slowScrollOnOverflow', settings.slowScrollOnOverflow === true ? 'true' : 'false');
+            params.append('slowScrollSpeedPxPerSec', String(Math.max(8, Math.min(120, parseInt(settings.slowScrollSpeedPxPerSec || 28, 10) || 28))));
+            params.append('mealTitleFontSize', String(Math.max(0.8, Math.min(4, parseFloat(settings.mealTitleFontSize || 2.1) || 2.1))));
+            params.append('mealTextFontSize', String(Math.max(0.8, Math.min(4, parseFloat(settings.mealTextFontSize || 1.85) || 1.85))));
+            params.append('textFontWeight', String(parseInt(settings.textFontWeight || 600, 10) || 600));
+            params.append('lineHeight', String(Math.max(1, Math.min(2.2, parseFloat(settings.lineHeight || 1.4) || 1.4))));
+            params.append('fontFamily', String(settings.fontFamily || 'Segoe UI, Tahoma, sans-serif'));
+            params.append('showAppetiteMessage', settings.showAppetiteMessage === true ? 'true' : 'false');
+            params.append('appetiteMessageText', String(settings.appetiteMessageText || ''));
+            params.append('showSourceUrl', settings.showSourceUrl === true ? 'true' : 'false');
+            params.append('sourceUrl', String(settings.sourceUrl || ''));
+            params.append('apiBaseUrl', settings.apiBaseUrl || '../../api/meal_plan.php');
+            if (companyId > 0) {
+                params.append('company_id', String(companyId));
+            }
+        }
+
+        function appendRoomOccupancyPreviewParams(params, settings) {
+            params.append('roomId', String(parseInt(settings.roomId || 0, 10) || 0));
+            params.append('showOnlyCurrent', settings.showOnlyCurrent === true ? 'true' : 'false');
+            params.append('showNextCount', String(Math.max(1, Math.min(12, parseInt(settings.showNextCount || 4, 10) || 4))));
+            params.append('apiBaseUrl', settings.apiBaseUrl || '../../api/room_occupancy.php');
+            if (companyId > 0) {
+                params.append('company_id', String(companyId));
+            }
+        }
+
         function buildModuleUrl(module) {
             const moduleKey = module.module_key || getModuleKeyById(module.module_id);
             const settings = module.settings || {};
-            
+
             let baseUrl = '';
-            let params = new URLSearchParams();
+            const params = new URLSearchParams();
 
-            const createPdfDataPreviewKey = (pdfDataBase64) => {
-                const key = `pdf_preview_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-                window.__edudisplejPdfPreviewStore = window.__edudisplejPdfPreviewStore || {};
-                window.__edudisplejPdfPreviewStore[key] = String(pdfDataBase64 || '');
-
-                const keys = Object.keys(window.__edudisplejPdfPreviewStore);
-                if (keys.length > 30) {
-                    keys.slice(0, keys.length - 30).forEach((staleKey) => {
-                        delete window.__edudisplejPdfPreviewStore[staleKey];
-                    });
-                }
-
-                return key;
-            };
-            
-            // Determine module path
             switch(moduleKey) {
                 case 'clock':
                     baseUrl = '../../modules/clock/m_clock.html';
-                    // Add all clock settings as URL parameters
-                    if (settings.type) params.append('type', settings.type);
-                    if (settings.format) params.append('format', settings.format);
-                    if (settings.dateFormat) params.append('dateFormat', settings.dateFormat);
-                    if (settings.timeColor) params.append('timeColor', settings.timeColor);
-                    if (settings.dateColor) params.append('dateColor', settings.dateColor);
-                    if (settings.bgColor) params.append('bgColor', settings.bgColor);
-                    if (settings.fontSize) params.append('fontSize', settings.fontSize);
-                    if (settings.timeFontSize) params.append('timeFontSize', settings.timeFontSize);
-                    if (settings.dateFontSize) params.append('dateFontSize', settings.dateFontSize);
-                    if (settings.clockSize) params.append('clockSize', settings.clockSize);
-                    if (settings.showSeconds !== undefined) params.append('showSeconds', settings.showSeconds);
-                    if (settings.showDate !== undefined) params.append('showDate', settings.showDate);
-                    if (settings.language) params.append('language', settings.language);
+                    appendClockPreviewParams(params, settings);
                     break;
-                    
+
                 case 'default-logo':
                     baseUrl = '../../modules/default/m_default.html';
-                    if (settings.text) params.append('text', settings.text);
-                    if (settings.fontSize) params.append('fontSize', settings.fontSize);
-                    if (settings.textColor) params.append('textColor', settings.textColor);
-                    if (settings.bgColor) params.append('bgColor', settings.bgColor);
-                    if (settings.showVersion !== undefined) params.append('showVersion', settings.showVersion);
-                    if (settings.version) params.append('version', settings.version);
+                    appendDefaultLogoPreviewParams(params);
                     break;
 
                 case 'text':
                     baseUrl = '../../modules/text/m_text.html';
-                    params.append('text', settings.text || '');
-                    params.append('durationSeconds', String(parseInt(module.duration_seconds || 10, 10) || 10));
-                    if (settings.fontFamily) params.append('fontFamily', settings.fontFamily);
-                    if (settings.fontSize) params.append('fontSize', settings.fontSize);
-                    if (settings.fontWeight) params.append('fontWeight', settings.fontWeight);
-                    if (settings.fontStyle) params.append('fontStyle', settings.fontStyle);
-                    if (settings.lineHeight) params.append('lineHeight', settings.lineHeight);
-                    if (settings.textAlign) params.append('textAlign', settings.textAlign);
-                    if (settings.textColor) params.append('textColor', settings.textColor);
-                    if (settings.bgColor) params.append('bgColor', settings.bgColor);
-                    if (settings.textAnimationEntry) params.append('textAnimationEntry', settings.textAnimationEntry);
-                    if (settings.scrollMode !== undefined) params.append('scrollMode', settings.scrollMode);
-                    if (settings.scrollStartPauseMs !== undefined) params.append('scrollStartPauseMs', settings.scrollStartPauseMs);
-                    if (settings.scrollEndPauseMs !== undefined) params.append('scrollEndPauseMs', settings.scrollEndPauseMs);
-                    if (settings.scrollSpeedPxPerSec !== undefined) params.append('scrollSpeedPxPerSec', settings.scrollSpeedPxPerSec);
-                    if (settings.bgImageData) {
-                        try {
-                            const storageKey = `text_bg_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-                            localStorage.setItem(storageKey, settings.bgImageData);
-                            params.append('bgImageStorageKey', storageKey);
-                        } catch (error) {
-                            params.append('bgImageData', settings.bgImageData);
-                        }
-                    }
+                    appendTextPreviewParams(params, settings, module);
                     break;
 
                 case 'pdf':
                     baseUrl = '../../modules/pdf/m_pdf.html';
-                    if (settings.pdfAssetUrl) {
-                        params.append('pdfAssetUrl', settings.pdfAssetUrl);
-                    } else if (settings.pdfDataBase64) {
-                        const dataKey = createPdfDataPreviewKey(settings.pdfDataBase64);
-                        params.append('pdfDataKey', dataKey);
-                    }
-                    if (settings.zoomLevel !== undefined) params.append('zoomLevel', settings.zoomLevel);
-
-                    const autoScrollEnabled = settings.autoScrollEnabled === true || settings.navigationMode === 'auto';
-                    params.append('autoScrollEnabled', autoScrollEnabled ? 'true' : 'false');
-                    if (settings.autoScrollSpeedPxPerSec !== undefined) params.append('autoScrollSpeedPxPerSec', settings.autoScrollSpeedPxPerSec);
-                    if (settings.autoScrollStartPauseMs !== undefined) params.append('autoScrollStartPauseMs', settings.autoScrollStartPauseMs);
-                    if (settings.autoScrollEndPauseMs !== undefined) params.append('autoScrollEndPauseMs', settings.autoScrollEndPauseMs);
-
-                    if (settings.pauseAtPercent !== undefined) {
-                        params.append('pauseAtPercent', settings.pauseAtPercent);
-                    } else {
-                        params.append('pauseAtPercent', '-1');
-                    }
-
-                    if (settings.pauseDurationMs !== undefined) {
-                        params.append('pauseDurationMs', settings.pauseDurationMs);
-                    }
+                    appendPdfPreviewParams(params, settings);
                     break;
 
                 case 'image-gallery':
                 case 'gallery':
                     baseUrl = '../../modules/gallery/m_gallery.html';
-                    params.append('imageUrlsJson', settings.imageUrlsJson || '[]');
-                    params.append('displayMode', settings.displayMode || 'slideshow');
-                    params.append('fitMode', settings.fitMode || 'cover');
-                    params.append('slideIntervalSec', settings.slideIntervalSec || 5);
-                    params.append('transitionMs', settings.transitionMs || 450);
-                    params.append('collageColumns', settings.collageColumns || 3);
-                    params.append('bgColor', settings.bgColor || '#000000');
+                    appendGalleryPreviewParams(params, settings);
                     break;
 
                 case 'video':
                     baseUrl = '../../modules/video/m_video.html';
-                    if (settings.videoAssetUrl) params.append('videoAssetUrl', settings.videoAssetUrl);
-                    params.append('muted', settings.muted === false ? 'false' : 'true');
-                    params.append('fitMode', settings.fitMode || 'contain');
-                    params.append('bgColor', settings.bgColor || '#000000');
+                    appendVideoPreviewParams(params, settings);
                     break;
-                    
+
+                case 'meal-menu':
+                    baseUrl = '../../modules/meal-menu/m_meal_menu.html';
+                    appendMealMenuPreviewParams(params, settings);
+                    break;
+
+                case 'room-occupancy':
+                    baseUrl = '../../modules/room-occupancy/m_room_occupancy.html';
+                    appendRoomOccupancyPreviewParams(params, settings);
+                    break;
+
                 default:
-                    // Default fallback - show module name
                     baseUrl = '../../modules/default/m_default.html';
                     params.append('text', module.module_name);
                     params.append('bgColor', '#1a3a52');
             }
 
             appendOverlayParams(params, settings, moduleKey);
-            
+
             const queryString = params.toString();
             return queryString ? `${baseUrl}?${queryString}` : baseUrl;
         }
@@ -5121,6 +6363,155 @@
             return code.toUpperCase();
         }
 
+        function normalizeGalleryImageUrls(rawValue) {
+            let source = rawValue;
+
+            if (Array.isArray(source)) {
+                return source.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10);
+            }
+
+            if (source && typeof source === 'object' && Array.isArray(source.imageUrls)) {
+                return source.imageUrls.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10);
+            }
+
+            if (typeof source === 'string') {
+                const text = String(source || '').trim();
+                if (!text) {
+                    return [];
+                }
+
+                try {
+                    const parsed = JSON.parse(text);
+                    if (Array.isArray(parsed)) {
+                        return parsed.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10);
+                    }
+                } catch (_) {
+                    const split = text.split(',').map(v => String(v || '').trim()).filter(Boolean);
+                    if (split.length > 1) {
+                        return split.slice(0, 10);
+                    }
+                }
+            }
+
+            return [];
+        }
+
+        function getGalleryModeFromSettings(settings) {
+            const mode = String(settings?.displayMode || 'slideshow');
+            return ['slideshow', 'collage', 'single'].includes(mode) ? mode : 'slideshow';
+        }
+
+        function getGalleryLoopDurationSeconds(settings, fallbackDuration) {
+            const slideRaw = parseInt(settings?.slideIntervalSec || 5, 10);
+            const slideIntervalSec = Math.max(1, Math.min(30, Number.isFinite(slideRaw) ? slideRaw : 5));
+            const images = normalizeGalleryImageUrls(settings?.imageUrlsJson ?? settings?.imageUrls ?? []);
+            const mode = getGalleryModeFromSettings(settings);
+
+            if (mode === 'slideshow') {
+                return Math.max(1, slideIntervalSec * Math.max(1, images.length));
+            }
+
+            const fallback = parseInt(fallbackDuration || 0, 10);
+            if (Number.isFinite(fallback) && fallback > 0) {
+                return fallback;
+            }
+            return slideIntervalSec;
+        }
+
+        function getClockLoopItemSummary(settings) {
+            const type = settings.type === 'analog' ? 'Analóg' : 'Digitális';
+            const details = [type];
+
+            if ((settings.type || 'digital') !== 'analog') {
+                details.push('24h');
+            }
+
+            const language = formatLanguageCode(settings.language);
+            return `${details.join(' • ')}<br>Nyelv: ${language}`;
+        }
+
+        function getTextLoopItemSummary(settings) {
+            const snippet = String(settings.text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            const baseText = snippet ? snippet.slice(0, 48) : 'Szöveg modul';
+
+            const details = [];
+            if (settings.fontSize) {
+                details.push(`${parseInt(settings.fontSize, 10) || 72}px`);
+            }
+            if (settings.textAlign) {
+                const alignMap = { left: 'balra', center: 'középre', right: 'jobbra' };
+                details.push(alignMap[String(settings.textAlign)] || String(settings.textAlign));
+            }
+            if (settings.fontWeight && String(settings.fontWeight) !== '400') {
+                details.push('félkövér');
+            }
+            if (settings.scrollMode) {
+                details.push('scroll');
+            }
+            if (String(settings.bgImageData || '').trim()) {
+                details.push('háttérkép');
+            }
+
+            return details.length > 0
+                ? `${baseText}<br>${details.join(' • ')}`
+                : baseText;
+        }
+
+        function getGalleryLoopItemSummary(settings) {
+            const galleryImages = normalizeGalleryImageUrls(settings.imageUrlsJson ?? settings.imageUrls ?? []);
+            const imageCount = galleryImages.length;
+
+            const modeMap = {
+                slideshow: 'slideshow',
+                collage: 'kollázs',
+                single: 'egy kép'
+            };
+            const mode = modeMap[getGalleryModeFromSettings(settings)] || 'slideshow';
+            const overlayFlags = [];
+            if (settings.clockOverlayEnabled) {
+                overlayFlags.push(`óra:${settings.clockOverlayPosition === 'bottom' ? 'lent' : 'fent'}`);
+            }
+            if (settings.textOverlayEnabled) {
+                overlayFlags.push(`szöveg:${settings.textOverlayPosition === 'bottom' ? 'lent' : 'fent'}`);
+            }
+            const overlayLine = overlayFlags.length ? `<br>Overlay: ${overlayFlags.join(' • ')}` : '';
+            return `${imageCount} kép<br>Mód: ${mode}${overlayLine}`;
+        }
+
+        function getVideoLoopItemSummary(item, settings) {
+            const duration = parseInt(settings.videoDurationSec || item.duration_seconds || 0, 10);
+            const fit = String(settings.fitMode || 'contain');
+            const muted = settings.muted === false ? 'hanggal' : 'némítva';
+            if (duration > 0) {
+                return `${duration}s • ${fit}<br>${muted}`;
+            }
+            return `Videó • ${fit}<br>${muted}`;
+        }
+
+        function getMealMenuLoopItemSummary(settings) {
+            const siteKey = String(settings.siteKey || 'jedalen.sk').trim() || 'jedalen.sk';
+            const institutionId = parseInt(settings.institutionId || 0, 10) || 0;
+            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'hu';
+            const visibleMeals = [];
+            if (settings.showBreakfast !== false) visibleMeals.push('Reggeli');
+            if (settings.showSnackAm !== false) visibleMeals.push('Tízórai');
+            if (settings.showLunch !== false) visibleMeals.push('Ebéd');
+            if (settings.showSnackPm === true) visibleMeals.push('Uzsonna');
+            if (settings.showDinner === true) visibleMeals.push('Vacsora');
+
+            const mealsText = visibleMeals.length > 0 ? visibleMeals.join(', ') : 'Nincs kijelölt étkezés';
+            const allergenText = settings.showAllergenEmojis === true ? ' • allergének: be' : '';
+            const iconText = settings.showMealTypeSvgIcons === false ? ' • SVG ikon: ki' : ' • SVG ikon: be';
+            return `${siteKey} • intézmény #${institutionId} • nyelv: ${language.toUpperCase()}<br>${mealsText}${allergenText}${iconText}`;
+        }
+
+        function getRoomOccupancyLoopItemSummary(settings) {
+            const roomId = parseInt(settings.roomId || 0, 10) || 0;
+            const onlyCurrent = settings.showOnlyCurrent === true ? 'csak aktuális' : 'napi lista';
+            const nextCount = Math.max(1, Math.min(12, parseInt(settings.showNextCount || 4, 10) || 4));
+            return `terem #${roomId}<br>${onlyCurrent} • következő: ${nextCount}`;
+        }
+
         function getLoopItemSummary(item) {
             if (!item) {
                 return '';
@@ -5130,85 +6521,125 @@
             const settings = item.settings || {};
 
             if (moduleKey === 'clock') {
-                const type = settings.type === 'analog' ? 'Analóg' : 'Digitális';
-                const details = [type];
-
-                if ((settings.type || 'digital') !== 'analog') {
-                    details.push('24h');
-                }
-
-                const language = formatLanguageCode(settings.language);
-                return `${details.join(' • ')}<br>Nyelv: ${language}`;
+                return getClockLoopItemSummary(settings);
             }
 
-            if (moduleKey === 'default-logo' && settings.text) {
-                return `${String(settings.text).slice(0, 24)}`;
+            if (moduleKey === 'default-logo') {
+                return `EDUdisplej.sk`;
             }
 
             if (moduleKey === 'text') {
-                const snippet = String(settings.text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-                const baseText = snippet ? snippet.slice(0, 48) : 'Szöveg modul';
-
-                const details = [];
-                if (settings.fontSize) {
-                    details.push(`${parseInt(settings.fontSize, 10) || 72}px`);
-                }
-                if (settings.textAlign) {
-                    const alignMap = { left: 'balra', center: 'középre', right: 'jobbra' };
-                    details.push(alignMap[String(settings.textAlign)] || String(settings.textAlign));
-                }
-                if (settings.fontWeight && String(settings.fontWeight) !== '400') {
-                    details.push('félkövér');
-                }
-                if (settings.scrollMode) {
-                    details.push('scroll');
-                }
-                if (String(settings.bgImageData || '').trim()) {
-                    details.push('háttérkép');
-                }
-
-                return details.length > 0
-                    ? `${baseText}<br>${details.join(' • ')}`
-                    : baseText;
+                return getTextLoopItemSummary(settings);
             }
 
             if (moduleKey === 'image-gallery' || moduleKey === 'gallery') {
-                let imageCount = 0;
-                try {
-                    const parsed = JSON.parse(String(settings.imageUrlsJson || '[]'));
-                    imageCount = Array.isArray(parsed) ? parsed.filter(Boolean).length : 0;
-                } catch (_) {
-                    imageCount = 0;
-                }
-
-                const modeMap = {
-                    slideshow: 'slideshow',
-                    collage: 'kollázs',
-                    single: 'egy kép'
-                };
-                const mode = modeMap[String(settings.displayMode || 'slideshow')] || 'slideshow';
-                const overlayFlags = [];
-                if (settings.clockOverlayEnabled) {
-                    overlayFlags.push(`óra:${settings.clockOverlayPosition === 'bottom' ? 'lent' : 'fent'}`);
-                }
-                if (settings.textOverlayEnabled) {
-                    overlayFlags.push(`szöveg:${settings.textOverlayPosition === 'bottom' ? 'lent' : 'fent'}`);
-                }
-                const overlayLine = overlayFlags.length ? `<br>Overlay: ${overlayFlags.join(' • ')}` : '';
-                return `${imageCount} kép<br>Mód: ${mode}${overlayLine}`;
+                return getGalleryLoopItemSummary(settings);
             }
 
             if (moduleKey === 'video') {
-                const duration = parseInt(settings.videoDurationSec || item.duration_seconds || 0, 10);
-                const fit = String(settings.fitMode || 'contain');
-                const muted = settings.muted === false ? 'hanggal' : 'némítva';
-                if (duration > 0) {
-                    return `${duration}s • ${fit}<br>${muted}`;
-                }
-                return `Videó • ${fit}<br>${muted}`;
+                return getVideoLoopItemSummary(item, settings);
+            }
+
+            if (moduleKey === 'meal-menu') {
+                return getMealMenuLoopItemSummary(settings);
+            }
+
+            if (moduleKey === 'room-occupancy') {
+                return getRoomOccupancyLoopItemSummary(settings);
             }
 
             return '';
+        }
+
+        function getLoopItemModuleKey(item) {
+            return item?.module_key || getModuleKeyById(item?.module_id);
+        }
+
+        function getLoopItemDurationValue(item, moduleKey, isTechnicalItem, isGalleryItem) {
+            if (isTechnicalItem) {
+                return 60;
+            }
+
+            if (isGalleryItem) {
+                return getGalleryLoopDurationSeconds(item?.settings || {}, item?.duration_seconds);
+            }
+
+            return parseInt(item?.duration_seconds || 10, 10);
+        }
+
+        function buildLoopItemDurationInputHtml(index, durationValue, durationBounds, flags) {
+            const { isTechnicalItem, isVideoItem, isGalleryItem } = flags;
+            const isReadOnly = isDefaultGroup || isTechnicalItem || isContentOnlyMode || isVideoItem || isGalleryItem;
+
+            if (isReadOnly) {
+                return `<input type="number" value="${durationValue}" min="${durationBounds.min}" max="${durationBounds.max}" step="${durationBounds.step}" disabled>`;
+            }
+
+            return `<input type="number" value="${durationValue}" min="${durationBounds.min}" max="${durationBounds.max}" step="${durationBounds.step}" onchange="updateDuration(${index}, this.value)" onkeydown="if (event.key === 'Enter') { event.preventDefault(); updateDuration(${index}, this.value); this.blur(); }" onclick="event.stopPropagation()">`;
+        }
+
+        function buildLoopItemActionButtonsHtml(index) {
+            if (isDefaultGroup) {
+                return `<button class="loop-btn" disabled title="A default csoport nem szerkeszthető">🔒</button>`;
+            }
+
+            if (isContentOnlyMode) {
+                return `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="Testreszabás">⚙️</button>`;
+            }
+
+            return `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="Testreszabás">⚙️</button>
+                        <button class="loop-btn" onclick="duplicateLoopItem(${index}); event.stopPropagation();" title="Duplikálás">📄</button>
+                        <button class="loop-btn" onclick="removeFromLoop(${index}); event.stopPropagation();" title="Törlés">🗑️</button>`;
+        }
+
+        function createLoopItemElement(item, index) {
+            const loopItem = document.createElement('div');
+            loopItem.className = 'loop-item';
+            loopItem.draggable = !isDefaultGroup && !isContentOnlyMode;
+            loopItem.dataset.index = index;
+
+            const isTechnicalItem = isTechnicalLoopItem(item);
+            const moduleKey = getLoopItemModuleKey(item);
+            const isVideoItem = moduleKey === 'video';
+            const isGalleryItem = moduleKey === 'image-gallery' || moduleKey === 'gallery';
+            const durationBounds = getDurationBoundsForModule(moduleKey);
+            const durationValue = getLoopItemDurationValue(item, moduleKey, isTechnicalItem, isGalleryItem);
+
+            if (isGalleryItem) {
+                item.duration_seconds = durationValue;
+            }
+
+            const durationInputHtml = buildLoopItemDurationInputHtml(index, durationValue, durationBounds, {
+                isTechnicalItem,
+                isVideoItem,
+                isGalleryItem,
+            });
+
+            const actionButtonsHtml = buildLoopItemActionButtonsHtml(index);
+
+            loopItem.innerHTML = `
+                    <div class="loop-order">${index + 1}</div>
+                    <div class="loop-details">
+                        <div class="loop-module-name">${item.module_name}</div>
+                        <div class="loop-module-desc">${getLoopItemSummary(item)}</div>
+                    </div>
+                    <div class="loop-duration">
+                        ${durationInputHtml}
+                        <span class="loop-duration-suffix">s</span>
+                    </div>
+                    <div class="loop-actions">
+                        ${actionButtonsHtml}
+                    </div>
+                `;
+
+            if (!isDefaultGroup && !isContentOnlyMode) {
+                loopItem.addEventListener('dragstart', handleDragStart);
+                loopItem.addEventListener('dragover', handleDragOver);
+                loopItem.addEventListener('drop', handleDrop);
+                loopItem.addEventListener('dragend', handleDragEnd);
+            }
+
+            return loopItem;
         }
         
         // Update preview when loop changes
@@ -5228,49 +6659,7 @@
             container.innerHTML = '';
             
             loopItems.forEach((item, index) => {
-                const loopItem = document.createElement('div');
-                loopItem.className = 'loop-item';
-                loopItem.draggable = !isDefaultGroup && !isContentOnlyMode;
-                loopItem.dataset.index = index;
-
-                const isTechnicalItem = isTechnicalLoopItem(item);
-                const isVideoItem = (item.module_key || getModuleKeyById(item.module_id)) === 'video';
-                const durationValue = isTechnicalItem ? 60 : parseInt(item.duration_seconds || 10);
-                const durationInputHtml = (isDefaultGroup || isTechnicalItem || isContentOnlyMode || isVideoItem)
-                    ? `<input type="number" value="${durationValue}" min="5" max="300" step="5" disabled>`
-                    : `<input type="number" value="${durationValue}" min="5" max="300" step="5" onchange="updateDuration(${index}, this.value)" onclick="event.stopPropagation()">`;
-
-                const actionButtonsHtml = isDefaultGroup
-                    ? `<button class="loop-btn" disabled title="A default csoport nem szerkeszthető">🔒</button>`
-                    : isContentOnlyMode
-                    ? `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="Testreszabás">⚙️</button>`
-                    : `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="Testreszabás">⚙️</button>
-                        <button class="loop-btn" onclick="duplicateLoopItem(${index}); event.stopPropagation();" title="Duplikálás">📄</button>
-                        <button class="loop-btn" onclick="removeFromLoop(${index}); event.stopPropagation();" title="Törlés">🗑️</button>`;
-                
-                loopItem.innerHTML = `
-                    <div class="loop-order">${index + 1}</div>
-                    <div class="loop-details">
-                        <div class="loop-module-name">${item.module_name}</div>
-                        <div class="loop-module-desc">${getLoopItemSummary(item)}</div>
-                    </div>
-                    <div class="loop-duration">
-                        ${durationInputHtml}
-                        <span class="loop-duration-suffix">s</span>
-                    </div>
-                    <div class="loop-actions">
-                        ${actionButtonsHtml}
-                    </div>
-                `;
-                
-                // Drag and drop handlers
-                if (!isDefaultGroup && !isContentOnlyMode) {
-                    loopItem.addEventListener('dragstart', handleDragStart);
-                    loopItem.addEventListener('dragover', handleDragOver);
-                    loopItem.addEventListener('drop', handleDrop);
-                    loopItem.addEventListener('dragend', handleDragEnd);
-                }
-                
+                const loopItem = createLoopItemElement(item, index);
                 container.appendChild(loopItem);
             });
             

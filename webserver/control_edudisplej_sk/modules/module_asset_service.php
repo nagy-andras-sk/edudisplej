@@ -125,30 +125,13 @@ function edudisplej_module_asset_extract_rel_path(string $value): string
 
 function edudisplej_module_asset_api_url_by_id(int $assetId, ?string $token = null): string
 {
-    $buildUrl = function (array $params): string {
-        $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
-        $relative = '../../api/group_loop/module_asset_file.php?' . $query;
-
-        $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-        $appPos = strpos($scriptName, '/control_edudisplej_sk/');
-        $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
-
-        if ($appPos === false || $host === '') {
-            return $relative;
-        }
-
-        $basePath = substr($scriptName, 0, $appPos + strlen('/control_edudisplej_sk'));
-        $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
-
-        return $scheme . '://' . $host . $basePath . '/api/group_loop/module_asset_file.php?' . $query;
-    };
-
     $params = ['asset_id' => $assetId];
     if (!empty($token)) {
         $params['token'] = $token;
     }
 
-    return $buildUrl($params);
+    $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    return '../../api/group_loop/module_asset_file.php?' . $query;
 }
 
 function edudisplej_module_asset_api_url_by_path(string $relPath, ?string $token = null): string
@@ -164,20 +147,7 @@ function edudisplej_module_asset_api_url_by_path(string $relPath, ?string $token
     }
 
     $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
-    $relative = '../../api/group_loop/module_asset_file.php?' . $query;
-
-    $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-    $appPos = strpos($scriptName, '/control_edudisplej_sk/');
-    $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
-
-    if ($appPos === false || $host === '') {
-        return $relative;
-    }
-
-    $basePath = substr($scriptName, 0, $appPos + strlen('/control_edudisplej_sk'));
-    $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
-
-    return $scheme . '://' . $host . $basePath . '/api/group_loop/module_asset_file.php?' . $query;
+    return '../../api/group_loop/module_asset_file.php?' . $query;
 }
 
 function edudisplej_module_asset_normalize_url_for_api(string $url, ?string $token = null): string

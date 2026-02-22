@@ -4,12 +4,35 @@
  * Validates bearer tokens and license keys for API requests
  */
 
-function validate_api_token() {
-    $response = [
-        'success' => false,
-        'message' => 'Authentication required'
-    ];
+require_once __DIR__ . '/../security_config.php';
 
+function edudisplej_api_get_headers(): array {
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        return is_array($headers) ? $headers : [];
+    }
+
+    $headers = [];
+    foreach ($_SERVER as $key => $value) {
+        if (strpos($key, 'HTTP_') === 0) {
+            $name = str_replace('_', '-', substr($key, 5));
+            $headers[$name] = $value;
+        }
+    }
+    return $headers;
+}
+
+function edudisplej_api_abort_json(int $statusCode, string $message): void {
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => false,
+        'message' => $message,
+    ]);
+    exit;
+}
+
+function validate_api_token() {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
@@ -34,7 +57,7 @@ function validate_api_token() {
         ];
     }
 
-    $headers = getallheaders();
+    $headers = edudisplej_api_get_headers();
     $auth_header = $headers['Authorization'] ?? $headers['authorization'] ?? '';
     $token_from_query = $_GET['token'] ?? '';
     $token_from_header = $headers['X-API-Token'] ?? $headers['x-api-token'] ?? '';
@@ -56,10 +79,7 @@ function validate_api_token() {
     }
 
     if (empty($token)) {
-        header('HTTP/1.1 401 Unauthorized');
-        header('Content-Type: application/json');
-        echo json_encode($response);
-        exit;
+        edudisplej_api_abort_json(401, 'Authentication required');
     }
 
     require_once __DIR__ . '/../dbkonfiguracia.php';
@@ -74,12 +94,7 @@ function validate_api_token() {
         if ($result->num_rows === 0) {
             $stmt->close();
             $conn->close();
-
-            header('HTTP/1.1 401 Unauthorized');
-            header('Content-Type: application/json');
-            $response['message'] = 'Invalid API token';
-            echo json_encode($response);
-            exit;
+            edudisplej_api_abort_json(401, 'Invalid API token');
         }
 
         $company = $result->fetch_assoc();
@@ -87,22 +102,12 @@ function validate_api_token() {
 
         if (!$company['is_active']) {
             $conn->close();
-
-            header('HTTP/1.1 403 Forbidden');
-            header('Content-Type: application/json');
-            $response['message'] = 'Company license is inactive';
-            echo json_encode($response);
-            exit;
+            edudisplej_api_abort_json(403, 'Company license is inactive');
         }
 
         if (empty($company['license_key'])) {
             $conn->close();
-
-            header('HTTP/1.1 403 Forbidden');
-            header('Content-Type: application/json');
-            $response['message'] = 'No valid license key';
-            echo json_encode($response);
-            exit;
+            edudisplej_api_abort_json(403, 'No valid license key');
         }
 
         $conn->close();
@@ -120,11 +125,8 @@ function validate_api_token() {
             'auth_type' => 'token'
         ];
     } catch (Exception $e) {
-        header('HTTP/1.1 500 Internal Server Error');
-        header('Content-Type: application/json');
-        $response['message'] = 'Authentication error: ' . $e->getMessage();
-        echo json_encode($response);
-        exit;
+        error_log('api/auth.php validate_api_token error: ' . $e->getMessage());
+        edudisplej_api_abort_json(500, 'Authentication service error');
     }
 }
 
@@ -137,10 +139,7 @@ function api_require_company_match(array $company, $target_company_id, string $m
         return;
     }
     if (empty($target_company_id) || (int)$company['id'] !== (int)$target_company_id) {
-        header('HTTP/1.1 403 Forbidden');
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => $message]);
-        exit;
+        edudisplej_api_abort_json(403, $message);
     }
 }
 
@@ -155,10 +154,7 @@ function api_require_group_company(mysqli $conn, array $company, int $group_id):
     $row = $result->fetch_assoc();
     $stmt->close();
     if (!$row || (int)$row['company_id'] !== (int)$company['id']) {
-        header('HTTP/1.1 403 Forbidden');
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-        exit;
+        edudisplej_api_abort_json(403, 'Unauthorized');
     }
 }
 
@@ -179,7 +175,7 @@ function api_require_group_company(mysqli $conn, array $company, int $group_id):
  * @return bool  True when signature is valid (or signing is not configured/required)
  */
 function validate_request_signature(array $company, string $request_body, bool $required = false): bool {
-    $headers = getallheaders();
+    $headers = edudisplej_api_get_headers();
     $timestamp = $headers['X-EDU-Timestamp'] ?? $headers['x-edu-timestamp'] ?? '';
     $nonce     = $headers['X-EDU-Nonce']     ?? $headers['x-edu-nonce']     ?? '';
     $signature = $headers['X-EDU-Signature'] ?? $headers['x-edu-signature'] ?? '';

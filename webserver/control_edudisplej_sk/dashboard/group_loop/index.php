@@ -124,7 +124,10 @@ try {
 
 $group_loop_modules_catalog = array_values(array_merge($available_modules, $unconfigured_module ? [$unconfigured_module] : []));
 $group_loop_css_version = (string)(@filemtime(__DIR__ . '/assets/css/app.css') ?: time());
-$group_loop_js_version = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: time());
+$group_loop_js_version_app = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: time());
+$group_loop_js_version_pdf = (string)(@filemtime(__DIR__ . '/assets/js/modules/pdf.js') ?: $group_loop_js_version_app);
+$group_loop_js_version_gallery = (string)(@filemtime(__DIR__ . '/assets/js/modules/gallery.js') ?: $group_loop_js_version_app);
+$group_loop_js_version_video = (string)(@filemtime(__DIR__ . '/assets/js/modules/video.js') ?: $group_loop_js_version_app);
 
 function edudisplej_group_loop_module_emoji(string $moduleKey): string {
     $key = strtolower(trim($moduleKey));
@@ -1156,7 +1159,7 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
 
                     <div class="loop-workspace-col loop-workspace-editor">
                         <div class="planner-column-header" style="display:flex; align-items:center; justify-content:space-between; gap:8px; text-transform:none; letter-spacing:0; font-size:11px;">
-                            <span>Szerkesztett loop: <strong id="active-loop-inline-name">—</strong></span>
+                            <span>Szerkesztett loop: <strong id="active-loop-inline-name">—</strong><span id="active-loop-inline-schedule" style="margin-left:6px; font-weight:400; color:#425466;"></span></span>
                             <?php if (!$is_default_group && !$is_content_only_mode): ?>
                                 <span style="display:flex; gap:6px; align-items:center;">
                                     <button class="btn" type="button" onclick="renameActiveLoopStyle()" style="padding:4px 8px; font-size:11px;">✏️ Átnevezés</button>
@@ -1263,7 +1266,6 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
         <div class="planner-title">Ütemezés</div>
         <div class="planner-legend">
             <span><span class="dot weekly"></span>Heti blokk</span>
-            <span><span class="dot special"></span>Speciális dátum blokk</span>
             <span><span class="dot active"></span>Aktív tartomány</span>
         </div>
 
@@ -1303,7 +1305,7 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
             </div>
 
             <div class="schedule-calendar-column">
-                <div class="planner-column-header">Heti nézet és speciális napok</div>
+                <div class="planner-column-header">Heti nézet</div>
                 <div class="time-block-toolbar">
                     <button type="button" class="btn" onclick="changeScheduleWeek(-1)" title="Előző hét">◀</button>
                     <span id="schedule-week-label" style="font-size:12px; color:#425466; font-weight:700;"></span>
@@ -1320,23 +1322,8 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
                 <div class="schedule-grid-wrap">
                     <table class="schedule-grid" id="weekly-schedule-grid"></table>
                 </div>
-
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
-                    <strong style="font-size:12px; color:#425466;">Speciális nap:</strong>
-                    <input type="date" id="special-day-focus" onchange="renderSpecialBlocksList()">
-                    <button type="button" class="btn" onclick="openSpecialDayPlanner()">Nap megnyitása</button>
-                    <input type="search" id="special-date-search" class="special-search-input" placeholder="Keresés dátumra vagy blokk névre..." oninput="renderSpecialBlocksList()">
-                </div>
-                <div style="display:grid; grid-template-columns:160px 120px 120px 1fr; gap:8px; margin-bottom:8px; align-items:center;">
-                    <input type="date" id="special-date-input">
-                    <select id="special-start-input" aria-label="Speciális kezdés (24 órás)"></select>
-                    <select id="special-end-input" aria-label="Speciális befejezés (24 órás)"></select>
-                    <button type="button" class="btn" onclick="createSpecialDateBlockFromInputs()">Speciális esemény hozzáadása</button>
-                </div>
             </div>
         </div>
-
-        <div class="special-blocks-list" id="special-blocks-list"></div>
     </div>
     <?php endif; ?>
 
@@ -1353,6 +1340,7 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
     <script>
         window.GroupLoopBootstrap = <?php echo json_encode([
             'groupId' => (int)$group_id,
+            'companyId' => (int)$company_id,
             'isDefaultGroup' => (bool)$is_default_group,
             'isContentOnlyMode' => (bool)$is_content_only_mode,
             'technicalModule' => $unconfigured_module ? [
@@ -1363,10 +1351,10 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
             'modulesCatalog' => $group_loop_modules_catalog,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
     </script>
-    <script src="assets/js/modules/pdf.js?v=<?php echo rawurlencode($group_loop_js_version); ?>"></script>
-    <script src="assets/js/modules/gallery.js?v=<?php echo rawurlencode($group_loop_js_version); ?>"></script>
-    <script src="assets/js/modules/video.js?v=<?php echo rawurlencode($group_loop_js_version); ?>"></script>
-    <script src="assets/js/app.js?v=<?php echo rawurlencode($group_loop_js_version); ?>"></script>
+    <script src="assets/js/modules/pdf.js?v=<?php echo rawurlencode($group_loop_js_version_pdf); ?>"></script>
+    <script src="assets/js/modules/gallery.js?v=<?php echo rawurlencode($group_loop_js_version_gallery); ?>"></script>
+    <script src="assets/js/modules/video.js?v=<?php echo rawurlencode($group_loop_js_version_video); ?>"></script>
+    <script src="assets/js/app.js?v=<?php echo rawurlencode($group_loop_js_version_app); ?>"></script>
     <?php if (false): ?>
     
     <script>
@@ -1588,6 +1576,57 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
             if (placeholder) {
                 placeholder.style.display = showModules ? 'none' : 'flex';
             }
+
+            syncLoopContainerHeightToModules();
+        }
+
+        let loopContainerHeightObserver = null;
+
+        function syncLoopContainerHeightToModules() {
+            const wrapper = document.getElementById('modules-panel-wrapper');
+            const container = document.getElementById('loop-container');
+            const editorColumn = document.querySelector('.loop-workspace-editor');
+            if (!wrapper || !container) {
+                return;
+            }
+
+            if (wrapper.offsetParent === null) {
+                container.style.minHeight = '';
+                if (editorColumn) {
+                    editorColumn.style.minHeight = '';
+                }
+                return;
+            }
+
+            const wrapperHeight = Math.ceil(wrapper.getBoundingClientRect().height);
+            if (wrapperHeight > 0) {
+                container.style.minHeight = `${wrapperHeight}px`;
+                if (editorColumn) {
+                    editorColumn.style.minHeight = `${wrapperHeight}px`;
+                }
+            }
+        }
+
+        function initLoopContainerHeightSync() {
+            syncLoopContainerHeightToModules();
+
+            if (typeof ResizeObserver === 'undefined') {
+                return;
+            }
+
+            const wrapper = document.getElementById('modules-panel-wrapper');
+            if (!wrapper) {
+                return;
+            }
+
+            if (loopContainerHeightObserver) {
+                loopContainerHeightObserver.disconnect();
+            }
+
+            loopContainerHeightObserver = new ResizeObserver(() => {
+                syncLoopContainerHeightToModules();
+            });
+            loopContainerHeightObserver.observe(wrapper);
         }
 
         function ensureSingleDefaultLoopStyle() {
@@ -4495,6 +4534,7 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
             if (loopItems.length === 0) {
                 container.className = 'empty';
                 container.innerHTML = '<p>Nincs elem a loop-ban. Húzz ide modult az „Elérhető Modulok” panelről.</p>';
+                syncLoopContainerHeightToModules();
                 updateTotalDuration();
                 stopPreview(); // Stop preview if loop is empty
                 return;
@@ -4549,6 +4589,8 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
                 
                 container.appendChild(loopItem);
             });
+
+            syncLoopContainerHeightToModules();
             
             updateTotalDuration();
             if (loopItems.length > 0) {
@@ -4820,10 +4862,12 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
         }
 
         window.addEventListener('resize', () => {
+            syncLoopContainerHeightToModules();
             updatePreviewResolution();
         });
         
         // Load resolutions on page load
+        initLoopContainerHeightSync();
         loadGroupResolutions();
     </script>
     <?php endif; ?>

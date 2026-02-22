@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDisplej Terem Foglaltság</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+        body { background: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        .root { width: 100%; height: 100%; padding: 2.4vh 2.4vw; display: grid; grid-template-rows: auto auto 1fr auto; gap: 1.2vh; }
+        .title { font-size: clamp(24px, 3.1vw, 54px); font-weight: 700; }
+        .subtitle { font-size: clamp(14px, 1.35vw, 24px); color: #cbd5e1; margin-top: 4px; }
+        .status-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .badge { border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 999px; padding: 6px 10px; font-size: clamp(12px, 1.05vw, 18px); }
+        .badge.ok { background: rgba(22, 163, 74, .2); color: #bbf7d0; }
+        .badge.busy { background: rgba(220, 38, 38, .2); color: #fecaca; }
+        .badge.info { background: rgba(30, 64, 175, .2); color: #bfdbfe; }
+        .list { border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 10px; overflow: hidden; }
+        .row { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 10px 12px; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
+        .row:last-child { border-bottom: 0; }
+        .time { font-weight: 700; color: #e2e8f0; font-size: clamp(16px, 1.4vw, 24px); }
+        .text { font-size: clamp(16px, 1.35vw, 24px); color: #f8fafc; white-space: pre-wrap; word-break: break-word; }
+        .muted { color: #94a3b8; }
+        .empty { border: 1px dashed rgba(148,163,184,.35); border-radius: 12px; padding: 14px; color: #cbd5e1; font-size: clamp(18px, 1.7vw, 30px); }
+        .foot { font-size: clamp(12px, 1vw, 18px); color: #94a3b8; }
+    </style>
+</head>
+<body>
+<div class="root">
+    <div>
+        <div class="title">Terem foglaltság</div>
+        <div class="subtitle" id="subtitle">Betöltés...</div>
+    </div>
+
+    <div class="status-bar" id="status"></div>
+
+    <div id="events"></div>
+
+    <div class="foot" id="foot"></div>
+</div>
+
+<script>
+(function () {
+    function parseBool(value, fallback) {
+        if (value === null || value === undefined || value === '') return fallback;
+        if (typeof value === 'boolean') return value;
+        const normalized = String(value).toLowerCase();
+        if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+        if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+        return fallback;
+    }
+
+    function parseIntSafe(value, fallback) {
+        const n = parseInt(value, 10);
+        return Number.isFinite(n) ? n : fallback;
+    }
+
+    function appendToken(url) {
+        const pageParams = new URLSearchParams(window.location.search);
+        const pageToken = pageParams.get('token');
+        if (!pageToken || String(url).includes('token=')) {
+            return url;
+        }
+        const glue = String(url).includes('?') ? '&' : '?';
+        return `${url}${glue}token=${encodeURIComponent(pageToken)}`;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+    }
+
+    function getSettings() {
+        const defaults = {
+            roomId: 0,
+            companyId: 0,
+            showOnlyCurrent: false,
+            showNextCount: 4,
+            apiBaseUrl: '../../api/room_occupancy.php'
+        };
+
+        const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS) ? window.EDUDISPLEJ_SETTINGS : {};
+        const params = new URLSearchParams(window.location.search);
+
+        return {
+            roomId: parseIntSafe(params.get('roomId') ?? injected.roomId, defaults.roomId),
+            companyId: parseIntSafe(params.get('company_id') ?? params.get('companyId') ?? injected.companyId, defaults.companyId),
+            showOnlyCurrent: parseBool(params.get('showOnlyCurrent') ?? injected.showOnlyCurrent, defaults.showOnlyCurrent),
+            showNextCount: Math.max(1, Math.min(12, parseIntSafe(params.get('showNextCount') ?? injected.showNextCount, defaults.showNextCount))),
+            apiBaseUrl: String(params.get('apiBaseUrl') ?? injected.apiBaseUrl ?? defaults.apiBaseUrl)
+        };
+    }
+
+    function resolveApiUrl(base, query) {
+        const hasQ = String(base).includes('?');
+        return `${base}${hasQ ? '&' : '?'}${query}`;
+    }
+
+    function render(data, settings, sourceText) {
+        const subtitle = document.getElementById('subtitle');
+        const status = document.getElementById('status');
+        const eventsContainer = document.getElementById('events');
+        const foot = document.getElementById('foot');
+
+        const roomName = String(data?.room_name || '').trim();
+        const eventDate = String(data?.event_date || '').trim();
+        subtitle.textContent = roomName ? `${roomName}${eventDate ? ` • ${eventDate}` : ''}` : 'Nincs kiválasztott terem';
+
+        const current = data?.current_event || null;
+        const isOccupied = Boolean(data?.is_occupied_now);
+        const allEvents = Array.isArray(data?.events) ? data.events : [];
+
+        const nowTime = new Date().toTimeString().slice(0, 5);
+        const upcoming = allEvents.filter((event) => String(event?.start_time || '') >= nowTime).slice(0, settings.showNextCount);
+
+        const rows = settings.showOnlyCurrent
+            ? (current ? [current] : [])
+            : allEvents;
+
+        const badges = [];
+        badges.push(`<span class="badge ${isOccupied ? 'busy' : 'ok'}">${isOccupied ? '🔴 Foglalt' : '🟢 Szabad'}</span>`);
+        if (current) {
+            badges.push(`<span class="badge info">Most: ${escapeHtml(current.start_time)}–${escapeHtml(current.end_time)} ${escapeHtml(current.event_title || '')}</span>`);
+        }
+        badges.push(`<span class="badge info">Forrás: ${escapeHtml(sourceText)}</span>`);
+        if (!settings.showOnlyCurrent) {
+            badges.push(`<span class="badge info">Napi események: ${allEvents.length}</span>`);
+        } else {
+            badges.push(`<span class="badge info">Következő: ${upcoming.length}</span>`);
+        }
+        status.innerHTML = badges.join('');
+
+        if (!rows.length) {
+            eventsContainer.innerHTML = '<div class="empty">Nincs megjeleníthető foglaltság ehhez a nézethez.</div>';
+        } else {
+            eventsContainer.innerHTML = `<div class="list">${rows.map((event) => {
+                const time = `${escapeHtml(event.start_time || '')} - ${escapeHtml(event.end_time || '')}`;
+                const title = escapeHtml(event.event_title || '');
+                const note = escapeHtml(event.event_note || '');
+                return `<div class="row"><div class="time">${time}</div><div class="text">${title}${note ? `<div class="muted" style="margin-top:4px;">${note}</div>` : ''}</div></div>`;
+            }).join('')}</div>`;
+        }
+
+        const updateTs = allEvents.length > 0 ? String(allEvents[0]?.updated_at || '').trim() : '';
+        foot.textContent = updateTs ? `Frissítve: ${updateTs}` : 'Frissítési idő: ismeretlen';
+    }
+
+    async function fetchWithTimeout(url, timeoutMs) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { method: 'GET', cache: 'no-store', signal: controller.signal });
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    async function init() {
+        const settings = getSettings();
+        const cacheKey = `room_occ_cache_${settings.companyId}_${settings.roomId}`;
+
+        if (settings.roomId <= 0) {
+            render({ room_name: '', event_date: new Date().toISOString().slice(0, 10), events: [], current_event: null, is_occupied_now: false }, settings, 'Nincs kiválasztott terem');
+            return;
+        }
+
+        const params = new URLSearchParams({
+            action: 'schedule',
+            room_id: String(settings.roomId),
+            date: new Date().toISOString().slice(0, 10)
+        });
+        if (settings.companyId > 0) {
+            params.set('company_id', String(settings.companyId));
+        }
+
+        let rendered = false;
+        try {
+            const url = appendToken(resolveApiUrl(settings.apiBaseUrl, params.toString()));
+            const response = await fetchWithTimeout(url, 6000);
+            const payload = await response.json();
+            if (response.ok && payload && payload.success) {
+                const data = payload.data || {};
+                render(data, settings, 'Szerver');
+                rendered = true;
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({ data, saved_at: Date.now() }));
+                } catch (_) {}
+            }
+        } catch (_) {}
+
+        if (!rendered) {
+            try {
+                const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+                if (cached?.data) {
+                    render(cached.data, settings, 'Offline cache');
+                    rendered = true;
+                }
+            } catch (_) {}
+        }
+
+        if (!rendered) {
+            render({ room_name: '', event_date: new Date().toISOString().slice(0, 10), events: [], current_event: null, is_occupied_now: false }, settings, 'Nincs adat');
+        }
+    }
+
+    init();
+    setInterval(() => {
+        init();
+    }, 60 * 1000);
+})();
+</script>
+</body>
+</html>

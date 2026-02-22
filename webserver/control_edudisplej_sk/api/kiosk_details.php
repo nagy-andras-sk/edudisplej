@@ -237,6 +237,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $friendly_name = trim((string)($data['friendly_name'] ?? ''));
     $location = trim((string)($data['location'] ?? ''));
     $group_id = isset($data['group_id']) ? intval($data['group_id']) : null;
+    $screenshot_enabled = isset($data['screenshot_enabled']) ? (intval($data['screenshot_enabled']) ? 1 : 0) : null;
 
     if ($kiosk_id_post <= 0) {
         $response['message'] = 'Invalid kiosk ID';
@@ -266,6 +267,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $update_stmt->bind_param("ssii", $friendly_name, $location, $kiosk_id_post, $company_id);
         $update_stmt->execute();
         $update_stmt->close();
+
+        if ($screenshot_enabled !== null) {
+            $screenshot_stmt = $conn->prepare("UPDATE kiosks SET screenshot_enabled = ? WHERE id = ? AND company_id = ?");
+            $screenshot_stmt->bind_param("iii", $screenshot_enabled, $kiosk_id_post, $company_id);
+            $screenshot_stmt->execute();
+            $screenshot_stmt->close();
+        }
 
         if ($group_id !== null && $group_id > 0) {
             $group_stmt = $conn->prepare("SELECT id FROM kiosk_groups WHERE id = ? AND company_id = ? LIMIT 1");

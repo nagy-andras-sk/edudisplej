@@ -11,6 +11,14 @@ INIT_BASE="https://install.edudisplej.sk/init"
 BACKUP_DIR="${TARGET_DIR}.backup.$(date +%s)"
 TOKEN_FILE="${TARGET_DIR}/lic/token"
 APT_UPDATED="false"
+APT_COMMON_OPTS=(
+    "-o" "Dpkg::Use-Pty=0"
+    "-o" "Dpkg::Options::=--force-confdef"
+    "-o" "Dpkg::Options::=--force-confold"
+    "-o" "Acquire::Retries=3"
+    "-o" "Acquire::http::Timeout=30"
+    "-o" "Acquire::https::Timeout=30"
+)
 
 wait_for_apt_locks() {
     local timeout_seconds="${1:-180}"
@@ -41,11 +49,13 @@ apt_install_missing() {
     }
 
     if [ "$APT_UPDATED" != "true" ]; then
-        apt-get update -qq || return 1
+        DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a \
+            apt-get "${APT_COMMON_OPTS[@]}" update -qq < /dev/null || return 1
         APT_UPDATED="true"
     fi
 
-    apt-get install -y "$package" >/dev/null 2>&1
+    DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a \
+        apt-get -y "${APT_COMMON_OPTS[@]}" install "$package" < /dev/null >/dev/null 2>&1
 }
 
 # Kontrola root opravneni / Root jogok ellenorzese

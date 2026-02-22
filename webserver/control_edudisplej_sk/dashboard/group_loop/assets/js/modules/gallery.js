@@ -5,6 +5,118 @@ const GroupLoopGalleryModule = (() => {
     const MAX_LIBRARY_ITEMS = 200;
     let globalDropGuardsCleanup = null;
     let libraryItems = [];
+    const DEBUG_PREFIX = '[GroupLoopGallery]';
+
+    const logDebug = (...args) => {
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+            console.debug(DEBUG_PREFIX, ...args);
+        }
+    };
+
+    const logWarn = (...args) => {
+        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+            console.warn(DEBUG_PREFIX, ...args);
+        }
+    };
+
+    const logError = (...args) => {
+        if (typeof console !== 'undefined' && typeof console.error === 'function') {
+            console.error(DEBUG_PREFIX, ...args);
+        }
+    };
+
+    const probeImageUrlFailure = async (url) => {
+        const probeUrl = String(url || '').trim();
+        if (!probeUrl) {
+            logWarn('probeImageUrlFailure: empty URL');
+            return {
+                ok: false,
+                status: 0,
+                message: 'Üres kép URL'
+            };
+        }
+
+        try {
+            const response = await fetch(probeUrl, {
+                method: 'GET',
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+
+            const contentType = response.headers.get('content-type') || '';
+            let bodyPreview = '';
+            let magicHex = '';
+            let magicLooksValid = null;
+
+            if (contentType.startsWith('image/')) {
+                try {
+                    const raw = await response.clone().arrayBuffer();
+                    const bytes = new Uint8Array(raw).slice(0, 16);
+                    magicHex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+
+                    const isPng = bytes.length >= 8
+                        && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+                        && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+                    const isJpeg = bytes.length >= 3
+                        && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+                    const isGif = bytes.length >= 6
+                        && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46;
+                    const isWebp = bytes.length >= 12
+                        && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+                        && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+
+                    magicLooksValid = isPng || isJpeg || isGif || isWebp;
+                } catch (magicError) {
+                    magicLooksValid = false;
+                    magicHex = `[magic-read-failed: ${magicError?.message || String(magicError)}]`;
+                }
+            }
+
+            if (!contentType.startsWith('image/')) {
+                try {
+                    const text = await response.text();
+                    bodyPreview = String(text || '').slice(0, 500);
+                } catch (bodyReadError) {
+                    bodyPreview = `[body read failed: ${bodyReadError?.message || String(bodyReadError)}]`;
+                }
+            }
+
+            const result = {
+                ok: response.ok,
+                status: response.status,
+                statusText: response.statusText,
+                contentType,
+                bodyPreview,
+                magicHex,
+                magicLooksValid,
+                finalUrl: response.url
+            };
+
+            logError('thumbnail probe result', {
+                probeUrl,
+                ok: result.ok,
+                status: result.status,
+                statusText: result.statusText,
+                redirected: response.redirected,
+                finalUrl: result.finalUrl,
+                contentType: result.contentType,
+                bodyPreview: result.bodyPreview
+            });
+
+            return result;
+        } catch (probeError) {
+            logError('thumbnail probe request failed', {
+                probeUrl,
+                error: probeError?.message || String(probeError)
+            });
+
+            return {
+                ok: false,
+                status: 0,
+                message: probeError?.message || 'Hálózati hiba'
+            };
+        }
+    };
 
     const isFileDragEvent = (event) => {
         const types = Array.from(event?.dataTransfer?.types || []);
@@ -55,10 +167,21 @@ const GroupLoopGalleryModule = (() => {
         try {
             const parsed = JSON.parse(String(raw || '[]'));
             if (!Array.isArray(parsed)) {
+                logWarn('parseImageUrls: parsed JSON is not array', { raw });
                 return [];
             }
-            return parsed.map((item) => String(item || '').trim()).filter(Boolean).slice(0, MAX_IMAGES);
-        } catch (_) {
+            const normalized = parsed.map((item) => String(item || '').trim()).filter(Boolean).slice(0, MAX_IMAGES);
+            logDebug('parseImageUrls: normalized list', {
+                inputType: typeof raw,
+                parsedLength: parsed.length,
+                normalizedLength: normalized.length
+            });
+            return normalized;
+        } catch (error) {
+            logError('parseImageUrls: JSON parse failed', {
+                raw,
+                error: error?.message || String(error)
+            });
             return [];
         }
     };
@@ -77,6 +200,11 @@ const GroupLoopGalleryModule = (() => {
             ...(window.galleryModuleSettings || {}),
             imageUrlsJson: JSON.stringify(normalized)
         };
+
+        logDebug('writeImageUrls: saved image url list', {
+            count: normalized.length,
+            firstUrl: normalized[0] || null
+        });
 
         return normalized;
     };
@@ -114,10 +242,15 @@ const GroupLoopGalleryModule = (() => {
         if (!libraryItems.length) {
             list.innerHTML = '';
             status.textContent = 'Nincs korábban feltöltött kép.';
+            logDebug('renderLibrary: no items');
             return;
         }
 
         status.textContent = `Talált elemek: ${libraryItems.length}`;
+        logDebug('renderLibrary: rendering items', {
+            count: libraryItems.length,
+            first: libraryItems[0] || null
+        });
         list.innerHTML = libraryItems.map((item) => {
             const id = parseInt(item.asset_id || 0, 10);
             const url = String(item.asset_url || '').replace(/"/g, '&quot;');
@@ -141,10 +274,29 @@ const GroupLoopGalleryModule = (() => {
         }
 
         try {
-            const response = await fetch(`../../api/group_loop/module_asset_library.php?module_key=image-gallery&asset_kind=image&limit=${MAX_LIBRARY_ITEMS}`, {
+            const libraryUrl = `../../api/group_loop/module_asset_library.php?module_key=image-gallery&asset_kind=image&limit=${MAX_LIBRARY_ITEMS}`;
+            logDebug('loadLibrary: requesting asset library', { libraryUrl });
+
+            const response = await fetch(libraryUrl, {
                 credentials: 'same-origin'
             });
+
+            logDebug('loadLibrary: response received', {
+                ok: response.ok,
+                status: response.status,
+                statusText: response.statusText,
+                redirected: response.redirected,
+                responseUrl: response.url
+            });
+
             const data = await response.json();
+            logDebug('loadLibrary: payload summary', {
+                success: !!data?.success,
+                hasAssetsArray: Array.isArray(data?.assets),
+                assetCount: Array.isArray(data?.assets) ? data.assets.length : null,
+                message: data?.message || null
+            });
+
             if (!response.ok || !data?.success || !Array.isArray(data.assets)) {
                 throw new Error(data?.message || `HTTP ${response.status}`);
             }
@@ -158,8 +310,16 @@ const GroupLoopGalleryModule = (() => {
                 }))
                 .filter((item) => item.asset_id > 0 && item.asset_url !== '');
 
+            logDebug('loadLibrary: normalized assets', {
+                count: libraryItems.length,
+                first: libraryItems[0] || null
+            });
+
             renderLibrary();
         } catch (error) {
+            logError('loadLibrary: failed', {
+                error: error?.message || String(error)
+            });
             libraryItems = [];
             renderLibrary();
             if (status) {
@@ -241,6 +401,13 @@ const GroupLoopGalleryModule = (() => {
             throw new Error('Hiányzó group_id');
         }
 
+        logDebug('uploadImageAsset: preparing upload', {
+            groupId,
+            fileName: file?.name || null,
+            fileType: file?.type || null,
+            fileSize: file?.size || null
+        });
+
         const formData = new FormData();
         formData.append('group_id', String(groupId));
         formData.append('module_key', 'image-gallery');
@@ -265,6 +432,12 @@ const GroupLoopGalleryModule = (() => {
             };
 
             xhr.onload = () => {
+                logDebug('uploadImageAsset: upload response', {
+                    status: xhr.status,
+                    responseType: xhr.responseType,
+                    hasJsonResponse: !!xhr.response
+                });
+
                 const data = xhr.response || (() => {
                     try {
                         return JSON.parse(xhr.responseText || '{}');
@@ -274,14 +447,30 @@ const GroupLoopGalleryModule = (() => {
                 })();
 
                 if (xhr.status >= 200 && xhr.status < 300 && data && data.success && data.asset_url) {
+                    logDebug('uploadImageAsset: upload success', {
+                        assetUrl: data.asset_url,
+                        assetId: data.asset_id || null
+                    });
                     resolve(data);
                     return;
                 }
 
+                logError('uploadImageAsset: upload rejected', {
+                    status: xhr.status,
+                    responseMessage: data?.message || null,
+                    response: data || null,
+                    responseText: xhr.responseText || null
+                });
                 reject(new Error(data?.message || `Feltöltési hiba (HTTP ${xhr.status})`));
             };
 
-            xhr.onerror = () => reject(new Error('Hálózati hiba a feltöltés során'));
+            xhr.onerror = () => {
+                logError('uploadImageAsset: network error', {
+                    status: xhr.status,
+                    responseText: xhr.responseText || null
+                });
+                reject(new Error('Hálózati hiba a feltöltés során'));
+            };
             xhr.send(formData);
         });
     };
@@ -293,12 +482,18 @@ const GroupLoopGalleryModule = (() => {
             return;
         }
 
-        const imageUrls = getImageUrls();
-
         const displayMode = document.getElementById('gallery-display-mode')?.value || (window.galleryModuleSettings?.displayMode || 'slideshow');
-        const fitMode = document.getElementById('gallery-fit-mode')?.value || (window.galleryModuleSettings?.fitMode || 'cover');
+
+        let imageUrls = getImageUrls();
+        if (displayMode === 'single' && imageUrls.length > 1) {
+            imageUrls = imageUrls.slice(0, 1);
+            writeImageUrls(imageUrls);
+        }
+
+        const fitMode = document.getElementById('gallery-fit-mode')?.value || (window.galleryModuleSettings?.fitMode || 'contain');
         const slideIntervalSec = parseInt(document.getElementById('gallery-slide-interval')?.value, 10) || 5;
-        const transitionMs = parseInt(document.getElementById('gallery-transition-ms')?.value, 10) || 450;
+        const transitionEnabled = document.getElementById('gallery-transition-enabled')?.checked !== false;
+        const transitionMs = transitionEnabled ? 450 : 0;
         const collageColumns = parseInt(document.getElementById('gallery-collage-columns')?.value, 10) || 3;
         const bgColor = document.getElementById('gallery-bg-color')?.value || '#000000';
 
@@ -308,6 +503,7 @@ const GroupLoopGalleryModule = (() => {
             displayMode,
             fitMode,
             slideIntervalSec,
+            transitionEnabled,
             transitionMs,
             collageColumns,
             bgColor
@@ -316,6 +512,7 @@ const GroupLoopGalleryModule = (() => {
         if (!imageUrls.length) {
             empty.style.display = 'block';
             iframe.removeAttribute('src');
+            logDebug('updateLivePreview: cleared preview (no images)');
             return;
         }
 
@@ -325,12 +522,41 @@ const GroupLoopGalleryModule = (() => {
         params.append('displayMode', displayMode);
         params.append('fitMode', fitMode);
         params.append('slideIntervalSec', String(slideIntervalSec));
+        params.append('transitionEnabled', transitionEnabled ? 'true' : 'false');
         params.append('transitionMs', String(transitionMs));
         params.append('collageColumns', String(collageColumns));
         params.append('bgColor', String(bgColor));
         params.append('preview', String(Date.now()));
 
         iframe.src = `../../modules/gallery/m_gallery.html?${params.toString()}`;
+        logDebug('updateLivePreview: iframe src set', {
+            imageCount: imageUrls.length,
+            displayMode,
+            fitMode,
+            slideIntervalSec,
+            transitionEnabled,
+            transitionMs,
+            collageColumns,
+            bgColor,
+            iframeSrc: iframe.src
+        });
+    };
+
+    const updateModeDependentSettingsVisibility = () => {
+        const mode = document.getElementById('gallery-display-mode')?.value || 'slideshow';
+        const slideshowWrap = document.getElementById('gallery-slide-interval-wrap');
+        const transitionWrap = document.getElementById('gallery-transition-toggle-wrap');
+        const collageWrap = document.getElementById('gallery-collage-columns-wrap');
+
+        if (slideshowWrap) {
+            slideshowWrap.style.display = mode === 'slideshow' ? 'block' : 'none';
+        }
+        if (transitionWrap) {
+            transitionWrap.style.display = mode === 'slideshow' ? 'flex' : 'none';
+        }
+        if (collageWrap) {
+            collageWrap.style.display = mode === 'collage' ? 'block' : 'none';
+        }
     };
 
     const renderImageList = () => {
@@ -340,8 +566,17 @@ const GroupLoopGalleryModule = (() => {
             return;
         }
 
-        const imageUrls = getImageUrls();
+        const displayMode = document.getElementById('gallery-display-mode')?.value || (window.galleryModuleSettings?.displayMode || 'slideshow');
+        let imageUrls = getImageUrls();
+        if (displayMode === 'single' && imageUrls.length > 1) {
+            imageUrls = imageUrls.slice(0, 1);
+            writeImageUrls(imageUrls);
+        }
         status.textContent = `Feltöltve: ${imageUrls.length}/${MAX_IMAGES} kép`;
+        logDebug('renderImageList: rendering image list', {
+            count: imageUrls.length,
+            urls: imageUrls
+        });
 
         if (!imageUrls.length) {
             list.innerHTML = '<div style="font-size:12px; color:#7b8794;">Még nincs feltöltött kép.</div>';
@@ -359,10 +594,62 @@ const GroupLoopGalleryModule = (() => {
         }).join('');
 
         list.querySelectorAll('[data-gallery-thumb]').forEach((imgEl) => {
-            imgEl.addEventListener('error', () => {
+            imgEl.addEventListener('error', async () => {
+                const imgSrc = imgEl.currentSrc || imgEl.src || imgEl.getAttribute('src') || '';
+                logError('renderImageList: thumbnail image load error', {
+                    imgSrc,
+                    naturalWidth: imgEl.naturalWidth,
+                    naturalHeight: imgEl.naturalHeight,
+                    complete: imgEl.complete,
+                    index: imgEl.getAttribute('data-gallery-thumb')
+                });
+                const probe = await probeImageUrlFailure(imgSrc);
                 imgEl.style.display = 'none';
                 const errorNote = document.createElement('span');
-                errorNote.textContent = 'Kép betöltési hiba';
+                const inlineDetail = (() => {
+                    if (!probe) {
+                        return 'ismeretlen hiba';
+                    }
+
+                    const apiMessage = (() => {
+                        const raw = String(probe.bodyPreview || '').trim();
+                        if (!raw) {
+                            return '';
+                        }
+
+                        if (raw.startsWith('{')) {
+                            try {
+                                const parsed = JSON.parse(raw);
+                                return String(parsed?.message || '').trim();
+                            } catch (_) {
+                                return '';
+                            }
+                        }
+
+                        const compact = raw.replace(/\s+/g, ' ').trim();
+                        return compact.slice(0, 120);
+                    })();
+
+                    if (probe.ok) {
+                        const ct = String(probe.contentType || '').toLowerCase();
+                        if (ct && !ct.startsWith('image/')) {
+                            return apiMessage
+                                ? `HTTP ${probe.status}: nem kép válasz (${probe.contentType}) - ${apiMessage}`
+                                : `HTTP ${probe.status}: nem kép válasz (${probe.contentType})`;
+                        }
+                        if (probe.magicLooksValid === false) {
+                            return `HTTP ${probe.status}: nem valós képtartalom (magic: ${probe.magicHex || 'n/a'})`;
+                        }
+                        return `HTTP ${probe.status}: kép dekódolási hiba vagy sérült fájl`;
+                    }
+
+                    if (probe.status > 0) {
+                        return apiMessage ? `HTTP ${probe.status}: ${apiMessage}` : `HTTP ${probe.status}`;
+                    }
+                    return String(probe.message || 'hálózati hiba');
+                })();
+
+                errorNote.textContent = `Kép betöltési hiba: ${inlineDetail}`;
                 errorNote.style.fontSize = '11px';
                 errorNote.style.color = '#b42318';
                 const parent = imgEl.parentElement;
@@ -409,8 +696,20 @@ const GroupLoopGalleryModule = (() => {
             if (status) {
                 status.textContent = 'Nincs érvényes kép a kiválasztott fájlok között.';
             }
+            logWarn('handleFiles: no valid image files selected', {
+                incomingCount: Array.isArray(files) ? files.length : (files?.length || 0)
+            });
             return;
         }
+
+        logDebug('handleFiles: selected image files', {
+            selectedCount: selected.length,
+            selectedFiles: selected.map((file) => ({
+                name: file?.name || null,
+                type: file?.type || null,
+                size: file?.size || null
+            }))
+        });
 
         let uploaded = 0;
 
@@ -434,8 +733,18 @@ const GroupLoopGalleryModule = (() => {
                 imageUrls = imageUrls.filter(Boolean).slice(0, MAX_IMAGES);
                 writeImageUrls(imageUrls);
                 uploaded += 1;
+                logDebug('handleFiles: image uploaded and added to list', {
+                    uploaded,
+                    totalSelected: selected.length,
+                    lastAssetUrl: result?.asset_url || null,
+                    currentTotalImages: imageUrls.length
+                });
                 renderImageList();
             } catch (error) {
+                logError('handleFiles: upload failed for file', {
+                    fileName: file?.name || null,
+                    error: error?.message || String(error)
+                });
                 alert(`Kép feltöltési hiba: ${error?.message || 'ismeretlen hiba'}`);
             }
         }
@@ -453,18 +762,32 @@ const GroupLoopGalleryModule = (() => {
     };
 
     const bindInputEvents = () => {
-        ['gallery-display-mode', 'gallery-fit-mode', 'gallery-slide-interval', 'gallery-transition-ms', 'gallery-collage-columns', 'gallery-bg-color']
+        ['gallery-display-mode', 'gallery-fit-mode', 'gallery-slide-interval', 'gallery-transition-enabled', 'gallery-collage-columns', 'gallery-bg-color']
             .forEach((id) => {
                 const el = document.getElementById(id);
                 if (!el) {
                     return;
                 }
-                const eventName = el.tagName === 'SELECT' || el.type === 'color' ? 'change' : 'input';
-                el.addEventListener(eventName, updateLivePreview);
+                const eventName = el.tagName === 'SELECT' || el.type === 'color' || el.type === 'checkbox' ? 'change' : 'input';
+                el.addEventListener(eventName, () => {
+                    if (id === 'gallery-display-mode') {
+                        updateModeDependentSettingsVisibility();
+                    }
+                    updateLivePreview();
+                    if (id === 'gallery-display-mode') {
+                        renderImageList();
+                    }
+                });
             });
     };
 
     const initializeUI = () => {
+        logDebug('initializeUI: init start', {
+            groupId: parseInt(window.GroupLoopBootstrap?.groupId || 0, 10),
+            bootstrapAvailable: !!window.GroupLoopBootstrap,
+            settingsAvailable: !!window.galleryModuleSettings
+        });
+
         const uploadArea = document.getElementById('gallery-upload-area');
         const fileInput = document.getElementById('gallery-file-input');
         const libraryRefreshBtn = document.getElementById('gallery-library-refresh');
@@ -517,6 +840,7 @@ const GroupLoopGalleryModule = (() => {
             });
         }
 
+        updateModeDependentSettingsVisibility();
         bindInputEvents();
         renderImageList();
         loadLibrary();

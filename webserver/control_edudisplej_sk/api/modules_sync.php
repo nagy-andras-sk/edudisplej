@@ -165,7 +165,220 @@ function edudisplej_resolve_active_time_block_id(mysqli $conn, int $group_id): a
     return ['has_blocks' => true, 'active_block_id' => null];
 }
 
-function edudisplej_optimize_module_settings_for_sync(string $module_key, $settings): array {
+function edudisplej_sync_hydrate_text_collection_settings(mysqli $conn, int $company_id, array $settings): array {
+    $source_type = strtolower(trim((string)($settings['textSourceType'] ?? 'manual')));
+    if ($source_type !== 'collection') {
+        return $settings;
+    }
+
+    $collection_id = (int)($settings['textCollectionId'] ?? 0);
+    if ($collection_id <= 0 || $company_id <= 0) {
+        return $settings;
+    }
+
+    static $collectionCache = [];
+    $cacheKey = $company_id . ':' . $collection_id;
+    if (!array_key_exists($cacheKey, $collectionCache)) {
+        $stmt = $conn->prepare("SELECT id, title, content_html, bg_color, bg_image_data, updated_at
+                                FROM text_collections
+                                WHERE id = ? AND company_id = ? AND is_active = 1
+                                LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('ii', $collection_id, $company_id);
+            $stmt->execute();
+            $collectionCache[$cacheKey] = $stmt->get_result()->fetch_assoc() ?: null;
+            $stmt->close();
+        } else {
+            $collectionCache[$cacheKey] = null;
+        }
+    }
+
+    $collection = $collectionCache[$cacheKey] ?? null;
+    if (!$collection) {
+        return $settings;
+    }
+
+    $settings['text'] = (string)($collection['content_html'] ?? $settings['text'] ?? '');
+    $settings['bgColor'] = (string)($collection['bg_color'] ?? $settings['bgColor'] ?? '#000000');
+    $settings['bgImageData'] = (string)($collection['bg_image_data'] ?? $settings['bgImageData'] ?? '');
+    $settings['textCollectionLabel'] = (string)($collection['title'] ?? $settings['textCollectionLabel'] ?? '');
+    $versionTs = strtotime((string)($collection['updated_at'] ?? ''));
+    if ($versionTs) {
+        $settings['textCollectionVersionTs'] = $versionTs * 1000;
+    }
+
+    return $settings;
+}
+
+function edudisplej_sync_prefetch_meal_menu_payload(mysqli $conn, int $company_id, array $settings): ?array {
+    $institution_id = (int)($settings['institutionId'] ?? 0);
+    if ($institution_id <= 0 || $company_id <= 0) {
+        return null;
+    }
+
+    $source_type = strtolower(trim((string)($settings['sourceType'] ?? 'server')));
+    if ($source_type !== 'manual') {
+        $source_type = 'server';
+    }
+
+    $date_value = date('Y-m-d');
+    $showBreakfast = !empty($settings['showBreakfast']);
+    $showSnackAm = !empty($settings['showSnackAm']);
+    $showLunch = !empty($settings['showLunch']);
+    $showSnackPm = !empty($settings['showSnackPm']);
+    $showDinner = !empty($settings['showDinner']);
+
+    $inst_stmt = $conn->prepare("SELECT institution_name
+                                FROM meal_plan_institutions
+                                WHERE id = ? AND (company_id = 0 OR company_id = ?)
+                                ORDER BY company_id DESC
+                                LIMIT 1");
+    if (!$inst_stmt) {
+        return null;
+    }
+    $inst_stmt->bind_param('ii', $institution_id, $company_id);
+    $inst_stmt->execute();
+    $inst = $inst_stmt->get_result()->fetch_assoc();
+    $inst_stmt->close();
+
+    if (!$inst) {
+        return null;
+    }
+
+    $source_effective = $source_type;
+    $menu_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                FROM meal_plan_items
+                                WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date = ?
+                                    AND (
+                                        ? = ''
+                                        OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                        OR source_type = ?
+                                    )
+                                ORDER BY company_id DESC
+                                LIMIT 1");
+    if (!$menu_stmt) {
+        return null;
+    }
+    $menu_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+    $menu_stmt->execute();
+    $menu = $menu_stmt->get_result()->fetch_assoc();
+    $menu_stmt->close();
+
+    if (!$menu && $source_type === 'manual') {
+        $source_effective = 'server';
+        $menu_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                    FROM meal_plan_items
+                                    WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date = ?
+                                        AND (
+                                            ? = ''
+                                            OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                            OR source_type = ?
+                                        )
+                                    ORDER BY company_id DESC
+                                    LIMIT 1");
+        if ($menu_stmt) {
+            $menu_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $menu_stmt->execute();
+            $menu = $menu_stmt->get_result()->fetch_assoc();
+            $menu_stmt->close();
+        }
+    }
+
+    if (!$menu) {
+        $fallback_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date <= ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY menu_date DESC, company_id DESC
+                                        LIMIT 1");
+        if ($fallback_stmt) {
+            $fallback_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $fallback_stmt->execute();
+            $menu = $fallback_stmt->get_result()->fetch_assoc();
+            $fallback_stmt->close();
+        }
+    }
+
+    if (!$menu && $source_type === 'manual' && $source_effective !== 'server') {
+        $source_effective = 'server';
+        $fallback_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date <= ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY menu_date DESC, company_id DESC
+                                        LIMIT 1");
+        if ($fallback_stmt) {
+            $fallback_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $fallback_stmt->execute();
+            $menu = $fallback_stmt->get_result()->fetch_assoc();
+            $fallback_stmt->close();
+        }
+    }
+
+    if (!$menu) {
+        $future_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date >= ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY menu_date ASC, company_id DESC
+                                        LIMIT 1");
+        if ($future_stmt) {
+            $future_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $future_stmt->execute();
+            $menu = $future_stmt->get_result()->fetch_assoc();
+            $future_stmt->close();
+        }
+    }
+
+    if (!$menu && $source_type === 'manual' && $source_effective !== 'server') {
+        $source_effective = 'server';
+        $future_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date >= ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY menu_date ASC, company_id DESC
+                                        LIMIT 1");
+        if ($future_stmt) {
+            $future_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
+            $future_stmt->execute();
+            $menu = $future_stmt->get_result()->fetch_assoc();
+            $future_stmt->close();
+        }
+    }
+
+    $meals = [];
+    if ($showBreakfast) { $meals[] = ['key' => 'breakfast', 'label' => 'Reggeli', 'text' => (string)($menu['breakfast'] ?? '')]; }
+    if ($showSnackAm) { $meals[] = ['key' => 'snack_am', 'label' => 'Tízórai', 'text' => (string)($menu['snack_am'] ?? '')]; }
+    if ($showLunch) { $meals[] = ['key' => 'lunch', 'label' => 'Ebéd', 'text' => (string)($menu['lunch'] ?? '')]; }
+    if ($showSnackPm) { $meals[] = ['key' => 'snack_pm', 'label' => 'Uzsonna', 'text' => (string)($menu['snack_pm'] ?? '')]; }
+    if ($showDinner) { $meals[] = ['key' => 'dinner', 'label' => 'Vacsora', 'text' => (string)($menu['dinner'] ?? '')]; }
+
+    return [
+        'institution_name' => (string)($inst['institution_name'] ?? ''),
+        'menu_date' => (string)($menu['menu_date'] ?? $date_value),
+        'meals' => $meals,
+        'source_type' => (string)($menu['source_type'] ?? ''),
+        'updated_at' => (string)($menu['updated_at'] ?? ''),
+    ];
+}
+
+function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company_id, string $module_key, $settings): array {
     $normalized = is_array($settings) ? $settings : [];
     $key = strtolower(trim($module_key));
     $requestToken = edudisplej_current_request_api_token();
@@ -214,6 +427,18 @@ function edudisplej_optimize_module_settings_for_sync(string $module_key, $setti
             $normalized['videoAssetUrl'] = edudisplej_module_asset_normalize_url_for_api($assetUrl, $requestToken);
         }
         return $normalized;
+    }
+
+    if ($key === 'text') {
+        return edudisplej_sync_hydrate_text_collection_settings($conn, $company_id, $normalized);
+    }
+
+    if ($key === 'meal-menu' || $key === 'meal_menu') {
+        $prefetched = edudisplej_sync_prefetch_meal_menu_payload($conn, $company_id, $normalized);
+        if ($prefetched) {
+            $normalized['offlinePrefetchedMenuData'] = $prefetched;
+            $normalized['offlinePrefetchedMenuSavedAt'] = date('c');
+        }
     }
 
     return $normalized;
@@ -471,7 +696,7 @@ try {
             if (!empty($row['settings'])) {
                 $settings = json_decode($row['settings'], true) ?? [];
             }
-            $settings = edudisplej_optimize_module_settings_for_sync((string)($row['module_key'] ?? ''), $settings);
+            $settings = edudisplej_optimize_module_settings_for_sync($conn, (int)($kiosk['company_id'] ?? 0), (string)($row['module_key'] ?? ''), $settings);
             $duration = (int)$row['duration_seconds'];
             if (($row['module_key'] ?? '') === 'unconfigured') {
                 $duration = 60;
@@ -519,7 +744,7 @@ try {
             if (!empty($row['settings'])) {
                 $settings = json_decode($row['settings'], true) ?? [];
             }
-            $settings = edudisplej_optimize_module_settings_for_sync((string)($row['module_key'] ?? ''), $settings);
+            $settings = edudisplej_optimize_module_settings_for_sync($conn, (int)($kiosk['company_id'] ?? 0), (string)($row['module_key'] ?? ''), $settings);
             $duration = (int)$row['duration_seconds'];
             if (($row['module_key'] ?? '') === 'unconfigured') {
                 $duration = 60;

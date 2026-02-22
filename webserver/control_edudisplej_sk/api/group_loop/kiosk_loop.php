@@ -6,8 +6,8 @@
  */
 $start_time = microtime(true);
 session_start();
-require_once '../../dbkonfiguracia.php';
-require_once '../../logging.php';
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../../logging.php';
 
 header('Content-Type: application/json');
 

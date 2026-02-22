@@ -99,13 +99,15 @@
             display: grid;
             grid-template-columns: 20% 60% 20%;
             gap: 10px;
-            align-items: start;
+            align-items: stretch;
         }
 
         .loop-workspace-col {
             border: 1px solid #cfd6dd;
             background: #fff;
             min-width: 0;
+            display: flex;
+            flex-direction: column;
         }
 
         .builder-top-layout > div {

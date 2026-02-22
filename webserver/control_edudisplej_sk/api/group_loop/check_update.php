@@ -5,8 +5,8 @@
  * Used for version checking before module download
  * No session required - uses device_id authentication
  */
-require_once '../../dbkonfiguracia.php';
-require_once '../auth.php';
+require_once __DIR__ . '/../../dbkonfiguracia.php';
+require_once __DIR__ . '/../auth.php';
 
 $api_company = validate_api_token();
 

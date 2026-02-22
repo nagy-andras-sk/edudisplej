@@ -45,6 +45,12 @@
         .digital-time {
             margin-bottom: 10px;
         }
+
+        .digital-weekday {
+            opacity: 0.95;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
         
         .digital-date {
             opacity: 0.8;
@@ -102,8 +108,14 @@
         }
         
         .analog-date {
-            margin-top: 20px;
+            margin-top: 8px;
             font-weight: 600;
+        }
+
+        .analog-weekday {
+            margin-top: 20px;
+            font-weight: 700;
+            opacity: 0.95;
         }
     </style>
 </head>
@@ -121,9 +133,9 @@
             timeColor: urlParams.get('timeColor') || '#ffffff',
             dateColor: urlParams.get('dateColor') || '#ffffff',
             bgColor: urlParams.get('bgColor') || '#000000',
-            fontSize: parseInt(urlParams.get('fontSize')) || 120,
-            timeFontSize: parseInt(urlParams.get('timeFontSize')) || parseInt(urlParams.get('fontSize')) || 120,
-            dateFontSize: parseInt(urlParams.get('dateFontSize')) || Math.max(16, Math.round((parseInt(urlParams.get('timeFontSize')) || parseInt(urlParams.get('fontSize')) || 120) * 0.3)),
+            fontSize: parseInt(urlParams.get('fontSize')) || 150,
+            timeFontSize: parseInt(urlParams.get('timeFontSize')) || parseInt(urlParams.get('fontSize')) || 150,
+            dateFontSize: parseInt(urlParams.get('dateFontSize')) || Math.max(18, Math.round((parseInt(urlParams.get('timeFontSize')) || parseInt(urlParams.get('fontSize')) || 150) * 0.32)),
             clockSize: parseInt(urlParams.get('clockSize')) || 300,
             showSeconds: urlParams.get('showSeconds') !== 'false',
             showDate: urlParams.get('showDate') !== 'false',
@@ -170,16 +182,19 @@
             en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
         };
         
-        function formatDate(date) {
+        function formatWeekday(date) {
+            return dayNames[settings.language][date.getDay()];
+        }
+
+        function formatDateValue(date) {
             const year = date.getFullYear();
             const month = date.getMonth();
             const day = date.getDate();
-            const dayName = dayNames[settings.language][date.getDay()];
             const monthName = monthNames[settings.language][month];
             
             switch(settings.dateFormat) {
                 case 'full':
-                    return `${year}. ${monthName} ${day}. - ${dayName}`;
+                    return `${year}. ${monthName} ${day}.`;
                 case 'short':
                     return `${year}. ${monthName} ${day}.`;
                 case 'dmy':
@@ -189,7 +204,7 @@
                 case 'none':
                     return '';
                 default:
-                    return `${year}. ${monthName} ${day}. - ${dayName}`;
+                    return `${year}. ${monthName} ${day}.`;
             }
         }
         
@@ -199,15 +214,19 @@
             container.innerHTML = `
                 <div class="digital-clock">
                     <div class="digital-time" id="digitalTime"></div>
+                    <div class="digital-weekday" id="digitalWeekday"></div>
                     <div class="digital-date" id="digitalDate"></div>
                 </div>
             `;
             
             const timeEl = document.getElementById('digitalTime');
+            const weekdayEl = document.getElementById('digitalWeekday');
             const dateEl = document.getElementById('digitalDate');
             
             timeEl.style.fontSize = (settings.timeFontSize || settings.fontSize) + 'px';
             timeEl.style.color = settings.timeColor;
+            weekdayEl.style.fontSize = Math.max(16, Math.round((settings.dateFontSize || Math.round((settings.timeFontSize || settings.fontSize) * 0.32)) * 1.05)) + 'px';
+            weekdayEl.style.color = settings.dateColor;
             dateEl.style.fontSize = (settings.dateFontSize || Math.round((settings.timeFontSize || settings.fontSize) * 0.3)) + 'px';
             dateEl.style.color = settings.dateColor;
             
@@ -227,7 +246,9 @@
                 }
                 
                 timeEl.textContent = timeString;
-                dateEl.textContent = formatDate(now);
+                weekdayEl.textContent = formatWeekday(now);
+                dateEl.textContent = formatDateValue(now);
+                weekdayEl.style.display = settings.showDate ? '' : 'none';
                 dateEl.style.display = (settings.showDate && settings.dateFormat !== 'none') ? '' : 'none';
             }
             
@@ -246,6 +267,7 @@
                     <div class="clock-hand minute-hand" id="minuteHand" style="height: ${size * 0.35}px; background: ${settings.timeColor};"></div>
                     ${settings.showSeconds ? `<div class="clock-hand second-hand" id="secondHand" style="height: ${size * 0.4}px; background: ${settings.dateColor};"></div>` : ''}
                 </div>
+                <div class="analog-weekday" id="analogWeekday" style="color: ${settings.timeColor}; font-size: ${Math.max(16, Math.round((settings.dateFontSize || size * 0.08) * 1.05))}px;"></div>
                 <div class="analog-date" id="analogDate" style="color: ${settings.timeColor}; font-size: ${settings.dateFontSize || size * 0.08}px;"></div>
             `;
             
@@ -289,6 +311,7 @@
                 clockEl.appendChild(number);
             }
             
+            const weekdayEl = document.getElementById('analogWeekday');
             const dateEl = document.getElementById('analogDate');
             
             function updateAnalogClock() {
@@ -307,7 +330,9 @@
                     document.getElementById('secondHand').style.transform = `rotate(${secondDeg}deg)`;
                 }
                 
-                dateEl.textContent = formatDate(now);
+                weekdayEl.textContent = formatWeekday(now);
+                dateEl.textContent = formatDateValue(now);
+                weekdayEl.style.display = settings.showDate ? '' : 'none';
                 dateEl.style.display = (settings.showDate && settings.dateFormat !== 'none') ? '' : 'none';
             }
             

@@ -366,7 +366,7 @@ json_get_string_from_content() {
     local query="$2"
 
     if command -v jq >/dev/null 2>&1; then
-        printf '%s' "$json_content" | jq -r "$query // empty" 2>/dev/null
+        printf '%s' "$json_content" | jq -r "$query // empty" 2>/dev/null || true
         return
     fi
 
@@ -418,7 +418,7 @@ get_service_version_from_structure() {
 
 list_structure_services() {
     local structure_content="$1"
-    json_get_string_from_content "$structure_content" '.service_versions | keys[]'
+    json_get_string_from_content "$structure_content" '.service_versions | keys[]' || true
 }
 
 run_full_reinstall_with_token() {
@@ -989,7 +989,9 @@ EOF
                 log "Skipping extra loop check in this cycle (refresh already completed)"
             else
                 log "Checking for loop configuration changes..."
-                check_loop_updates "$device_id"
+                if ! check_loop_updates "$device_id"; then
+                    log_error "Loop check failed (non-critical), continuing sync cycle"
+                fi
             fi
             
             # Get loop version for logging and DB update
