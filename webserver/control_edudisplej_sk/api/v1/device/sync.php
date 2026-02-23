@@ -113,6 +113,29 @@ function v1_enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_p
     $conn->query("DELETE FROM sync_logs WHERE id IN ($id_list)");
 }
 
+function v1_has_recent_control_panel_activity(mysqli $conn, int $company_id, int $window_seconds = 600): bool {
+    if ($company_id <= 0 || $window_seconds <= 0) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("SELECT id
+                            FROM users
+                            WHERE company_id = ?
+                              AND last_activity_at IS NOT NULL
+                              AND last_activity_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+                            LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("ii", $company_id, $window_seconds);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return !empty($row);
+}
+
 $api_company = validate_api_token();
 
 // Read raw body once
@@ -435,14 +458,21 @@ try {
     // Fallback: honour legacy boolean flag if TTL not set
     $screenshot_requested = $screenshot_ttl_active || (bool)$kiosk['screenshot_requested'];
 
+    $activity_window_seconds = 10 * 60;
+    $fast_interval_seconds = 30;
+    $default_interval_seconds = 5 * 60;
+    $company_id_for_activity = (int)($kiosk['company_id'] ?? 0);
+    $has_recent_activity = v1_has_recent_control_panel_activity($conn, $company_id_for_activity, $activity_window_seconds);
+    $effective_interval = $has_recent_activity ? $fast_interval_seconds : $default_interval_seconds;
+
     $response['success']                   = true;
     $response['kiosk_id']                  = $kiosk_id;
     $response['device_id']                 = $kiosk['device_id'];
-    $response['sync_interval']             = $kiosk['sync_interval'];
+    $response['sync_interval']             = $effective_interval;
     $response['screenshot_requested']      = $screenshot_requested;
     $response['screenshot_enabled']        = (bool)$kiosk['screenshot_enabled'];
     $response['debug_mode']                = (bool)$kiosk['debug_mode'];
-    $response['screenshot_interval_seconds'] = (int)$kiosk['screenshot_interval_seconds'];
+    $response['screenshot_interval_seconds'] = $effective_interval;
     $response['company_id']                = $kiosk['company_id'];
     $response['company_name']              = $kiosk['company_name'] ?? '';
     $response['needs_update']              = $need_update;

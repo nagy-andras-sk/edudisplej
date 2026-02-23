@@ -15,6 +15,7 @@ CONFIG_JSON="${CONFIG_DIR}/data/config.json"
 LOOP_FILE="${MODULES_DIR}/loop.json"
 LOOP_PLAYER="${LOCAL_WEB_DIR}/loop_player.html"
 TOKEN_FILE="${CONFIG_DIR}/lic/token"
+ASSETS_DIR="${LOCAL_WEB_DIR}/assets"
 
 # Logging - all output to stderr to avoid interfering with function return values
 log() {
@@ -192,11 +193,10 @@ EOF
 # Save loop configuration
 save_loop_config() {
     local loop_response="$1"
-    
+
     log "Saving loop configuration..."
-    
+
     if command -v jq >/dev/null 2>&1; then
-        # Parse loop data and add metadata
         local loop_data=$(echo "$loop_response" | jq '.loop_config // []')
         local offline_plan=$(echo "$loop_response" | jq '.offline_plan // null')
         local loop_last_update=$(echo "$loop_response" | jq -r '.loop_last_update // empty')
@@ -213,8 +213,7 @@ save_loop_config() {
         if [ -n "$active_time_block_id" ] && [ "$active_time_block_id" != "null" ]; then
             active_time_block_json="$active_time_block_id"
         fi
-        
-        # Create loop config with timestamp
+
         cat > "$LOOP_FILE" <<EOF
 {
     "last_update": "$loop_last_update",
@@ -225,25 +224,23 @@ save_loop_config() {
     "offline_plan": $offline_plan
 }
 EOF
-        
+
         log_success "Loop configuration saved to $LOOP_FILE"
         log "  Last update: $loop_last_update"
-        
-        # Store download info locally
+
         cat > "${MODULES_DIR}/.download_info.json" <<EOF
 {
     "last_download": "$(date '+%Y-%m-%d %H:%M:%S')",
     "loop_last_update": "$loop_last_update"
 }
 EOF
-        
-        # Pretty print loop info
+
         local modules_count=$(echo "$loop_data" | jq -r 'length')
         local base_count=$(echo "$offline_plan" | jq -r '.base_loop | length')
         local blocks_count=$(echo "$offline_plan" | jq -r '.time_blocks | length')
         log "Active loop contains $modules_count modules"
         log "Offline plan: base=$base_count modules, blocks=$blocks_count"
-        
+
         local i=0
         while [ $i -lt $modules_count ]; do
             local mod_name=$(echo "$loop_data" | jq -r ".[$i].module_name")
@@ -251,12 +248,396 @@ EOF
             log "  $((i+1)). $mod_name (${duration}s)"
             i=$((i + 1))
         done
-        
+
         return 0
     else
         log_error "jq is required for JSON parsing"
         return 1
     fi
+}
+
+enrich_loop_runtime_metadata() {
+    if [ ! -f "$LOOP_FILE" ]; then
+        log_error "Loop file not found for metadata enrichment: $LOOP_FILE"
+        return 1
+    fi
+
+    python3 - "$LOOP_FILE" "$MODULES_DIR" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+loop_file = Path(sys.argv[1])
+modules_dir = Path(sys.argv[2])
+
+try:
+    data = json.loads(loop_file.read_text(encoding='utf-8', errors='ignore'))
+except Exception as exc:
+    print(f"Failed to parse loop file: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+stats = {
+    'patched': 0,
+    'removed': 0,
+}
+
+prefetch_loop_assets_and_meal_json() {
+    if [ ! -f "$LOOP_FILE" ]; then
+        log_error "Loop file not found for asset prefetch: $LOOP_FILE"
+        return 1
+    fi
+
+    mkdir -p "$ASSETS_DIR"
+
+    local token
+    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+
+    python3 - "$LOOP_FILE" "$ASSETS_DIR" "$MODULES_DIR" "$token" <<'PY'
+import hashlib
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+loop_file = Path(sys.argv[1])
+assets_dir = Path(sys.argv[2])
+modules_dir = Path(sys.argv[3])
+token = sys.argv[4]
+
+assets_dir.mkdir(parents=True, exist_ok=True)
+
+try:
+    data = json.loads(loop_file.read_text(encoding='utf-8', errors='ignore'))
+except Exception as exc:
+    print(f"Failed to parse loop file: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+stats = {
+    'assets_scanned': 0,
+    'assets_downloaded': 0,
+    'assets_reused': 0,
+    'assets_failed': 0,
+    'meal_json_written': 0,
+    'settings_patched': 0,
+}
+
+URL_RE = re.compile(r'^https?://', re.IGNORECASE)
+ALLOWED_KEYWORDS = (
+    '/uploads/',
+    '/module_asset',
+    '/module-assets',
+    '/api/module_asset',
+    '/api/module-assets',
+)
+
+
+def iter_all_entries(obj):
+    if not isinstance(obj, dict):
+        return
+    for item in obj.get('loop') or []:
+        if isinstance(item, dict):
+            yield item
+    offline = obj.get('offline_plan') or {}
+    for item in offline.get('base_loop') or []:
+        if isinstance(item, dict):
+            yield item
+    for block in offline.get('time_blocks') or []:
+        if not isinstance(block, dict):
+            continue
+        for item in block.get('loops') or []:
+            if isinstance(item, dict):
+                yield item
+
+
+def sanitize_ext_from_url(url: str) -> str:
+    try:
+        path = urlparse(url).path or ''
+    except Exception:
+        path = ''
+    ext = Path(path).suffix.lower().strip()
+    if ext and 1 < len(ext) <= 10 and re.match(r'^\.[a-z0-9]+$', ext):
+        return ext
+    return '.bin'
+
+
+def should_cache_url(url: str) -> bool:
+    if not url or not URL_RE.search(url):
+        return False
+    lower = url.lower()
+    return any(keyword in lower for keyword in ALLOWED_KEYWORDS)
+
+
+def local_asset_path_for(url: str) -> Path:
+    digest = hashlib.sha1(url.encode('utf-8')).hexdigest()
+    ext = sanitize_ext_from_url(url)
+    return assets_dir / f"{digest}{ext}"
+
+
+def download_to_file(url: str, target: Path) -> bool:
+    if target.is_file() and target.stat().st_size > 0:
+        stats['assets_reused'] += 1
+        return True
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        'curl', '-sS', '--fail', '--location', '--connect-timeout', '10', '--max-time', '90',
+        '-H', f'Authorization: Bearer {token}',
+        '-o', str(target),
+        url,
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+    except Exception:
+        stats['assets_failed'] += 1
+        return False
+
+    if proc.returncode != 0:
+        try:
+            target.unlink(missing_ok=True)
+        except Exception:
+            pass
+        stats['assets_failed'] += 1
+        return False
+
+    if not target.is_file() or target.stat().st_size <= 0:
+        try:
+            target.unlink(missing_ok=True)
+        except Exception:
+            pass
+        stats['assets_failed'] += 1
+        return False
+
+    stats['assets_downloaded'] += 1
+    return True
+
+
+def rewrite_url_to_local(url: str, local_file: Path) -> str:
+    return 'file://' + local_file.as_posix()
+
+
+def maybe_patch_url(value):
+    if not isinstance(value, str):
+        return value, False
+    candidate = value.strip()
+    if not should_cache_url(candidate):
+        return value, False
+    stats['assets_scanned'] += 1
+    local_target = local_asset_path_for(candidate)
+    if not download_to_file(candidate, local_target):
+        return value, False
+    return rewrite_url_to_local(candidate, local_target), True
+
+
+def patch_settings_assets(settings):
+    if not isinstance(settings, dict):
+        return settings
+
+    for key, value in list(settings.items()):
+        if isinstance(value, str):
+            patched, changed = maybe_patch_url(value)
+            if changed:
+                settings[key] = patched
+                stats['settings_patched'] += 1
+                continue
+
+            key_lower = key.lower()
+            if key_lower.endswith('json') and ('url' in key_lower or 'image' in key_lower or 'asset' in key_lower):
+                try:
+                    parsed = json.loads(value)
+                except Exception:
+                    parsed = None
+                if isinstance(parsed, list):
+                    out = []
+                    list_changed = False
+                    for entry in parsed:
+                        if isinstance(entry, str):
+                            p, ch = maybe_patch_url(entry)
+                            out.append(p)
+                            list_changed = list_changed or ch
+                        else:
+                            out.append(entry)
+                    if list_changed:
+                        settings[key] = json.dumps(out, ensure_ascii=False)
+                        stats['settings_patched'] += 1
+
+        elif isinstance(value, list):
+            changed = False
+            out = []
+            for entry in value:
+                if isinstance(entry, str):
+                    p, ch = maybe_patch_url(entry)
+                    out.append(p)
+                    changed = changed or ch
+                else:
+                    out.append(entry)
+            if changed:
+                settings[key] = out
+                stats['settings_patched'] += 1
+
+    return settings
+
+
+def normalize_meal_payload(payload, fallback_date: str):
+    if not isinstance(payload, dict):
+        return None
+    meals = payload.get('meals') if isinstance(payload.get('meals'), list) else []
+    normalized = {
+        'institution_name': str(payload.get('institution_name') or ''),
+        'menu_date': str(payload.get('menu_date') or fallback_date),
+        'meals': meals,
+        'source_type': str(payload.get('source_type') or ''),
+        'updated_at': str(payload.get('updated_at') or ''),
+    }
+    return normalized
+
+
+def write_meal_json_files(entry):
+    module_key = str(entry.get('module_key') or '').strip().lower()
+    if module_key not in ('meal-menu', 'meal_menu'):
+        return
+
+    settings = entry.get('settings') if isinstance(entry.get('settings'), dict) else {}
+    prefetched = settings.get('offlinePrefetchedMenuData')
+    if not isinstance(prefetched, dict):
+        return
+
+    module_folder = str(entry.get('module_folder') or '').strip() or module_key
+    target_dir = modules_dir / module_folder / 'offline'
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    fallback_today = str(prefetched.get('menu_date') or '')
+    today_payload = None
+    tomorrow_payload = None
+
+    if isinstance(prefetched.get('today'), dict) or isinstance(prefetched.get('tomorrow'), dict):
+        today_payload = normalize_meal_payload(prefetched.get('today'), fallback_today)
+        tomorrow_payload = normalize_meal_payload(prefetched.get('tomorrow'), '')
+    else:
+        today_payload = normalize_meal_payload(prefetched, fallback_today)
+
+    if today_payload is not None:
+        today_file = target_dir / 'mai.json'
+        today_file.write_text(json.dumps(today_payload, ensure_ascii=False, indent=2), encoding='utf-8')
+        stats['meal_json_written'] += 1
+        settings['offlinePrefetchedTodayFile'] = 'offline/mai.json'
+
+    if tomorrow_payload is not None:
+        tomorrow_file = target_dir / 'holnapi.json'
+        tomorrow_file.write_text(json.dumps(tomorrow_payload, ensure_ascii=False, indent=2), encoding='utf-8')
+        stats['meal_json_written'] += 1
+        settings['offlinePrefetchedTomorrowFile'] = 'offline/holnapi.json'
+
+    entry['settings'] = settings
+
+
+for item in iter_all_entries(data):
+    settings = item.get('settings') if isinstance(item.get('settings'), dict) else {}
+    settings = patch_settings_assets(settings)
+    item['settings'] = settings
+    write_meal_json_files(item)
+
+loop_file.write_text(json.dumps(data, ensure_ascii=False, indent=4), encoding='utf-8')
+print(json.dumps(stats, ensure_ascii=False))
+PY
+
+    log_success "Loop asset prefetch + meal JSON cache completed"
+    return 0
+}
+
+def detect_main_file(module_key: str) -> str:
+    key = (module_key or '').strip()
+    if not key:
+        return ''
+
+    module_path = modules_dir / key
+    if not module_path.exists() or not module_path.is_dir():
+        return ''
+
+    for candidate in ('live.html', 'index.html'):
+        if (module_path / candidate).is_file():
+            return candidate
+
+    m_prefixed = sorted([p.name for p in module_path.glob('m_*.html') if p.is_file()])
+    if m_prefixed:
+        return m_prefixed[0]
+
+    any_html = sorted([p.name for p in module_path.glob('*.html') if p.is_file()])
+    if any_html:
+        return any_html[0]
+
+    return ''
+
+def normalize_entry(entry):
+    if not isinstance(entry, dict):
+        return None
+
+    module_key = str(entry.get('module_key') or '').strip()
+    if not module_key:
+        return None
+
+    module_folder = str(entry.get('module_folder') or '').strip()
+    if not module_folder:
+        module_folder = module_key
+        entry['module_folder'] = module_folder
+        stats['patched'] += 1
+
+    module_main_file = str(entry.get('module_main_file') or '').strip()
+    if not module_main_file:
+        module_main_file = detect_main_file(module_key)
+        if module_main_file:
+            entry['module_main_file'] = module_main_file
+            stats['patched'] += 1
+
+    if not module_main_file:
+        return None
+
+    local_path = modules_dir / module_folder / module_main_file
+    if not local_path.is_file():
+        detected = detect_main_file(module_key)
+        if detected:
+            entry['module_folder'] = module_key
+            entry['module_main_file'] = detected
+            stats['patched'] += 1
+            local_path = modules_dir / module_key / detected
+
+    if not local_path.is_file():
+        return None
+
+    return entry
+
+def normalize_list(entries):
+    normalized = []
+    for item in entries or []:
+        patched = normalize_entry(item)
+        if patched is None:
+            stats['removed'] += 1
+            continue
+        normalized.append(patched)
+    return normalized
+
+data['loop'] = normalize_list(data.get('loop') or [])
+
+offline_plan = data.get('offline_plan') or {}
+offline_plan['base_loop'] = normalize_list(offline_plan.get('base_loop') or [])
+
+time_blocks = offline_plan.get('time_blocks') or []
+for block in time_blocks:
+    block['loops'] = normalize_list(block.get('loops') or [])
+
+offline_plan['time_blocks'] = time_blocks
+data['offline_plan'] = offline_plan
+
+if not data.get('loop') and offline_plan.get('base_loop'):
+    data['loop'] = offline_plan['base_loop']
+
+loop_file.write_text(json.dumps(data, ensure_ascii=False, indent=4), encoding='utf-8')
+print(f"patched={stats['patched']} removed={stats['removed']}")
+PY
+
+    log_success "Loop runtime metadata enriched"
+    return 0
 }
 
 # Create unconfigured page
@@ -801,11 +1182,15 @@ $loop_json
                 if (moduleRenderer) {
                     modulePath = moduleRenderer.replace(/^\/+/, '');
                 } else {
-                    if (!moduleFolder || !moduleMainFile) {
-                        this.log('Missing module runtime metadata for ' + (module.module_name || moduleKey));
+                    if (moduleFolder && moduleMainFile) {
+                        modulePath = 'modules/' + moduleFolder + '/' + moduleMainFile;
+                    } else if (moduleKey) {
+                        this.log('Missing module runtime metadata for ' + (module.module_name || moduleKey) + ', applying legacy fallback');
+                        modulePath = 'modules/' + moduleKey + '/live.html';
+                    } else {
+                        this.log('Missing module runtime metadata for ' + (module.module_name || 'unknown module'));
                         return 'unconfigured.html?reason=missing_module_runtime';
                     }
-                    modulePath = 'modules/' + moduleFolder + '/' + moduleMainFile;
                 }
                 
                 // Build URL with parameters
@@ -979,14 +1364,47 @@ main() {
         | @tsv
     ')
 
+    local total_modules=0
+    local failed_modules=()
+
     while IFS=$'\t' read -r module module_dir_key; do
         [ -z "${module:-}" ] && continue
         [ -z "${module_dir_key:-}" ] && module_dir_key="$module"
+        total_modules=$((total_modules + 1))
 
-        download_module "$device_id" "$module" "$module_dir_key" || {
-            log_error "Failed to download module: $module"
-        }
+        local attempt=1
+        local downloaded=false
+        while [ $attempt -le 3 ]; do
+            if download_module "$device_id" "$module" "$module_dir_key"; then
+                downloaded=true
+                break
+            fi
+            log_error "Download attempt ${attempt}/3 failed for module: $module"
+            attempt=$((attempt + 1))
+            [ $attempt -le 3 ] && sleep 2
+        done
+
+        if [ "$downloaded" != true ]; then
+            log_error "Failed to download module after retries: $module"
+            failed_modules+=("$module")
+        fi
     done <<< "$module_entries"
+
+    if [ $total_modules -eq 0 ]; then
+        log_error "No modules resolved from loop payload; cannot continue"
+        exit 1
+    fi
+
+    if [ ${#failed_modules[@]} -gt 0 ]; then
+        log_error "Required modules failed to download: ${failed_modules[*]}"
+        exit 1
+    fi
+
+    # Download and localize external assets referenced by module settings
+    prefetch_loop_assets_and_meal_json || log_error "Asset prefetch / meal JSON cache failed"
+
+    # Enrich loop entries with runtime metadata detected from downloaded files
+    enrich_loop_runtime_metadata || log_error "Loop runtime metadata enrichment failed"
     
     # Create unconfigured page and loop player
     create_unconfigured_page

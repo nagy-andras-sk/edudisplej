@@ -23,6 +23,8 @@ CONFIG_FILE="${DATA_DIR}/config.json"
 TOKEN_FILE="${CONFIG_DIR}/lic/token"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/command_executor.log"
+LOOP_FILE="${CONFIG_DIR}/localweb/modules/loop.json"
+LOCAL_POWER_STATE_FILE="${DATA_DIR}/local_display_power_state"
 COMMAND_TIMEOUT=300  # 5 minutes timeout per command
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"
 
@@ -185,6 +187,58 @@ execute_command() {
                 log_error "$error"
             fi
             ;;
+
+        display_power_off)
+            log "Executing display power OFF sequence..."
+            local off_errors=0
+
+            sudo systemctl stop edudisplej-kiosk.service 2>/dev/null || off_errors=$((off_errors + 1))
+            sudo systemctl stop edudisplej-content.service 2>/dev/null || true
+
+            if command -v vcgencmd >/dev/null 2>&1; then
+                vcgencmd display_power 0 >/dev/null 2>&1 || off_errors=$((off_errors + 1))
+            elif [ -x /opt/vc/bin/tvservice ]; then
+                /opt/vc/bin/tvservice -o >/dev/null 2>&1 || off_errors=$((off_errors + 1))
+            else
+                off_errors=$((off_errors + 1))
+            fi
+
+            if [ "$off_errors" -eq 0 ]; then
+                output="Display power OFF applied (service stopped + HDMI off)"
+                log_success "$output"
+            else
+                output="Display power OFF attempted with partial issues"
+                status="failed"
+                error="One or more OFF operations failed"
+                log_error "$error"
+            fi
+            ;;
+
+        display_power_on)
+            log "Executing display power ON sequence..."
+            local on_errors=0
+
+            if command -v vcgencmd >/dev/null 2>&1; then
+                vcgencmd display_power 1 >/dev/null 2>&1 || on_errors=$((on_errors + 1))
+            elif [ -x /opt/vc/bin/tvservice ]; then
+                /opt/vc/bin/tvservice -p >/dev/null 2>&1 || on_errors=$((on_errors + 1))
+            else
+                on_errors=$((on_errors + 1))
+            fi
+
+            sudo systemctl start edudisplej-kiosk.service 2>/dev/null || on_errors=$((on_errors + 1))
+            sudo systemctl start edudisplej-content.service 2>/dev/null || true
+
+            if [ "$on_errors" -eq 0 ]; then
+                output="Display power ON applied (service started + HDMI on)"
+                log_success "$output"
+            else
+                output="Display power ON attempted with partial issues"
+                status="failed"
+                error="One or more ON operations failed"
+                log_error "$error"
+            fi
+            ;;
         
         custom)
             log "Executing custom command..."
@@ -233,6 +287,167 @@ report_command_result() {
     "status": "$status",
     "output": $(echo -n "$output" | jq -Rs .),
     "error": $(echo -n "$error" | jq -Rs .)
+}
+
+resolve_local_schedule_mode() {
+    if [ ! -f "$LOOP_FILE" ]; then
+        echo "UNKNOWN"
+        return 0
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        log_error "python3 not available - local schedule enforcement skipped"
+        echo "UNKNOWN"
+        return 0
+    fi
+
+    python3 - "$LOOP_FILE" <<'PY'
+import json
+import sys
+from datetime import datetime
+
+loop_file = sys.argv[1]
+
+try:
+    with open(loop_file, 'r', encoding='utf-8', errors='ignore') as fh:
+        data = json.load(fh)
+except Exception:
+    print('UNKNOWN')
+    raise SystemExit(0)
+
+def parse_time_to_seconds(value):
+    text = str(value or '00:00:00')
+    parts = text.split(':')
+    try:
+        h = int(parts[0]) if len(parts) > 0 else 0
+        m = int(parts[1]) if len(parts) > 1 else 0
+        s = int(parts[2]) if len(parts) > 2 else 0
+    except Exception:
+        return 0
+    return (h * 3600) + (m * 60) + s
+
+def is_block_active(block, now):
+    if not isinstance(block, dict):
+        return False
+    if int(block.get('is_active', 1) or 1) == 0:
+        return False
+
+    block_type = 'date' if str(block.get('block_type', 'weekly')).lower() == 'date' else 'weekly'
+    date_key = now.strftime('%Y-%m-%d')
+
+    if block_type == 'date':
+        if str(block.get('specific_date') or '') != date_key:
+            return False
+    else:
+        day = now.isoweekday()
+        allowed = set()
+        for raw in str(block.get('days_mask', '')).split(','):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                val = int(raw)
+            except Exception:
+                continue
+            if 1 <= val <= 7:
+                allowed.add(val)
+        if allowed and day not in allowed:
+            return False
+
+    now_seconds = now.hour * 3600 + now.minute * 60 + now.second
+    start_seconds = parse_time_to_seconds(block.get('start_time', '00:00:00'))
+    end_seconds = parse_time_to_seconds(block.get('end_time', '00:00:00'))
+
+    if start_seconds <= end_seconds:
+        return start_seconds <= now_seconds <= end_seconds
+    return now_seconds >= start_seconds or now_seconds <= end_seconds
+
+def block_sort_key(block):
+    block_type_weight = 2 if str(block.get('block_type', 'weekly')).lower() == 'date' else 1
+    priority = int(block.get('priority', 100) or 100)
+    display_order = int(block.get('display_order', 0) or 0)
+    block_id = int(block.get('id', 0) or 0)
+    return (-block_type_weight, -priority, display_order, block_id)
+
+def normalize_loop_items(items):
+    return [item for item in (items or []) if isinstance(item, dict)]
+
+plan = data.get('offline_plan') if isinstance(data.get('offline_plan'), dict) else {}
+base_loop = normalize_loop_items(plan.get('base_loop') if isinstance(plan, dict) else None)
+if not base_loop:
+    base_loop = normalize_loop_items(data.get('loop'))
+
+time_blocks = [b for b in (plan.get('time_blocks') if isinstance(plan, dict) else []) if isinstance(b, dict)]
+now = datetime.now()
+active_blocks = [b for b in time_blocks if is_block_active(b, now)]
+
+if active_blocks:
+    active_blocks.sort(key=block_sort_key)
+    winner = active_blocks[0]
+    winner_loop = normalize_loop_items(winner.get('loops'))
+    active_loop = winner_loop if winner_loop else base_loop
+else:
+    active_loop = base_loop
+
+if not active_loop:
+    print('ACTIVE')
+    raise SystemExit(0)
+
+has_turned_off = False
+for item in active_loop:
+    key = str(item.get('module_key') or '').strip().lower()
+    if key == 'turned-off':
+        has_turned_off = True
+        continue
+    if key:
+        print('ACTIVE')
+        raise SystemExit(0)
+
+print('TURNED_OFF' if has_turned_off else 'ACTIVE')
+PY
+}
+
+apply_local_schedule_mode() {
+    local mode="$1"
+    [ -z "$mode" ] && return 0
+    [ "$mode" = "UNKNOWN" ] && return 0
+
+    local previous_mode=""
+    if [ -f "$LOCAL_POWER_STATE_FILE" ]; then
+        previous_mode=$(cat "$LOCAL_POWER_STATE_FILE" 2>/dev/null | tr -d '\n\r')
+    fi
+
+    if [ "$mode" = "$previous_mode" ]; then
+        return 0
+    fi
+
+    if [ "$mode" = "TURNED_OFF" ]; then
+        log "Local schedule mode switch: ACTIVE -> TURNED_OFF"
+        sudo systemctl stop edudisplej-kiosk.service 2>/dev/null || true
+        sudo systemctl stop edudisplej-content.service 2>/dev/null || true
+        if command -v vcgencmd >/dev/null 2>&1; then
+            vcgencmd display_power 0 >/dev/null 2>&1 || true
+        elif [ -x /opt/vc/bin/tvservice ]; then
+            /opt/vc/bin/tvservice -o >/dev/null 2>&1 || true
+        fi
+    else
+        log "Local schedule mode switch: TURNED_OFF -> ACTIVE"
+        if command -v vcgencmd >/dev/null 2>&1; then
+            vcgencmd display_power 1 >/dev/null 2>&1 || true
+        elif [ -x /opt/vc/bin/tvservice ]; then
+            /opt/vc/bin/tvservice -p >/dev/null 2>&1 || true
+        fi
+        sudo systemctl start edudisplej-kiosk.service 2>/dev/null || true
+        sudo systemctl start edudisplej-content.service 2>/dev/null || true
+    fi
+
+    echo "$mode" > "$LOCAL_POWER_STATE_FILE"
+}
+
+enforce_local_schedule_power_state() {
+    local mode
+    mode=$(resolve_local_schedule_mode)
+    apply_local_schedule_mode "$mode"
 }
 EOF
 )
@@ -323,6 +538,8 @@ trap 'log "Command Executor Service stopped"; exit 0' SIGTERM SIGINT
 
 # Main loop - check for commands every 30 seconds
 while true; do
+    enforce_local_schedule_power_state
     main
+    enforce_local_schedule_power_state
     sleep 30
 done

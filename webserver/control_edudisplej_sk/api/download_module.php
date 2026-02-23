@@ -57,7 +57,8 @@ try {
     }
     
     // Check if module is authorized for this kiosk
-    // Either through group assignment or direct kiosk assignment
+    // Either through group assignment, direct kiosk assignment,
+    // or group planner loop styles (kiosk_group_loop_plans.plan_json)
     $authorized = false;
     
     // Check group modules (use module_key instead of name)
@@ -92,6 +93,40 @@ try {
             $authorized = true;
         }
         $stmt->close();
+    }
+
+    // Check group planner loop styles (JSON plan) for module_key
+    if (!$authorized && !empty($group_id)) {
+        $plan_stmt = $conn->prepare("SELECT plan_json FROM kiosk_group_loop_plans WHERE group_id = ? LIMIT 1");
+        if ($plan_stmt) {
+            $plan_stmt->bind_param("i", $group_id);
+            $plan_stmt->execute();
+            $plan_row = $plan_stmt->get_result()->fetch_assoc();
+            $plan_stmt->close();
+
+            if (!empty($plan_row['plan_json'])) {
+                $decoded_plan = json_decode((string)$plan_row['plan_json'], true);
+                if (is_array($decoded_plan)) {
+                    $loop_styles = is_array($decoded_plan['loop_styles'] ?? null) ? $decoded_plan['loop_styles'] : [];
+                    foreach ($loop_styles as $style) {
+                        if (!is_array($style)) {
+                            continue;
+                        }
+                        $items = is_array($style['items'] ?? null) ? $style['items'] : [];
+                        foreach ($items as $item) {
+                            if (!is_array($item)) {
+                                continue;
+                            }
+                            $item_key = (string)($item['module_key'] ?? '');
+                            if ($item_key !== '' && strcasecmp($item_key, $module_name) === 0) {
+                                $authorized = true;
+                                break 2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     closeDbConnection($conn);

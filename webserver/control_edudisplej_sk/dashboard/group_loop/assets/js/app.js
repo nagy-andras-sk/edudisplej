@@ -12,6 +12,7 @@
         const isDefaultGroup = !!groupLoopBootstrap.isDefaultGroup;
         const isContentOnlyMode = !!groupLoopBootstrap.isContentOnlyMode;
         const technicalModule = groupLoopBootstrap.technicalModule || null;
+        const turnedOffLoopAction = groupLoopBootstrap.turnedOffLoopAction || null;
         const modulesCatalog = Array.isArray(groupLoopBootstrap.modulesCatalog) ? groupLoopBootstrap.modulesCatalog : [];
 
         function getDefaultUnconfiguredItem() {
@@ -859,6 +860,58 @@
                         listInner.appendChild(row);
                     }
                 });
+
+                if (listInner && !isDefaultGroup && !isContentOnlyMode && turnedOffLoopAction) {
+                    const actionRow = document.createElement('div');
+                    actionRow.className = 'loop-schedule-row';
+
+                    const left = document.createElement('div');
+                    const name = document.createElement('div');
+                    name.className = 'loop-schedule-row-name';
+                    name.textContent = '⏻ Kikapcsolási esemény';
+                    const meta = document.createElement('div');
+                    meta.className = 'loop-schedule-row-meta';
+                    meta.textContent = 'Ütemezhető kijelző kikapcsolás: service leállítás + HDMI off';
+                    left.appendChild(name);
+                    left.appendChild(meta);
+
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'btn';
+                    button.textContent = 'Loophoz adás';
+                    button.addEventListener('click', () => {
+                        let targetStyleId = parseInt(fixedStyleInput?.value || activeLoopStyleId || 0, 10);
+                        const isDefaultTarget = targetStyleId === parseInt(defaultLoopStyleId || 0, 10);
+                        const targetExists = schedulableStyles.some((style) => parseInt(style.id, 10) === targetStyleId);
+
+                        if (!targetExists || isDefaultTarget) {
+                            targetStyleId = parseInt(schedulableStyles[0]?.id || 0, 10);
+                        }
+
+                        if (!targetStyleId) {
+                            showAutosaveToast('⚠️ Előbb hozz létre egy ütemezhető loopot', true);
+                            scrollToLoopBuilderAndCreate();
+                            return;
+                        }
+
+                        if (fixedStyleInput) {
+                            fixedStyleInput.value = String(targetStyleId);
+                        }
+
+                        const targetStyle = getLoopStyleById(targetStyleId);
+                        if (fixedStyleLabel && targetStyle) {
+                            fixedStyleLabel.textContent = `Kiválasztott loop: ${targetStyle.name}`;
+                        }
+
+                        openLoopStyleDetail(targetStyleId);
+                        addTurnedOffLoopItem();
+                        renderLoopStyleSelector();
+                    });
+
+                    actionRow.appendChild(left);
+                    actionRow.appendChild(button);
+                    listInner.appendChild(actionRow);
+                }
             }
 
             if (fixedStyleInput) {
@@ -2580,7 +2633,7 @@
 
         function buildLoopItemForModule(moduleId, moduleName, moduleDesc, moduleKey) {
             const normalizedKey = String(moduleKey || '').toLowerCase();
-            const defaultDuration = normalizedKey === 'unconfigured' || normalizedKey === 'meal-menu' ? 60 : 10;
+            const defaultDuration = normalizedKey === 'unconfigured' || normalizedKey === 'meal-menu' || normalizedKey === 'turned-off' ? 60 : 10;
             return {
                 module_id: moduleId,
                 module_name: moduleName,
@@ -2589,6 +2642,42 @@
                 duration_seconds: defaultDuration,
                 settings: getDefaultSettings(moduleKey || '')
             };
+        }
+
+        function getTurnedOffLoopTemplate() {
+            const fallbackId = parseInt(technicalModule?.id || 0, 10);
+            const actionId = parseInt(turnedOffLoopAction?.id || 0, 10);
+            const moduleId = actionId > 0 ? actionId : (fallbackId > 0 ? fallbackId : 0);
+            if (moduleId <= 0) {
+                return null;
+            }
+
+            return buildLoopItemForModule(
+                moduleId,
+                String(turnedOffLoopAction?.name || 'Turned Off'),
+                String(turnedOffLoopAction?.description || 'Kijelző kikapcsolása: tartalomszolgáltatás leáll, HDMI kimenet kikapcsol.'),
+                'turned-off'
+            );
+        }
+
+        function addTurnedOffLoopItem() {
+            if (isLoopEditingBlocked()) {
+                return;
+            }
+
+            if (!ensureActiveLoopStyleSelected()) {
+                return;
+            }
+
+            const turnedOffItem = getTurnedOffLoopTemplate();
+            if (!turnedOffItem) {
+                showAutosaveToast('⚠️ A turned-off loop elem most nem elérhető', true);
+                return;
+            }
+
+            loopItems = [turnedOffItem];
+            normalizeRenderAndAutosaveLoop();
+            showAutosaveToast('✓ Kikapcsolás loop beállítva');
         }
 
         function parseModuleCatalogPayload(rawPayload) {
@@ -2695,6 +2784,15 @@
             }
 
             const moduleKey = getModuleKeyById(moduleId);
+
+            if (moduleKey === 'turned-off') {
+                const turnedOffItem = buildLoopItemForModule(moduleId, moduleName, moduleDesc, moduleKey);
+                loopItems = [turnedOffItem];
+                normalizeRenderAndAutosaveLoop();
+                return;
+            }
+
+            loopItems = loopItems.filter((item) => getLoopItemModuleKey(item) !== 'turned-off');
 
             if (moduleKey !== 'unconfigured') {
                 loopItems = loopItems.filter(item => !isTechnicalLoopItem(item));
@@ -3590,6 +3688,7 @@
                     fitMode: 'contain',
                     bgColor: '#000000'
                 },
+                'turned-off': {},
                 'image-gallery': {
                     imageUrlsJson: '[]',
                     displayMode: 'slideshow',
@@ -6343,6 +6442,12 @@
                     appendRoomOccupancyPreviewParams(params, settings);
                     break;
 
+                case 'turned-off':
+                    baseUrl = '../../modules/default/m_default.html';
+                    params.append('text', '⏻ Turned Off');
+                    params.append('bgColor', '#111111');
+                    break;
+
                 default:
                     baseUrl = '../../modules/default/m_default.html';
                     params.append('text', module.module_name);
@@ -6546,6 +6651,10 @@
 
             if (moduleKey === 'room-occupancy') {
                 return getRoomOccupancyLoopItemSummary(settings);
+            }
+
+            if (moduleKey === 'turned-off') {
+                return 'Kijelző kikapcsolási idősáv';
             }
 
             return '';

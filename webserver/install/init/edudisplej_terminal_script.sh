@@ -129,6 +129,8 @@ else
         DOWNLOAD_EXIT=$?
         log_terminal "Module download failed with exit code: $DOWNLOAD_EXIT"
         echo -e "${RED}✗ Module download failed (exit code: $DOWNLOAD_EXIT)${NC}"
+        echo "Retrying after service restart..."
+        exit 1
     fi
 fi
 
@@ -143,6 +145,66 @@ echo "────────────────────────�
 
 LOOP_PLAYER="${LOCAL_WEB_DIR}/loop_player.html"
 WAITING_PAGE="${INIT_DIR}/waiting_registration.html"
+STARTUP_SPLASH_PAGE="/tmp/edudisplej_startup_splash.html"
+
+create_startup_splash_page() {
+    local target_url="$1"
+
+    cat > "$STARTUP_SPLASH_PAGE" <<EOF
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduDisplej</title>
+    <style>
+        html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        .wrap {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 18px;
+            background: radial-gradient(circle at center, #111 0%, #000 70%);
+        }
+        .logo {
+            font-size: clamp(48px, 8vw, 128px);
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            color: #fff;
+            text-shadow: 0 0 18px rgba(255,255,255,0.2);
+        }
+        .sub {
+            font-size: clamp(12px, 1.4vw, 22px);
+            opacity: 0.8;
+            letter-spacing: 0.08em;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="logo">EDUDISPLEJ</div>
+        <div class="sub">KIOSK LOADING...</div>
+    </div>
+    <script>
+        window.setTimeout(function () {
+            window.location.replace('file://${target_url}');
+        }, 120);
+    </script>
+</body>
+</html>
+EOF
+}
 
 # Check if device is registered, if not show waiting page
 if [ ! -f "$KIOSK_CONF" ]; then
@@ -185,8 +247,10 @@ echo "Target: file://${LOOP_PLAYER}"
 log_terminal "Launching: surf -F file://${LOOP_PLAYER}"
 echo ""
 
+create_startup_splash_page "$LOOP_PLAYER"
+
 # Launch surf fullscreen
-surf -F "file://${LOOP_PLAYER}"
+surf -F "file://${STARTUP_SPLASH_PAGE}"
 
 # If surf exits, log it
 log_terminal "Surf browser exited"

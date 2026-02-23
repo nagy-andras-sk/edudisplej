@@ -312,7 +312,25 @@ try {
             exit();
         }
 
-        $stmt = $conn->prepare("SELECT kgm.*, m.name as module_name, m.module_key, m.description
+        $stmt = $conn->prepare("SELECT
+                                    kgm.id,
+                                    kgm.group_id,
+                                    kgm.time_block_id,
+                                    kgm.module_id,
+                                    kgm.display_order,
+                                    kgm.duration_seconds,
+                                    kgm.settings,
+                                    kgm.is_active,
+                                    kgm.module_key,
+                                    COALESCE(NULLIF(kgm.module_key, ''), m.module_key) AS resolved_module_key,
+                                    CASE
+                                        WHEN LOWER(COALESCE(NULLIF(kgm.module_key, ''), m.module_key)) = 'turned-off' THEN 'Turned Off'
+                                        ELSE m.name
+                                    END AS resolved_module_name,
+                                    CASE
+                                        WHEN LOWER(COALESCE(NULLIF(kgm.module_key, ''), m.module_key)) = 'turned-off' THEN 'Kijelző kikapcsolása: tartalomszolgáltatás leáll, HDMI kimenet kikapcsol.'
+                                        ELSE m.description
+                                    END AS resolved_description
                                 FROM kiosk_group_modules kgm
                                 JOIN modules m ON kgm.module_id = m.id
                                 WHERE kgm.group_id = ?
@@ -325,15 +343,15 @@ try {
         $block_loops = [];
         while ($row = $result->fetch_assoc()) {
             $duration_seconds = (int)$row['duration_seconds'];
-            if (($row['module_key'] ?? '') === 'unconfigured') {
+            if (($row['resolved_module_key'] ?? '') === 'unconfigured') {
                 $duration_seconds = 60;
             }
             $item = [
                 'id' => $row['id'],
                 'module_id' => $row['module_id'],
-                'module_name' => $row['module_name'],
-                'module_key' => $row['module_key'],
-                'description' => $row['description'],
+                'module_name' => $row['resolved_module_name'],
+                'module_key' => $row['resolved_module_key'],
+                'description' => $row['resolved_description'],
                 'duration_seconds' => $duration_seconds,
                 'display_order' => $row['display_order'],
                 'settings' => $row['settings'] ? json_decode($row['settings'], true) : null,
@@ -508,6 +526,41 @@ try {
                 $time_blocks[] = $expanded_block;
             }
         }
+
+        $normalize_virtual_loop_item = function ($loop_item) use ($unconfigured_module) {
+            if (!is_array($loop_item)) {
+                return $loop_item;
+            }
+
+            $module_key = strtolower(trim((string)($loop_item['module_key'] ?? '')));
+            if ($module_key !== 'turned-off') {
+                return $loop_item;
+            }
+
+            $virtual_module_id = (int)($unconfigured_module['id'] ?? 0);
+            if ($virtual_module_id <= 0) {
+                return $loop_item;
+            }
+
+            $loop_item['module_id'] = $virtual_module_id;
+            $loop_item['module_key'] = 'turned-off';
+            $loop_item['module_name'] = 'Turned Off';
+            if (!array_key_exists('settings', $loop_item) || !is_array($loop_item['settings'])) {
+                $loop_item['settings'] = [];
+            }
+
+            return $loop_item;
+        };
+
+        $base_loop = array_values(array_map($normalize_virtual_loop_item, is_array($base_loop) ? $base_loop : []));
+        $time_blocks = array_values(array_map(function ($block) use ($normalize_virtual_loop_item) {
+            if (!is_array($block)) {
+                return $block;
+            }
+            $loops = is_array($block['loops'] ?? null) ? $block['loops'] : [];
+            $block['loops'] = array_values(array_map($normalize_virtual_loop_item, $loops));
+            return $block;
+        }, is_array($time_blocks) ? $time_blocks : []));
 
         $validation = edudisplej_validate_time_blocks_conflicts($time_blocks);
         if (!$validation['ok']) {

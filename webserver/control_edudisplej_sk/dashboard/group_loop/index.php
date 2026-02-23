@@ -90,6 +90,7 @@ $logout_url = '../../login.php?logout=1';
 // Get available modules for this company
 $available_modules = [];
 $unconfigured_module = null;
+$turned_off_loop_action = null;
 try {
     $conn = getDbConnection();
     
@@ -122,6 +123,15 @@ try {
     error_log($e->getMessage());
 }
 
+if ($unconfigured_module) {
+    $turned_off_loop_action = [
+        'id' => (int)$unconfigured_module['id'],
+        'name' => 'Turned Off',
+        'description' => 'Kijelző kikapcsolása: tartalomszolgáltatás leáll, HDMI kimenet kikapcsol.',
+        'module_key' => 'turned-off',
+    ];
+}
+
 $group_loop_modules_catalog = array_values(array_merge($available_modules, $unconfigured_module ? [$unconfigured_module] : []));
 $group_loop_css_version = (string)(@filemtime(__DIR__ . '/assets/css/app.css') ?: time());
 $group_loop_js_version_app = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: time());
@@ -142,6 +152,7 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
         'video' => '🎬',
         'weather' => '🌤️',
         'rss' => '📰',
+        'turned-off' => '⏻',
         'unconfigured' => '⚙️',
     ];
 
@@ -1348,6 +1359,7 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
                 'name' => $unconfigured_module['name'],
                 'description' => $unconfigured_module['description'] ?? ''
             ] : null,
+            'turnedOffLoopAction' => $turned_off_loop_action,
             'modulesCatalog' => $group_loop_modules_catalog,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
     </script>

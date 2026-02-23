@@ -115,6 +115,11 @@ function edudisplej_db_autofix_run(): void {
             $conn->query("UPDATE users SET user_role = 'admin' WHERE isadmin = 1");
         }
 
+        $user_last_activity_check = $conn->query("SHOW COLUMNS FROM users LIKE 'last_activity_at'");
+        if (!$user_last_activity_check || $user_last_activity_check->num_rows === 0) {
+            $conn->query("ALTER TABLE users ADD COLUMN last_activity_at DATETIME NULL DEFAULT NULL AFTER last_login");
+        }
+
         $conn->query("CREATE TABLE IF NOT EXISTS archived_users (
             id INT AUTO_INCREMENT PRIMARY KEY,
             original_user_id INT NULL,

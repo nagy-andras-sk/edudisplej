@@ -43,6 +43,22 @@ if (isset($_SESSION['user_id'])) {
         exit();
     }
     $_SESSION['last_activity_at'] = time();
+
+    try {
+        $activity_conn = getDbConnection();
+        $user_id = (int)($_SESSION['user_id'] ?? 0);
+        if ($user_id > 0) {
+            $activity_stmt = $activity_conn->prepare("UPDATE users SET last_activity_at = NOW() WHERE id = ?");
+            if ($activity_stmt) {
+                $activity_stmt->bind_param('i', $user_id);
+                $activity_stmt->execute();
+                $activity_stmt->close();
+            }
+        }
+        closeDbConnection($activity_conn);
+    } catch (Throwable $e) {
+        error_log('header activity update failed: ' . $e->getMessage());
+    }
 }
 
 $is_admin_user = !empty($_SESSION['isadmin']);

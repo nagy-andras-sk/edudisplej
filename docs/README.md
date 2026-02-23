@@ -243,6 +243,7 @@ Zariadenia sú automaticky pomenované: `edudisplej-XXXXXX` (posledných 6 znako
 ## 📚 Documentation / Dokumentácia
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** – Full architecture reference: repo structure, auth model, API spec, HMAC-SHA256 signing, screenshot TTL policy, kiosk service architecture, DB schema, migration plan, and manual test steps.
+- **[docs/SYNC_OFFLINE_ARCHITECTURE.md](docs/SYNC_OFFLINE_ARCHITECTURE.md)** – Sync pipeline és offline tárolási architektúra: loop/schedule mentés, modul + asset prefetch, meal offline fallback, előnyök/hátrányok.
 - **[docs/email.md](docs/email.md)** – SMTP configuration, multilingual email templates, password reset flow.
 - **[docs/mfa.md](docs/mfa.md)** – TOTP MFA setup, backup codes, login flow.
 - **[docs/licensing.md](docs/licensing.md)** – Company license model, device slot management, expiry policy.

@@ -217,140 +217,129 @@ function edudisplej_sync_prefetch_meal_menu_payload(mysqli $conn, int $company_i
     $inst_stmt->close();
 
     if (!$inst) {
+        $inst_fallback_stmt = $conn->prepare("SELECT institution_name
+                                             FROM meal_plan_institutions
+                                             WHERE id = ? AND is_active = 1
+                                             LIMIT 1");
+        if ($inst_fallback_stmt) {
+            $inst_fallback_stmt->bind_param('i', $institution_id);
+            $inst_fallback_stmt->execute();
+            $inst = $inst_fallback_stmt->get_result()->fetch_assoc();
+            $inst_fallback_stmt->close();
+        }
+
+        if (!$inst) {
+            $inst = ['institution_name' => ''];
+        }
+    }
+
+    $fetch_menu_for_date = function (string $target_date, bool $strict_date = false) use ($conn, $institution_id, $company_id, $source_type) {
+        $source_candidates = $source_type === 'manual' ? ['manual', 'server'] : ['server'];
+        foreach ($source_candidates as $source_effective) {
+            $menu_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                        FROM meal_plan_items
+                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date = ?
+                                            AND (
+                                                ? = ''
+                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                OR source_type = ?
+                                            )
+                                        ORDER BY company_id DESC
+                                        LIMIT 1");
+            if ($menu_stmt) {
+                $menu_stmt->bind_param('iissss', $institution_id, $company_id, $target_date, $source_effective, $source_effective, $source_effective);
+                $menu_stmt->execute();
+                $menu = $menu_stmt->get_result()->fetch_assoc();
+                $menu_stmt->close();
+                if ($menu) {
+                    return $menu;
+                }
+            }
+
+            if ($strict_date) {
+                continue;
+            }
+
+            $fallback_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                            FROM meal_plan_items
+                                            WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date <= ?
+                                                AND (
+                                                    ? = ''
+                                                    OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                    OR source_type = ?
+                                                )
+                                            ORDER BY menu_date DESC, company_id DESC
+                                            LIMIT 1");
+            if ($fallback_stmt) {
+                $fallback_stmt->bind_param('iissss', $institution_id, $company_id, $target_date, $source_effective, $source_effective, $source_effective);
+                $fallback_stmt->execute();
+                $menu = $fallback_stmt->get_result()->fetch_assoc();
+                $fallback_stmt->close();
+                if ($menu) {
+                    return $menu;
+                }
+            }
+
+            $future_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
+                                            FROM meal_plan_items
+                                            WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date >= ?
+                                                AND (
+                                                    ? = ''
+                                                    OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
+                                                    OR source_type = ?
+                                                )
+                                            ORDER BY menu_date ASC, company_id DESC
+                                            LIMIT 1");
+            if ($future_stmt) {
+                $future_stmt->bind_param('iissss', $institution_id, $company_id, $target_date, $source_effective, $source_effective, $source_effective);
+                $future_stmt->execute();
+                $menu = $future_stmt->get_result()->fetch_assoc();
+                $future_stmt->close();
+                if ($menu) {
+                    return $menu;
+                }
+            }
+        }
+
         return null;
+    };
+
+    $build_meal_payload = function (?array $menu, string $fallback_date) use ($inst, $showBreakfast, $showSnackAm, $showLunch, $showSnackPm, $showDinner) {
+        $meals = [];
+        if ($showBreakfast) { $meals[] = ['key' => 'breakfast', 'label' => 'Reggeli', 'text' => (string)($menu['breakfast'] ?? '')]; }
+        if ($showSnackAm) { $meals[] = ['key' => 'snack_am', 'label' => 'Tízórai', 'text' => (string)($menu['snack_am'] ?? '')]; }
+        if ($showLunch) { $meals[] = ['key' => 'lunch', 'label' => 'Ebéd', 'text' => (string)($menu['lunch'] ?? '')]; }
+        if ($showSnackPm) { $meals[] = ['key' => 'snack_pm', 'label' => 'Uzsonna', 'text' => (string)($menu['snack_pm'] ?? '')]; }
+        if ($showDinner) { $meals[] = ['key' => 'dinner', 'label' => 'Vacsora', 'text' => (string)($menu['dinner'] ?? '')]; }
+
+        return [
+            'institution_name' => (string)($inst['institution_name'] ?? ''),
+            'menu_date' => (string)($menu['menu_date'] ?? $fallback_date),
+            'meals' => $meals,
+            'source_type' => (string)($menu['source_type'] ?? ''),
+            'updated_at' => (string)($menu['updated_at'] ?? ''),
+        ];
+    };
+
+    $menu_today = $fetch_menu_for_date($date_value, false);
+    $payload_today = $build_meal_payload($menu_today, $date_value);
+
+    $layout_mode = strtolower(trim((string)($settings['layoutMode'] ?? 'classic')));
+    $show_tomorrow = !array_key_exists('showTomorrowInSquare', $settings) || !empty($settings['showTomorrowInSquare']);
+    $is_square_dual = ($layout_mode === 'square_dual_day');
+
+    if ($is_square_dual) {
+        $tomorrow_date = date('Y-m-d', strtotime($date_value . ' +1 day'));
+        $menu_tomorrow = $show_tomorrow ? $fetch_menu_for_date($tomorrow_date, true) : null;
+        $payload_tomorrow = $show_tomorrow ? $build_meal_payload($menu_tomorrow, $tomorrow_date) : null;
+
+        return [
+            'today' => $payload_today,
+            'tomorrow' => $payload_tomorrow,
+        ];
     }
 
-    $source_effective = $source_type;
-    $menu_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
-                                FROM meal_plan_items
-                                WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date = ?
-                                    AND (
-                                        ? = ''
-                                        OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
-                                        OR source_type = ?
-                                    )
-                                ORDER BY company_id DESC
-                                LIMIT 1");
-    if (!$menu_stmt) {
-        return null;
-    }
-    $menu_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
-    $menu_stmt->execute();
-    $menu = $menu_stmt->get_result()->fetch_assoc();
-    $menu_stmt->close();
-
-    if (!$menu && $source_type === 'manual') {
-        $source_effective = 'server';
-        $menu_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
-                                    FROM meal_plan_items
-                                    WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date = ?
-                                        AND (
-                                            ? = ''
-                                            OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
-                                            OR source_type = ?
-                                        )
-                                    ORDER BY company_id DESC
-                                    LIMIT 1");
-        if ($menu_stmt) {
-            $menu_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
-            $menu_stmt->execute();
-            $menu = $menu_stmt->get_result()->fetch_assoc();
-            $menu_stmt->close();
-        }
-    }
-
-    if (!$menu) {
-        $fallback_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
-                                        FROM meal_plan_items
-                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date <= ?
-                                            AND (
-                                                ? = ''
-                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
-                                                OR source_type = ?
-                                            )
-                                        ORDER BY menu_date DESC, company_id DESC
-                                        LIMIT 1");
-        if ($fallback_stmt) {
-            $fallback_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
-            $fallback_stmt->execute();
-            $menu = $fallback_stmt->get_result()->fetch_assoc();
-            $fallback_stmt->close();
-        }
-    }
-
-    if (!$menu && $source_type === 'manual' && $source_effective !== 'server') {
-        $source_effective = 'server';
-        $fallback_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
-                                        FROM meal_plan_items
-                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date <= ?
-                                            AND (
-                                                ? = ''
-                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
-                                                OR source_type = ?
-                                            )
-                                        ORDER BY menu_date DESC, company_id DESC
-                                        LIMIT 1");
-        if ($fallback_stmt) {
-            $fallback_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
-            $fallback_stmt->execute();
-            $menu = $fallback_stmt->get_result()->fetch_assoc();
-            $fallback_stmt->close();
-        }
-    }
-
-    if (!$menu) {
-        $future_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
-                                        FROM meal_plan_items
-                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date >= ?
-                                            AND (
-                                                ? = ''
-                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
-                                                OR source_type = ?
-                                            )
-                                        ORDER BY menu_date ASC, company_id DESC
-                                        LIMIT 1");
-        if ($future_stmt) {
-            $future_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
-            $future_stmt->execute();
-            $menu = $future_stmt->get_result()->fetch_assoc();
-            $future_stmt->close();
-        }
-    }
-
-    if (!$menu && $source_type === 'manual' && $source_effective !== 'server') {
-        $source_effective = 'server';
-        $future_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
-                                        FROM meal_plan_items
-                                        WHERE institution_id = ? AND (company_id = 0 OR company_id = ?) AND menu_date >= ?
-                                            AND (
-                                                ? = ''
-                                                OR (? = 'server' AND source_type IN ('server', 'auto_jedalen'))
-                                                OR source_type = ?
-                                            )
-                                        ORDER BY menu_date ASC, company_id DESC
-                                        LIMIT 1");
-        if ($future_stmt) {
-            $future_stmt->bind_param('iissss', $institution_id, $company_id, $date_value, $source_effective, $source_effective, $source_effective);
-            $future_stmt->execute();
-            $menu = $future_stmt->get_result()->fetch_assoc();
-            $future_stmt->close();
-        }
-    }
-
-    $meals = [];
-    if ($showBreakfast) { $meals[] = ['key' => 'breakfast', 'label' => 'Reggeli', 'text' => (string)($menu['breakfast'] ?? '')]; }
-    if ($showSnackAm) { $meals[] = ['key' => 'snack_am', 'label' => 'Tízórai', 'text' => (string)($menu['snack_am'] ?? '')]; }
-    if ($showLunch) { $meals[] = ['key' => 'lunch', 'label' => 'Ebéd', 'text' => (string)($menu['lunch'] ?? '')]; }
-    if ($showSnackPm) { $meals[] = ['key' => 'snack_pm', 'label' => 'Uzsonna', 'text' => (string)($menu['snack_pm'] ?? '')]; }
-    if ($showDinner) { $meals[] = ['key' => 'dinner', 'label' => 'Vacsora', 'text' => (string)($menu['dinner'] ?? '')]; }
-
-    return [
-        'institution_name' => (string)($inst['institution_name'] ?? ''),
-        'menu_date' => (string)($menu['menu_date'] ?? $date_value),
-        'meals' => $meals,
-        'source_type' => (string)($menu['source_type'] ?? ''),
-        'updated_at' => (string)($menu['updated_at'] ?? ''),
-    ];
+    return $payload_today;
 }
 
 function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company_id, string $module_key, $settings): array {
@@ -419,6 +408,36 @@ function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company
     return $normalized;
 }
 
+function edudisplej_normalize_plan_loop_item_for_sync(mysqli $conn, int $company_id, array $item): array {
+    $module_key = strtolower(trim((string)($item['module_key'] ?? '')));
+    $runtime_payload = edudisplej_module_runtime_payload_for_sync($module_key);
+
+    $raw_settings = $item['settings'] ?? [];
+    if (is_string($raw_settings)) {
+        $decoded = json_decode($raw_settings, true);
+        $raw_settings = is_array($decoded) ? $decoded : [];
+    } elseif (!is_array($raw_settings)) {
+        $raw_settings = [];
+    }
+
+    $optimized_settings = edudisplej_optimize_module_settings_for_sync($conn, $company_id, $module_key, $raw_settings);
+
+    $item['module_key'] = $module_key;
+    $item['module_name'] = (string)($item['module_name'] ?? $module_key);
+    $item['duration_seconds'] = (int)($item['duration_seconds'] ?? 15);
+    $item['display_order'] = (int)($item['display_order'] ?? 0);
+    $item['settings'] = $optimized_settings;
+    $item['module_folder'] = (string)($item['module_folder'] ?? $runtime_payload['module_folder']);
+    $item['module_renderer'] = (string)($item['module_renderer'] ?? $runtime_payload['module_renderer']);
+    $item['module_main_file'] = (string)($item['module_main_file'] ?? $runtime_payload['module_main_file']);
+
+    if (!isset($item['source'])) {
+        $item['source'] = 'group';
+    }
+
+    return $item;
+}
+
 function edudisplej_module_runtime_payload_for_sync(string $module_key): array {
     $resolved_key = strtolower(trim($module_key));
     if ($resolved_key === '') {
@@ -440,6 +459,65 @@ function edudisplej_module_runtime_payload_for_sync(string $module_key): array {
         'module_folder' => (string)($runtime['folder'] ?? $resolved_key),
         'module_renderer' => $renderer_rel,
         'module_main_file' => $main_file,
+    ];
+}
+
+function edudisplej_kiosk_loop_requires_turned_off(array $loop_config): bool {
+    if (empty($loop_config)) {
+        return false;
+    }
+
+    $has_turned_off = false;
+    foreach ($loop_config as $item) {
+        $module_key = strtolower(trim((string)($item['module_key'] ?? '')));
+        if ($module_key === 'turned-off') {
+            $has_turned_off = true;
+            continue;
+        }
+        if ($module_key !== '') {
+            return false;
+        }
+    }
+
+    return $has_turned_off;
+}
+
+function edudisplej_kiosk_loop_apply_terminal_power_mode(mysqli $conn, int $kiosk_id, bool $should_turn_off): array {
+    $turn_off_command = 'display_power_off';
+    $turn_on_command = 'display_power_on';
+
+    $target_command = $should_turn_off ? $turn_off_command : $turn_on_command;
+    $target_command_type = $should_turn_off ? 'display_power_off' : 'display_power_on';
+    $mode = $should_turn_off ? 'TURNED_OFF' : 'ACTIVE';
+    $queued = false;
+
+    $last_stmt = $conn->prepare("SELECT command_type, status
+                                FROM kiosk_command_queue
+                                WHERE kiosk_id = ?
+                                  AND command_type IN ('display_power_off', 'display_power_on')
+                                ORDER BY id DESC
+                                LIMIT 1");
+    $last_stmt->bind_param('i', $kiosk_id);
+    $last_stmt->execute();
+    $last_row = $last_stmt->get_result()->fetch_assoc();
+    $last_stmt->close();
+
+    $last_command_type = strtolower((string)($last_row['command_type'] ?? ''));
+    $last_status = strtolower((string)($last_row['status'] ?? ''));
+    $already_in_target_state = ($last_command_type === $target_command_type) && ($last_status !== 'failed');
+
+    if (!$already_in_target_state) {
+        $insert_stmt = $conn->prepare("INSERT INTO kiosk_command_queue (kiosk_id, command_type, command, status, created_at)
+                                       VALUES (?, ?, ?, 'pending', NOW())");
+        $insert_stmt->bind_param('iss', $kiosk_id, $target_command_type, $target_command);
+        $insert_stmt->execute();
+        $insert_stmt->close();
+        $queued = true;
+    }
+
+    return [
+        'terminal_power_mode' => $mode,
+        'terminal_power_command_queued' => $queued,
     ];
 }
 
@@ -478,8 +556,13 @@ try {
     
     // Get kiosk's loop configuration
     // First check if kiosk has specific modules assigned
-    $stmt = $conn->prepare("
-        SELECT km.*, m.name as module_name, m.module_key
+    $stmt = $conn->prepare(" 
+        SELECT km.*,
+               COALESCE(NULLIF(km.module_key, ''), m.module_key) AS resolved_module_key,
+               CASE
+                   WHEN LOWER(COALESCE(NULLIF(km.module_key, ''), m.module_key)) = 'turned-off' THEN 'Turned Off'
+                   ELSE m.name
+               END AS resolved_module_name
         FROM kiosk_modules km
         JOIN modules m ON km.module_id = m.id
         WHERE km.kiosk_id = ? AND km.is_active = 1
@@ -500,15 +583,17 @@ try {
     $loop_plan_version = 0;
     $loop_plan_updated_at = null;
     while ($row = $result->fetch_assoc()) {
-        $runtime_payload = edudisplej_module_runtime_payload_for_sync((string)($row['module_key'] ?? ''));
+        $resolved_module_key = (string)($row['resolved_module_key'] ?? $row['module_key'] ?? '');
+        $resolved_module_name = (string)($row['resolved_module_name'] ?? $row['module_name'] ?? $resolved_module_key);
+        $runtime_payload = edudisplej_module_runtime_payload_for_sync($resolved_module_key);
 
         $loop_item = [
             'module_id' => (int)$row['module_id'],
-            'module_name' => $row['module_name'],
-            'module_key' => $row['module_key'],
+            'module_name' => $resolved_module_name,
+            'module_key' => $resolved_module_key,
             'duration_seconds' => (int)$row['duration_seconds'],
             'display_order' => (int)$row['display_order'],
-            'settings' => edudisplej_optimize_module_settings_for_sync($conn, (int)$company_id, (string)($row['module_key'] ?? ''), $row['settings'] ? json_decode($row['settings'], true) : []),
+            'settings' => edudisplej_optimize_module_settings_for_sync($conn, (int)$company_id, $resolved_module_key, $row['settings'] ? json_decode($row['settings'], true) : []),
             'source' => 'kiosk',
             'module_folder' => $runtime_payload['module_folder'],
             'module_renderer' => $runtime_payload['module_renderer'],
@@ -518,11 +603,11 @@ try {
         $loop_config[] = $loop_item;
         $offline_plan['base_loop'][] = $loop_item;
 
-        $module_key = (string)($row['module_key'] ?? '');
+        $module_key = $resolved_module_key;
         if ($module_key !== '' && !isset($preload_map[$module_key])) {
             $preload_map[$module_key] = [
                 'module_key' => $module_key,
-                'name' => (string)($row['module_name'] ?? $module_key),
+                'name' => $resolved_module_name,
                 'module_folder' => $runtime_payload['module_folder'],
                 'module_renderer' => $runtime_payload['module_renderer'],
                 'module_main_file' => $runtime_payload['module_main_file'],
@@ -577,7 +662,15 @@ try {
                     if ($style_id === 0) {
                         continue;
                     }
-                    $style_map[$style_id] = is_array($style['items'] ?? null) ? $style['items'] : [];
+                    $raw_items = is_array($style['items'] ?? null) ? $style['items'] : [];
+                    $normalized_items = [];
+                    foreach ($raw_items as $raw_item) {
+                        if (!is_array($raw_item)) {
+                            continue;
+                        }
+                        $normalized_items[] = edudisplej_normalize_plan_loop_item_for_sync($conn, (int)$company_id, $raw_item);
+                    }
+                    $style_map[$style_id] = $normalized_items;
                 }
 
                 if ($planner_default_loop_style_id === 0 && !empty($style_map)) {
@@ -749,7 +842,12 @@ try {
             }
             $blocks_stmt->close();
 
-            $all_modules_stmt = $conn->prepare("SELECT kgm.*, m.name as module_name, m.module_key
+            $all_modules_stmt = $conn->prepare("SELECT kgm.*, 
+                                                       COALESCE(NULLIF(kgm.module_key, ''), m.module_key) AS resolved_module_key,
+                                                       CASE
+                                                           WHEN LOWER(COALESCE(NULLIF(kgm.module_key, ''), m.module_key)) = 'turned-off' THEN 'Turned Off'
+                                                           ELSE m.name
+                                                       END AS resolved_module_name
                                                 FROM kiosk_group_modules kgm
                                                 JOIN modules m ON kgm.module_id = m.id
                                                 WHERE kgm.group_id = ? AND kgm.is_active = 1
@@ -760,25 +858,27 @@ try {
 
             $base_loop = [];
             while ($row = $all_modules_result->fetch_assoc()) {
-                $runtime_payload = edudisplej_module_runtime_payload_for_sync((string)($row['module_key'] ?? ''));
+                $resolved_module_key = (string)($row['resolved_module_key'] ?? $row['module_key'] ?? '');
+                $resolved_module_name = (string)($row['resolved_module_name'] ?? $row['module_name'] ?? $resolved_module_key);
+                $runtime_payload = edudisplej_module_runtime_payload_for_sync($resolved_module_key);
                 $module_item = [
                     'module_id' => (int)$row['module_id'],
-                    'module_name' => $row['module_name'],
-                    'module_key' => $row['module_key'],
+                    'module_name' => $resolved_module_name,
+                    'module_key' => $resolved_module_key,
                     'duration_seconds' => (int)$row['duration_seconds'],
                     'display_order' => (int)$row['display_order'],
-                    'settings' => edudisplej_optimize_module_settings_for_sync($conn, (int)$company_id, (string)($row['module_key'] ?? ''), $row['settings'] ? json_decode($row['settings'], true) : []),
+                    'settings' => edudisplej_optimize_module_settings_for_sync($conn, (int)$company_id, $resolved_module_key, $row['settings'] ? json_decode($row['settings'], true) : []),
                     'source' => 'group',
                     'module_folder' => $runtime_payload['module_folder'],
                     'module_renderer' => $runtime_payload['module_renderer'],
                     'module_main_file' => $runtime_payload['module_main_file'],
                 ];
 
-                $module_key = (string)($row['module_key'] ?? '');
+                $module_key = $resolved_module_key;
                 if ($module_key !== '' && !isset($preload_map[$module_key])) {
                     $preload_map[$module_key] = [
                         'module_key' => $module_key,
-                        'name' => (string)($row['module_name'] ?? $module_key),
+                        'name' => $resolved_module_name,
                         'module_folder' => $runtime_payload['module_folder'],
                         'module_renderer' => $runtime_payload['module_renderer'],
                         'module_main_file' => $runtime_payload['module_main_file'],
@@ -853,6 +953,9 @@ try {
         $loop_last_update = date('Y-m-d H:i:s');
     }
     
+    $should_turn_off = edudisplej_kiosk_loop_requires_turned_off($loop_config);
+    $terminal_state = edudisplej_kiosk_loop_apply_terminal_power_mode($conn, (int)$kiosk_id, $should_turn_off);
+
     closeDbConnection($conn);
     
     $response['success'] = true;
@@ -867,6 +970,8 @@ try {
     if (!isset($response['active_scope'])) {
         $response['active_scope'] = 'base';
     }
+    $response['terminal_power_mode'] = $terminal_state['terminal_power_mode'];
+    $response['terminal_power_command_queued'] = $terminal_state['terminal_power_command_queued'];
     $response['loop_last_update'] = $loop_last_update;
     
     // Use JSON encoding options to prevent output truncation

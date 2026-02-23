@@ -8,7 +8,19 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { width: 100%; height: 100%; overflow: hidden; }
         body { background: #0f172a; color: #f8fafc; font-family: var(--meal-font-family, 'Segoe UI', Tahoma, sans-serif); }
-        .root { width: 100%; height: 100%; padding: 3.2vh 3vw; display: grid; grid-template-rows: auto 1fr auto; gap: 2vh; position: relative; }
+        .root { width: 100%; height: 100%; position: relative; --overlay-top-height: 0%; --overlay-bottom-height: 0%; }
+        .content-layer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: var(--overlay-top-height);
+            bottom: var(--overlay-bottom-height);
+            padding: 3.2vh 3vw;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 2vh;
+            overflow: hidden;
+        }
         .root.center { justify-items: center; text-align: center; }
         .root.center .head { width: 100%; justify-content: center; }
         .root.center .title-wrap { display:flex; flex-direction:column; align-items:center; }
@@ -79,15 +91,17 @@
 <div class="root">
     <div id="overlayTop" class="overlay-band"></div>
     <div id="overlayBottom" class="overlay-band"></div>
-    <div class="head">
-        <div class="title-wrap">
-            <div class="title" id="title">Étrend</div>
-            <div class="subtitle" id="subtitle">Betöltés...</div>
+    <div class="content-layer">
+        <div class="head">
+            <div class="title-wrap">
+                <div class="title" id="title">Étrend</div>
+                <div class="subtitle" id="subtitle">Betöltés...</div>
+            </div>
+            <div class="status" id="status">🔄 Szerver lekérés</div>
         </div>
-        <div class="status" id="status">🔄 Szerver lekérés</div>
+        <div class="cards-wrap" id="cards-wrap"><div class="cards" id="cards"></div></div>
+        <div class="foot" id="foot"></div>
     </div>
-    <div class="cards-wrap" id="cards-wrap"><div class="cards" id="cards"></div></div>
-    <div class="foot" id="foot"></div>
 </div>
 <script>
 (function () {
@@ -753,6 +767,9 @@
         const root = document.querySelector('.root');
         if (!root) return;
 
+        let topHeight = 0;
+        let bottomHeight = 0;
+
         const topBand = document.getElementById('overlayTop');
         const bottomBand = document.getElementById('overlayBottom');
         if (!topBand || !bottomBand) return;
@@ -764,6 +781,11 @@
             const height = Math.max(20, Math.min(40, Number(settings.clockOverlayHeightPercent || 40)));
             band.style.display = 'flex';
             band.style.height = `${height}%`;
+            if (String(settings.clockOverlayPosition || '').toLowerCase() === 'bottom') {
+                bottomHeight = Math.max(bottomHeight, height);
+            } else {
+                topHeight = Math.max(topHeight, height);
+            }
 
             const renderClock = () => {
                 const now = new Date();
@@ -784,6 +806,11 @@
             const height = Math.max(12, Math.min(40, Number(settings.textOverlayHeightPercent || 20)));
             band.style.display = 'flex';
             band.style.height = `${height}%`;
+            if (String(settings.textOverlayPosition || '').toLowerCase() === 'bottom') {
+                bottomHeight = Math.max(bottomHeight, height);
+            } else {
+                topHeight = Math.max(topHeight, height);
+            }
 
             let segments = [];
             const sourceType = String(settings.textOverlaySourceType || 'manual').toLowerCase();
@@ -832,6 +859,9 @@
                 state.raf = requestAnimationFrame(tick);
             }
         }
+
+        root.style.setProperty('--overlay-top-height', `${topHeight}%`);
+        root.style.setProperty('--overlay-bottom-height', `${bottomHeight}%`);
     }
 
     function isoDateOffset(days) {
@@ -882,6 +912,23 @@
         }
     }
 
+    async function loadOfflineMealFile(pathValue) {
+        const path = String(pathValue || '').trim();
+        if (!path) {
+            return null;
+        }
+        try {
+            const response = await fetch(path, { method: 'GET', cache: 'no-store' });
+            if (!response.ok) {
+                return null;
+            }
+            const payload = await response.json();
+            return payload && typeof payload === 'object' ? payload : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
     async function init() {
         const settings = getSettings();
         applyVisualSettings(settings);
@@ -919,6 +966,37 @@
                 }
             }
         } catch (_) {
+        }
+
+        if (!rendered) {
+            const todayFile = String(settings.offlinePrefetchedTodayFile || '').trim();
+            const tomorrowFile = String(settings.offlinePrefetchedTomorrowFile || '').trim();
+            if (settings.layoutMode === 'square_dual_day') {
+                const todayFromFile = await loadOfflineMealFile(todayFile);
+                const tomorrowFromFile = settings.showTomorrowInSquare !== false ? await loadOfflineMealFile(tomorrowFile) : null;
+                if (todayFromFile || tomorrowFromFile) {
+                    renderSquareDual(
+                        todayFromFile || { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
+                        tomorrowFromFile || { institution_name: '', menu_date: isoDateOffset(1), meals: [] },
+                        settings
+                    );
+                    rendered = true;
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayFromFile, tomorrow: tomorrowFromFile } }));
+                    } catch (_) {
+                    }
+                }
+            } else {
+                const todayFromFile = await loadOfflineMealFile(todayFile);
+                if (todayFromFile) {
+                    render(todayFromFile, settings);
+                    rendered = true;
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: todayFromFile }));
+                    } catch (_) {
+                    }
+                }
+            }
         }
 
         if (!rendered) {

@@ -1207,6 +1207,34 @@ function edudisplej_maintenance_get_used_meal_targets(mysqli $conn): array {
         $targets[$key]['group_ids'][$groupId] = true;
     }
 
+    $plannerTargets = edudisplej_maintenance_collect_meal_targets_from_group_plans($conn);
+    foreach ($plannerTargets as $plannerTarget) {
+        $companyId = (int)($plannerTarget['company_id'] ?? 0);
+        $institutionId = (int)($plannerTarget['institution_id'] ?? 0);
+        $siteKey = strtolower(trim((string)($plannerTarget['site_key'] ?? '')));
+        $groupIds = array_values(array_unique(array_map('intval', (array)($plannerTarget['group_ids'] ?? []))));
+
+        if ($companyId <= 0 || $institutionId <= 0 || $siteKey === '' || empty($groupIds)) {
+            continue;
+        }
+
+        $key = $companyId . '|' . $siteKey . '|' . $institutionId;
+        if (!isset($targets[$key])) {
+            $targets[$key] = [
+                'company_id' => $companyId,
+                'site_key' => $siteKey,
+                'institution_id' => $institutionId,
+                'group_ids' => [],
+            ];
+        }
+
+        foreach ($groupIds as $groupId) {
+            if ($groupId > 0) {
+                $targets[$key]['group_ids'][$groupId] = true;
+            }
+        }
+    }
+
     return array_values(array_map(static function (array $entry): array {
         $entry['group_ids'] = array_values(array_map('intval', array_keys($entry['group_ids'])));
         return $entry;
@@ -1289,12 +1317,115 @@ function edudisplej_maintenance_get_meal_targets_for_institution_ids(mysqli $con
         }
     }
 
+    $plannerTargets = edudisplej_maintenance_collect_meal_targets_from_group_plans($conn);
+    foreach ($plannerTargets as $plannerTarget) {
+        $companyId = (int)($plannerTarget['company_id'] ?? 0);
+        $institutionId = (int)($plannerTarget['institution_id'] ?? 0);
+        $siteKey = strtolower(trim((string)($plannerTarget['site_key'] ?? '')));
+        $groupIds = array_values(array_unique(array_map('intval', (array)($plannerTarget['group_ids'] ?? []))));
+
+        if ($companyId <= 0 || $institutionId <= 0 || $siteKey === '' || empty($groupIds)) {
+            continue;
+        }
+
+        $key = $companyId . '|' . $siteKey . '|' . $institutionId;
+        if (!isset($targetsByKey[$key])) {
+            continue;
+        }
+
+        foreach ($groupIds as $groupId) {
+            if ($groupId > 0) {
+                $targetsByKey[$key]['group_ids'][$groupId] = true;
+            }
+        }
+    }
+
     foreach ($targetsByKey as $entry) {
         $entry['group_ids'] = array_values(array_map('intval', array_keys((array)$entry['group_ids'])));
         $targets[] = $entry;
     }
 
     return $targets;
+}
+
+function edudisplej_maintenance_collect_meal_targets_from_group_plans(mysqli $conn): array {
+    $result = $conn->query("SELECT klp.group_id, kg.company_id, klp.plan_json
+                           FROM kiosk_group_loop_plans klp
+                           INNER JOIN kiosk_groups kg ON kg.id = klp.group_id
+                           WHERE kg.company_id > 0
+                             AND klp.plan_json IS NOT NULL
+                             AND klp.plan_json <> ''");
+    if (!$result) {
+        logError('Jedalen sync: failed to query planner meal targets: ' . $conn->error);
+        return [];
+    }
+
+    $targets = [];
+    while ($row = $result->fetch_assoc()) {
+        $groupId = (int)($row['group_id'] ?? 0);
+        $companyId = (int)($row['company_id'] ?? 0);
+        $planJson = (string)($row['plan_json'] ?? '');
+        if ($groupId <= 0 || $companyId <= 0 || $planJson === '') {
+            continue;
+        }
+
+        $decodedPlan = json_decode($planJson, true);
+        if (!is_array($decodedPlan)) {
+            continue;
+        }
+
+        $loopStyles = is_array($decodedPlan['loop_styles'] ?? null) ? $decodedPlan['loop_styles'] : [];
+        foreach ($loopStyles as $style) {
+            if (!is_array($style)) {
+                continue;
+            }
+            $items = is_array($style['items'] ?? null) ? $style['items'] : [];
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $moduleKey = strtolower(trim((string)($item['module_key'] ?? '')));
+                if ($moduleKey !== 'meal-menu' && $moduleKey !== 'meal_menu') {
+                    continue;
+                }
+
+                $settings = $item['settings'] ?? [];
+                if (is_string($settings)) {
+                    $decodedSettings = json_decode($settings, true);
+                    if (is_array($decodedSettings)) {
+                        $settings = $decodedSettings;
+                    }
+                }
+                if (!is_array($settings)) {
+                    continue;
+                }
+
+                $institutionId = (int)($settings['institutionId'] ?? 0);
+                $siteKey = strtolower(trim((string)($settings['siteKey'] ?? 'jedalen.sk')));
+                if ($institutionId <= 0 || $siteKey === '') {
+                    continue;
+                }
+
+                $key = $companyId . '|' . $siteKey . '|' . $institutionId;
+                if (!isset($targets[$key])) {
+                    $targets[$key] = [
+                        'company_id' => $companyId,
+                        'site_key' => $siteKey,
+                        'institution_id' => $institutionId,
+                        'group_ids' => [],
+                    ];
+                }
+
+                $targets[$key]['group_ids'][$groupId] = true;
+            }
+        }
+    }
+
+    return array_values(array_map(static function (array $entry): array {
+        $entry['group_ids'] = array_values(array_map('intval', array_keys((array)$entry['group_ids'])));
+        return $entry;
+    }, $targets));
 }
 
 function edudisplej_maintenance_bootstrap_jedalen_targets(mysqli $conn, array $syncConfig): array {
@@ -2370,6 +2501,27 @@ try {
             
             foreach ($table_def['foreign_keys'] as $fk_name => $fk_def) {
                 if (!isset($existing_fks[$fk_name])) {
+                    // Cleanup orphan rows before adding FK (prevents ALTER TABLE failure)
+                    // Supports common FK definitions like: FOREIGN KEY (child_col) REFERENCES parent_table(parent_col)
+                    if (preg_match('/FOREIGN\s+KEY\s*\(([^\)]+)\)\s+REFERENCES\s+`?([a-zA-Z0-9_]+)`?\s*\(([^\)]+)\)/i', $fk_def, $m)) {
+                        $child_col = trim(str_replace('`', '', (string)$m[1]));
+                        $parent_table = trim(str_replace('`', '', (string)$m[2]));
+                        $parent_col = trim(str_replace('`', '', (string)$m[3]));
+
+                        if ($child_col !== '' && $parent_table !== '' && $parent_col !== '') {
+                            $cleanup_sql = "DELETE c FROM $table_name c LEFT JOIN $parent_table p ON c.$child_col = p.$parent_col WHERE c.$child_col IS NOT NULL AND p.$parent_col IS NULL";
+                            logResult("Executing SQL (orphan cleanup): $cleanup_sql", 'info');
+                            if ($conn->query($cleanup_sql)) {
+                                $removed = (int)$conn->affected_rows;
+                                if ($removed > 0) {
+                                    logResult("Removed $removed orphan row(s) from '$table_name' before adding FK '$fk_name'", 'warning');
+                                }
+                            } else {
+                                logError("Orphan cleanup failed for FK '$fk_name' on table '$table_name': " . $conn->error);
+                            }
+                        }
+                    }
+
                     $sql = "ALTER TABLE $table_name ADD CONSTRAINT $fk_name $fk_def";
                     logResult("Executing SQL: $sql", 'info');
                     if ($conn->query($sql)) {
