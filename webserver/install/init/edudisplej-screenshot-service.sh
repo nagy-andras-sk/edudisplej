@@ -287,8 +287,7 @@ main() {
             log_debug "Screenshot active - capturing (interval: ${current_interval}s)..."
             
             # Capture screenshot
-            screenshot_file=$(capture_screenshot)
-            if [ $? -eq 0 ] && [ -n "$screenshot_file" ]; then
+            if screenshot_file=$(capture_screenshot); then
                 log_debug "Screenshot captured: $screenshot_file"
                 
                 # Upload screenshot

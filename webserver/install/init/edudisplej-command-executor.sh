@@ -27,6 +27,8 @@ LOOP_FILE="${CONFIG_DIR}/localweb/modules/loop.json"
 LOCAL_POWER_STATE_FILE="${DATA_DIR}/local_display_power_state"
 COMMAND_TIMEOUT=300  # 5 minutes timeout per command
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"
+COMMAND_POLL_INTERVAL="${EDUDISPLEJ_COMMAND_POLL_INTERVAL:-30}"
+SCHEDULE_ENFORCE_INTERVAL="${EDUDISPLEJ_SCHEDULE_ENFORCE_INTERVAL:-5}"
 
 # Create directories
 mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
@@ -65,6 +67,29 @@ reset_to_unconfigured() {
     fi
 }
 
+unit_exists() {
+    local service_name="$1"
+    systemctl list-unit-files "$service_name" >/dev/null 2>&1 || [ -f "/etc/systemd/system/${service_name}" ]
+}
+
+service_action() {
+    local action="$1"
+    local service_name="$2"
+
+    if ! unit_exists "$service_name"; then
+        log_debug "Service not installed, skipping ${action}: ${service_name}"
+        return 0
+    fi
+
+    if sudo systemctl "$action" "$service_name" 2>/dev/null; then
+        log_success "Service ${action} successful: ${service_name}"
+        return 0
+    fi
+
+    log_error "Service ${action} failed: ${service_name}"
+    return 1
+}
+
 # Get API token
 get_api_token() {
     if [ -f "$TOKEN_FILE" ]; then
@@ -77,7 +102,7 @@ get_api_token() {
 get_device_id() {
     if [ -f "$CONFIG_FILE" ]; then
         if command -v jq >/dev/null 2>&1; then
-            jq -r '.device_id // empty' "$CONFIG_FILE" 2>/dev/null
+            jq -r '.device_id // empty' "$CONFIG_FILE" 2>/dev/null || true
         else
             grep -o '"device_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | head -1 | cut -d'"' -f4
         fi
@@ -87,7 +112,7 @@ get_device_id() {
 get_kiosk_id() {
     if [ -f "$CONFIG_FILE" ]; then
         if command -v jq >/dev/null 2>&1; then
-            jq -r '.kiosk_id // empty' "$CONFIG_FILE" 2>/dev/null
+            jq -r '.kiosk_id // empty' "$CONFIG_FILE" 2>/dev/null || true
         else
             grep -o '"kiosk_id"[[:space:]]*:[[:space:]]*[0-9]*' "$CONFIG_FILE" | head -1 | cut -d: -f2
         fi
@@ -178,9 +203,8 @@ execute_command() {
 
         restart_service)
             log "Restarting service: $command"
-            if systemctl restart "$command" 2>&1; then
+            if service_action restart "$command"; then
                 output="Service restarted: $command"
-                log_success "Service restarted: $command"
             else
                 error="Failed to restart service: $command"
                 status="failed"
@@ -192,8 +216,7 @@ execute_command() {
             log "Executing display power OFF sequence..."
             local off_errors=0
 
-            sudo systemctl stop edudisplej-kiosk.service 2>/dev/null || off_errors=$((off_errors + 1))
-            sudo systemctl stop edudisplej-content.service 2>/dev/null || true
+            service_action stop edudisplej-kiosk.service || off_errors=$((off_errors + 1))
 
             if command -v vcgencmd >/dev/null 2>&1; then
                 vcgencmd display_power 0 >/dev/null 2>&1 || off_errors=$((off_errors + 1))
@@ -226,8 +249,7 @@ execute_command() {
                 on_errors=$((on_errors + 1))
             fi
 
-            sudo systemctl start edudisplej-kiosk.service 2>/dev/null || on_errors=$((on_errors + 1))
-            sudo systemctl start edudisplej-content.service 2>/dev/null || true
+            service_action start edudisplej-kiosk.service || on_errors=$((on_errors + 1))
 
             if [ "$on_errors" -eq 0 ]; then
                 output="Display power ON applied (service started + HDMI on)"
@@ -287,6 +309,31 @@ report_command_result() {
     "status": "$status",
     "output": $(echo -n "$output" | jq -Rs .),
     "error": $(echo -n "$error" | jq -Rs .)
+}
+EOF
+)
+
+    log_debug "Reporting command result: $command_id -> $status"
+
+    local response=$(curl -s -X POST \
+        -H "Authorization: Bearer $token" \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        --max-time 10 --connect-timeout 5 \
+        "$COMMAND_RESULT_API" 2>/dev/null || echo "{\"success\": false}")
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
+
+    if echo "$response" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
+        log_success "Command result reported: $command_id"
+        return 0
+    else
+        log_error "Failed to report command result: $response"
+        return 1
+    fi
 }
 
 resolve_local_schedule_mode() {
@@ -393,17 +440,16 @@ if not active_loop:
     print('ACTIVE')
     raise SystemExit(0)
 
-has_turned_off = False
 for item in active_loop:
     key = str(item.get('module_key') or '').strip().lower()
     if key == 'turned-off':
-        has_turned_off = True
-        continue
+        print('TURNED_OFF')
+        raise SystemExit(0)
     if key:
         print('ACTIVE')
         raise SystemExit(0)
 
-print('TURNED_OFF' if has_turned_off else 'ACTIVE')
+print('ACTIVE')
 PY
 }
 
@@ -423,8 +469,7 @@ apply_local_schedule_mode() {
 
     if [ "$mode" = "TURNED_OFF" ]; then
         log "Local schedule mode switch: ACTIVE -> TURNED_OFF"
-        sudo systemctl stop edudisplej-kiosk.service 2>/dev/null || true
-        sudo systemctl stop edudisplej-content.service 2>/dev/null || true
+        service_action stop edudisplej-kiosk.service || true
         if command -v vcgencmd >/dev/null 2>&1; then
             vcgencmd display_power 0 >/dev/null 2>&1 || true
         elif [ -x /opt/vc/bin/tvservice ]; then
@@ -437,8 +482,7 @@ apply_local_schedule_mode() {
         elif [ -x /opt/vc/bin/tvservice ]; then
             /opt/vc/bin/tvservice -p >/dev/null 2>&1 || true
         fi
-        sudo systemctl start edudisplej-kiosk.service 2>/dev/null || true
-        sudo systemctl start edudisplej-content.service 2>/dev/null || true
+        service_action start edudisplej-kiosk.service || true
     fi
 
     echo "$mode" > "$LOCAL_POWER_STATE_FILE"
@@ -449,31 +493,6 @@ enforce_local_schedule_power_state() {
     mode=$(resolve_local_schedule_mode)
     apply_local_schedule_mode "$mode"
 }
-EOF
-)
-    
-    log_debug "Reporting command result: $command_id -> $status"
-    
-    local response=$(curl -s -X POST \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -d "$payload" \
-        --max-time 10 --connect-timeout 5 \
-        "$COMMAND_RESULT_API" 2>/dev/null || echo "{\"success\": false}")
-    
-    if is_auth_error "$response"; then
-        reset_to_unconfigured
-        return 1
-    fi
-
-    if echo "$response" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
-        log_success "Command result reported: $command_id"
-        return 0
-    else
-        log_error "Failed to report command result: $response"
-        return 1
-    fi
-}
 
 # Main loop
 main() {
@@ -482,17 +501,17 @@ main() {
     # Get API token
     local token=""
     token=$(get_api_token) || {
-        log_error "Failed to read API token - service cannot operate"
-        sleep 60
-        return 1
+        log_error "Failed to read API token - waiting for next cycle"
+        sleep 30
+        return 0
     }
 
     local device_id
     device_id=$(get_device_id)
     if [ -z "$device_id" ]; then
-        log_error "Device ID not found - service cannot operate"
-        sleep 60
-        return 1
+        log_error "Device ID not found/readable yet - waiting for next cycle"
+        sleep 30
+        return 0
     fi
 
     local kiosk_id
@@ -503,7 +522,7 @@ main() {
     
     if ! echo "$response" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
         log_debug "No commands available or API error"
-        return 1
+        return 0
     fi
     
     # Parse commands using jq if available, otherwise use grep
@@ -536,10 +555,17 @@ main() {
 # Trap signals
 trap 'log "Command Executor Service stopped"; exit 0' SIGTERM SIGINT
 
-# Main loop - check for commands every 30 seconds
+# Main loop - enforce schedule frequently, poll commands on a slower interval
+last_command_poll=0
 while true; do
+    now_ts=$(date +%s)
     enforce_local_schedule_power_state
-    main
+
+    if [ $((now_ts - last_command_poll)) -ge "$COMMAND_POLL_INTERVAL" ]; then
+        main
+        last_command_poll=$now_ts
+    fi
+
     enforce_local_schedule_power_state
-    sleep 30
+    sleep "$SCHEDULE_ENFORCE_INTERVAL"
 done

@@ -72,8 +72,8 @@ Ez a dokumentum a Raspberry-n futó EduDisplej service-eket írja le:
 **Script flow (`kiosk-start.sh`):**
 1. Első booton futtatja az `edudisplej-init.sh` setupot.
 2. Régi Xorg példányok takarítása.
-3. `startx` indítás `:0`-án.
-4. Végtelen keepalive loop (`sleep 60`).
+3. `startx` indítás `:0`-án **foreground** módban.
+4. Ha X/Openbox kilép, a `systemd` azonnal érzékeli és a service restart policy lép életbe.
 
 ---
 
@@ -109,7 +109,7 @@ Ez a dokumentum a Raspberry-n futó EduDisplej service-eket írja le:
 **Cél:** telemetria + health státusz küldése control panel felé.
 
 **Lényeg:**
-- User: `pi`
+- User: `edudisplej` (telepítéskor konzol userre renderelve)
 - `Restart=always`, `RestartSec=10`
 - Alap ciklus: `HEALTH_CHECK_INTERVAL=300s`
 - Fast loop esetén: `5s`
@@ -149,7 +149,7 @@ Ez a dokumentum a Raspberry-n futó EduDisplej service-eket írja le:
 **Cél:** távoli admin parancsok végrehajtása.
 
 **Lényeg:**
-- User: `pi`
+- User: `edudisplej` (telepítéskor konzol userre renderelve)
 - Ciklus: 30s polling
 
 **Parancstípus példák:**
@@ -196,6 +196,9 @@ Ez a dokumentum a Raspberry-n futó EduDisplej service-eket írja le:
 - `sync` update esetén restartolja a `kiosk` service-t.
 - `health` olvassa a sync/service/network állapotot, és továbbjelenti.
 - `command-executor` tud fast-loop flaget kapcsolni, service-t restartolni, full update-et indítani.
+
+Telepítési megjegyzés:
+- A `kiosk`, `sync`, `watchdog`, `screenshot`, `command-executor`, `health` service-ek a structure alapú telepítésben és a fallback core listában is szerepelnek, így update után sem maradhatnak ki.
 
 ---
 

@@ -67,6 +67,9 @@ All notable changes are documented here. Format: [Keep a Changelog](https://keep
 - Installer hardening: az összes kritikus `apt-get` hívás TTY-függetlenre frissítve (`Dpkg::Use-Pty=0`, stdin redirection `< /dev/null`, non-interactive env)
 - Tömeges (headless) telepítéseknél megszűnik az a hiba, ahol az install folyamat `apt-get ...` lépésnél `T (stopped)` állapotban megakadt
 - Screenshot service fix: a kliens már a szerver `screenshot_enabled` flagjét is figyelembe veszi a `last_sync_response.json` fájlból (nem csak a `screenshot_requested` jelet), így a periodikus screenshot feltöltés valóban elindul bekapcsolt policy esetén
+- Kiosk startup fix: a `kiosk-start.sh` már foreground módban futtatja a `startx`-et (`exec`), így X/Openbox összeomlás esetén a `systemd` megbízhatóan újraindítja a service-t
+- Service orchestration fix: a structure/fallback telepítés most kötelezően tartalmazza az `edudisplej-command-executor.service` és `edudisplej-health.service` unitokat is
+- Command executor stabilitás: javítva a sérült heredoc/funkció-blokk, és eltávolítva a nem létező `edudisplej-content.service` hivatkozások
 
 ---
 

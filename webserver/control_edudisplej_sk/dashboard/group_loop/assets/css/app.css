@@ -184,6 +184,10 @@
             background: #ffe9b5;
         }
 
+        .planner-legend .turned-off {
+            background: #efd8fb;
+        }
+
         .planner-legend .active {
             background: #fff;
             outline: 2px solid #1f3e56;
@@ -933,6 +937,11 @@
             border-bottom: none;
         }
 
+        .loop-schedule-row.turned-off-style-row {
+            background: #f8eefc;
+            border-left: 3px solid #7a3fb5;
+        }
+
         .loop-schedule-row-name {
             font-size: 12px;
             color: #1f2d3d;
@@ -1015,6 +1024,10 @@
 
         .schedule-cell.has-weekly {
             background: #d9ebff;
+        }
+
+        .schedule-cell.has-weekly.has-turned-off {
+            background: #efd8fb;
         }
 
         .schedule-cell.has-special {

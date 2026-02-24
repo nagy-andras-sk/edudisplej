@@ -1277,6 +1277,7 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
         <div class="planner-title">Ütemezés</div>
         <div class="planner-legend">
             <span><span class="dot weekly"></span>Heti blokk</span>
+            <span><span class="dot turned-off"></span>Kikapcsolási terv</span>
             <span><span class="dot active"></span>Aktív tartomány</span>
         </div>
 

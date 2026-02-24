@@ -795,6 +795,7 @@
             const dragList = document.getElementById('loop-style-drag-list');
             const fixedStyleInput = document.getElementById('fixed-plan-loop-style');
             const fixedStyleLabel = document.getElementById('fixed-plan-loop-label');
+            ensureTurnedOffLoopStyle();
             const schedulableStyles = getLoopStylesSortedByLastModified(loopStyles)
                 .filter((style) => parseInt(style.id, 10) !== parseInt(defaultLoopStyleId || 0, 10));
 
@@ -826,15 +827,20 @@
                 }
                 schedulableStyles.forEach((style) => {
                     const row = document.createElement('div');
-                    row.className = 'loop-schedule-row';
+                    const turnedOffStyle = isTurnedOffLoopStyle(style);
+                    row.className = `loop-schedule-row${turnedOffStyle ? ' turned-off-style-row' : ''}`;
 
                     const left = document.createElement('div');
                     const name = document.createElement('div');
                     name.className = 'loop-schedule-row-name';
-                    name.textContent = style.name;
+                    name.textContent = turnedOffStyle ? `⏻ ${style.name}` : style.name;
                     const meta = document.createElement('div');
                     meta.className = 'loop-schedule-row-meta';
-                    meta.textContent = parseInt(style.id, 10) === selectedSchedulableId ? 'Kijelölt loop' : 'Heti vagy speciális tervbe tehető';
+                    if (turnedOffStyle) {
+                        meta.textContent = 'Ütemezhető kijelző kikapcsolás (külön tervszínnel)';
+                    } else {
+                        meta.textContent = parseInt(style.id, 10) === selectedSchedulableId ? 'Kijelölt loop' : 'Heti vagy speciális tervbe tehető';
+                    }
                     left.appendChild(name);
                     left.appendChild(meta);
 
@@ -860,58 +866,6 @@
                         listInner.appendChild(row);
                     }
                 });
-
-                if (listInner && !isDefaultGroup && !isContentOnlyMode && turnedOffLoopAction) {
-                    const actionRow = document.createElement('div');
-                    actionRow.className = 'loop-schedule-row';
-
-                    const left = document.createElement('div');
-                    const name = document.createElement('div');
-                    name.className = 'loop-schedule-row-name';
-                    name.textContent = '⏻ Kikapcsolási esemény';
-                    const meta = document.createElement('div');
-                    meta.className = 'loop-schedule-row-meta';
-                    meta.textContent = 'Ütemezhető kijelző kikapcsolás: service leállítás + HDMI off';
-                    left.appendChild(name);
-                    left.appendChild(meta);
-
-                    const button = document.createElement('button');
-                    button.type = 'button';
-                    button.className = 'btn';
-                    button.textContent = 'Loophoz adás';
-                    button.addEventListener('click', () => {
-                        let targetStyleId = parseInt(fixedStyleInput?.value || activeLoopStyleId || 0, 10);
-                        const isDefaultTarget = targetStyleId === parseInt(defaultLoopStyleId || 0, 10);
-                        const targetExists = schedulableStyles.some((style) => parseInt(style.id, 10) === targetStyleId);
-
-                        if (!targetExists || isDefaultTarget) {
-                            targetStyleId = parseInt(schedulableStyles[0]?.id || 0, 10);
-                        }
-
-                        if (!targetStyleId) {
-                            showAutosaveToast('⚠️ Előbb hozz létre egy ütemezhető loopot', true);
-                            scrollToLoopBuilderAndCreate();
-                            return;
-                        }
-
-                        if (fixedStyleInput) {
-                            fixedStyleInput.value = String(targetStyleId);
-                        }
-
-                        const targetStyle = getLoopStyleById(targetStyleId);
-                        if (fixedStyleLabel && targetStyle) {
-                            fixedStyleLabel.textContent = `Kiválasztott loop: ${targetStyle.name}`;
-                        }
-
-                        openLoopStyleDetail(targetStyleId);
-                        addTurnedOffLoopItem();
-                        renderLoopStyleSelector();
-                    });
-
-                    actionRow.appendChild(left);
-                    actionRow.appendChild(button);
-                    listInner.appendChild(actionRow);
-                }
             }
 
             if (fixedStyleInput) {
@@ -1753,8 +1707,10 @@
                     const isActive = weeklyBlocks.some((block) => activeScope === `block:${block.id}`);
                     const primaryBlock = weeklyBlocks.find((block) => activeScope === `block:${block.id}`) || weeklyBlocks[0] || null;
                     const primaryBlockId = primaryBlock ? parseInt(primaryBlock.id, 10) : 0;
+                    const primaryLoopStyle = primaryBlock ? getLoopStyleById(primaryBlock.loop_style_id || 0) : null;
+                    const hasTurnedOffStyle = isTurnedOffLoopStyle(primaryLoopStyle);
                     const hasLocked = weeklyBlocks.some((block) => parseInt(block.is_locked || 0, 10) === 1);
-                    const className = `schedule-cell${hasWeekly ? ' has-weekly' : ''}${isActive ? ' active-scope' : ''}${isTodayCell ? ' today' : ''}${(isRangeSelected || isResizePreview) ? ' range-select' : ''}${hasLocked ? ' locked' : ''}`;
+                    const className = `schedule-cell${hasWeekly ? ' has-weekly' : ''}${hasTurnedOffStyle ? ' has-turned-off' : ''}${isActive ? ' active-scope' : ''}${isTodayCell ? ' today' : ''}${(isRangeSelected || isResizePreview) ? ' range-select' : ''}${hasLocked ? ' locked' : ''}`;
                     const styleName = hasWeekly
                         ? (() => {
                             const styleId = parseInt(weeklyBlocks[0].loop_style_id || 0, 10);
@@ -2430,7 +2386,12 @@
                 return false;
             }
 
-            if ((item.module_key || '') === 'unconfigured') {
+            const moduleKey = String(item.module_key || '').toLowerCase();
+            if (moduleKey === 'turned-off') {
+                return false;
+            }
+
+            if (moduleKey === 'unconfigured') {
                 return true;
             }
 
@@ -2460,6 +2421,15 @@
             const existingTechnical = loopItems.find(item => isTechnicalLoopItem(item));
 
             if (existingTechnical) {
+                if (isTurnedOffLoopItem(existingTechnical)) {
+                    loopItems = [{
+                        ...existingTechnical,
+                        module_key: 'turned-off',
+                        duration_seconds: 60
+                    }];
+                    return;
+                }
+
                 loopItems = [{
                     ...existingTechnical,
                     module_key: 'unconfigured',
@@ -2658,6 +2628,86 @@
                 String(turnedOffLoopAction?.description || 'Kijelző kikapcsolása: tartalomszolgáltatás leáll, HDMI kimenet kikapcsol.'),
                 'turned-off'
             );
+        }
+
+        function isTurnedOffLoopItem(item) {
+            if (!item || typeof item !== 'object') {
+                return false;
+            }
+            const key = String(item.module_key || '').toLowerCase();
+            return key === 'turned-off';
+        }
+
+        function isTurnedOffLoopStyle(style) {
+            if (!style || typeof style !== 'object') {
+                return false;
+            }
+            const items = Array.isArray(style.items) ? style.items : [];
+            return items.length === 1 && isTurnedOffLoopItem(items[0]);
+        }
+
+        function ensureTurnedOffLoopStyle() {
+            if (isDefaultGroup || isContentOnlyMode || !turnedOffLoopAction) {
+                return null;
+            }
+
+            const desiredName = String(turnedOffLoopAction.name || 'Kikapcsolási esemény').trim() || 'Kikapcsolási esemény';
+            const isLegacyTurnedOffName = (name) => /kikapcsol|turned\s*off/i.test(String(name || ''));
+
+            const legacyStyle = (Array.isArray(loopStyles) ? loopStyles : []).find((style) => {
+                const styleId = parseInt(style?.id || 0, 10);
+                if (styleId === parseInt(defaultLoopStyleId || 0, 10)) {
+                    return false;
+                }
+                const items = Array.isArray(style?.items) ? style.items : [];
+                if (items.length !== 1 || isTurnedOffLoopItem(items[0])) {
+                    return false;
+                }
+                const itemModuleId = parseInt(items[0]?.module_id || 0, 10);
+                const technicalModuleId = parseInt(technicalModule?.id || 0, 10);
+                return technicalModuleId > 0 && itemModuleId === technicalModuleId && isLegacyTurnedOffName(style?.name);
+            }) || null;
+
+            if (legacyStyle) {
+                legacyStyle.name = desiredName;
+                legacyStyle.items = [{
+                    ...legacyStyle.items[0],
+                    module_key: 'turned-off',
+                    module_name: String(turnedOffLoopAction.name || 'Turned Off'),
+                    duration_seconds: 60,
+                    settings: (legacyStyle.items[0] && typeof legacyStyle.items[0].settings === 'object' && legacyStyle.items[0].settings !== null)
+                        ? legacyStyle.items[0].settings
+                        : {}
+                }];
+                legacyStyle.last_modified_ms = Date.now();
+                return legacyStyle;
+            }
+
+            let existing = (Array.isArray(loopStyles) ? loopStyles : []).find((style) => {
+                const styleId = parseInt(style?.id || 0, 10);
+                return styleId !== parseInt(defaultLoopStyleId || 0, 10) && isTurnedOffLoopStyle(style);
+            }) || null;
+
+            if (existing) {
+                if (String(existing.name || '').trim() !== desiredName) {
+                    existing.name = desiredName;
+                    existing.last_modified_ms = Date.now();
+                }
+                return existing;
+            }
+
+            const turnedOffItem = getTurnedOffLoopTemplate();
+            if (!turnedOffItem) {
+                return null;
+            }
+
+            const created = createFallbackLoopStyle(
+                String(turnedOffLoopAction.name || 'Kikapcsolási esemény').trim() || 'Kikapcsolási esemény',
+                [turnedOffItem]
+            );
+            loopStyles.push(created);
+            ensureSingleDefaultLoopStyle();
+            return created;
         }
 
         function addTurnedOffLoopItem() {

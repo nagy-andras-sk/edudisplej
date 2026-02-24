@@ -368,12 +368,12 @@ else
     chmod -R 755 "$TARGET_DIR"
     
     # Setup screenshot service directories and permissions
-    mkdir -p "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic"
+    mkdir -p "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic" "${TARGET_DIR}/logs"
     chmod 755 "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic"
+    chmod 755 "${TARGET_DIR}/logs"
+    chown -R "${CONSOLE_USER}:${CONSOLE_USER}" "${TARGET_DIR}/logs" 2>/dev/null || true
     # Ensure config.json is readable by screenshot service
     [ -f "${TARGET_DIR}/data/config.json" ] && chmod 644 "${TARGET_DIR}/data/config.json"
-    # Cleanup old log directory if exists
-    rm -rf "${TARGET_DIR}/logs"
 fi
 
 # ============================================================================

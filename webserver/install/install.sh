@@ -508,11 +508,13 @@ chown -R "$CONSOLE_USER:$CONSOLE_USER" "${TARGET_DIR}/data"
 chmod 755 "${TARGET_DIR}/data"
 chmod 755 "${TARGET_DIR}/data/screenshots"
 
+# Ensure logs directory is writable for user-space services (health/command executor)
+mkdir -p "${TARGET_DIR}/logs"
+chown -R "$CONSOLE_USER:$CONSOLE_USER" "${TARGET_DIR}/logs"
+chmod 755 "${TARGET_DIR}/logs"
+
 # config.json should be readable/writable by CONSOLE_USER
 [ -f "${TARGET_DIR}/data/config.json" ] && chmod 664 "${TARGET_DIR}/data/config.json"
-
-# Cleanup old log directory if exists
-rm -rf "${TARGET_DIR}/logs"
 
 echo "[✓] Oprávnenia nastavené - Permissions configured"
 
@@ -703,6 +705,8 @@ CORE_SERVICES=(
     "edudisplej-sync.service"
     "edudisplej-watchdog.service"
     "edudisplej-screenshot-service.service"
+    "edudisplej-command-executor.service"
+    "edudisplej-health.service"
 )
 
 # Copy/render service files first

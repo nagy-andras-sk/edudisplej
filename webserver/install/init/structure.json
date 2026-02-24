@@ -14,7 +14,9 @@
     "edudisplej-screenshot-service.sh": "2026-02-22T00:00:00Z",
     "edudisplej-screenshot-service.service": "2026-02-22T00:00:00Z",
     "edudisplej-command-executor.sh": "2026-02-22T00:00:00Z",
-    "edudisplej-command-executor.service": "2026-02-22T00:00:00Z"
+    "edudisplej-command-executor.service": "2026-02-22T00:00:00Z",
+    "edudisplej-health.sh": "2026-02-22T00:00:00Z",
+    "edudisplej-health.service": "2026-02-22T00:00:00Z"
   },
   "files": [
     {
@@ -129,6 +131,28 @@
       "description": "Screenshot service for capturing and uploading screen images"
     },
     {
+      "source": "edudisplej-command-executor.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-command-executor.sh",
+      "permissions": "755",
+      "description": "Remote command polling and execution service"
+    },
+    {
+      "source": "edudisplej-health.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-health.sh",
+      "permissions": "755",
+      "description": "Kiosk health telemetry service"
+    },
+    {
+      "source": "edudisplej-command-executor.service",
+      "destination": "/opt/edudisplej/init/edudisplej-command-executor.service",
+      "permissions": "644"
+    },
+    {
+      "source": "edudisplej-health.service",
+      "destination": "/opt/edudisplej/init/edudisplej-health.service",
+      "permissions": "644"
+    },
+    {
       "source": "edudisplej-config-manager.sh",
       "destination": "/opt/edudisplej/init/edudisplej-config-manager.sh",
       "permissions": "755",
@@ -170,6 +194,20 @@
       "enabled": true,
       "autostart": true,
       "description": "Screenshot capture and upload service"
+    },
+    {
+      "source": "edudisplej-command-executor.service",
+      "name": "edudisplej-command-executor.service",
+      "enabled": true,
+      "autostart": true,
+      "description": "Remote command executor service"
+    },
+    {
+      "source": "edudisplej-health.service",
+      "name": "edudisplej-health.service",
+      "enabled": true,
+      "autostart": true,
+      "description": "Kiosk health reporting service"
     }
   ]
 }
