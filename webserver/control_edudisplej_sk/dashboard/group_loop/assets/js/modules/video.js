@@ -2,6 +2,7 @@ const GroupLoopVideoModule = (() => {
     'use strict';
 
     const MAX_LIBRARY_ITEMS = 200;
+    let globalDropGuardsCleanup = null;
 
     const parseIntSafe = (value, fallback) => {
         const parsed = parseInt(value, 10);
@@ -70,6 +71,50 @@ const GroupLoopVideoModule = (() => {
             video.onerror = () => done(null);
             video.src = String(url || '');
         });
+    };
+
+    const isFileDragEvent = (event) => {
+        const types = event?.dataTransfer?.types;
+        if (!types) {
+            return false;
+        }
+        return Array.from(types).includes('Files');
+    };
+
+    const setupGlobalDropGuards = (uploadArea) => {
+        if (typeof globalDropGuardsCleanup === 'function') {
+            globalDropGuardsCleanup();
+            globalDropGuardsCleanup = null;
+        }
+
+        const preventWindowFileDrop = (event) => {
+            if (!uploadArea || !uploadArea.isConnected) {
+                if (typeof globalDropGuardsCleanup === 'function') {
+                    globalDropGuardsCleanup();
+                    globalDropGuardsCleanup = null;
+                }
+                return;
+            }
+
+            if (!isFileDragEvent(event)) {
+                return;
+            }
+
+            if (uploadArea.contains(event.target)) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+        };
+
+        window.addEventListener('dragover', preventWindowFileDrop);
+        window.addEventListener('drop', preventWindowFileDrop);
+
+        globalDropGuardsCleanup = () => {
+            window.removeEventListener('dragover', preventWindowFileDrop);
+            window.removeEventListener('drop', preventWindowFileDrop);
+        };
     };
 
     const updateDurationBadge = () => {
@@ -293,28 +338,65 @@ const GroupLoopVideoModule = (() => {
         const importLibrary = document.getElementById('video-library-import');
 
         if (uploadArea && fileInput) {
+            setupGlobalDropGuards(uploadArea);
+
+            const openPicker = () => {
+                fileInput.value = '';
+                try {
+                    if (typeof fileInput.showPicker === 'function') {
+                        fileInput.showPicker();
+                    } else {
+                        fileInput.click();
+                    }
+                } catch (_) {
+                    fileInput.click();
+                }
+            };
+
             uploadArea.addEventListener('click', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                fileInput.value = '';
-                fileInput.click();
+                openPicker();
             });
+
+            uploadArea.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') {
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                openPicker();
+            });
+
+            uploadArea.setAttribute('tabindex', '0');
             uploadArea.addEventListener('dragenter', (event) => {
+                if (!isFileDragEvent(event)) {
+                    return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
                 uploadArea.style.backgroundColor = '#e6f0ff';
             });
             uploadArea.addEventListener('dragover', (event) => {
+                if (!isFileDragEvent(event)) {
+                    return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
                 uploadArea.style.backgroundColor = '#e6f0ff';
             });
             uploadArea.addEventListener('dragleave', (event) => {
+                if (!isFileDragEvent(event)) {
+                    return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
                 uploadArea.style.backgroundColor = '#f8f9fa';
             });
             uploadArea.addEventListener('drop', (event) => {
+                if (!isFileDragEvent(event)) {
+                    return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
                 uploadArea.style.backgroundColor = '#f8f9fa';

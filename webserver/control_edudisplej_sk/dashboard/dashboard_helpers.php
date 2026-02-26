@@ -53,11 +53,36 @@ function edudisplej_time_in_range($now, $start, $end) {
 }
 
 /**
- * Get Hungarian short day name
+ * Get localized text for dashboard helpers
  */
-function edudisplej_day_short_hu($day) {
-    $map = [1 => 'H', 2 => 'K', 3 => 'Sze', 4 => 'Cs', 5 => 'P', 6 => 'Szo', 7 => 'V'];
-    return $map[(int)$day] ?? '?';
+function edudisplej_dashboard_t(string $key, string $default, array $vars = []): string {
+    if (function_exists('t_def')) {
+        return t_def($key, $default, $vars);
+    }
+
+    $translated = $default;
+    foreach ($vars as $name => $value) {
+        if ($name === '' || $name === null) {
+            continue;
+        }
+        $translated = str_replace('{' . $name . '}', (string)$value, $translated);
+    }
+    return $translated;
+}
+
+/**
+ * Get localized short day name
+ */
+function edudisplej_day_short(int $day): string {
+    $lang = function_exists('edudisplej_get_lang') ? (string)edudisplej_get_lang() : 'sk';
+    $maps = [
+        'hu' => [1 => 'H', 2 => 'K', 3 => 'Sze', 4 => 'Cs', 5 => 'P', 6 => 'Szo', 7 => 'V'],
+        'en' => [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'],
+        'sk' => [1 => 'Po', 2 => 'Ut', 3 => 'St', 4 => 'Št', 5 => 'Pi', 6 => 'So', 7 => 'Ne'],
+    ];
+
+    $map = $maps[$lang] ?? $maps['sk'];
+    return $map[$day] ?? '?';
 }
 
 /**
@@ -160,21 +185,29 @@ function edudisplej_format_schedule_info(array $block, array $style_map, DateTim
 
     $start = substr((string)($block['start_time'] ?? '00:00:00'), 0, 5);
     $end = substr((string)($block['end_time'] ?? '00:00:00'), 0, 5);
-    $until = 'Eddig: ' . $end;
+    $until = edudisplej_dashboard_t('dashboard.schedule.until', 'Until: {end}', ['end' => $end]);
 
     if (strtolower((string)($block['block_type'] ?? 'weekly')) === 'date') {
         $date = (string)($block['specific_date'] ?? $now->format('Y-m-d'));
         return [
             'loop_name' => $loop_name,
-            'schedule_text' => 'Speciális ' . $date . ' ' . $start . '-' . $end . ' • ' . $until,
+            'schedule_text' => edudisplej_dashboard_t(
+                'dashboard.schedule.date',
+                'Special {date} {start}-{end} • {until}',
+                ['date' => $date, 'start' => $start, 'end' => $end, 'until' => $until]
+            ),
         ];
     }
 
     $days = array_filter(array_map('intval', explode(',', (string)($block['days_mask'] ?? ''))));
-    $days_label = implode(',', array_map('edudisplej_day_short_hu', $days));
+    $days_label = implode(',', array_map('edudisplej_day_short', $days));
     return [
         'loop_name' => $loop_name,
-        'schedule_text' => 'Terv ' . $days_label . ' ' . $start . '-' . $end . ' • ' . $until,
+        'schedule_text' => edudisplej_dashboard_t(
+            'dashboard.schedule.weekly',
+            'Plan {days} {start}-{end} • {until}',
+            ['days' => $days_label, 'start' => $start, 'end' => $end, 'until' => $until]
+        ),
     ];
 }
 
@@ -185,7 +218,7 @@ function edudisplej_resolve_group_current_content($plan, $now) {
     if (!is_array($plan)) {
         return [
             'loop_name' => 'DEFAULT',
-            'schedule_text' => 'Nincs terv',
+            'schedule_text' => edudisplej_dashboard_t('dashboard.schedule.none', 'No plan'),
         ];
     }
 
@@ -207,6 +240,6 @@ function edudisplej_resolve_group_current_content($plan, $now) {
     $default_name = trim((string)($style_map[$default_style_id] ?? '')) ?: 'DEFAULT';
     return [
         'loop_name' => $default_name,
-        'schedule_text' => 'Nincs aktív idősáv',
+        'schedule_text' => edudisplej_dashboard_t('dashboard.schedule.no_active', 'No active time block'),
     ];
 }

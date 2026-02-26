@@ -18,6 +18,7 @@ try {
     // Get request data
     $device_id = $_POST['device_id'] ?? $_GET['device_id'] ?? '';
     $module_name = $_POST['module_name'] ?? $_GET['module_name'] ?? '';
+    $module_name = edudisplej_canonical_module_key((string)$module_name);
     
     if (empty($device_id) || empty($module_name)) {
         $response['message'] = 'Missing device_id or module_name';
@@ -118,7 +119,7 @@ try {
                                 continue;
                             }
                             $item_key = (string)($item['module_key'] ?? '');
-                            if ($item_key !== '' && strcasecmp($item_key, $module_name) === 0) {
+                            if ($item_key !== '' && edudisplej_canonical_module_key($item_key) === $module_name) {
                                 $authorized = true;
                                 break 2;
                             }

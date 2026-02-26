@@ -9,6 +9,8 @@ require_once '../../dbkonfiguracia.php';
 require_once '../../i18n.php';
 require_once '../../auth_roles.php';
 
+$current_lang = edudisplej_apply_language_preferences();
+
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../../login.php');
@@ -20,11 +22,11 @@ $user_id = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
 $is_admin = isset($_SESSION['isadmin']) && $_SESSION['isadmin'];
 $session_role = edudisplej_get_session_role();
-$is_content_only_mode = ($session_role === 'content_editor');
+$is_content_only_mode = false;
 
 if (!edudisplej_can_edit_module_content()) {
     http_response_code(403);
-    echo 'Access denied';
+    echo htmlspecialchars(t_def('common.access_denied', 'Access denied'));
     exit();
 }
 
@@ -61,7 +63,7 @@ try {
     // Check permissions: only groups of the current company are accessible
     if (!$group || (int)($group['company_id'] ?? 0) !== (int)$company_id) {
         http_response_code(403);
-        echo 'Access denied';
+        echo htmlspecialchars(t_def('common.access_denied', 'Access denied'));
         exit();
     }
 
@@ -82,7 +84,7 @@ if ($breadcrumb_group_name === '') {
 $breadcrumb_items = [
     ['label' => '📁 ' . t('nav.groups'), 'href' => '../groups.php'],
     ['label' => '👥 ' . $breadcrumb_group_name, 'href' => '../group_kiosks.php?id=' . (int)$group_id],
-    ['label' => '⚙️ Loop config', 'current' => true],
+    ['label' => '⚙️ ' . t_def('group_loop.breadcrumb', 'Loop config'), 'current' => true],
 ];
 
 $logout_url = '../../login.php?logout=1';
@@ -126,13 +128,27 @@ try {
 if ($unconfigured_module) {
     $turned_off_loop_action = [
         'id' => (int)$unconfigured_module['id'],
-        'name' => 'Turned Off',
-        'description' => 'Kijelző kikapcsolása: tartalomszolgáltatás leáll, HDMI kimenet kikapcsol.',
+        'name' => t_def('group_loop.turned_off.name', 'Turned Off'),
+        'description' => t_def('group_loop.turned_off.description', 'Scheduled display power off (content service stop + HDMI off).'),
         'module_key' => 'turned-off',
     ];
 }
 
 $group_loop_modules_catalog = array_values(array_merge($available_modules, $unconfigured_module ? [$unconfigured_module] : []));
+$group_loop_modules_catalog = array_map(static function (array $module): array {
+    $module['name'] = edudisplej_group_loop_module_name($module);
+    return $module;
+}, $group_loop_modules_catalog);
+
+$group_loop_localized_module_names = [];
+foreach ($group_loop_modules_catalog as $module) {
+    $module_key = strtolower(trim((string)($module['module_key'] ?? '')));
+    if ($module_key !== '') {
+        $group_loop_localized_module_names[$module_key] = (string)($module['name'] ?? '');
+    }
+}
+
+$group_loop_localized_module_names['turned-off'] = t_def('group_loop.turned_off.name', 'Turned Off');
 $group_loop_css_version = (string)(@filemtime(__DIR__ . '/assets/css/app.css') ?: time());
 $group_loop_js_version_app = (string)(@filemtime(__DIR__ . '/assets/js/app.js') ?: time());
 $group_loop_js_version_pdf = (string)(@filemtime(__DIR__ . '/assets/js/modules/pdf.js') ?: $group_loop_js_version_app);
@@ -157,6 +173,17 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
     ];
 
     return $map[$key] ?? '🧩';
+}
+
+function edudisplej_group_loop_module_name(array $module): string {
+    $module_key = strtolower(trim((string)($module['module_key'] ?? '')));
+    $fallback = (string)($module['name'] ?? '');
+
+    if ($module_key === '') {
+        return $fallback;
+    }
+
+    return t_def('group_loop.module_name.' . str_replace('-', '_', $module_key), $fallback);
 }
 ?>
 <?php include '../../admin/header.php'; ?>
@@ -1080,14 +1107,14 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
     <?php endif; ?>
 
     <div class="loop-main-header">
-        ⚙️ Loop Testreszabás • Csoport:
+        ⚙️ <?php echo htmlspecialchars(t_def('group_loop.header.title', 'Loop customization')); ?> • <?php echo htmlspecialchars(t_def('group_loop.header.group', 'Group')); ?>:
         <strong id="group-name-display"><?php echo htmlspecialchars($group['name']); ?></strong>
         <?php if (!$is_default_group && !$is_content_only_mode): ?>
-            <button type="button" id="group-name-edit-btn" onclick="toggleGroupNameEdit(true)" style="margin-left:8px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="Átnevezés">✏️</button>
+            <button type="button" id="group-name-edit-btn" onclick="toggleGroupNameEdit(true)" style="margin-left:8px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="<?php echo htmlspecialchars(t_def('group_loop.rename', 'Rename')); ?>">✏️</button>
             <span id="group-name-edit-wrap" style="display:none;margin-left:8px;">
                 <input type="text" id="rename-group-inline-input" value="<?php echo htmlspecialchars($group['name'] ?? '', ENT_QUOTES); ?>" style="min-width:220px;">
-                <button type="button" onclick="renameCurrentGroup()" style="margin-left:6px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="Jóváhagyás">✅</button>
-                <button type="button" onclick="toggleGroupNameEdit(false)" style="margin-left:2px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="Mégse">✖️</button>
+                <button type="button" onclick="renameCurrentGroup()" style="margin-left:6px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="<?php echo htmlspecialchars(t_def('common.save', 'Save')); ?>">✅</button>
+                <button type="button" onclick="toggleGroupNameEdit(false)" style="margin-left:2px;border:none;background:transparent;cursor:pointer;font-size:14px;" title="<?php echo htmlspecialchars(t_def('common.cancel', 'Cancel')); ?>">✖️</button>
             </span>
         <?php endif; ?>
     </div>
@@ -1095,49 +1122,50 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
     <div class="loop-main-layout">
         <div class="loop-main-left">
             <div class="loop-builder" id="loop-builder">
-                <h2 id="loop-config-title">🔄 Csoport loopok</h2>
+                <h2 id="loop-config-title">🔄 <?php echo htmlspecialchars(t_def('group_loop.title', 'Group loops')); ?></h2>
 
                 <div class="loop-style-selector-panel">
                     <div class="loop-style-selector-row">
-                        <label for="loop-style-select">Kiválasztott loop lista:</label>
+                        <label for="loop-style-select"><?php echo htmlspecialchars(t_def('group_loop.selected_loop_list', 'Selected loop list')); ?>:</label>
                         <select id="loop-style-select" onchange="openLoopStyleDetail(this.value)"></select>
                         <?php if (!$is_default_group && !$is_content_only_mode): ?>
-                            <button class="btn" type="button" onclick="createLoopStyle()">+ Új loop</button>
-                            <button class="btn btn-danger" id="loop-style-delete-btn" type="button" onclick="deleteActiveLoopStyle()">🗑️ Loop törlése</button>
+                            <button class="btn" type="button" onclick="createLoopStyle()">+ <?php echo htmlspecialchars(t_def('group_loop.new_loop', 'New loop')); ?></button>
+                            <button class="btn btn-danger" id="loop-style-delete-btn" type="button" onclick="deleteActiveLoopStyle()">🗑️ <?php echo htmlspecialchars(t_def('group_loop.delete_loop', 'Delete loop')); ?></button>
                         <?php endif; ?>
                     </div>
                 </div>
 
                 <div id="loop-workspace-placeholder" class="loop-detail-placeholder" style="display:none; min-height:180px; margin-top:10px;">
-                    Először válassz egy loop listát a legördülő mezőből. Utána megjelenik a modul katalógus, az aktív loop szerkesztő és az előnézet.
+                    <?php echo htmlspecialchars(t_def('group_loop.placeholder.select_loop_first', 'First, select a loop list from the dropdown. Then the module catalog, active loop editor and preview will appear.')); ?>
                 </div>
 
                 <div id="loop-edit-workspace" class="loop-edit-workspace" style="display:grid;">
                     <div class="loop-workspace-col loop-workspace-modules">
-                        <div class="planner-column-header">Modul katalógus</div>
+                        <div class="planner-column-header"><?php echo htmlspecialchars(t_def('group_loop.module_catalog', 'Module catalog')); ?></div>
                         <div id="modules-panel-placeholder" class="loop-detail-placeholder" style="display:none; min-height:120px; margin:10px;">
-                            Elérhető modulok csak akkor jelennek meg, ha kiválasztasz egy loopot.
+                            <?php echo htmlspecialchars(t_def('group_loop.placeholder.modules_after_select', 'Available modules appear only after selecting a loop.')); ?>
                         </div>
 
                         <div id="modules-panel-wrapper" style="display:block; padding:10px;">
                             <div class="modules-panel">
-                                <h2>📦 Elérhető Modulok</h2>
+                                <h2>📦 <?php echo htmlspecialchars(t_def('group_loop.available_modules', 'Available modules')); ?></h2>
 
                                 <?php if (!$is_default_group): ?>
                                     <?php foreach ($available_modules as $module): ?>
                                         <?php $module_key = (string)($module['module_key'] ?? ''); ?>
+                                        <?php $module_display_name = edudisplej_group_loop_module_name($module); ?>
                                         <div class="module-item is-collapsed"
                                             data-module-id="<?php echo (int)$module['id']; ?>"
                                             data-module-key="<?php echo htmlspecialchars($module_key, ENT_QUOTES, 'UTF-8'); ?>"
-                                            data-module-name="<?php echo htmlspecialchars((string)$module['name'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-module-name="<?php echo htmlspecialchars($module_display_name, ENT_QUOTES, 'UTF-8'); ?>"
                                             data-module-desc="<?php echo htmlspecialchars((string)($module['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
                                             <?php if (!$is_content_only_mode): ?>
                                                 draggable="true"
                                             <?php endif; ?>
                                         >
                                             <div class="module-item-head">
-                                                <div class="module-name"><span class="module-icon"><?php echo htmlspecialchars(edudisplej_group_loop_module_emoji($module_key)); ?></span><?php echo htmlspecialchars($module['name']); ?></div>
-                                                <button type="button" class="module-toggle-btn" aria-expanded="false" title="Leírás nyitása/zárása">▾</button>
+                                                <div class="module-name"><span class="module-icon"><?php echo htmlspecialchars(edudisplej_group_loop_module_emoji($module_key)); ?></span><?php echo htmlspecialchars($module_display_name); ?></div>
+                                                <button type="button" class="module-toggle-btn" aria-expanded="false" title="<?php echo htmlspecialchars(t_def('group_loop.toggle_description', 'Toggle description')); ?>">▾</button>
                                             </div>
                                             <div class="module-desc"><?php echo htmlspecialchars($module['description'] ?? ''); ?></div>
                                         </div>
@@ -1145,66 +1173,67 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
                                 <?php endif; ?>
 
                                 <?php if ($unconfigured_module): ?>
+                                    <?php $unconfigured_display_name = edudisplej_group_loop_module_name($unconfigured_module); ?>
                                     <div id="unconfiguredModuleItem" class="module-item is-collapsed"
                                         style="display: <?php echo $is_default_group ? 'block' : 'none'; ?>;"
                                         data-module-id="<?php echo (int)$unconfigured_module['id']; ?>"
                                         data-module-key="<?php echo htmlspecialchars((string)($unconfigured_module['module_key'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
-                                        data-module-name="<?php echo htmlspecialchars((string)$unconfigured_module['name'], ENT_QUOTES, 'UTF-8'); ?>"
+                                        data-module-name="<?php echo htmlspecialchars($unconfigured_display_name, ENT_QUOTES, 'UTF-8'); ?>"
                                         data-module-desc="<?php echo htmlspecialchars((string)($unconfigured_module['description'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
                                         <?php if (!$is_default_group && !$is_content_only_mode): ?>
                                             draggable="true"
                                         <?php endif; ?>
                                     >
                                         <div class="module-item-head">
-                                            <div class="module-name"><span class="module-icon"><?php echo htmlspecialchars(edudisplej_group_loop_module_emoji((string)($unconfigured_module['module_key'] ?? 'unconfigured'))); ?></span><?php echo htmlspecialchars($unconfigured_module['name']); ?></div>
-                                            <button type="button" class="module-toggle-btn" aria-expanded="false" title="Leírás nyitása/zárása">▾</button>
+                                            <div class="module-name"><span class="module-icon"><?php echo htmlspecialchars(edudisplej_group_loop_module_emoji((string)($unconfigured_module['module_key'] ?? 'unconfigured'))); ?></span><?php echo htmlspecialchars($unconfigured_display_name); ?></div>
+                                            <button type="button" class="module-toggle-btn" aria-expanded="false" title="<?php echo htmlspecialchars(t_def('group_loop.toggle_description', 'Toggle description')); ?>">▾</button>
                                         </div>
-                                        <div class="module-desc"><?php echo htmlspecialchars($unconfigured_module['description'] ?? 'Technikai modul – csak üres loop esetén.'); ?></div>
+                                        <div class="module-desc"><?php echo htmlspecialchars($unconfigured_module['description'] ?? t_def('group_loop.technical_module_desc', 'Technical module – only for empty loop fallback.')); ?></div>
                                     </div>
                                 <?php endif; ?>
 
-                                <p id="noModulesMessage" style="text-align: center; color: #999; padding: 16px 8px; display: <?php echo ($is_default_group || empty($available_modules)) ? 'block' : 'none'; ?>;"><?php echo $is_default_group ? 'A default csoportnál csak az unconfigured modul engedélyezett.' : 'Nincsenek elérhető modulok'; ?></p>
+                                <p id="noModulesMessage" style="text-align: center; color: #999; padding: 16px 8px; display: <?php echo ($is_default_group || empty($available_modules)) ? 'block' : 'none'; ?>;"><?php echo $is_default_group ? htmlspecialchars(t_def('group_loop.default_only_unconfigured', 'Only the unconfigured module is allowed for default group.')) : htmlspecialchars(t_def('group_loop.no_modules', 'No available modules')); ?></p>
                             </div>
                         </div>
                     </div>
 
                     <div class="loop-workspace-col loop-workspace-editor">
                         <div class="planner-column-header" style="display:flex; align-items:center; justify-content:space-between; gap:8px; text-transform:none; letter-spacing:0; font-size:11px;">
-                            <span>Szerkesztett loop: <strong id="active-loop-inline-name">—</strong><span id="active-loop-inline-schedule" style="margin-left:6px; font-weight:400; color:#425466;"></span></span>
+                            <span><?php echo htmlspecialchars(t_def('group_loop.edited_loop', 'Edited loop')); ?>: <strong id="active-loop-inline-name">—</strong><span id="active-loop-inline-schedule" style="margin-left:6px; font-weight:400; color:#425466;"></span></span>
                             <?php if (!$is_default_group && !$is_content_only_mode): ?>
                                 <span style="display:flex; gap:6px; align-items:center;">
-                                    <button class="btn" type="button" onclick="renameActiveLoopStyle()" style="padding:4px 8px; font-size:11px;">✏️ Átnevezés</button>
-                                    <button class="btn" type="button" onclick="duplicateActiveLoopStyle()" style="padding:4px 8px; font-size:11px;">📄 Duplikálás</button>
+                                    <button class="btn" type="button" onclick="renameActiveLoopStyle()" style="padding:4px 8px; font-size:11px;">✏️ <?php echo htmlspecialchars(t_def('group_loop.rename', 'Rename')); ?></button>
+                                    <button class="btn" type="button" onclick="duplicateActiveLoopStyle()" style="padding:4px 8px; font-size:11px;">📄 <?php echo htmlspecialchars(t_def('group_loop.duplicate', 'Duplicate')); ?></button>
                                 </span>
                             <?php endif; ?>
                         </div>
                         <div style="padding:10px;">
                             <div id="loop-detail-placeholder" class="loop-detail-placeholder" style="display:none;">
-                                Válassz egy loopot a legördülő listából a szerkesztéshez.
+                                <?php echo htmlspecialchars(t_def('group_loop.select_for_edit', 'Select a loop from the dropdown list for editing.')); ?>
                             </div>
 
                             <div id="loop-detail-panel" style="display:block;">
                                 <div id="loop-container" class="empty" ondragover="allowModuleCatalogDrop(event)" ondragenter="allowModuleCatalogDrop(event)" ondragleave="handleModuleCatalogDragLeave(event)" ondrop="dropCatalogModuleToLoop(event)">
-                                    <p>Nincs elem a loop-ban. Húzz ide modult az „Elérhető Modulok” panelről.</p>
+                                    <p><?php echo htmlspecialchars(t_def('group_loop.empty_drag_hint', 'No items in loop. Drag modules here from the "Available modules" panel.')); ?></p>
                                 </div>
 
                                 <div class="control-panel">
-                                    <button class="btn btn-danger" onclick="clearLoop()" <?php echo ($is_default_group || $is_content_only_mode) ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : ''; ?>>🗑️ Összes törlése</button>
-                                    <div class="total-duration" id="total-duration">Össz: 0 mp</div>
+                                    <button class="btn btn-danger" onclick="clearLoop()" <?php echo ($is_default_group || $is_content_only_mode) ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : ''; ?>>🗑️ <?php echo htmlspecialchars(t_def('group_loop.clear_all', 'Clear all')); ?></button>
+                                    <div class="total-duration" id="total-duration"><?php echo htmlspecialchars(t_def('group_loop.total_duration_short', 'Total: 0 sec')); ?></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <div class="loop-workspace-col loop-workspace-preview" id="preview-panel-wrapper">
-                        <div class="planner-column-header">Előnézet</div>
+                        <div class="planner-column-header"><?php echo htmlspecialchars(t_def('group_loop.preview', 'Preview')); ?></div>
                         <div style="padding:10px;">
                             <div class="preview-panel">
-                                <h2 id="preview-title">📺 Loop előnézete</h2>
+                                <h2 id="preview-title">📺 <?php echo htmlspecialchars(t_def('group_loop.preview_title', 'Loop preview')); ?></h2>
                                 
                                 <div style="margin-bottom: 15px;">
                                     <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 13px;">
-                                        Felbontás szerinti előnézet:
+                                        <?php echo htmlspecialchars(t_def('group_loop.preview_resolution', 'Resolution preview')); ?>:
                                     </label>
                                     <select id="resolutionSelector" onchange="updatePreviewResolution()" style="
                                         width: 100%;
@@ -1226,16 +1255,16 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
                                 
                                 <div class="preview-screen" id="previewScreen">
                                     <div class="preview-empty" id="previewEmpty">
-                                        <p>🎬 Nincs loop</p>
-                                        <p style="font-size: 12px; color: #999; margin-top: 10px;">Adj hozzá modulokat a loop előnézetéhez</p>
+                                        <p>🎬 <?php echo htmlspecialchars(t_def('group_loop.no_loop', 'No loop')); ?></p>
+                                        <p style="font-size: 12px; color: #999; margin-top: 10px;"><?php echo htmlspecialchars(t_def('group_loop.preview_add_modules', 'Add modules for loop preview')); ?></p>
                                     </div>
                                     <iframe id="previewIframe" class="preview-iframe" style="display: none;"></iframe>
                                 </div>
                                 
                                 <div class="preview-controls">
-                                    <button class="preview-btn preview-btn-play" id="btnPlay" onclick="startPreview()">▶️ Lejátszás</button>
-                                    <button class="preview-btn preview-btn-pause" id="btnPause" onclick="pausePreview()" style="display: none;">⏸️ Szünet</button>
-                                    <button class="preview-btn preview-btn-stop" id="btnStop" onclick="stopPreview()">⏹️ Stop</button>
+                                    <button class="preview-btn preview-btn-play" id="btnPlay" onclick="startPreview()">▶️ <?php echo htmlspecialchars(t_def('group_loop.play', 'Play')); ?></button>
+                                    <button class="preview-btn preview-btn-pause" id="btnPause" onclick="pausePreview()" style="display: none;">⏸️ <?php echo htmlspecialchars(t_def('group_loop.pause', 'Pause')); ?></button>
+                                    <button class="preview-btn preview-btn-stop" id="btnStop" onclick="stopPreview()">⏹️ <?php echo htmlspecialchars(t_def('group_loop.stop', 'Stop')); ?></button>
                                 </div>
                                 
                                 <div class="preview-progress">
@@ -1245,22 +1274,22 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
                                 </div>
                                 
                                 <div class="preview-navigation">
-                                    <button class="preview-nav-btn" id="btnPrev" onclick="previousModule()" title="Előző modul">◄</button>
+                                    <button class="preview-nav-btn" id="btnPrev" onclick="previousModule()" title="<?php echo htmlspecialchars(t_def('group_loop.prev_module', 'Previous module')); ?>">◄</button>
                                     <div class="preview-nav-info" id="navInfo">—</div>
-                                    <button class="preview-nav-btn" id="btnNext" onclick="nextModule()" title="Következő modul">►</button>
+                                    <button class="preview-nav-btn" id="btnNext" onclick="nextModule()" title="<?php echo htmlspecialchars(t_def('group_loop.next_module', 'Next module')); ?>">►</button>
                                 </div>
                                 
                                 <div class="preview-info" id="previewInfo">
                                     <div class="preview-info-row">
-                                        <span class="preview-info-label">Aktuális modul:</span>
+                                        <span class="preview-info-label"><?php echo htmlspecialchars(t_def('group_loop.current_module', 'Current module')); ?>:</span>
                                         <span class="preview-info-value" id="currentModule">—</span>
                                     </div>
                                     <div class="preview-info-row">
-                                        <span class="preview-info-label">Loop állapot:</span>
-                                        <span class="preview-info-value" id="loopStatus">Leállítva</span>
+                                        <span class="preview-info-label"><?php echo htmlspecialchars(t_def('group_loop.loop_status', 'Loop status')); ?>:</span>
+                                        <span class="preview-info-value" id="loopStatus"><?php echo htmlspecialchars(t_def('group_loop.stopped', 'Stopped')); ?></span>
                                     </div>
                                     <div class="preview-info-row">
-                                        <span class="preview-info-label">Ciklusok:</span>
+                                        <span class="preview-info-label"><?php echo htmlspecialchars(t_def('group_loop.cycles', 'Cycles')); ?>:</span>
                                         <span class="preview-info-value" id="loopCount">0</span>
                                     </div>
                                 </div>
@@ -1274,16 +1303,16 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
 
     <?php if (!$is_default_group): ?>
     <div class="planner-panel">
-        <div class="planner-title">Ütemezés</div>
+        <div class="planner-title"><?php echo htmlspecialchars(t_def('group_loop.schedule', 'Scheduling')); ?></div>
         <div class="planner-legend">
-            <span><span class="dot weekly"></span>Heti blokk</span>
-            <span><span class="dot turned-off"></span>Kikapcsolási terv</span>
-            <span><span class="dot active"></span>Aktív tartomány</span>
+            <span><span class="dot weekly"></span><?php echo htmlspecialchars(t_def('group_loop.legend.weekly', 'Weekly block')); ?></span>
+            <span><span class="dot turned-off"></span><?php echo htmlspecialchars(t_def('group_loop.legend.turned_off', 'Turned off plan')); ?></span>
+            <span><span class="dot active"></span><?php echo htmlspecialchars(t_def('group_loop.legend.active', 'Active range')); ?></span>
         </div>
 
         <div class="schedule-workspace">
             <div class="schedule-loop-column">
-                <div class="planner-column-header">Heti loop terv</div>
+                <div class="planner-column-header"><?php echo htmlspecialchars(t_def('group_loop.weekly_loop_plan', 'Weekly loop plan')); ?></div>
                 <div id="loop-style-drag-list" class="time-block-toolbar" style="margin-bottom:0;"></div>
                 <div id="fixed-weekly-planner" class="fixed-weekly-planner-modal" style="display:none;">
                     <div class="fixed-weekly-planner-backdrop" onclick="closeFixedWeeklyPlannerModal()"></div>
@@ -1291,10 +1320,10 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
                         <input type="hidden" id="fixed-plan-block-id" value="">
                         <input type="hidden" id="fixed-plan-loop-style" value="">
                         <div class="fixed-weekly-planner-head">
-                            <label id="fixed-weekly-planner-title" style="font-size:12px; font-weight:700; color:#1f2d3d; margin:0;">Kijelölt heti blokk szerkesztése</label>
-                            <button type="button" class="fixed-weekly-close-btn" onclick="closeFixedWeeklyPlannerModal()" aria-label="Bezárás" title="Bezárás">✕</button>
+                            <label id="fixed-weekly-planner-title" style="font-size:12px; font-weight:700; color:#1f2d3d; margin:0;"><?php echo htmlspecialchars(t_def('group_loop.edit_selected_weekly_block', 'Edit selected weekly block')); ?></label>
+                            <button type="button" class="fixed-weekly-close-btn" onclick="closeFixedWeeklyPlannerModal()" aria-label="<?php echo htmlspecialchars(t_def('common.close', 'Close')); ?>" title="<?php echo htmlspecialchars(t_def('common.close', 'Close')); ?>">✕</button>
                         </div>
-                        <div id="fixed-plan-loop-label" style="font-size:12px; color:#425466; font-weight:600;">Kiválasztott loop: —</div>
+                        <div id="fixed-plan-loop-label" style="font-size:12px; color:#425466; font-weight:600;"><?php echo htmlspecialchars(t_def('group_loop.selected_loop_empty', 'Selected loop: —')); ?></div>
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
                             <label style="display:flex; align-items:center; gap:4px; font-size:12px;"><input type="checkbox" class="fixed-plan-day-checkbox" value="1">H</label>
                             <label style="display:flex; align-items:center; gap:4px; font-size:12px;"><input type="checkbox" class="fixed-plan-day-checkbox" value="2">K</label>
@@ -1305,30 +1334,30 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
                             <label style="display:flex; align-items:center; gap:4px; font-size:12px;"><input type="checkbox" class="fixed-plan-day-checkbox" value="7">V</label>
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                            <select id="fixed-plan-start" aria-label="Heti terv kezdete (óra-perc)"></select>
-                            <select id="fixed-plan-end" aria-label="Heti terv vége (óra-perc)"></select>
+                            <input type="time" id="fixed-plan-start" step="60" aria-label="<?php echo htmlspecialchars(t_def('group_loop.weekly_start_time_aria', 'Weekly plan start (hour-minute)')); ?>">
+                            <input type="time" id="fixed-plan-end" step="60" aria-label="<?php echo htmlspecialchars(t_def('group_loop.weekly_end_time_aria', 'Weekly plan end (hour-minute)')); ?>">
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                            <button id="fixed-plan-add-btn" type="button" class="btn" onclick="createFixedWeeklyBlockFromInputs()">Frissítés</button>
-                            <button type="button" class="btn btn-danger" onclick="deleteSelectedWeeklyPlanBlock()" title="Kijelölt törlése">🗑️</button>
+                            <button id="fixed-plan-add-btn" type="button" class="btn" onclick="createFixedWeeklyBlockFromInputs()"><?php echo htmlspecialchars(t_def('common.update', 'Update')); ?></button>
+                            <button type="button" class="btn btn-danger" onclick="deleteSelectedWeeklyPlanBlock()" title="<?php echo htmlspecialchars(t_def('group_loop.delete_selected', 'Delete selected')); ?>">🗑️</button>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="schedule-calendar-column">
-                <div class="planner-column-header">Heti nézet</div>
+                <div class="planner-column-header"><?php echo htmlspecialchars(t_def('group_loop.weekly_view', 'Weekly view')); ?></div>
                 <div class="time-block-toolbar">
-                    <button type="button" class="btn" onclick="changeScheduleWeek(-1)" title="Előző hét">◀</button>
+                    <button type="button" class="btn" onclick="changeScheduleWeek(-1)" title="<?php echo htmlspecialchars(t_def('group_loop.prev_week', 'Previous week')); ?>">◀</button>
                     <span id="schedule-week-label" style="font-size:12px; color:#425466; font-weight:700;"></span>
-                    <button type="button" class="btn" onclick="changeScheduleWeek(1)" title="Következő hét">▶</button>
-                    <button type="button" class="btn" onclick="openScheduleDatePicker()" title="Dátum választása">📅</button>
+                    <button type="button" class="btn" onclick="changeScheduleWeek(1)" title="<?php echo htmlspecialchars(t_def('group_loop.next_week', 'Next week')); ?>">▶</button>
+                    <button type="button" class="btn" onclick="openScheduleDatePicker()" title="<?php echo htmlspecialchars(t_def('group_loop.pick_date', 'Pick date')); ?>">📅</button>
                     <input type="date" id="schedule-date-picker" onchange="setScheduleDateFromPicker(this.value)" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;" aria-hidden="true" tabindex="-1">
-                    <label for="schedule-grid-step" style="margin-left:8px;">Felbontás:</label>
+                    <label for="schedule-grid-step" style="margin-left:8px;"><?php echo htmlspecialchars(t_def('group_loop.resolution', 'Resolution')); ?>:</label>
                     <select id="schedule-grid-step" style="min-width:90px;" onchange="setScheduleGridStep(this.value)">
-                        <option value="60">60 perc</option>
-                        <option value="30">30 perc</option>
-                        <option value="15">15 perc</option>
+                        <option value="60"><?php echo htmlspecialchars(t_def('group_loop.minutes_60', '60 min')); ?></option>
+                        <option value="30"><?php echo htmlspecialchars(t_def('group_loop.minutes_30', '30 min')); ?></option>
+                        <option value="15"><?php echo htmlspecialchars(t_def('group_loop.minutes_15', '15 min')); ?></option>
                     </select>
                 </div>
                 <div class="schedule-grid-wrap">
@@ -1340,10 +1369,10 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
     <?php endif; ?>
 
     <div id="pending-save-bar" class="pending-save-bar" style="display:none;">
-        <span id="pending-save-text">Nem mentett változtatások</span>
+        <span id="pending-save-text"><?php echo htmlspecialchars(t_def('group_loop.unsaved_changes', 'Unsaved changes')); ?></span>
         <div class="pending-save-actions">
-            <button type="button" class="btn pending-save-btn" onclick="publishLoopPlan()">💾 Mentés</button>
-            <button type="button" class="btn pending-discard-btn" onclick="discardLocalDraft()" title="Elvetés">✕</button>
+            <button type="button" class="btn pending-save-btn" onclick="publishLoopPlan()">💾 <?php echo htmlspecialchars(t_def('common.save', 'Save')); ?></button>
+            <button type="button" class="btn pending-discard-btn" onclick="discardLocalDraft()" title="<?php echo htmlspecialchars(t_def('group_loop.discard', 'Discard')); ?>">✕</button>
         </div>
     </div>
 
@@ -1357,11 +1386,35 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
             'isContentOnlyMode' => (bool)$is_content_only_mode,
             'technicalModule' => $unconfigured_module ? [
                 'id' => (int)$unconfigured_module['id'],
-                'name' => $unconfigured_module['name'],
+                'name' => edudisplej_group_loop_module_name($unconfigured_module),
                 'description' => $unconfigured_module['description'] ?? ''
             ] : null,
             'turnedOffLoopAction' => $turned_off_loop_action,
             'modulesCatalog' => $group_loop_modules_catalog,
+            'localizedModuleNames' => $group_loop_localized_module_names,
+            'i18n' => [
+                'group_loop.schedule_button' => t_def('group_loop.schedule_button', 'Schedule'),
+                'group_loop.no_schedulable' => t_def('group_loop.no_schedulable', 'No schedulable loops.'),
+                'group_loop.create' => t_def('common.create', 'Create'),
+                'group_loop.add' => t_def('group_loop.add', 'Add'),
+                'group_loop.selected_loop' => t_def('group_loop.selected_loop', 'Selected loop: {name}'),
+                'group_loop.selected_loop_empty' => t_def('group_loop.selected_loop_empty', 'Selected loop: —'),
+                'group_loop.turned_off_meta' => t_def('group_loop.turned_off_meta', ''),
+                'group_loop.weekly_or_special' => t_def('group_loop.weekly_or_special', 'Can be placed into weekly or special plan'),
+                'group_loop.currently_selected' => t_def('group_loop.currently_selected', 'Selected loop'),
+                'group_loop.quick_schedule_title' => t_def('group_loop.quick_schedule_title', 'Weekly schedule'),
+                'group_loop.quick_schedule_loop' => t_def('group_loop.quick_schedule_loop', 'Loop'),
+                'group_loop.quick_schedule_start_aria' => t_def('group_loop.quick_schedule_start_aria', 'Weekly start (hour-minute)'),
+                'group_loop.quick_schedule_end_aria' => t_def('group_loop.quick_schedule_end_aria', 'Weekly end (hour-minute)'),
+                'group_loop.day_and_time_required' => t_def('group_loop.day_and_time_required', 'Choose at least one day and set both times'),
+                'group_loop.start_end_same' => t_def('group_loop.start_end_same', 'Start and end time cannot be the same'),
+                'group_loop.weekly_slot_created' => t_def('group_loop.weekly_slot_created', 'Weekly time block created'),
+                'group_loop.default_not_schedulable' => t_def('group_loop.default_not_schedulable', 'DEFAULT loop cannot be scheduled'),
+                'group_loop.conflict_cancelled' => t_def('group_loop.conflict_cancelled', 'Cancelled because of conflict'),
+                'group_loop.conflict_prompt' => t_def('group_loop.conflict_prompt', 'There are existing loops in this time:\n{names}\n\n1 = trim conflicting blocks (end sooner)\n2 = delete conflicting blocks\n0 = cancel'),
+                'group_loop.customization' => t_def('group_loop.customization', 'Customization'),
+                'group_loop.unspecified_module' => t_def('group_loop.unspecified_module', 'Module')
+            ],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
     </script>
     <script src="assets/js/modules/pdf.js?v=<?php echo rawurlencode($group_loop_js_version_pdf); ?>"></script>

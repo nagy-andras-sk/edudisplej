@@ -9,7 +9,7 @@ function edudisplej_normalize_user_role(?string $role, bool $is_admin = false): 
     }
 
     $value = strtolower(trim((string)$role));
-    $allowed = ['user', 'loop_manager', 'content_editor'];
+    $allowed = ['user', 'easy_user'];
 
     return in_array($value, $allowed, true) ? $value : 'user';
 }
@@ -21,18 +21,14 @@ function edudisplej_get_session_role(): string {
     return edudisplej_normalize_user_role($role, $is_admin);
 }
 
-function edudisplej_is_content_editor(): bool {
-    return edudisplej_get_session_role() === 'content_editor';
-}
-
 function edudisplej_can_manage_loops(): bool {
     $role = edudisplej_get_session_role();
-    return in_array($role, ['admin', 'user', 'loop_manager'], true);
+    return in_array($role, ['admin', 'user', 'easy_user'], true);
 }
 
 function edudisplej_can_edit_module_content(): bool {
     $role = edudisplej_get_session_role();
-    return in_array($role, ['admin', 'user', 'loop_manager', 'content_editor'], true);
+    return in_array($role, ['admin', 'user', 'easy_user'], true);
 }
 
 function edudisplej_ensure_user_role_column(mysqli $conn): void {

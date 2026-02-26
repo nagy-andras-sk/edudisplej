@@ -296,8 +296,7 @@ include 'header.php';
             <select id="user_role" name="user_role">
                 <?php $selected_role = $edit_user ? edudisplej_normalize_user_role($edit_user['user_role'] ?? 'user', !empty($edit_user['isadmin'])) : 'user'; ?>
                 <option value="user" <?php echo $selected_role === 'user' ? 'selected' : ''; ?>>Felhasználó</option>
-                <option value="loop_manager" <?php echo $selected_role === 'loop_manager' ? 'selected' : ''; ?>>Loop/modul kezelő</option>
-                <option value="content_editor" <?php echo $selected_role === 'content_editor' ? 'selected' : ''; ?>>Tartalom módosító</option>
+                <option value="easy_user" <?php echo $selected_role === 'easy_user' ? 'selected' : ''; ?>>Egyszerű felhasználó</option>
             </select>
         </div>
         <?php if (!$edit_user): ?>
@@ -354,10 +353,8 @@ include 'header.php';
                                     $role_label = 'Admin';
                                 } else {
                                     $role_value = edudisplej_normalize_user_role($user['user_role'] ?? 'user', false);
-                                    if ($role_value === 'loop_manager') {
-                                        $role_label = 'Loop/modul kezelő';
-                                    } elseif ($role_value === 'content_editor') {
-                                        $role_label = 'Tartalom módosító';
+                                    if ($role_value === 'easy_user') {
+                                        $role_label = 'Egyszerű felhasználó';
                                     }
                                 }
                                 echo htmlspecialchars($role_label);

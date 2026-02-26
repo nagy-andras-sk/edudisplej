@@ -140,6 +140,93 @@ function edudisplej_get_active_block_id(mysqli $conn, int $group_id): array {
     return ['has_blocks' => true, 'active_block_id' => null];
 }
 
+function edudisplej_kiosk_loop_normalize_time($raw, string $fallback = '00:00:00'): string {
+    $candidate = trim((string)$raw);
+    if (!preg_match('/^(?<h>\d{2}):(?<m>\d{2})(?::(?<s>\d{2}))?$/', $candidate, $m)) {
+        return $fallback;
+    }
+
+    $h = (int)$m['h'];
+    $mi = (int)$m['m'];
+    $s = isset($m['s']) ? (int)$m['s'] : 0;
+    if ($h < 0 || $h > 23 || $mi < 0 || $mi > 59 || $s < 0 || $s > 59) {
+        return $fallback;
+    }
+
+    return sprintf('%02d:%02d:%02d', $h, $mi, $s);
+}
+
+function edudisplej_pick_newer_timestamp(?string $current, ?string $candidate): ?string {
+    $candidate = trim((string)$candidate);
+    if ($candidate === '') {
+        return $current;
+    }
+
+    $current = trim((string)$current);
+    if ($current === '') {
+        return $candidate;
+    }
+
+    $currentTs = strtotime($current);
+    $candidateTs = strtotime($candidate);
+    if ($currentTs === false) {
+        return $candidate;
+    }
+    if ($candidateTs === false) {
+        return $current;
+    }
+
+    return $candidateTs > $currentTs ? $candidate : $current;
+}
+
+function edudisplej_collect_meal_prefetch_latest_from_settings(array $settings, ?string $latest = null): ?string {
+    $prefetched = $settings['offlinePrefetchedMenuData'] ?? null;
+    if (is_array($prefetched)) {
+        if (isset($prefetched['updated_at'])) {
+            $latest = edudisplej_pick_newer_timestamp($latest, (string)$prefetched['updated_at']);
+        }
+        if (isset($prefetched['today']) && is_array($prefetched['today'])) {
+            $latest = edudisplej_pick_newer_timestamp($latest, (string)($prefetched['today']['updated_at'] ?? ''));
+        }
+        if (isset($prefetched['tomorrow']) && is_array($prefetched['tomorrow'])) {
+            $latest = edudisplej_pick_newer_timestamp($latest, (string)($prefetched['tomorrow']['updated_at'] ?? ''));
+        }
+    }
+
+    if (isset($settings['offlinePrefetchedMenuSavedAt'])) {
+        $savedAt = trim((string)$settings['offlinePrefetchedMenuSavedAt']);
+        if ($savedAt !== '') {
+            $savedTs = strtotime($savedAt);
+            if ($savedTs !== false) {
+                $latest = edudisplej_pick_newer_timestamp($latest, date('Y-m-d H:i:s', $savedTs));
+            }
+        }
+    }
+
+    return $latest;
+}
+
+function edudisplej_collect_meal_prefetch_latest_from_loop_items(array $items, ?string $latest = null): ?string {
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $moduleKey = strtolower(trim((string)($item['module_key'] ?? '')));
+        if ($moduleKey !== 'meal-menu' && $moduleKey !== 'meal_menu') {
+            continue;
+        }
+
+        $settings = $item['settings'] ?? null;
+        if (!is_array($settings)) {
+            continue;
+        }
+
+        $latest = edudisplej_collect_meal_prefetch_latest_from_settings($settings, $latest);
+    }
+
+    return $latest;
+}
+
 function edudisplej_sync_hydrate_text_collection_settings(mysqli $conn, int $company_id, array $settings): array {
     $source_type = strtolower(trim((string)($settings['textSourceType'] ?? 'manual')));
     if ($source_type !== 'collection') {
@@ -398,6 +485,9 @@ function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company
     }
 
     if ($key === 'meal-menu' || $key === 'meal_menu') {
+        if ((int)($normalized['companyId'] ?? 0) <= 0 && $company_id > 0) {
+            $normalized['companyId'] = $company_id;
+        }
         $prefetched = edudisplej_sync_prefetch_meal_menu_payload($conn, $company_id, $normalized);
         if ($prefetched) {
             $normalized['offlinePrefetchedMenuData'] = $prefetched;
@@ -409,7 +499,7 @@ function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company
 }
 
 function edudisplej_normalize_plan_loop_item_for_sync(mysqli $conn, int $company_id, array $item): array {
-    $module_key = strtolower(trim((string)($item['module_key'] ?? '')));
+    $module_key = edudisplej_canonical_module_key((string)($item['module_key'] ?? ''));
     $runtime_payload = edudisplej_module_runtime_payload_for_sync($module_key);
 
     $raw_settings = $item['settings'] ?? [];
@@ -425,6 +515,9 @@ function edudisplej_normalize_plan_loop_item_for_sync(mysqli $conn, int $company
     $item['module_key'] = $module_key;
     $item['module_name'] = (string)($item['module_name'] ?? $module_key);
     $item['duration_seconds'] = (int)($item['duration_seconds'] ?? 15);
+    if ($module_key === 'turned-off') {
+        $item['duration_seconds'] = 120;
+    }
     $item['display_order'] = (int)($item['display_order'] ?? 0);
     $item['settings'] = $optimized_settings;
     $item['module_folder'] = (string)($item['module_folder'] ?? $runtime_payload['module_folder']);
@@ -439,7 +532,7 @@ function edudisplej_normalize_plan_loop_item_for_sync(mysqli $conn, int $company
 }
 
 function edudisplej_module_runtime_payload_for_sync(string $module_key): array {
-    $resolved_key = strtolower(trim($module_key));
+    $resolved_key = edudisplej_canonical_module_key($module_key);
     if ($resolved_key === '') {
         return [
             'module_folder' => '',
@@ -469,7 +562,7 @@ function edudisplej_kiosk_loop_requires_turned_off(array $loop_config): bool {
 
     $has_turned_off = false;
     foreach ($loop_config as $item) {
-        $module_key = strtolower(trim((string)($item['module_key'] ?? '')));
+        $module_key = edudisplej_canonical_module_key((string)($item['module_key'] ?? ''));
         if ($module_key === 'turned-off') {
             $has_turned_off = true;
             continue;
@@ -583,7 +676,7 @@ try {
     $loop_plan_version = 0;
     $loop_plan_updated_at = null;
     while ($row = $result->fetch_assoc()) {
-        $resolved_module_key = (string)($row['resolved_module_key'] ?? $row['module_key'] ?? '');
+        $resolved_module_key = edudisplej_canonical_module_key((string)($row['resolved_module_key'] ?? $row['module_key'] ?? ''));
         $resolved_module_name = (string)($row['resolved_module_name'] ?? $row['module_name'] ?? $resolved_module_key);
         $runtime_payload = edudisplej_module_runtime_payload_for_sync($resolved_module_key);
 
@@ -691,8 +784,8 @@ try {
                         'block_name' => (string)($block['block_name'] ?? 'Időblokk'),
                         'block_type' => strtolower((string)($block['block_type'] ?? 'weekly')) === 'date' ? 'date' : 'weekly',
                         'specific_date' => !empty($block['specific_date']) ? (string)$block['specific_date'] : null,
-                        'start_time' => (string)($block['start_time'] ?? '00:00:00'),
-                        'end_time' => (string)($block['end_time'] ?? '00:00:00'),
+                        'start_time' => edudisplej_kiosk_loop_normalize_time($block['start_time'] ?? '00:00:00', '00:00:00'),
+                        'end_time' => edudisplej_kiosk_loop_normalize_time($block['end_time'] ?? '00:00:00', '00:00:00'),
                         'days_mask' => (string)($block['days_mask'] ?? '1,2,3,4,5,6,7'),
                         'is_active' => (int)($block['is_active'] ?? 1),
                         'priority' => (int)($block['priority'] ?? 100),
@@ -795,7 +888,7 @@ try {
                 }
 
                 foreach ($all_plan_modules as $item) {
-                    $module_key = (string)($item['module_key'] ?? '');
+                    $module_key = edudisplej_canonical_module_key((string)($item['module_key'] ?? ''));
                     if ($module_key === '' || isset($preload_map[$module_key])) {
                         continue;
                     }
@@ -858,7 +951,7 @@ try {
 
             $base_loop = [];
             while ($row = $all_modules_result->fetch_assoc()) {
-                $resolved_module_key = (string)($row['resolved_module_key'] ?? $row['module_key'] ?? '');
+                $resolved_module_key = edudisplej_canonical_module_key((string)($row['resolved_module_key'] ?? $row['module_key'] ?? ''));
                 $resolved_module_name = (string)($row['resolved_module_name'] ?? $row['module_name'] ?? $resolved_module_key);
                 $runtime_payload = edudisplej_module_runtime_payload_for_sync($resolved_module_key);
                 $module_item = [
@@ -952,6 +1045,21 @@ try {
     if (!$loop_last_update) {
         $loop_last_update = date('Y-m-d H:i:s');
     }
+
+    $meal_prefetch_latest = null;
+    $meal_prefetch_latest = edudisplej_collect_meal_prefetch_latest_from_loop_items($loop_config, $meal_prefetch_latest);
+    if (is_array($offline_plan['base_loop'] ?? null)) {
+        $meal_prefetch_latest = edudisplej_collect_meal_prefetch_latest_from_loop_items($offline_plan['base_loop'], $meal_prefetch_latest);
+    }
+    if (is_array($offline_plan['time_blocks'] ?? null)) {
+        foreach ($offline_plan['time_blocks'] as $block) {
+            if (!is_array($block) || !is_array($block['loops'] ?? null)) {
+                continue;
+            }
+            $meal_prefetch_latest = edudisplej_collect_meal_prefetch_latest_from_loop_items($block['loops'], $meal_prefetch_latest);
+        }
+    }
+    $loop_last_update = edudisplej_pick_newer_timestamp($loop_last_update, $meal_prefetch_latest) ?? $loop_last_update;
     
     $should_turn_off = edudisplej_kiosk_loop_requires_turned_off($loop_config);
     $terminal_state = edudisplej_kiosk_loop_apply_terminal_power_mode($conn, (int)$kiosk_id, $should_turn_off);

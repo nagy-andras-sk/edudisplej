@@ -256,6 +256,149 @@ EOF
     fi
 }
 
+canonicalize_module_key() {
+    local raw="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
+    case "$raw" in
+        meal_menu) echo "meal-menu" ;;
+        room_occupancy) echo "room-occupancy" ;;
+        default_logo) echo "default-logo" ;;
+        image_gallery) echo "image-gallery" ;;
+        *) echo "$raw" ;;
+    esac
+}
+
+cleanup_stale_local_content() {
+    if ! command -v python3 >/dev/null 2>&1; then
+        log_error "python3 not available - stale content cleanup skipped"
+        return 1
+    fi
+
+    local cleanup_output
+    if ! cleanup_output=$(python3 - "$MODULES_DIR" "$ASSETS_DIR" "$LOOP_FILE" "$@" <<'PY'
+import json
+import shutil
+import sys
+from pathlib import Path
+
+modules_dir = Path(sys.argv[1])
+assets_dir = Path(sys.argv[2])
+loop_file = Path(sys.argv[3])
+desired_dirs = {str(item).strip() for item in sys.argv[4:] if str(item).strip()}
+
+removed_modules = 0
+removed_asset_files = 0
+removed_asset_dirs = 0
+
+if modules_dir.exists() and modules_dir.is_dir():
+    for entry in modules_dir.iterdir():
+        if not entry.is_dir():
+            continue
+        if entry.name in desired_dirs:
+            continue
+        shutil.rmtree(entry, ignore_errors=True)
+        removed_modules += 1
+
+def iter_loop_items(payload):
+    direct = payload.get('loop')
+    if isinstance(direct, list):
+        for item in direct:
+            if isinstance(item, dict):
+                yield item
+
+    offline_plan = payload.get('offline_plan')
+    if not isinstance(offline_plan, dict):
+        return
+
+    base_loop = offline_plan.get('base_loop')
+    if isinstance(base_loop, list):
+        for item in base_loop:
+            if isinstance(item, dict):
+                yield item
+
+    time_blocks = offline_plan.get('time_blocks')
+    if isinstance(time_blocks, list):
+        for block in time_blocks:
+            if not isinstance(block, dict):
+                continue
+            loops = block.get('loops')
+            if not isinstance(loops, list):
+                continue
+            for item in loops:
+                if isinstance(item, dict):
+                    yield item
+
+keep_meal_rel_files = set()
+if loop_file.exists() and loop_file.is_file():
+    try:
+        payload = json.loads(loop_file.read_text(encoding='utf-8', errors='ignore'))
+    except Exception:
+        payload = {}
+
+    for item in iter_loop_items(payload if isinstance(payload, dict) else {}):
+        settings = item.get('settings')
+        if not isinstance(settings, dict):
+            continue
+        for field in ('offlinePrefetchedTodayFile', 'offlinePrefetchedTomorrowFile'):
+            raw = str(settings.get(field) or '').strip()
+            if not raw:
+                continue
+            marker = '../../assets/'
+            if marker in raw:
+                rel = raw.split(marker, 1)[1].strip().replace('\\', '/')
+            else:
+                rel = raw.replace('\\', '/').lstrip('./')
+                if rel.startswith('assets/'):
+                    rel = rel[len('assets/'):]
+            if rel.startswith('meal-menu/'):
+                keep_meal_rel_files.add(rel)
+
+meal_assets_root = assets_dir / 'meal-menu'
+if meal_assets_root.exists() and meal_assets_root.is_dir():
+    for file_path in meal_assets_root.rglob('*'):
+        if not file_path.is_file():
+            continue
+        rel = file_path.relative_to(assets_dir).as_posix()
+        if rel in keep_meal_rel_files:
+            continue
+        try:
+            file_path.unlink()
+            removed_asset_files += 1
+        except Exception:
+            pass
+
+    for dir_path in sorted(meal_assets_root.rglob('*'), key=lambda p: len(p.parts), reverse=True):
+        if not dir_path.is_dir():
+            continue
+        try:
+            next(dir_path.iterdir())
+            continue
+        except StopIteration:
+            try:
+                dir_path.rmdir()
+                removed_asset_dirs += 1
+            except Exception:
+                pass
+
+    try:
+        next(meal_assets_root.iterdir())
+    except StopIteration:
+        try:
+            meal_assets_root.rmdir()
+            removed_asset_dirs += 1
+        except Exception:
+            pass
+
+print(f"removed_modules={removed_modules} removed_asset_files={removed_asset_files} removed_asset_dirs={removed_asset_dirs}")
+PY
+    ); then
+        log_error "Stale content cleanup failed"
+        return 1
+    fi
+
+    log "Stale content cleanup summary: $cleanup_output"
+    return 0
+}
+
 enrich_loop_runtime_metadata() {
     if [ ! -f "$LOOP_FILE" ]; then
         log_error "Loop file not found for metadata enrichment: $LOOP_FILE"
@@ -386,7 +529,212 @@ prefetch_loop_assets_and_meal_json() {
         return 1
     fi
 
+    if ! command -v python3 >/dev/null 2>&1; then
+        log_error "python3 not available - meal JSON prefetch skipped"
+        return 1
+    fi
+
+    local token
+    token=$(get_api_token) || {
+        log_error "Meal prefetch skipped: missing API token"
+        return 1
+    }
+
     mkdir -p "$ASSETS_DIR"
+
+    local prefetch_output
+    if ! prefetch_output=$(python3 - "$LOOP_FILE" "$ASSETS_DIR" "$API_BASE_URL" "$token" <<'PY'
+import datetime
+import hashlib
+import json
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+loop_file = Path(sys.argv[1])
+assets_dir = Path(sys.argv[2])
+api_base = sys.argv[3].rstrip('/')
+token = sys.argv[4]
+
+try:
+    data = json.loads(loop_file.read_text(encoding='utf-8', errors='ignore'))
+except Exception as exc:
+    print(f'failed_to_parse_loop:{exc}')
+    raise SystemExit(1)
+
+def as_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {'1', 'true', 'yes', 'on'}:
+        return True
+    if text in {'0', 'false', 'no', 'off'}:
+        return False
+    return default
+
+def as_int(value, default=0):
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+def iter_loop_items(root_data):
+    direct = root_data.get('loop')
+    if isinstance(direct, list):
+        for item in direct:
+            if isinstance(item, dict):
+                yield item
+
+    offline_plan = root_data.get('offline_plan')
+    if not isinstance(offline_plan, dict):
+        return
+
+    base_loop = offline_plan.get('base_loop')
+    if isinstance(base_loop, list):
+        for item in base_loop:
+            if isinstance(item, dict):
+                yield item
+
+    time_blocks = offline_plan.get('time_blocks')
+    if isinstance(time_blocks, list):
+        for block in time_blocks:
+            if not isinstance(block, dict):
+                continue
+            loops = block.get('loops')
+            if not isinstance(loops, list):
+                continue
+            for item in loops:
+                if isinstance(item, dict):
+                    yield item
+
+def fetch_meal_payload(config, target_date, exact_date=False):
+    query = {
+        'action': 'menu',
+        'site_key': config['site_key'],
+        'institution_id': str(config['institution_id']),
+        'date': target_date,
+        'exact_date': '1' if exact_date else '0',
+        'show_breakfast': '1' if config['show_breakfast'] else '0',
+        'show_snack_am': '1' if config['show_snack_am'] else '0',
+        'show_lunch': '1' if config['show_lunch'] else '0',
+        'show_snack_pm': '1' if config['show_snack_pm'] else '0',
+        'show_dinner': '1' if config['show_dinner'] else '0',
+        'source_type': config['source_type'],
+    }
+    if config['company_id'] > 0:
+        query['company_id'] = str(config['company_id'])
+
+    url = f"{api_base}/api/meal_plan.php?{urllib.parse.urlencode(query)}"
+    request = urllib.request.Request(url, headers={
+        'Authorization': f'Bearer {token}',
+        'User-Agent': 'EduDisplejSync/1.0 (+meal-prefetch)',
+        'Accept': 'application/json, text/plain, */*'
+    })
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            payload = json.loads(response.read().decode('utf-8', errors='ignore'))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, urllib.error.HTTPError):
+        return None
+
+    if not isinstance(payload, dict) or payload.get('success') is not True:
+        return None
+    data = payload.get('data')
+    return data if isinstance(data, dict) else None
+
+meal_groups = {}
+meal_items_found = 0
+
+for item in iter_loop_items(data):
+    module_key = str(item.get('module_key') or '').strip().lower()
+    if module_key not in {'meal-menu', 'meal_menu'}:
+        continue
+
+    settings = item.get('settings')
+    if not isinstance(settings, dict):
+        continue
+
+    meal_items_found += 1
+    config = {
+        'company_id': as_int(settings.get('companyId'), 0),
+        'site_key': str(settings.get('siteKey') or 'jedalen.sk').strip() or 'jedalen.sk',
+        'institution_id': as_int(settings.get('institutionId'), 0),
+        'source_type': 'manual' if str(settings.get('sourceType') or 'server').strip().lower() == 'manual' else 'server',
+        'show_breakfast': as_bool(settings.get('showBreakfast'), True),
+        'show_snack_am': as_bool(settings.get('showSnackAm'), True),
+        'show_lunch': as_bool(settings.get('showLunch'), True),
+        'show_snack_pm': as_bool(settings.get('showSnackPm'), False),
+        'show_dinner': as_bool(settings.get('showDinner'), False),
+        'layout_mode': str(settings.get('layoutMode') or 'classic').strip().lower() or 'classic',
+        'show_tomorrow_square': as_bool(settings.get('showTomorrowInSquare'), True),
+    }
+
+    if config['institution_id'] <= 0:
+        continue
+
+    fingerprint = json.dumps(config, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+    key = hashlib.sha1(fingerprint.encode('utf-8')).hexdigest()[:14]
+    if key not in meal_groups:
+        meal_groups[key] = {'config': config, 'settings_refs': []}
+    meal_groups[key]['settings_refs'].append(settings)
+
+today_date = datetime.date.today().isoformat()
+tomorrow_date = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+meal_assets_root = assets_dir / 'meal-menu'
+meal_assets_root.mkdir(parents=True, exist_ok=True)
+
+prefetched_groups = 0
+prefetched_files = 0
+patched_settings = 0
+
+for key, group in meal_groups.items():
+    config = group['config']
+    target_dir = meal_assets_root / key
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    today_payload = fetch_meal_payload(config, today_date, exact_date=False)
+    tomorrow_payload = None
+    if config['layout_mode'] == 'square_dual_day' and config['show_tomorrow_square']:
+        tomorrow_payload = fetch_meal_payload(config, tomorrow_date, exact_date=True)
+
+    today_rel = ''
+    tomorrow_rel = ''
+
+    if isinstance(today_payload, dict):
+        (target_dir / 'today.json').write_text(json.dumps(today_payload, ensure_ascii=False, indent=2), encoding='utf-8')
+        today_rel = f"../../assets/meal-menu/{key}/today.json"
+        prefetched_files += 1
+
+    if isinstance(tomorrow_payload, dict):
+        (target_dir / 'tomorrow.json').write_text(json.dumps(tomorrow_payload, ensure_ascii=False, indent=2), encoding='utf-8')
+        tomorrow_rel = f"../../assets/meal-menu/{key}/tomorrow.json"
+        prefetched_files += 1
+
+    if not today_rel and not tomorrow_rel:
+        continue
+
+    prefetched_groups += 1
+    saved_at = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
+    for settings in group['settings_refs']:
+        settings['offlinePrefetchedTodayFile'] = today_rel
+        settings['offlinePrefetchedTomorrowFile'] = tomorrow_rel
+        settings['offlinePrefetchedMenuSavedAt'] = saved_at
+        if 'offlinePrefetchedMenuData' in settings:
+            settings.pop('offlinePrefetchedMenuData', None)
+        patched_settings += 1
+
+loop_file.write_text(json.dumps(data, ensure_ascii=False, indent=4), encoding='utf-8')
+print(f"meal_items={meal_items_found} groups={len(meal_groups)} prefetched_groups={prefetched_groups} files={prefetched_files} patched={patched_settings}")
+PY
+    ); then
+        log_error "Meal JSON prefetch failed"
+        return 1
+    fi
+
+    log "Meal prefetch summary: $prefetch_output"
     log_success "Loop asset prefetch + meal JSON cache completed"
     return 0
 }
@@ -1102,12 +1450,22 @@ main() {
     # Extract module list from API payload (module_key + module_folder)
     local module_entries
     module_entries=$(echo "$loop_response" | jq -r '
+        def canon($k):
+            (($k // "") | ascii_downcase | gsub("^\\s+|\\s+$"; "")) as $x
+            | if $x == "meal_menu" then "meal-menu"
+              elif $x == "room_occupancy" then "room-occupancy"
+              elif $x == "default_logo" then "default-logo"
+              elif $x == "image_gallery" then "image-gallery"
+              else $x
+              end;
         [
             .loop_config[]?,
             .preload_modules[]?,
             .offline_plan.base_loop[]?,
             (.offline_plan.time_blocks[]?.loops[]?)
         ]
+        | map(.module_key = canon(.module_key))
+        | map(.module_folder = canon((.module_folder // .module_key)))
         | map(select((.module_key // "") != ""))
         | unique_by(.module_key)
         | .[]
@@ -1117,10 +1475,19 @@ main() {
 
     local total_modules=0
     local failed_modules=()
+    local resolved_module_dirs=()
 
     while IFS=$'\t' read -r module module_dir_key; do
         [ -z "${module:-}" ] && continue
+        module="$(canonicalize_module_key "$module")"
         [ -z "${module_dir_key:-}" ] && module_dir_key="$module"
+        module_dir_key="$(canonicalize_module_key "$module_dir_key")"
+
+        if [ "$module" = "turned-off" ]; then
+            log "Skipping virtual module: $module"
+            continue
+        fi
+
         total_modules=$((total_modules + 1))
 
         local attempt=1
@@ -1138,12 +1505,13 @@ main() {
         if [ "$downloaded" != true ]; then
             log_error "Failed to download module after retries: $module"
             failed_modules+=("$module")
+        else
+            resolved_module_dirs+=("$module_dir_key")
         fi
     done <<< "$module_entries"
 
     if [ $total_modules -eq 0 ]; then
-        log_error "No modules resolved from loop payload; cannot continue"
-        exit 1
+        log "No downloadable modules resolved from loop payload (virtual-only plan)"
     fi
 
     if [ ${#failed_modules[@]} -gt 0 ]; then
@@ -1156,6 +1524,9 @@ main() {
 
     # Enrich loop entries with runtime metadata detected from downloaded files
     enrich_loop_runtime_metadata || log_error "Loop runtime metadata enrichment failed"
+
+    # Remove stale module folders and stale meal JSON assets not referenced by current loop
+    cleanup_stale_local_content "${resolved_module_dirs[@]}" || log_error "Stale local content cleanup failed"
     
     # Create unconfigured page and loop player
     create_unconfigured_page

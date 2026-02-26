@@ -70,6 +70,10 @@ function edudisplej_module_policy_registry(): array
                 'bgColor' => ['type' => 'color', 'default' => '#000000'],
             ],
         ],
+        'turned-off' => [
+            'duration' => ['fixed' => 120],
+            'settings' => [],
+        ],
         'pdf' => [
             'duration' => ['min' => 1, 'max' => 3600, 'default' => 10],
             'settings' => [

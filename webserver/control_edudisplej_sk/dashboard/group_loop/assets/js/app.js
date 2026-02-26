@@ -13,7 +13,44 @@
         const isContentOnlyMode = !!groupLoopBootstrap.isContentOnlyMode;
         const technicalModule = groupLoopBootstrap.technicalModule || null;
         const turnedOffLoopAction = groupLoopBootstrap.turnedOffLoopAction || null;
+        const TURNED_OFF_LOOP_DURATION_SECONDS = 120;
         const modulesCatalog = Array.isArray(groupLoopBootstrap.modulesCatalog) ? groupLoopBootstrap.modulesCatalog : [];
+        const localizedModuleNames = (groupLoopBootstrap.localizedModuleNames && typeof groupLoopBootstrap.localizedModuleNames === 'object')
+            ? groupLoopBootstrap.localizedModuleNames
+            : {};
+        const i18nCatalog = (groupLoopBootstrap.i18n && typeof groupLoopBootstrap.i18n === 'object') ? groupLoopBootstrap.i18n : {};
+
+        function tr(key, fallback, vars = null) {
+            let text = String(i18nCatalog[key] ?? fallback ?? key ?? '');
+            if (!vars || typeof vars !== 'object') {
+                return text;
+            }
+            Object.entries(vars).forEach(([name, value]) => {
+                text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value ?? ''));
+            });
+            return text;
+        }
+
+        function getLocalizedModuleName(moduleKey, fallbackName = '') {
+            const normalizedKey = String(moduleKey || '').toLowerCase();
+            const fallback = String(fallbackName || '').trim();
+            if (!normalizedKey) {
+                return fallback || tr('group_loop.unspecified_module', 'Module');
+            }
+
+            const mapped = String(localizedModuleNames[normalizedKey] || '').trim();
+            if (mapped) {
+                return mapped;
+            }
+
+            return tr(`group_loop.module_name.${normalizedKey.replace(/-/g, '_')}`, fallback || normalizedKey);
+        }
+
+        function resolveLoopItemModuleName(item) {
+            const key = getLoopItemModuleKey(item);
+            const fallback = String(item?.module_name || '').trim();
+            return getLocalizedModuleName(key, fallback);
+        }
 
         function getDefaultUnconfiguredItem() {
             if (!technicalModule) {
@@ -22,7 +59,7 @@
 
             return {
                 module_id: parseInt(technicalModule.id),
-                module_name: technicalModule.name,
+                module_name: getLocalizedModuleName('unconfigured', technicalModule.name),
                 description: technicalModule.description || 'Technikai modul – csak üres loop esetén.',
                 module_key: 'unconfigured',
                 duration_seconds: 60,
@@ -809,14 +846,14 @@
                     const info = document.createElement('div');
                     info.style.fontSize = '12px';
                     info.style.color = '#8a97a6';
-                    info.textContent = 'Nincs időzíthető loop.';
+                    info.textContent = tr('group_loop.no_schedulable', 'No schedulable loops.');
                     if (listInner) {
                         listInner.appendChild(info);
                         if (!isDefaultGroup && !isContentOnlyMode) {
                             const createBtn = document.createElement('button');
                             createBtn.type = 'button';
                             createBtn.className = 'btn';
-                            createBtn.textContent = 'Létrehozás';
+                            createBtn.textContent = tr('group_loop.create', 'Create');
                             createBtn.style.marginTop = '8px';
                             createBtn.addEventListener('click', () => {
                                 scrollToLoopBuilderAndCreate();
@@ -837,9 +874,11 @@
                     const meta = document.createElement('div');
                     meta.className = 'loop-schedule-row-meta';
                     if (turnedOffStyle) {
-                        meta.textContent = 'Ütemezhető kijelző kikapcsolás (külön tervszínnel)';
+                        meta.textContent = '';
                     } else {
-                        meta.textContent = parseInt(style.id, 10) === selectedSchedulableId ? 'Kijelölt loop' : 'Heti vagy speciális tervbe tehető';
+                        meta.textContent = parseInt(style.id, 10) === selectedSchedulableId
+                            ? tr('group_loop.currently_selected', 'Selected loop')
+                            : tr('group_loop.weekly_or_special', 'Can be placed into weekly or special plan');
                     }
                     left.appendChild(name);
                     left.appendChild(meta);
@@ -847,13 +886,13 @@
                     const button = document.createElement('button');
                     button.type = 'button';
                     button.className = 'btn';
-                    button.textContent = 'Időzítés';
+                    button.textContent = tr('group_loop.schedule_button', 'Schedule');
                     button.addEventListener('click', () => {
                         if (fixedStyleInput) {
                             fixedStyleInput.value = String(style.id);
                         }
                         if (fixedStyleLabel) {
-                            fixedStyleLabel.textContent = `Kiválasztott loop: ${style.name}`;
+                            fixedStyleLabel.textContent = tr('group_loop.selected_loop', 'Selected loop: {name}', { name: style.name });
                         }
                         openLoopStyleDetail(style.id);
                         openQuickScheduleDialog(style.id);
@@ -878,8 +917,8 @@
                 if (fixedStyleLabel) {
                     const selectedStyle = schedulableStyles.find((style) => String(style.id) === resolvedValue) || null;
                     fixedStyleLabel.textContent = selectedStyle
-                        ? `Kiválasztott loop: ${selectedStyle.name}`
-                        : 'Kiválasztott loop: —';
+                        ? tr('group_loop.selected_loop', 'Selected loop: {name}', { name: selectedStyle.name })
+                        : tr('group_loop.selected_loop_empty', 'Selected loop: —');
                 }
             }
 
@@ -1057,7 +1096,7 @@
             }).join('\n');
 
             const choice = prompt(
-                `Ebben az időben már tervben van loop:\n${names}\n\n1 = Ütköző blokkok lecsonkítása (hamarabb vége)\n2 = Ütköző blokkok törlése\n0 = Mégse`,
+                tr('group_loop.conflict_prompt', 'There are existing loops in this time:\n{names}\n\n1 = trim conflicting blocks (end sooner)\n2 = delete conflicting blocks\n0 = cancel', { names }),
                 '1'
             );
 
@@ -1110,7 +1149,7 @@
 
             const normalizedStyleId = parseInt(loopStyleId || 0, 10);
             if (!normalizedStyleId || normalizedStyleId === parseInt(defaultLoopStyleId || 0, 10)) {
-                showAutosaveToast('⚠️ A DEFAULT loop nem tervezhető', true);
+                showAutosaveToast(`⚠️ ${tr('group_loop.default_not_schedulable', 'DEFAULT loop cannot be scheduled')}`, true);
                 return;
             }
 
@@ -1123,18 +1162,18 @@
             host.innerHTML = `
                 <div style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:3200;">
                     <div style="background:#fff; width:min(500px,92vw); border:1px solid #cfd6dd; padding:16px;">
-                        <h3 style="margin:0 0 10px 0;">Heti időzítés</h3>
-                        <div style="font-size:12px; color:#425466; margin-bottom:10px;">Loop: <strong>${styleName}</strong></div>
+                        <h3 style="margin:0 0 10px 0;">${tr('group_loop.quick_schedule_title', 'Weekly schedule')}</h3>
+                        <div style="font-size:12px; color:#425466; margin-bottom:10px;">${tr('group_loop.quick_schedule_loop', 'Loop')}: <strong>${styleName}</strong></div>
                         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
                             ${[1,2,3,4,5,6,7].map((d) => `<label style="display:flex; align-items:center; gap:4px; font-size:12px;"><input type="checkbox" class="quick-weekly-day" value="${d}">${getDayShortLabel(String(d))}</label>`).join('')}
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
-                            <select id="quick-weekly-start" aria-label="Heti kezdés (24 órás)"></select>
-                            <select id="quick-weekly-end" aria-label="Heti befejezés (24 órás)"></select>
+                            <input type="time" id="quick-weekly-start" step="60" aria-label="${tr('group_loop.quick_schedule_start_aria', 'Weekly start (hour-minute)')}">
+                            <input type="time" id="quick-weekly-end" step="60" aria-label="${tr('group_loop.quick_schedule_end_aria', 'Weekly end (hour-minute)')}">
                         </div>
                         <div style="display:flex; justify-content:flex-end; gap:8px;">
-                            <button type="button" class="btn" onclick="closeTimeBlockModal()">Mégse</button>
-                            <button type="button" class="btn" onclick="saveQuickScheduleDialog(${normalizedStyleId})">Hozzáadás</button>
+                            <button type="button" class="btn" onclick="closeTimeBlockModal()">${tr('common.cancel', 'Cancel')}</button>
+                            <button type="button" class="btn" onclick="saveQuickScheduleDialog(${normalizedStyleId})">${tr('group_loop.add', 'Add')}</button>
                         </div>
                     </div>
                 </div>
@@ -1151,14 +1190,14 @@
             const styleId = parseInt(loopStyleId || 0, 10);
 
             if (!styleId || selectedDays.length === 0 || !startRaw || !endRaw) {
-                showAutosaveToast('⚠️ Add meg a napot és az időt', true);
+                showAutosaveToast(`⚠️ ${tr('group_loop.day_and_time_required', 'Choose at least one day and set both times')}`, true);
                 return;
             }
 
             const startMinute = parseMinuteFromTime(`${startRaw}:00`, 0);
             const endMinute = parseMinuteFromTime(`${endRaw}:00`, 0);
             if (startMinute === endMinute) {
-                showAutosaveToast('⚠️ A kezdés és befejezés nem lehet azonos', true);
+                showAutosaveToast(`⚠️ ${tr('group_loop.start_end_same', 'Start and end time cannot be the same')}`, true);
                 return;
             }
 
@@ -1168,7 +1207,7 @@
                 days_mask: normalizeDaysMask(selectedDays),
                 start_time: minutesToTimeString(startMinute),
                 end_time: minutesToTimeString(endMinute),
-                block_name: `Heti ${startRaw}-${endRaw}`,
+                block_name: `${tr('group_loop.quick_schedule_title', 'Weekly schedule')} ${startRaw}-${endRaw}`,
                 priority: 200,
                 loop_style_id: styleId,
                 is_active: 1,
@@ -1177,7 +1216,7 @@
             };
 
             if (!resolveScheduleConflicts(payload, null)) {
-                showAutosaveToast('ℹ️ Ütközés miatt megszakítva', true);
+                showAutosaveToast(`ℹ️ ${tr('group_loop.conflict_cancelled', 'Cancelled because of conflict')}`, true);
                 return;
             }
 
@@ -1186,7 +1225,7 @@
             activeScope = `block:${payload.id}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(120);
-            showAutosaveToast('✓ Heti idősáv létrehozva');
+            showAutosaveToast(`✓ ${tr('group_loop.weekly_slot_created', 'Weekly time block created')}`);
         }
 
         function createFixedWeeklyBlockFromInputs() {
@@ -1373,6 +1412,10 @@
             if (!style) {
                 return;
             }
+            if (isTurnedOffLoopStyle(style)) {
+                showAutosaveToast('⚠️ A Turned Off loop fix és nem módosítható', true);
+                return;
+            }
             const name = prompt('Loop új neve:', style.name || '');
             if (!name || !String(name).trim()) {
                 return;
@@ -1413,6 +1456,11 @@
             }
             const style = getLoopStyleById(styleId);
             if (!style) {
+                return;
+            }
+
+            if (isTurnedOffLoopStyle(style)) {
+                showAutosaveToast('⚠️ A Turned Off loop fix és nem törölhető', true);
                 return;
             }
 
@@ -2156,8 +2204,8 @@
                                 }).join('')}
                         </div>
                         <div style="display:grid; grid-template-columns:120px 120px 1fr auto; gap:8px; align-items:center; margin-bottom:12px;">
-                            <select id="special-day-plan-start" aria-label="Speciális napi kezdés (24 órás)"></select>
-                            <select id="special-day-plan-end" aria-label="Speciális napi befejezés (24 órás)"></select>
+                            <input type="time" id="special-day-plan-start" step="60" aria-label="Speciális napi kezdés (24 órás)">
+                            <input type="time" id="special-day-plan-end" step="60" aria-label="Speciális napi befejezés (24 órás)">
                             <select id="special-day-plan-loop">
                                 ${loopStyles
                                     .filter((style) => parseInt(style.id, 10) !== parseInt(defaultLoopStyleId || 0, 10))
@@ -2425,7 +2473,7 @@
                     loopItems = [{
                         ...existingTechnical,
                         module_key: 'turned-off',
-                        duration_seconds: 60
+                        duration_seconds: TURNED_OFF_LOOP_DURATION_SECONDS
                     }];
                     return;
                 }
@@ -2576,7 +2624,8 @@
         }
 
         function isLoopEditingBlocked() {
-            return isDefaultGroup || isContentOnlyMode;
+            const activeStyle = getLoopStyleById(activeLoopStyleId);
+            return isDefaultGroup || isContentOnlyMode || isTurnedOffLoopStyle(activeStyle);
         }
 
         function ensureActiveLoopStyleSelected() {
@@ -2603,10 +2652,12 @@
 
         function buildLoopItemForModule(moduleId, moduleName, moduleDesc, moduleKey) {
             const normalizedKey = String(moduleKey || '').toLowerCase();
-            const defaultDuration = normalizedKey === 'unconfigured' || normalizedKey === 'meal-menu' || normalizedKey === 'turned-off' ? 60 : 10;
+            const defaultDuration = normalizedKey === 'turned-off'
+                ? TURNED_OFF_LOOP_DURATION_SECONDS
+                : ((normalizedKey === 'unconfigured' || normalizedKey === 'meal-menu') ? 60 : 10);
             return {
                 module_id: moduleId,
-                module_name: moduleName,
+                module_name: getLocalizedModuleName(moduleKey || getModuleKeyById(moduleId), moduleName),
                 description: moduleDesc,
                 module_key: moduleKey || null,
                 duration_seconds: defaultDuration,
@@ -2651,12 +2702,50 @@
                 return null;
             }
 
-            const desiredName = String(turnedOffLoopAction.name || 'Kikapcsolási esemény').trim() || 'Kikapcsolási esemény';
+            const desiredName = String(turnedOffLoopAction.name || 'Turned Off').trim() || 'Turned Off';
             const isLegacyTurnedOffName = (name) => /kikapcsol|turned\s*off/i.test(String(name || ''));
+            const defaultStyleId = parseInt(defaultLoopStyleId || 0, 10);
+            const technicalModuleId = parseInt(technicalModule?.id || 0, 10);
+
+            const turnedOffCandidates = (Array.isArray(loopStyles) ? loopStyles : []).filter((style) => {
+                const styleId = parseInt(style?.id || 0, 10);
+                if (!styleId || styleId === defaultStyleId) {
+                    return false;
+                }
+
+                if (isTurnedOffLoopStyle(style)) {
+                    return true;
+                }
+
+                const items = Array.isArray(style?.items) ? style.items : [];
+                if (items.length !== 1) {
+                    return false;
+                }
+                const itemModuleId = parseInt(items[0]?.module_id || 0, 10);
+                return technicalModuleId > 0 && itemModuleId === technicalModuleId && isLegacyTurnedOffName(style?.name);
+            });
+
+            if (turnedOffCandidates.length > 1) {
+                const keepStyle = turnedOffCandidates[0];
+                const removedIds = new Set(turnedOffCandidates.slice(1).map((style) => parseInt(style.id, 10)));
+
+                timeBlocks = (Array.isArray(timeBlocks) ? timeBlocks : []).map((block) => {
+                    const styleId = parseInt(block?.loop_style_id || 0, 10);
+                    if (removedIds.has(styleId)) {
+                        return {
+                            ...block,
+                            loop_style_id: parseInt(keepStyle.id, 10)
+                        };
+                    }
+                    return block;
+                });
+
+                loopStyles = loopStyles.filter((style) => !removedIds.has(parseInt(style?.id || 0, 10)));
+            }
 
             const legacyStyle = (Array.isArray(loopStyles) ? loopStyles : []).find((style) => {
                 const styleId = parseInt(style?.id || 0, 10);
-                if (styleId === parseInt(defaultLoopStyleId || 0, 10)) {
+                if (styleId === defaultStyleId) {
                     return false;
                 }
                 const items = Array.isArray(style?.items) ? style.items : [];
@@ -2664,34 +2753,33 @@
                     return false;
                 }
                 const itemModuleId = parseInt(items[0]?.module_id || 0, 10);
-                const technicalModuleId = parseInt(technicalModule?.id || 0, 10);
                 return technicalModuleId > 0 && itemModuleId === technicalModuleId && isLegacyTurnedOffName(style?.name);
             }) || null;
 
             if (legacyStyle) {
+                const turnedOffTemplate = getTurnedOffLoopTemplate();
+                if (!turnedOffTemplate) {
+                    return null;
+                }
                 legacyStyle.name = desiredName;
-                legacyStyle.items = [{
-                    ...legacyStyle.items[0],
-                    module_key: 'turned-off',
-                    module_name: String(turnedOffLoopAction.name || 'Turned Off'),
-                    duration_seconds: 60,
-                    settings: (legacyStyle.items[0] && typeof legacyStyle.items[0].settings === 'object' && legacyStyle.items[0].settings !== null)
-                        ? legacyStyle.items[0].settings
-                        : {}
-                }];
+                legacyStyle.items = [turnedOffTemplate];
                 legacyStyle.last_modified_ms = Date.now();
                 return legacyStyle;
             }
 
             let existing = (Array.isArray(loopStyles) ? loopStyles : []).find((style) => {
                 const styleId = parseInt(style?.id || 0, 10);
-                return styleId !== parseInt(defaultLoopStyleId || 0, 10) && isTurnedOffLoopStyle(style);
+                return styleId !== defaultStyleId && isTurnedOffLoopStyle(style);
             }) || null;
 
             if (existing) {
                 if (String(existing.name || '').trim() !== desiredName) {
                     existing.name = desiredName;
                     existing.last_modified_ms = Date.now();
+                }
+                const turnedOffTemplate = getTurnedOffLoopTemplate();
+                if (turnedOffTemplate) {
+                    existing.items = [turnedOffTemplate];
                 }
                 return existing;
             }
@@ -2702,7 +2790,7 @@
             }
 
             const created = createFallbackLoopStyle(
-                String(turnedOffLoopAction.name || 'Kikapcsolási esemény').trim() || 'Kikapcsolási esemény',
+                desiredName,
                 [turnedOffItem]
             );
             loopStyles.push(created);
@@ -3015,6 +3103,12 @@
             }
 
             const moduleKey = loopItems[index]?.module_key || getModuleKeyById(loopItems[index]?.module_id);
+
+            if (String(moduleKey || '').toLowerCase() === 'turned-off') {
+                loopItems[index].duration_seconds = TURNED_OFF_LOOP_DURATION_SECONDS;
+                refreshDurationAndRestartPreviewIfNeeded();
+                return;
+            }
 
             if (applyDurationUpdateForSpecialModule(index, moduleKey)) {
                 return;
@@ -3752,6 +3846,7 @@
                     ...getTextOverlayDefaults()
                 },
                 'meal-menu': {
+                    companyId,
                     siteKey: 'jedalen.sk',
                     institutionId: 0,
                     sourceType: 'server',
@@ -5760,7 +5855,7 @@
                     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="margin: 0;">⚙️ ${item.module_name} - Testreszabás</h2>
+                        <h2 style="margin: 0;">⚙️ ${resolveLoopItemModuleName(item)} - ${tr('group_loop.customization', 'Customization')}</h2>
                         <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
                             background: #1e40af;
                             color: white;
@@ -5783,7 +5878,7 @@
                             border: none;
                             border-radius: 5px;
                             cursor: pointer;
-                        ">Mégse</button>
+                        ">${tr('common.cancel', 'Cancel')}</button>
                         <button onclick="saveCustomization(${index})" style="
                             padding: 10px 20px;
                             background: #28a745;
@@ -5791,7 +5886,7 @@
                             border: none;
                             border-radius: 5px;
                             cursor: pointer;
-                        ">💾 Mentés</button>
+                        ">${tr('common.save', 'Save')}</button>
                     </div>
                 </div>
             `;
@@ -6016,6 +6111,7 @@
 
         function collectMealMenuSettingsFromForm() {
             return {
+                companyId: Math.max(0, parseInt(companyId || 0, 10) || 0),
                 siteKey: String(document.getElementById('setting-mealSiteKey')?.value || 'jedalen.sk').trim() || 'jedalen.sk',
                 institutionId: parseInt(document.getElementById('setting-mealInstitutionId')?.value || '0', 10) || 0,
                 sourceType: (String(document.getElementById('setting-mealSourceType')?.value || 'manual').toLowerCase() === 'server') ? 'server' : 'manual',
@@ -6123,7 +6219,7 @@
         }
 
         function updatePreviewModuleInfo(module) {
-            document.getElementById('currentModule').textContent = `${currentPreviewIndex + 1}. ${module.module_name}`;
+            document.getElementById('currentModule').textContent = `${currentPreviewIndex + 1}. ${resolveLoopItemModuleName(module)}`;
             document.getElementById('navInfo').textContent = `${currentPreviewIndex + 1} / ${loopItems.length}`;
         }
 
@@ -6500,7 +6596,7 @@
 
                 default:
                     baseUrl = '../../modules/default/m_default.html';
-                    params.append('text', module.module_name);
+                    params.append('text', resolveLoopItemModuleName(module));
                     params.append('bgColor', '#1a3a52');
             }
 
@@ -6719,6 +6815,10 @@
                 return 60;
             }
 
+            if (String(moduleKey || '').toLowerCase() === 'turned-off') {
+                return TURNED_OFF_LOOP_DURATION_SECONDS;
+            }
+
             if (isGalleryItem) {
                 return getGalleryLoopDurationSeconds(item?.settings || {}, item?.duration_seconds);
             }
@@ -6727,8 +6827,8 @@
         }
 
         function buildLoopItemDurationInputHtml(index, durationValue, durationBounds, flags) {
-            const { isTechnicalItem, isVideoItem, isGalleryItem } = flags;
-            const isReadOnly = isDefaultGroup || isTechnicalItem || isContentOnlyMode || isVideoItem || isGalleryItem;
+            const { isTechnicalItem, isVideoItem, isGalleryItem, isTurnedOffItem } = flags;
+            const isReadOnly = isDefaultGroup || isTechnicalItem || isContentOnlyMode || isVideoItem || isGalleryItem || isTurnedOffItem;
 
             if (isReadOnly) {
                 return `<input type="number" value="${durationValue}" min="${durationBounds.min}" max="${durationBounds.max}" step="${durationBounds.step}" disabled>`;
@@ -6761,6 +6861,7 @@
             const moduleKey = getLoopItemModuleKey(item);
             const isVideoItem = moduleKey === 'video';
             const isGalleryItem = moduleKey === 'image-gallery' || moduleKey === 'gallery';
+            const isTurnedOffItem = moduleKey === 'turned-off';
             const durationBounds = getDurationBoundsForModule(moduleKey);
             const durationValue = getLoopItemDurationValue(item, moduleKey, isTechnicalItem, isGalleryItem);
 
@@ -6772,6 +6873,7 @@
                 isTechnicalItem,
                 isVideoItem,
                 isGalleryItem,
+                isTurnedOffItem,
             });
 
             const actionButtonsHtml = buildLoopItemActionButtonsHtml(index);
@@ -6779,7 +6881,7 @@
             loopItem.innerHTML = `
                     <div class="loop-order">${index + 1}</div>
                     <div class="loop-details">
-                        <div class="loop-module-name">${item.module_name}</div>
+                        <div class="loop-module-name">${resolveLoopItemModuleName(item)}</div>
                         <div class="loop-module-desc">${getLoopItemSummary(item)}</div>
                     </div>
                     <div class="loop-duration">
@@ -6828,9 +6930,26 @@
             }
         }
 
-        function set24HourTimeSelectValue(selectId, preferred = '08:00') {
-            const selectEl = document.getElementById(selectId);
-            if (!selectEl) {
+        function normalizeTimeInputValue(preferred = '08:00') {
+            const normalized = String(preferred || '').slice(0, 5);
+            if (/^([01]\d|2[0-3]):[0-5]\d$/.test(normalized)) {
+                return normalized;
+            }
+            return '08:00';
+        }
+
+        function set24HourTimeSelectValue(inputId, preferred = '08:00') {
+            const inputEl = document.getElementById(inputId);
+            if (!inputEl) {
+                return;
+            }
+
+            const normalized = normalizeTimeInputValue(preferred);
+
+            if (String(inputEl.tagName || '').toLowerCase() === 'input') {
+                inputEl.type = 'time';
+                inputEl.step = '60';
+                inputEl.value = normalized;
                 return;
             }
 
@@ -6839,24 +6958,23 @@
                 values.push(minutesToTimeLabel(minute));
             }
 
-            const normalized = String(preferred || '').slice(0, 5);
-            selectEl.innerHTML = '';
+            inputEl.innerHTML = '';
 
             values.forEach((value) => {
                 const option = document.createElement('option');
                 option.value = value;
                 option.textContent = value;
-                selectEl.appendChild(option);
+                inputEl.appendChild(option);
             });
 
             if (normalized && !values.includes(normalized)) {
                 const extra = document.createElement('option');
                 extra.value = normalized;
                 extra.textContent = normalized;
-                selectEl.appendChild(extra);
+                inputEl.appendChild(extra);
             }
 
-            selectEl.value = normalized && selectEl.querySelector(`option[value="${normalized}"]`)
+            inputEl.value = normalized && inputEl.querySelector(`option[value="${normalized}"]`)
                 ? normalized
                 : values[0];
         }

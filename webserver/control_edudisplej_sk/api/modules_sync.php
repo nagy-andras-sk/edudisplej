@@ -5,6 +5,7 @@ require_once '../dbkonfiguracia.php';
 require_once 'auth.php';
 require_once '../logging.php';
 require_once '../modules/module_asset_service.php';
+require_once '../modules/module_standard.php';
 
 // Validate API authentication for device requests
 $api_company = validate_api_token();
@@ -369,7 +370,7 @@ function edudisplej_sync_prefetch_meal_menu_payload(mysqli $conn, int $company_i
 
 function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company_id, string $module_key, $settings): array {
     $normalized = is_array($settings) ? $settings : [];
-    $key = strtolower(trim($module_key));
+    $key = edudisplej_canonical_module_key($module_key);
     $requestToken = edudisplej_current_request_api_token();
 
     if ($key === 'pdf') {
@@ -423,6 +424,9 @@ function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company
     }
 
     if ($key === 'meal-menu' || $key === 'meal_menu') {
+        if ((int)($normalized['companyId'] ?? 0) <= 0 && $company_id > 0) {
+            $normalized['companyId'] = $company_id;
+        }
         $prefetched = edudisplej_sync_prefetch_meal_menu_payload($conn, $company_id, $normalized);
         if ($prefetched) {
             $normalized['offlinePrefetchedMenuData'] = $prefetched;
@@ -440,7 +444,7 @@ function edudisplej_modules_sync_loop_requires_turned_off(array $modules): bool 
 
     $has_turned_off = false;
     foreach ($modules as $module) {
-        $module_key = strtolower(trim((string)($module['module_key'] ?? '')));
+        $module_key = edudisplej_canonical_module_key((string)($module['module_key'] ?? ''));
         if ($module_key === 'turned-off') {
             $has_turned_off = true;
             continue;
@@ -712,7 +716,7 @@ try {
         $preload_stmt->execute();
         $preload_result = $preload_stmt->get_result();
         while ($preload_row = $preload_result->fetch_assoc()) {
-            $module_key = (string)($preload_row['resolved_module_key'] ?? '');
+            $module_key = edudisplej_canonical_module_key((string)($preload_row['resolved_module_key'] ?? ''));
             if ($module_key === '') {
                 continue;
             }
@@ -757,7 +761,7 @@ try {
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
-            $resolved_module_key = (string)($row['resolved_module_key'] ?? '');
+            $resolved_module_key = edudisplej_canonical_module_key((string)($row['resolved_module_key'] ?? ''));
             $resolved_module_name = (string)($row['resolved_module_name'] ?? $resolved_module_key);
             $settings = [];
             if (!empty($row['settings'])) {
@@ -813,7 +817,7 @@ try {
         $result = $stmt->get_result();
         
         while ($row = $result->fetch_assoc()) {
-            $resolved_module_key = (string)($row['resolved_module_key'] ?? '');
+            $resolved_module_key = edudisplej_canonical_module_key((string)($row['resolved_module_key'] ?? ''));
             $resolved_module_name = (string)($row['resolved_module_name'] ?? $resolved_module_key);
             $settings = [];
             if (!empty($row['settings'])) {

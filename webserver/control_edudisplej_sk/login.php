@@ -28,8 +28,8 @@ if (isset($_SESSION['user_id']) && isset($_SESSION['username'])) {
     // Redirect based on role
     if (isset($_SESSION['isadmin']) && $_SESSION['isadmin']) {
         header('Location: admin/dashboard.php');
-    } elseif (edudisplej_get_session_role() === 'content_editor') {
-        header('Location: dashboard/content_editor_index.php');
+    } elseif (edudisplej_get_session_role() === 'easy_user') {
+        header('Location: dashboard/easy_user.php');
     } else {
         header('Location: dashboard/index.php');
     }
@@ -143,8 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                         // Redirect based on role
                                         if ($user['isadmin']) {
                                             header('Location: admin/dashboard.php');
-                                        } elseif (edudisplej_normalize_user_role($user['user_role'] ?? null, false) === 'content_editor') {
-                                            header('Location: dashboard/content_editor_index.php');
+                                        } elseif (edudisplej_normalize_user_role($user['user_role'] ?? null, false) === 'easy_user') {
+                                            header('Location: dashboard/easy_user.php');
                                         } else {
                                             header('Location: dashboard/index.php');
                                         }
@@ -184,8 +184,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         // Redirect based on role
                         if ($user['isadmin']) {
                             header('Location: admin/dashboard.php');
-                        } elseif (edudisplej_normalize_user_role($user['user_role'] ?? null, false) === 'content_editor') {
-                            header('Location: dashboard/content_editor_index.php');
+                        } elseif (edudisplej_normalize_user_role($user['user_role'] ?? null, false) === 'easy_user') {
+                            header('Location: dashboard/easy_user.php');
                         } else {
                             header('Location: dashboard/index.php');
                         }

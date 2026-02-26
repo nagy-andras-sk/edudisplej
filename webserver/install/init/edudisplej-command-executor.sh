@@ -249,7 +249,7 @@ execute_command() {
                 on_errors=$((on_errors + 1))
             fi
 
-            service_action start edudisplej-kiosk.service || on_errors=$((on_errors + 1))
+            service_action restart edudisplej-kiosk.service || on_errors=$((on_errors + 1))
 
             if [ "$on_errors" -eq 0 ]; then
                 output="Display power ON applied (service started + HDMI on)"
@@ -482,7 +482,7 @@ apply_local_schedule_mode() {
         elif [ -x /opt/vc/bin/tvservice ]; then
             /opt/vc/bin/tvservice -p >/dev/null 2>&1 || true
         fi
-        service_action start edudisplej-kiosk.service || true
+        service_action restart edudisplej-kiosk.service || true
     fi
 
     echo "$mode" > "$LOCAL_POWER_STATE_FILE"

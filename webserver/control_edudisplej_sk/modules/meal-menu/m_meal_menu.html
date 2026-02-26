@@ -34,6 +34,7 @@
         .subtitle { font-size: clamp(20px, 2vw, 34px); color: #cbd5e1; margin-top: 6px; }
         .status { display: none; }
         .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6vh 1.2vw; align-content: start; }
+        .cards.single-card { grid-template-columns: minmax(0, 1fr); }
         .root.center .cards { justify-items: stretch; }
         .card { background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 14px; padding: 1.6vh 1.2vw; }
         .meal { font-size: clamp(24px, var(--meal-title-font-size, 2.1vw), 42px); font-weight: 700; color: #e2e8f0; margin-bottom: 10px; display:flex; align-items:center; gap:10px; }
@@ -250,6 +251,8 @@
             textOverlayColor: String(params.get('textOverlayColor') ?? injected.textOverlayColor ?? defaults.textOverlayColor),
             textOverlaySpeedPxPerSec: parseNum(params.get('textOverlaySpeedPxPerSec') ?? injected.textOverlaySpeedPxPerSec, defaults.textOverlaySpeedPxPerSec),
             apiBaseUrl: String(params.get('apiBaseUrl') ?? injected.apiBaseUrl ?? defaults.apiBaseUrl),
+            offlinePrefetchedTodayFile: String(params.get('offlinePrefetchedTodayFile') ?? injected.offlinePrefetchedTodayFile ?? ''),
+            offlinePrefetchedTomorrowFile: String(params.get('offlinePrefetchedTomorrowFile') ?? injected.offlinePrefetchedTomorrowFile ?? ''),
             offlinePrefetchedMenuData: (() => {
                 const raw = params.get('offlinePrefetchedMenuData') ?? injected.offlinePrefetchedMenuData ?? null;
                 if (!raw) return null;
@@ -636,6 +639,7 @@
         subtitle.style.display = (subtitle.textContent || '').trim() === '' ? 'none' : '';
 
         const meals = Array.isArray(data?.meals) ? data.meals : [];
+        cards.classList.toggle('single-card', meals.length === 1);
         stopSlowScroll();
         if (!meals.length) {
             cards.innerHTML = `<div class="empty">${escapeHtml(t.emptyMeals)}</div>`;
@@ -679,10 +683,14 @@
         subtitle.textContent = settings.showInstitutionName === false ? '' : (institutionName || t.noInstitution);
         subtitle.style.display = (subtitle.textContent || '').trim() === '' ? 'none' : '';
 
+        const todayMeals = Array.isArray(todayData?.meals) ? todayData.meals : [];
+        const tomorrowMeals = Array.isArray(tomorrowData?.meals) ? tomorrowData.meals : [];
+        const shouldShowTomorrowColumn = settings.showTomorrowInSquare !== false && tomorrowMeals.length > 0;
+
         const dayBlocks = [
             { key: 'today', title: t.today, data: todayData }
         ];
-        if (settings.showTomorrowInSquare !== false) {
+        if (shouldShowTomorrowColumn) {
             dayBlocks.push({ key: 'tomorrow', title: t.tomorrow, data: tomorrowData });
         }
 

@@ -22,10 +22,10 @@ $user_id    = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
 $company_name = $_SESSION['company_name'] ?? '';
 $session_role = edudisplej_get_session_role();
-$can_edit_kiosk_details = !edudisplej_is_content_editor();
+$can_edit_kiosk_details = true;
 
-if ($session_role === 'content_editor') {
-    header('Location: content_editor_index.php');
+if ($session_role === 'easy_user') {
+    header('Location: easy_user.php');
     exit();
 }
 

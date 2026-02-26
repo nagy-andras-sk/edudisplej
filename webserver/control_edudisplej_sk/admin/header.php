@@ -163,17 +163,9 @@ $dashboard_nav_pages = [
 ];
 
 if (!$is_admin_user) {
-    if ($current_user_role === 'content_editor') {
+    if ($current_user_role === 'easy_user') {
         $dashboard_nav_pages = [
-            'content_editor_index.php' => ['href' => 'content_editor_index.php', 'label' => '🖥️ ' . t('nav.kiosks'), 'key' => 'kiosks'],
-            'modules.php' => ['href' => 'modules.php', 'label' => '🧩 Modulok', 'key' => 'modules_page'],
-            'settings.php' => ['href' => 'settings.php', 'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
-        ];
-    } elseif ($current_user_role === 'loop_manager') {
-        $dashboard_nav_pages = [
-            'index.php'  => ['href' => 'index.php', 'label' => '🖥️ ' . t('nav.kiosks'), 'key' => 'kiosks'],
-            'groups.php' => ['href' => 'groups.php', 'label' => '📁 ' . t('nav.groups'), 'key' => 'groups'],
-            'modules.php' => ['href' => 'modules.php', 'label' => '🧩 Modulok', 'key' => 'modules_page'],
+            'easy_user.php' => ['href' => 'easy_user.php', 'label' => '✨ Egyszerű vezérlő', 'key' => 'easy_user'],
             'settings.php' => ['href' => 'settings.php', 'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
         ];
     }

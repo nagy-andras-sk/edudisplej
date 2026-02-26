@@ -146,11 +146,6 @@ $can_manage_assets = false;
 $current_role = edudisplej_get_session_role();
 $current_lang = edudisplej_apply_language_preferences();
 
-if ($current_role === 'content_editor' || $current_role === 'loop_manager') {
-    header('Location: index.php');
-    exit();
-}
-
 try {
     $conn = getDbConnection();
     edudisplej_ensure_user_role_column($conn);
@@ -480,12 +475,9 @@ $logout_url = '../login.php?logout=1';
                                         $normalized_role = edudisplej_normalize_user_role($u['user_role'] ?? 'user', false);
                                         $role = t_def('profile.role.user', 'Felhasználó');
                                         $role_color = '#1e40af';
-                                        if ($normalized_role === 'loop_manager') {
-                                            $role = t_def('profile.role.loop_manager', 'Loop/modul kezelő');
+                                        if ($normalized_role === 'easy_user') {
+                                            $role = t_def('profile.role.easy_user', 'Egyszerű felhasználó');
                                             $role_color = '#00695c';
-                                        } elseif ($normalized_role === 'content_editor') {
-                                            $role = t_def('profile.role.content_editor', 'Tartalom módosító');
-                                            $role_color = '#6a1b9a';
                                         }
                                     }
                                 ?>
@@ -814,12 +806,11 @@ $logout_url = '../login.php?logout=1';
             password: <?php echo json_encode(t_def('common.password', 'Jelszó'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             role: <?php echo json_encode(t_def('profile.users.col.role', 'Jogosultság'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             roleUser: <?php echo json_encode(t_def('profile.role.user', '👤 Felhasználó'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
-            roleLoopManager: <?php echo json_encode(t_def('profile.role.loop_manager', '🔁 Loop/modul kezelő'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
-            roleContentEditor: <?php echo json_encode(t_def('profile.role.content_editor', '📝 Tartalom módosító'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            roleEasyUser: <?php echo json_encode(t_def('profile.role.easy_user', '✨ Egyszerű felhasználó'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             permissionsTitle: <?php echo json_encode(t_def('profile.users.permissions_title', 'Felhasználó jogosultságai:'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             permissions1: <?php echo json_encode(t_def('profile.users.permissions.item1', 'Admin jogosultság itt nem adható'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             permissions2: <?php echo json_encode(t_def('profile.users.permissions.item2', 'Szerepkör szerint eltérő dashboard hozzáférés'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
-            permissions3: <?php echo json_encode(t_def('profile.users.permissions.item3', 'Tartalom módosító csak modul tartalmat kezelhet'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            permissions3: <?php echo json_encode(t_def('profile.users.permissions.item3', 'Egyszerű felhasználó alap, egyoldalas kezelőt kap'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             cancel: <?php echo json_encode(t_def('common.cancel', 'Mégsem'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             create: <?php echo json_encode(t_def('common.create', 'Létrehozás'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
             requiredFields: <?php echo json_encode(t_def('profile.users.required_fields', 'Kérem töltse ki az összes szükséges mezőt!'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
@@ -1024,8 +1015,7 @@ $logout_url = '../login.php?logout=1';
                             <label style="display: block; font-weight: bold; margin-bottom: 5px;">${PROFILE_I18N.role}</label>
                             <select id="user_role" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;">
                                 <option value="user">${PROFILE_I18N.roleUser}</option>
-                                <option value="loop_manager">${PROFILE_I18N.roleLoopManager}</option>
-                                <option value="content_editor">${PROFILE_I18N.roleContentEditor}</option>
+                                <option value="easy_user">${PROFILE_I18N.roleEasyUser}</option>
                             </select>
                         </div>
                         

@@ -225,13 +225,6 @@ $user_id = $_SESSION['user_id'];
 $company_id = $_SESSION['company_id'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (edudisplej_is_content_editor()) {
-        http_response_code(403);
-        $response['message'] = 'A tartalom módosító szerepkör nem szerkesztheti a kijelző adatait';
-        echo json_encode($response);
-        exit();
-    }
-
     $data = json_decode(file_get_contents('php://input'), true);
     $kiosk_id_post = intval($data['id'] ?? 0);
     $friendly_name = trim((string)($data['friendly_name'] ?? ''));

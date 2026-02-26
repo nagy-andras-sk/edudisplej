@@ -6,6 +6,7 @@ session_start();
 require_once __DIR__ . '/../../dbkonfiguracia.php';
 require_once __DIR__ . '/../../auth_roles.php';
 require_once __DIR__ . '/../../modules/module_policy.php';
+require_once __DIR__ . '/../../modules/module_standard.php';
 
 header('Content-Type: application/json');
 
@@ -67,6 +68,22 @@ function edudisplej_ensure_loop_plans_schema(mysqli $conn) {
     }
 }
 
+function edudisplej_normalize_time_value($raw, string $fallback = '00:00:00'): string {
+    $candidate = trim((string)$raw);
+    if (!preg_match('/^(?<h>\d{2}):(?<m>\d{2})(?::(?<s>\d{2}))?$/', $candidate, $m)) {
+        return $fallback;
+    }
+
+    $h = (int)$m['h'];
+    $mi = (int)$m['m'];
+    $s = isset($m['s']) ? (int)$m['s'] : 0;
+    if ($h < 0 || $h > 23 || $mi < 0 || $mi > 59 || $s < 0 || $s > 59) {
+        return $fallback;
+    }
+
+    return sprintf('%02d:%02d:%02d', $h, $mi, $s);
+}
+
 function edudisplej_time_ranges_overlap($a_start, $a_end, $b_start, $b_end) {
     if ($a_start <= $a_end && $b_start <= $b_end) {
         return $a_start < $b_end && $b_start < $a_end;
@@ -87,14 +104,8 @@ function edudisplej_validate_time_blocks_conflicts(array $time_blocks) {
             $type = 'weekly';
         }
 
-        $start = trim((string)($block['start_time'] ?? '08:00:00'));
-        $end = trim((string)($block['end_time'] ?? '12:00:00'));
-        if (strlen($start) === 5) {
-            $start .= ':00';
-        }
-        if (strlen($end) === 5) {
-            $end .= ':00';
-        }
+        $start = edudisplej_normalize_time_value($block['start_time'] ?? '08:00:00', '08:00:00');
+        $end = edudisplej_normalize_time_value($block['end_time'] ?? '12:00:00', '12:00:00');
 
         $days = [];
         if ($type === 'weekly') {
@@ -177,6 +188,7 @@ function edudisplej_resolve_module_key(mysqli $conn, int $module_id, array &$cac
     $stmt->close();
 
     $module_key = strtolower(trim((string)($row['module_key'] ?? '')));
+    $module_key = edudisplej_canonical_module_key($module_key);
     $cache[$module_id] = $module_key;
     return $module_key;
 }
@@ -194,7 +206,7 @@ function edudisplej_allowed_modules_for_company(mysqli $conn, int $company_id): 
 
     while ($row = $result->fetch_assoc()) {
         $module_id = (int)($row['id'] ?? 0);
-        $module_key = strtolower(trim((string)($row['module_key'] ?? '')));
+        $module_key = edudisplej_canonical_module_key((string)($row['module_key'] ?? ''));
         $module_name = trim((string)($row['name'] ?? $module_key));
         $licensed = ((int)($row['license_quantity'] ?? 0)) > 0;
 
@@ -552,15 +564,41 @@ try {
             return $loop_item;
         };
 
-        $base_loop = array_values(array_map($normalize_virtual_loop_item, is_array($base_loop) ? $base_loop : []));
-        $time_blocks = array_values(array_map(function ($block) use ($normalize_virtual_loop_item) {
+        $sanitize_loop_item = function ($loop_item) use ($normalize_virtual_loop_item) {
+            $normalized = $normalize_virtual_loop_item($loop_item);
+            if (!is_array($normalized)) {
+                return $normalized;
+            }
+
+            $module_key = strtolower(trim((string)($normalized['module_key'] ?? '')));
+            $normalized['duration_seconds'] = edudisplej_clamp_module_duration($module_key, $normalized['duration_seconds'] ?? null);
+            return $normalized;
+        };
+
+        $base_loop = array_values(array_map($sanitize_loop_item, is_array($base_loop) ? $base_loop : []));
+        $time_blocks = array_values(array_map(function ($block) use ($sanitize_loop_item) {
             if (!is_array($block)) {
                 return $block;
             }
             $loops = is_array($block['loops'] ?? null) ? $block['loops'] : [];
-            $block['loops'] = array_values(array_map($normalize_virtual_loop_item, $loops));
+            $block['loops'] = array_values(array_map($sanitize_loop_item, $loops));
             return $block;
         }, is_array($time_blocks) ? $time_blocks : []));
+
+        if ($has_planner_payload) {
+            $loop_styles = array_values(array_map(function ($style) use ($sanitize_loop_item) {
+                if (!is_array($style)) {
+                    return $style;
+                }
+
+                $style['items'] = array_values(array_map(
+                    $sanitize_loop_item,
+                    is_array($style['items'] ?? null) ? $style['items'] : []
+                ));
+
+                return $style;
+            }, $loop_styles));
+        }
 
         $validation = edudisplej_validate_time_blocks_conflicts($time_blocks);
         if (!$validation['ok']) {
@@ -602,55 +640,6 @@ try {
             exit();
         }
 
-        if ($session_role === 'content_editor') {
-            $conn->begin_transaction();
-            try {
-                $module_key_cache = [];
-                $existing_stmt = $conn->prepare("SELECT id FROM kiosk_group_modules WHERE group_id = ?");
-                $existing_stmt->bind_param("i", $group_id);
-                $existing_stmt->execute();
-                $existing_result = $existing_stmt->get_result();
-                $existing_ids = [];
-                while ($existing = $existing_result->fetch_assoc()) {
-                    $existing_ids[(int)$existing['id']] = true;
-                }
-                $existing_stmt->close();
-
-                foreach ($all_loops as $loop) {
-                    $loop_id = (int)($loop['id'] ?? 0);
-                    if ($loop_id <= 0 || !isset($existing_ids[$loop_id])) {
-                        continue;
-                    }
-
-                    $module_id = (int)($loop['module_id'] ?? 0);
-                    $module_key = strtolower(trim((string)($loop['module_key'] ?? '')));
-                    if ($module_key === '') {
-                        $module_key = edudisplej_resolve_module_key($conn, $module_id, $module_key_cache);
-                    }
-
-                    $sanitized_settings = edudisplej_sanitize_module_settings($module_key, $loop['settings'] ?? []);
-                    $video_duration = $module_key === 'video' ? edudisplej_video_duration_from_settings($sanitized_settings) : null;
-                    $settings = json_encode($sanitized_settings, JSON_UNESCAPED_UNICODE);
-                    if ($video_duration !== null) {
-                        $update_stmt = $conn->prepare("UPDATE kiosk_group_modules SET settings = ?, duration_seconds = ? WHERE id = ? AND group_id = ?");
-                        $update_stmt->bind_param("siii", $settings, $video_duration, $loop_id, $group_id);
-                    } else {
-                        $update_stmt = $conn->prepare("UPDATE kiosk_group_modules SET settings = ? WHERE id = ? AND group_id = ?");
-                        $update_stmt->bind_param("sii", $settings, $loop_id, $group_id);
-                    }
-                    $update_stmt->execute();
-                    $update_stmt->close();
-                }
-
-                $conn->commit();
-                echo json_encode(['success' => true, 'message' => 'Modultartalom sikeresen mentve']);
-            } catch (Exception $e) {
-                $conn->rollback();
-                throw $e;
-            }
-            exit();
-        }
-        
         // Start transaction
         $conn->begin_transaction();
 
@@ -681,8 +670,8 @@ try {
                     $block_type = 'weekly';
                 }
                 $specific_date = $block_type === 'date' ? trim((string)($block['specific_date'] ?? '')) : null;
-                $start_time = trim((string)($block['start_time'] ?? '08:00:00'));
-                $end_time = trim((string)($block['end_time'] ?? '12:00:00'));
+                $start_time = edudisplej_normalize_time_value($block['start_time'] ?? '08:00:00', '08:00:00');
+                $end_time = edudisplej_normalize_time_value($block['end_time'] ?? '12:00:00', '12:00:00');
                 $days_mask = trim((string)($block['days_mask'] ?? '1,2,3,4,5,6,7'));
                 $is_active_block = !isset($block['is_active']) || (int)$block['is_active'] !== 0 ? 1 : 0;
                 $priority = (int)($block['priority'] ?? ($block_type === 'date' ? 300 : 100));
@@ -690,19 +679,6 @@ try {
 
                 if ($block_name === '') {
                     $block_name = 'Időblokk';
-                }
-
-                if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $start_time)) {
-                    $start_time = '08:00:00';
-                }
-                if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $end_time)) {
-                    $end_time = '12:00:00';
-                }
-                if (strlen($start_time) === 5) {
-                    $start_time .= ':00';
-                }
-                if (strlen($end_time) === 5) {
-                    $end_time .= ':00';
                 }
 
                 $insert_block = $conn->prepare("INSERT INTO kiosk_group_time_blocks (group_id, block_name, block_type, specific_date, start_time, end_time, days_mask, is_active, priority, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -722,7 +698,7 @@ try {
             // Insert new loops
             foreach ($base_loop as $index => $loop) {
                 $module_id = intval($loop['module_id']);
-                $module_key = strtolower(trim((string)($loop['module_key'] ?? '')));
+                $module_key = edudisplej_canonical_module_key((string)($loop['module_key'] ?? ''));
                 if ($module_key === '') {
                     $module_key = edudisplej_resolve_module_key($conn, $module_id, $module_key_cache);
                 }
@@ -756,7 +732,7 @@ try {
 
                 foreach ($block['loops'] as $index => $loop) {
                     $module_id = intval($loop['module_id']);
-                    $module_key = strtolower(trim((string)($loop['module_key'] ?? '')));
+                    $module_key = edudisplej_canonical_module_key((string)($loop['module_key'] ?? ''));
                     if ($module_key === '') {
                         $module_key = edudisplej_resolve_module_key($conn, $module_id, $module_key_cache);
                     }

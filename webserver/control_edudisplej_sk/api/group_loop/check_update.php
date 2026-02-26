@@ -14,6 +14,91 @@ header('Content-Type: application/json');
 
 $response = ['success' => false, 'message' => ''];
 
+function edudisplej_pick_newer_timestamp(?string $current, ?string $candidate): ?string {
+    $candidate = trim((string)$candidate);
+    if ($candidate === '') {
+        return $current;
+    }
+
+    $current = trim((string)$current);
+    if ($current === '') {
+        return $candidate;
+    }
+
+    $currentTs = strtotime($current);
+    $candidateTs = strtotime($candidate);
+    if ($currentTs === false) {
+        return $candidate;
+    }
+    if ($candidateTs === false) {
+        return $current;
+    }
+
+    return $candidateTs > $currentTs ? $candidate : $current;
+}
+
+function edudisplej_meal_menu_latest_update_for_settings(mysqli $conn, int $company_id, array $settings): ?string {
+    $institution_id = (int)($settings['institutionId'] ?? 0);
+    if ($institution_id <= 0 || $company_id <= 0) {
+        return null;
+    }
+
+    $source_type = strtolower(trim((string)($settings['sourceType'] ?? 'server')));
+    if ($source_type === 'manual') {
+        $sql = "SELECT MAX(updated_at) AS latest_update
+                FROM meal_plan_items
+                WHERE institution_id = ? AND (company_id = 0 OR company_id = ?)
+                  AND source_type = 'manual'";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('ii', $institution_id, $company_id);
+    } else {
+        $sql = "SELECT MAX(updated_at) AS latest_update
+                FROM meal_plan_items
+                WHERE institution_id = ? AND (company_id = 0 OR company_id = ?)
+                  AND source_type IN ('server', 'auto_jedalen')";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('ii', $institution_id, $company_id);
+    }
+
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    $latest = trim((string)($row['latest_update'] ?? ''));
+    return $latest !== '' ? $latest : null;
+}
+
+function edudisplej_collect_meal_menu_latest_update_from_rows(mysqli $conn, int $company_id, array $rows): ?string {
+    $latest = null;
+    foreach ($rows as $row) {
+        $settingsRaw = $row['settings'] ?? null;
+        $settings = null;
+        if (is_string($settingsRaw) && $settingsRaw !== '') {
+            $decoded = json_decode($settingsRaw, true);
+            if (is_array($decoded)) {
+                $settings = $decoded;
+            }
+        } elseif (is_array($settingsRaw)) {
+            $settings = $settingsRaw;
+        }
+
+        if (!is_array($settings)) {
+            continue;
+        }
+
+        $candidate = edudisplej_meal_menu_latest_update_for_settings($conn, $company_id, $settings);
+        $latest = edudisplej_pick_newer_timestamp($latest, $candidate);
+    }
+
+    return $latest;
+}
+
 try {
     // Get device_id from POST, GET, or JSON body
     $device_id = $_POST['device_id'] ?? $_GET['device_id'] ?? '';
@@ -135,6 +220,26 @@ try {
         $row = $result->fetch_assoc();
         $latest_update = $row['latest_update'] ?? date('Y-m-d H:i:s');
         $stmt->close();
+
+        $meal_stmt = $conn->prepare("SELECT km.settings
+                                     FROM kiosk_modules km
+                                     JOIN modules m ON m.id = km.module_id
+                                     WHERE km.kiosk_id = ? AND km.is_active = 1
+                                       AND (LOWER(COALESCE(NULLIF(km.module_key, ''), m.module_key)) = 'meal-menu'
+                                            OR LOWER(COALESCE(NULLIF(km.module_key, ''), m.module_key)) = 'meal_menu')");
+        if ($meal_stmt) {
+            $meal_stmt->bind_param('i', $kiosk_id);
+            $meal_stmt->execute();
+            $meal_rows = [];
+            $meal_result = $meal_stmt->get_result();
+            while ($meal_row = $meal_result->fetch_assoc()) {
+                $meal_rows[] = $meal_row;
+            }
+            $meal_stmt->close();
+
+            $meal_latest_update = edudisplej_collect_meal_menu_latest_update_from_rows($conn, (int)$company_id, $meal_rows);
+            $latest_update = edudisplej_pick_newer_timestamp($latest_update, $meal_latest_update) ?? $latest_update;
+        }
         
         $response['success'] = true;
         $response['kiosk_id'] = $kiosk_id;
@@ -223,6 +328,26 @@ try {
             $latest_update = date('Y-m-d H:i:s');
         }
         $stmt->close();
+
+        $meal_stmt = $conn->prepare("SELECT kgm.settings
+                                     FROM kiosk_group_modules kgm
+                                     JOIN modules m ON m.id = kgm.module_id
+                                     WHERE kgm.group_id = ? AND kgm.is_active = 1
+                                       AND (LOWER(COALESCE(NULLIF(kgm.module_key, ''), m.module_key)) = 'meal-menu'
+                                            OR LOWER(COALESCE(NULLIF(kgm.module_key, ''), m.module_key)) = 'meal_menu')");
+        if ($meal_stmt) {
+            $meal_stmt->bind_param('i', $group_id);
+            $meal_stmt->execute();
+            $meal_rows = [];
+            $meal_result = $meal_stmt->get_result();
+            while ($meal_row = $meal_result->fetch_assoc()) {
+                $meal_rows[] = $meal_row;
+            }
+            $meal_stmt->close();
+
+            $meal_latest_update = edudisplej_collect_meal_menu_latest_update_from_rows($conn, (int)$company_id, $meal_rows);
+            $latest_update = edudisplej_pick_newer_timestamp($latest_update, $meal_latest_update) ?? $latest_update;
+        }
         
         $response['success'] = true;
         $response['kiosk_id'] = $kiosk_id;

@@ -1,6 +1,20 @@
 <?php
 require_once __DIR__ . '/module_registry.php';
 
+function edudisplej_canonical_module_key(string $moduleKey): string
+{
+    $key = strtolower(trim($moduleKey));
+
+    static $aliases = [
+        'meal_menu' => 'meal-menu',
+        'room_occupancy' => 'room-occupancy',
+        'default_logo' => 'default-logo',
+        'image_gallery' => 'image-gallery',
+    ];
+
+    return $aliases[$key] ?? $key;
+}
+
 function edudisplej_modules_root(): string
 {
     return realpath(__DIR__) ?: __DIR__;
@@ -28,7 +42,7 @@ function edudisplej_read_json_file_safe(string $absPath): ?array
 
 function edudisplej_resolve_module_runtime(string $moduleKey): array
 {
-    $moduleKey = strtolower(trim($moduleKey));
+    $moduleKey = edudisplej_canonical_module_key($moduleKey);
     $meta = edudisplej_module_meta($moduleKey);
 
     $folder = $meta['folder'] ?? $moduleKey;
