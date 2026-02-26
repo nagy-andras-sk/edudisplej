@@ -39,6 +39,27 @@ $groups = [];
 $error  = '';
 $group_plans_by_id = [];
 
+function edudisplej_parse_loop_version_timestamp($value) {
+    if ($value === null || $value === '') {
+        return null;
+    }
+
+    $text = trim((string)$value);
+    if ($text === '') {
+        return null;
+    }
+
+    if (preg_match('/^\d{14}$/', $text)) {
+        $dt = DateTimeImmutable::createFromFormat('YmdHis', $text);
+        if ($dt instanceof DateTimeImmutable) {
+            return $dt->getTimestamp();
+        }
+    }
+
+    $ts = strtotime($text);
+    return $ts === false ? null : $ts;
+}
+
 try {
     $conn = getDbConnection();
 
@@ -88,20 +109,32 @@ try {
             }
         }
         $server_loop_version = $row['group_server_loop_version'] ?: $row['kiosk_server_loop_version'];
-        $loop_version_mismatch = (
+        $loop_version_mismatch_raw = (
             $row['status'] !== 'offline'
             && $kiosk_loop_version !== null
             && !empty($server_loop_version)
             && $kiosk_loop_version !== $server_loop_version
         );
 
+        $server_loop_ts = edudisplej_parse_loop_version_timestamp($server_loop_version);
+        $loop_update_grace_active = (
+            $loop_version_mismatch_raw
+            && $server_loop_ts !== null
+            && (time() - $server_loop_ts) <= 900
+        );
+
+        $loop_version_mismatch = $loop_version_mismatch_raw && !$loop_update_grace_active;
+
         if ($loop_version_mismatch) {
             $row['status'] = 'online_error';
+        } elseif ($loop_update_grace_active && $row['status'] !== 'offline') {
+            $row['status'] = 'online_pending';
         }
 
         $row['kiosk_loop_version'] = $kiosk_loop_version;
         $row['server_loop_version'] = $server_loop_version;
         $row['loop_version_mismatch'] = $loop_version_mismatch;
+        $row['loop_update_grace_active'] = $loop_update_grace_active;
 
         $row['screenshot_url'] = !empty($row['screenshot_url'])
             ? ('../api/screenshot_file.php?kiosk_id=' . (int)$row['id'])
@@ -151,7 +184,7 @@ try {
 }
 
 $total   = count($kiosks);
-$online  = count(array_filter($kiosks, fn($k) => in_array($k['status'], ['online', 'online_error'], true)));
+$online  = count(array_filter($kiosks, fn($k) => in_array($k['status'], ['online', 'online_error', 'online_pending'], true)));
 $offline = $total - $online;
 
 include '../admin/header.php';
@@ -167,6 +200,12 @@ include '../admin/header.php';
         background: #fff8e1;
         color: #8a5400;
         border: 1px solid #e0b24d;
+    }
+
+    .status-badge.status-online_pending {
+        background: #e8f4ff;
+        color: #0a4f82;
+        border: 1px solid #6fb0e0;
     }
 
     .kiosk-screenshot-cell .preview-card.placeholder .screenshot-loader {
@@ -273,6 +312,8 @@ include '../admin/header.php';
                             <span class="status-badge kiosk-status-badge status-<?php echo htmlspecialchars($k['status']); ?>" style="cursor:pointer;" onclick="filterByStatusValue('<?php echo htmlspecialchars($k['status'], ENT_QUOTES, 'UTF-8'); ?>')" title="<?php echo htmlspecialchars(t_def('dashboard.filter.status_title', 'Szűrés erre a státuszra')); ?>">
                                 <?php if ($k['status'] === 'online_error'): ?>
                                     ⚠️ <?php echo htmlspecialchars(t_def('dashboard.status.online_error', 'Online-Hiba')); ?>
+                                <?php elseif ($k['status'] === 'online_pending'): ?>
+                                    ⏳ <?php echo htmlspecialchars(t_def('dashboard.status.online_pending', 'Frissítésre vár')); ?>
                                 <?php elseif ($k['status'] === 'online'): ?>
                                     🟢 <?php echo htmlspecialchars(t('dashboard.status.online')); ?>
                                 <?php else: ?>
@@ -312,7 +353,7 @@ include '../admin/header.php';
                         </td>
                         <td class="muted nowrap kiosk-last-seen"><?php echo htmlspecialchars($last_seen_str); ?></td>
                         <td class="kiosk-screenshot-cell">
-                            <?php if (in_array($k['status'], ['online', 'online_error'], true) && $k['screenshot_url']): ?>
+                            <?php if (in_array($k['status'], ['online', 'online_error', 'online_pending'], true) && $k['screenshot_url']): ?>
                                   <div class="preview-card" style="cursor:pointer;" onclick="openScreenshotViewer(<?php echo (int)$k['id']; ?>, <?php echo htmlspecialchars($screenshot_url_json, ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars($screenshot_ts_json, ENT_QUOTES, 'UTF-8'); ?>);" title="<?php echo htmlspecialchars(t_def('dashboard.screenshot.zoom_live', 'Nagyítás és élő frissítés')); ?>">
                                     <img class="screenshot-img"
                                          src="<?php echo htmlspecialchars($k['screenshot_url']); ?>"

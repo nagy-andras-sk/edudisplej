@@ -1334,8 +1334,8 @@ function edudisplej_group_loop_module_name(array $module): string {
                             <label style="display:flex; align-items:center; gap:4px; font-size:12px;"><input type="checkbox" class="fixed-plan-day-checkbox" value="7">V</label>
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                            <input type="time" id="fixed-plan-start" step="60" aria-label="<?php echo htmlspecialchars(t_def('group_loop.weekly_start_time_aria', 'Weekly plan start (hour-minute)')); ?>">
-                            <input type="time" id="fixed-plan-end" step="60" aria-label="<?php echo htmlspecialchars(t_def('group_loop.weekly_end_time_aria', 'Weekly plan end (hour-minute)')); ?>">
+                            <input type="text" id="fixed-plan-start" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\d|2[0-3]):[0-5]\d$" aria-label="<?php echo htmlspecialchars(t_def('group_loop.weekly_start_time_aria', 'Weekly plan start (hour-minute)')); ?>">
+                            <input type="text" id="fixed-plan-end" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\d|2[0-3]):[0-5]\d$" aria-label="<?php echo htmlspecialchars(t_def('group_loop.weekly_end_time_aria', 'Weekly plan end (hour-minute)')); ?>">
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                             <button id="fixed-plan-add-btn" type="button" class="btn" onclick="createFixedWeeklyBlockFromInputs()"><?php echo htmlspecialchars(t_def('common.update', 'Update')); ?></button>

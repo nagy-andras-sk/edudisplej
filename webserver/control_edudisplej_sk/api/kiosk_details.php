@@ -97,6 +97,20 @@ function normalize_loop_version_value($value) {
     return date('YmdHis', $ts);
 }
 
+function parse_loop_version_timestamp($value) {
+    $normalized = normalize_loop_version_value($value);
+    if ($normalized === null) {
+        return null;
+    }
+
+    $dt = DateTimeImmutable::createFromFormat('YmdHis', $normalized);
+    if ($dt instanceof DateTimeImmutable) {
+        return $dt->getTimestamp();
+    }
+
+    return null;
+}
+
 function normalize_screenshot_url($raw_url) {
     if ($raw_url === null) {
         return null;
@@ -182,20 +196,32 @@ if (isset($_GET['refresh_list'])) {
             $kiosk_loop_version = normalize_loop_version_value($row['loop_last_update'] ?? null);
             $server_loop_version = normalize_loop_version_value($row['group_server_loop_version'] ?? null)
                 ?? normalize_loop_version_value($row['kiosk_server_loop_version'] ?? null);
-            $loop_version_mismatch = (
+            $loop_version_mismatch_raw = (
                 ($row['status'] ?? '') !== 'offline'
                 && $kiosk_loop_version !== null
                 && $server_loop_version !== null
                 && $kiosk_loop_version !== $server_loop_version
             );
 
+            $server_loop_ts = parse_loop_version_timestamp($server_loop_version);
+            $loop_update_grace_active = (
+                $loop_version_mismatch_raw
+                && $server_loop_ts !== null
+                && (time() - $server_loop_ts) <= 900
+            );
+
+            $loop_version_mismatch = $loop_version_mismatch_raw && !$loop_update_grace_active;
+
             if ($loop_version_mismatch) {
                 $row['status'] = 'online_error';
+            } elseif ($loop_update_grace_active && (($row['status'] ?? '') !== 'offline')) {
+                $row['status'] = 'online_pending';
             }
 
             $row['kiosk_loop_version'] = $kiosk_loop_version;
             $row['server_loop_version'] = $server_loop_version;
             $row['loop_version_mismatch'] = $loop_version_mismatch;
+            $row['loop_update_grace_active'] = $loop_update_grace_active;
 
             $row['screenshot_url'] = !empty($row['screenshot_url'])
                 ? ('../api/screenshot_file.php?kiosk_id=' . (int)$row['id'])
@@ -352,15 +378,26 @@ try {
         $kiosk_loop_version = normalize_loop_version_value($kiosk['loop_last_update'] ?? null);
         $server_loop_version = normalize_loop_version_value($kiosk['group_server_loop_version'] ?? null)
             ?? normalize_loop_version_value($kiosk['kiosk_server_loop_version'] ?? null);
-        $loop_version_mismatch = (
+        $loop_version_mismatch_raw = (
             ($kiosk['status'] ?? '') !== 'offline'
             && $kiosk_loop_version !== null
             && $server_loop_version !== null
             && $kiosk_loop_version !== $server_loop_version
         );
 
+        $server_loop_ts = parse_loop_version_timestamp($server_loop_version);
+        $loop_update_grace_active = (
+            $loop_version_mismatch_raw
+            && $server_loop_ts !== null
+            && (time() - $server_loop_ts) <= 900
+        );
+
+        $loop_version_mismatch = $loop_version_mismatch_raw && !$loop_update_grace_active;
+
         if ($loop_version_mismatch) {
             $kiosk['status'] = 'online_error';
+        } elseif ($loop_update_grace_active && (($kiosk['status'] ?? '') !== 'offline')) {
+            $kiosk['status'] = 'online_pending';
         }
     }
     
@@ -407,6 +444,7 @@ try {
     $response['kiosk_loop_version'] = $kiosk_loop_version ?? null;
     $response['server_loop_version'] = $server_loop_version ?? null;
     $response['loop_version_mismatch'] = $loop_version_mismatch ?? false;
+    $response['loop_update_grace_active'] = $loop_update_grace_active ?? false;
     
     // Parse HW info
     if ($kiosk['hw_info']) {

@@ -718,12 +718,22 @@ for key, group in meal_groups.items():
 
     prefetched_groups += 1
     saved_at = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
+
+    inline_prefetched = None
+    if config['layout_mode'] == 'square_dual_day':
+        inline_prefetched = {
+            'today': today_payload if isinstance(today_payload, dict) else None,
+            'tomorrow': tomorrow_payload if isinstance(tomorrow_payload, dict) else None,
+        }
+    elif isinstance(today_payload, dict):
+        inline_prefetched = today_payload
+
     for settings in group['settings_refs']:
         settings['offlinePrefetchedTodayFile'] = today_rel
         settings['offlinePrefetchedTomorrowFile'] = tomorrow_rel
         settings['offlinePrefetchedMenuSavedAt'] = saved_at
-        if 'offlinePrefetchedMenuData' in settings:
-            settings.pop('offlinePrefetchedMenuData', None)
+        if inline_prefetched is not None:
+            settings['offlinePrefetchedMenuData'] = inline_prefetched
         patched_settings += 1
 
 loop_file.write_text(json.dumps(data, ensure_ascii=False, indent=4), encoding='utf-8')
@@ -1293,7 +1303,21 @@ $loop_json
                 }
                 
                 // Build URL with parameters
-                const params = new URLSearchParams(settings);
+                const params = new URLSearchParams();
+                Object.keys(settings || {}).forEach((key) => {
+                    const value = settings[key];
+                    if (value === undefined || value === null) {
+                        return;
+                    }
+                    if (typeof value === 'object') {
+                        try {
+                            params.set(key, JSON.stringify(value));
+                        } catch (_) {
+                        }
+                        return;
+                    }
+                    params.set(key, String(value));
+                });
                 const url = modulePath + (params.toString() ? '?' + params.toString() : '');
                 
                 return url;

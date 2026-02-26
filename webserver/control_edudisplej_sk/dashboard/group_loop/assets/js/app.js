@@ -1168,8 +1168,8 @@
                             ${[1,2,3,4,5,6,7].map((d) => `<label style="display:flex; align-items:center; gap:4px; font-size:12px;"><input type="checkbox" class="quick-weekly-day" value="${d}">${getDayShortLabel(String(d))}</label>`).join('')}
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
-                            <input type="time" id="quick-weekly-start" step="60" aria-label="${tr('group_loop.quick_schedule_start_aria', 'Weekly start (hour-minute)')}">
-                            <input type="time" id="quick-weekly-end" step="60" aria-label="${tr('group_loop.quick_schedule_end_aria', 'Weekly end (hour-minute)')}">
+                            <input type="text" id="quick-weekly-start" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="${tr('group_loop.quick_schedule_start_aria', 'Weekly start (hour-minute)')}">
+                            <input type="text" id="quick-weekly-end" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="${tr('group_loop.quick_schedule_end_aria', 'Weekly end (hour-minute)')}">
                         </div>
                         <div style="display:flex; justify-content:flex-end; gap:8px;">
                             <button type="button" class="btn" onclick="closeTimeBlockModal()">${tr('common.cancel', 'Cancel')}</button>
@@ -2204,8 +2204,8 @@
                                 }).join('')}
                         </div>
                         <div style="display:grid; grid-template-columns:120px 120px 1fr auto; gap:8px; align-items:center; margin-bottom:12px;">
-                            <input type="time" id="special-day-plan-start" step="60" aria-label="Speciális napi kezdés (24 órás)">
-                            <input type="time" id="special-day-plan-end" step="60" aria-label="Speciális napi befejezés (24 órás)">
+                            <input type="text" id="special-day-plan-start" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="Speciális napi kezdés (24 órás)">
+                            <input type="text" id="special-day-plan-end" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="Speciális napi befejezés (24 órás)">
                             <select id="special-day-plan-loop">
                                 ${loopStyles
                                     .filter((style) => parseInt(style.id, 10) !== parseInt(defaultLoopStyleId || 0, 10))
@@ -3469,11 +3469,11 @@
                             </div>
                             <div>
                                 <label style="display:block; font-size:12px; margin-bottom:4px;">Kezdés</label>
-                                <select id="tb-start" style="width:100%;"></select>
+                                <input id="tb-start" type="text" style="width:100%;" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$">
                             </div>
                             <div>
                                 <label style="display:block; font-size:12px; margin-bottom:4px;">Vége</label>
-                                <select id="tb-end" style="width:100%;"></select>
+                                <input id="tb-end" type="text" style="width:100%;" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$">
                             </div>
                             <div id="tb-days-wrap" style="grid-column:1 / span 2; ${blockType === 'weekly' ? '' : 'display:none;'}">
                                 <label style="display:block; font-size:12px; margin-bottom:6px;">Napok</label>
@@ -6947,8 +6947,11 @@
             const normalized = normalizeTimeInputValue(preferred);
 
             if (String(inputEl.tagName || '').toLowerCase() === 'input') {
-                inputEl.type = 'time';
-                inputEl.step = '60';
+                inputEl.type = 'text';
+                inputEl.setAttribute('inputmode', 'numeric');
+                inputEl.setAttribute('placeholder', 'HH:MM');
+                inputEl.setAttribute('maxlength', '5');
+                inputEl.setAttribute('pattern', '^([01]\\d|2[0-3]):[0-5]\\d$');
                 inputEl.value = normalized;
                 return;
             }

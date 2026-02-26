@@ -33,20 +33,33 @@
         .title { font-size: clamp(34px, 4.1vw, 74px); font-weight: 700; }
         .subtitle { font-size: clamp(20px, 2vw, 34px); color: #cbd5e1; margin-top: 6px; }
         .status { display: none; }
-        .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6vh 1.2vw; align-content: start; }
+        .status.is-debug { display: block; font-size: clamp(12px, 1.1vw, 18px); max-width: 56vw; text-align: right; color: #fca5a5; white-space: pre-line; }
+        .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.8vh 1.4vw; align-content: start; }
         .cards.single-card { grid-template-columns: minmax(0, 1fr); }
         .root.center .cards { justify-items: stretch; }
-        .card { background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 14px; padding: 1.6vh 1.2vw; }
-        .meal { font-size: clamp(24px, var(--meal-title-font-size, 2.1vw), 42px); font-weight: 700; color: #e2e8f0; margin-bottom: 10px; display:flex; align-items:center; gap:10px; }
+        .card { background: linear-gradient(180deg, rgba(15, 23, 42, 0.78) 0%, rgba(15, 23, 42, 0.64) 100%); border: 1px solid rgba(148, 163, 184, 0.34); border-radius: 18px; padding: 1.5vh 1.2vw; display:flex; flex-direction:column; gap:1.1vh; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03); }
+        .meal { font-size: clamp(30px, var(--meal-title-font-size, 2.35vw), 48px); font-weight: 800; color: #f1f5f9; margin-bottom: 8px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+        .meal-main { display:flex; align-items:center; gap:12px; min-width:0; }
+        .meal-name { min-width:0; }
         .root.center .meal { justify-content:center; }
-        .meal-icon { width: 24px; height: 24px; display:inline-block; color:#93c5fd; }
-        .meal-text-line { display:block; margin-bottom:2px; }
-        .meal-text-line.with-icon { display:flex; align-items:flex-start; gap:8px; }
-        .line-icon { width:16px; height:16px; display:inline-block; vertical-align:middle; margin-right:8px; color:#cbd5e1; }
-        .line-text { flex:1; min-width:0; }
-        .text { font-size: clamp(20px, var(--meal-text-font-size, 1.85vw), 34px); line-height: var(--meal-line-height, 1.4); font-weight: var(--meal-text-weight, 600); color: #f8fafc; white-space: var(--meal-white-space, pre-wrap); word-break: var(--meal-word-break, break-word); overflow: hidden; text-overflow: ellipsis; }
-        .allergen-row { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
-        .allergen-badge { font-size: clamp(12px, 1vw, 16px); line-height: 1; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 999px; padding: 4px 8px; background: rgba(15, 23, 42, 0.55); color: #e2e8f0; }
+        .meal-icon { width: clamp(32px, 2.1vw, 46px); height: clamp(32px, 2.1vw, 46px); display:inline-flex; color:#7dd3fc; flex: 0 0 auto; }
+        .meal-table { display:grid; gap:8px; }
+        .meal-row { display:grid; grid-template-columns: clamp(30px, 1.9vw, 42px) 1fr; align-items:flex-start; gap:12px; border:1px solid rgba(148,163,184,.24); border-radius:13px; background: rgba(30, 41, 59, 0.56); padding:10px 12px; }
+        .meal-row-icon { width: clamp(24px, 1.5vw, 34px); height: clamp(24px, 1.5vw, 34px); display:inline-flex; color:#bfdbfe; margin-top: 4px; flex: 0 0 auto; }
+        .meal-row-text { font-size: clamp(24px, var(--meal-text-font-size, 2.15vw), 40px); line-height: var(--meal-line-height, 1.38); font-weight: var(--meal-text-weight, 650); color: #f8fafc; white-space: var(--meal-white-space, pre-wrap); word-break: var(--meal-word-break, break-word); }
+        .allergen-wrap { margin-top: 6px; padding: 10px 10px 0; border-top: 1px solid rgba(148, 163, 184, 0.2); background: rgba(15, 23, 42, 0.38); border-radius: 12px; }
+        .allergen-title { font-size: clamp(14px, .95vw, 18px); letter-spacing: .03em; font-weight: 700; color: #cbd5e1; margin-bottom: 6px; text-transform: uppercase; }
+        .allergen-row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .allergen-badge { font-size: clamp(13px, .95vw, 17px); line-height: 1.1; border: 1px solid rgba(148, 163, 184, 0.34); border-radius: 999px; padding: 6px 10px; background: rgba(15, 23, 42, 0.72); color: #e2e8f0; display:inline-flex; align-items:center; gap:7px; font-weight: 600; }
+        .allergen-icon { width: clamp(14px, .9vw, 18px); height: clamp(14px, .9vw, 18px); display:inline-flex; color:#93c5fd; flex: 0 0 auto; }
+        .meal-allergen-inline { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top: 2px; }
+        .meal-allergen-dot { width: clamp(24px, 1.4vw, 32px); height: clamp(24px, 1.4vw, 32px); border-radius: 999px; border:1px solid rgba(148,163,184,.36); display:inline-flex; align-items:center; justify-content:center; background: rgba(15, 23, 42, 0.72); color:#93c5fd; }
+        .meal-allergen-dot svg { width: 72%; height: 72%; display:block; }
+        .meal-allergen-count { font-size: clamp(12px, .8vw, 15px); color:#cbd5e1; font-weight:700; margin-left: 2px; }
+        .allergen-gluten, .allergen-celery, .allergen-mustard { background: rgba(120, 53, 15, 0.35); border-color: rgba(251, 191, 36, 0.48); }
+        .allergen-milk, .allergen-egg, .allergen-fish { background: rgba(3, 105, 161, 0.28); border-color: rgba(125, 211, 252, 0.5); }
+        .allergen-nut, .allergen-sesame, .allergen-lupin, .allergen-shell { background: rgba(127, 29, 29, 0.3); border-color: rgba(252, 165, 165, 0.52); }
+        .allergen-soy, .allergen-sulfite, .allergen-warning { background: rgba(30, 64, 175, 0.28); border-color: rgba(147, 197, 253, 0.52); }
         .empty { grid-column: 1 / -1; border: 1px dashed rgba(148,163,184,.35); border-radius: 12px; padding: 16px; color: #cbd5e1; font-size: clamp(18px, 1.7vw, 32px); }
         .foot { font-size: clamp(16px, 1.2vw, 24px); color: #94a3b8; }
         .root.scroll-mode { justify-items: center; text-align: center; }
@@ -57,12 +70,19 @@
         .dual-days { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2vw; height: 100%; }
         .dual-days.single-day { grid-template-columns: minmax(0, 1fr); }
         .day-square { background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 16px; padding: 1.2vh 1vw; display:flex; flex-direction:column; min-height:0; }
-        .day-title { font-size: clamp(24px, 2.2vw, 44px); font-weight: 700; color: #e2e8f0; margin-bottom: .8vh; }
+        .day-title { font-size: clamp(28px, 2.4vw, 46px); font-weight: 800; color: #e2e8f0; margin-bottom: .8vh; display:flex; align-items:center; gap:10px; }
+        .day-title-icon { width: clamp(26px, 1.5vw, 34px); height: clamp(26px, 1.5vw, 34px); display:inline-flex; color:#7dd3fc; flex:0 0 auto; }
         .day-date { font-size: clamp(16px, 1.2vw, 24px); color: #94a3b8; margin-bottom: 1vh; }
         .day-content { display:grid; gap:.9vh; align-content:start; overflow:hidden; }
         .day-meal { border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 10px; padding: .7vh .7vw; background: rgba(15, 23, 42, 0.45); }
-        .day-meal-label { font-size: clamp(16px, 1.15vw, 22px); font-weight: 700; color: #cbd5e1; margin-bottom: .3vh; }
-        .day-meal-text { font-size: clamp(15px, 1.08vw, 20px); line-height: 1.28; color:#f8fafc; white-space: pre-wrap; word-break: break-word; }
+        .day-meal-label { font-size: clamp(19px, 1.35vw, 26px); font-weight: 700; color: #cbd5e1; margin-bottom: .3vh; display:flex; align-items:center; gap:8px; }
+        .day-meal-icon { width: clamp(18px, 1.05vw, 24px); height: clamp(18px, 1.05vw, 24px); display:inline-flex; color:#bfdbfe; flex: 0 0 auto; }
+        .day-meal-text { font-size: clamp(19px, 1.3vw, 26px); line-height: 1.3; color:#f8fafc; white-space: pre-wrap; word-break: break-word; }
+        .meal-icon svg, .meal-row-icon svg, .allergen-icon svg, .day-title-icon svg, .day-meal-icon svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
         .foot-line { display:block; }
         .foot-source { display:block; margin-top:4px; font-size: clamp(12px, .95vw, 16px); opacity:.9; }
 
@@ -316,6 +336,8 @@
             cutlery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3v8"/><path d="M10 3v8"/><path d="M8.5 11v10"/><path d="M15 3c3 2 3 6 0 8v10"/></svg>',
             plate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
             food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4v8"/><path d="M8 4v8"/><path d="M6.5 12v8"/><path d="M13 4c3 2 3 6 0 8v8"/><path d="M18 4v16"/></svg>'
+            ,
+            calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M3 10h18"/></svg>'
         };
         return map[name] || map.food;
     }
@@ -467,22 +489,42 @@
         }[m]));
     }
 
+    function allergenBadgeSvg(kind) {
+        const safe = String(kind || '').toLowerCase();
+        const icons = {
+            gluten: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18"/><path d="M8 7c0 2-1 3-3 4 2 1 3 2 3 4"/><path d="M16 7c0 2 1 3 3 4-2 1-3 2-3 4"/></svg>',
+            milk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6"/><path d="M10 3v3l-2 3v9a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V9l-2-3V3"/></svg>',
+            egg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4c3 0 6 4 6 8a6 6 0 1 1-12 0c0-4 3-8 6-8z"/></svg>',
+            fish: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12c3-4 8-6 13-5v10c-5 1-10-1-13-5z"/><path d="M16 12h5"/></svg>',
+            nut: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 10c0-3 2-5 4-5s4 2 4 5-2 9-4 9-4-6-4-9z"/></svg>',
+            soy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 14c0-4 2-6 6-6 4 0 6 2 6 6 0 3-2 5-6 5-4 0-6-2-6-5z"/></svg>',
+            celery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 20V8"/><path d="M12 20V6"/><path d="M16 20V9"/><path d="M7 8c-2-2-2-4 0-6"/><path d="M12 6c-2-2-2-4 0-6"/></svg>',
+            mustard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>',
+            sesame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 13c0-3 2-5 4-5s4 2 4 5-2 5-4 5-4-2-4-5z"/><circle cx="12" cy="13" r="1"/></svg>',
+            sulfite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h10l2 6-7 12-7-12z"/></svg>',
+            shell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14c0-5 4-9 8-9s8 4 8 9"/><path d="M4 14h16"/><path d="M12 5v9"/></svg>',
+            lupin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18"/><path d="M12 8c2-2 4-2 6 0"/><path d="M12 12c2-2 4-2 6 0"/><path d="M12 16c2-2 4-2 6 0"/></svg>',
+            warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l9 16H3l9-16z"/><path d="M12 9v4"/><circle cx="12" cy="16" r="1"/></svg>'
+        };
+        return icons[safe] || icons.warning;
+    }
+
     function allergenMap() {
         return {
-            1: { emoji: '🌾', label: 'Glutén' },
-            2: { emoji: '🦐', label: 'Rákfélék' },
-            3: { emoji: '🥚', label: 'Tojás' },
-            4: { emoji: '🐟', label: 'Hal' },
-            5: { emoji: '🥜', label: 'Földimogyoró' },
-            6: { emoji: '🫘', label: 'Szója' },
-            7: { emoji: '🥛', label: 'Tej' },
-            8: { emoji: '🌰', label: 'Diófélék' },
-            9: { emoji: '🥬', label: 'Zeller' },
-            10: { emoji: '🟡', label: 'Mustár' },
-            11: { emoji: '🌱', label: 'Szezámmag' },
-            12: { emoji: '🍷', label: 'Kén-dioxid/szulfitok' },
-            13: { emoji: '🌼', label: 'Csillagfürt' },
-            14: { emoji: '🦪', label: 'Puhatestűek' }
+            1: { icon: 'gluten', label: 'Glutén' },
+            2: { icon: 'shell', label: 'Rákfélék' },
+            3: { icon: 'egg', label: 'Tojás' },
+            4: { icon: 'fish', label: 'Hal' },
+            5: { icon: 'nut', label: 'Földimogyoró' },
+            6: { icon: 'soy', label: 'Szója' },
+            7: { icon: 'milk', label: 'Tej' },
+            8: { icon: 'nut', label: 'Diófélék' },
+            9: { icon: 'celery', label: 'Zeller' },
+            10: { icon: 'mustard', label: 'Mustár' },
+            11: { icon: 'sesame', label: 'Szezámmag' },
+            12: { icon: 'sulfite', label: 'Kén-dioxid/szulfitok' },
+            13: { icon: 'lupin', label: 'Csillagfürt' },
+            14: { icon: 'shell', label: 'Puhatestűek' }
         };
     }
 
@@ -507,19 +549,19 @@
 
     function allergenIconForLabel(label) {
         const n = normalizeAllergenLabel(label);
-        if (n.includes('lepok') || n.includes('obilnin')) return '🌾';
-        if (n.includes('vajcia') || n.includes('toj')) return '🥚';
-        if (n.includes('mlieko') || n.includes('tej')) return '🥛';
-        if (n.includes('ryb') || n.includes('hal')) return '🐟';
-        if (n.includes('horcica') || n.includes('must')) return '🟡';
-        if (n.includes('zeler')) return '🥬';
-        if (n.includes('soj')) return '🫘';
-        if (n.includes('orech') || n.includes('dio')) return '🌰';
-        if (n.includes('sezam')) return '🌱';
-        if (n.includes('siričit') || n.includes('sulfit')) return '🍷';
-        if (n.includes('rak')) return '🦐';
-        if (n.includes('makkys')) return '🥜';
-        return '⚠️';
+        if (n.includes('lepok') || n.includes('obilnin')) return 'gluten';
+        if (n.includes('vajcia') || n.includes('toj')) return 'egg';
+        if (n.includes('mlieko') || n.includes('tej')) return 'milk';
+        if (n.includes('ryb') || n.includes('hal')) return 'fish';
+        if (n.includes('horcica') || n.includes('must')) return 'mustard';
+        if (n.includes('zeler')) return 'celery';
+        if (n.includes('soj')) return 'soy';
+        if (n.includes('orech') || n.includes('dio')) return 'nut';
+        if (n.includes('sezam')) return 'sesame';
+        if (n.includes('siričit') || n.includes('sulfit')) return 'sulfite';
+        if (n.includes('rak')) return 'shell';
+        if (n.includes('makkys')) return 'nut';
+        return 'warning';
     }
 
     function extractAllergenCodes(text) {
@@ -576,41 +618,56 @@
             : '';
         const name = escapeHtml(rawName);
         const originalText = stripSourceNoise(String(meal.text || '').trim());
-        const allergenCodes = settings.showAllergenEmojis ? extractAllergenCodes(originalText) : [];
-        const allergenLabels = settings.showAllergenEmojis ? extractAllergenLabels(originalText) : [];
+        const allergenCodes = extractAllergenCodes(originalText);
+        const allergenLabels = extractAllergenLabels(originalText);
 
         const displayTextRaw = settings.showAllergenEmojis
             ? (stripAllergenAnnotations(originalText) || originalText)
             : originalText;
         const textLines = String(displayTextRaw || '—').split(/\r?\n/).map((line) => normalizeMealLine(line)).filter((line) => line !== '');
-        const text = textLines.length > 0
+        const rowHtml = textLines.length > 0
             ? textLines.map((line, idx) => {
                 const safeLine = escapeHtml(line);
-                if (settings.showMealTypeSvgIcons !== true) {
-                    return `<span class="meal-text-line">${safeLine}</span>`;
-                }
-                return `<span class="meal-text-line with-icon"><span class="line-icon" aria-hidden="true">${mealLineSvg(line, key, idx)}</span><span class="line-text">${safeLine}</span></span>`;
+                const rowIcon = settings.showMealTypeSvgIcons === true
+                    ? `<span class="meal-row-icon" aria-hidden="true">${mealLineSvg(line, key, idx)}</span>`
+                    : `<span class="meal-row-icon" aria-hidden="true">${iconSvg('food')}</span>`;
+                return `<div class="meal-row">${rowIcon}<div class="meal-row-text">${safeLine}</div></div>`;
             }).join('')
-            : '—';
+            : `<div class="meal-row"><span class="meal-row-icon" aria-hidden="true">${iconSvg('food')}</span><div class="meal-row-text">—</div></div>`;
 
         let allergenHtml = '';
+        const map = allergenMap();
+        const inlineIconKeys = (() => {
+            const keys = [];
+            allergenCodes.forEach((code) => {
+                const icon = (map[code] && map[code].icon) ? map[code].icon : 'warning';
+                if (!keys.includes(icon)) keys.push(icon);
+            });
+            allergenLabels.forEach((label) => {
+                const icon = allergenIconForLabel(label);
+                if (!keys.includes(icon)) keys.push(icon);
+            });
+            return keys;
+        })();
+        const inlineAllergenHtml = inlineIconKeys.length > 0
+            ? `<span class="meal-allergen-inline">${inlineIconKeys.slice(0, 6).map((iconKey) => `<span class="meal-allergen-dot allergen-${escapeHtml(iconKey)}" title="Allergén"><span aria-hidden="true">${allergenBadgeSvg(iconKey)}</span></span>`).join('')}${inlineIconKeys.length > 6 ? `<span class="meal-allergen-count">+${inlineIconKeys.length - 6}</span>` : ''}</span>`
+            : '';
         if (settings.showAllergenEmojis && (allergenCodes.length > 0 || allergenLabels.length > 0)) {
-            const map = allergenMap();
             const codeBadges = allergenCodes.map((code) => {
-                const item = map[code] || { emoji: '⚠️', label: 'Allergén' };
+                const item = map[code] || { icon: 'warning', label: 'Allergén' };
                 const title = escapeHtml(`${item.label} (${code})`);
-                return `<span class="allergen-badge" title="${title}">${item.emoji} ${code}</span>`;
+                return `<span class="allergen-badge allergen-${escapeHtml(item.icon)}" title="${title}"><span class="allergen-icon" aria-hidden="true">${allergenBadgeSvg(item.icon)}</span>${code}</span>`;
             });
             const labelBadges = allergenLabels.map((label) => {
-                const icon = allergenIconForLabel(label);
+                const iconKey = allergenIconForLabel(label);
                 const safeLabel = escapeHtml(label);
-                return `<span class="allergen-badge" title="${safeLabel}">${icon} ${safeLabel}</span>`;
+                return `<span class="allergen-badge allergen-${escapeHtml(iconKey)}" title="${safeLabel}"><span class="allergen-icon" aria-hidden="true">${allergenBadgeSvg(iconKey)}</span>${safeLabel}</span>`;
             });
             const badges = [...codeBadges, ...labelBadges].join('');
-            allergenHtml = `<div class="allergen-row">${badges}</div>`;
+            allergenHtml = `<div class="allergen-wrap"><div class="allergen-title">Allergének</div><div class="allergen-row">${badges}</div></div>`;
         }
 
-        return `<div class="card"><div class="meal">${mealIconHtml}<span>${name}</span></div><div class="text">${text}</div>${allergenHtml}</div>`;
+        return `<div class="card"><div class="meal"><span class="meal-main">${mealIconHtml}<span class="meal-name">${name}</span></span>${inlineAllergenHtml}</div><div class="meal-table">${rowHtml}</div>${allergenHtml}</div>`;
     }
 
     function render(data, settings) {
@@ -709,12 +766,15 @@
                         .filter(Boolean)
                         .join('\n');
                     const safeText = escapeHtml(displayText);
-                    return `<div class="day-meal"><div class="day-meal-label">${safeName}</div><div class="day-meal-text">${safeText}</div></div>`;
+                    const labelIcon = settings.showMealTypeSvgIcons === true
+                        ? `<span class="day-meal-icon" aria-hidden="true">${mealTypeSvg(meal.key)}</span>`
+                        : '';
+                    return `<div class="day-meal"><div class="day-meal-label">${labelIcon}<span>${safeName}</span></div><div class="day-meal-text">${safeText}</div></div>`;
                 }).join('')
                 : `<div class="empty">${escapeHtml(t.emptyMeals)}</div>`;
 
             const dateText = escapeHtml(String(day.data?.menu_date || '').trim());
-            return `<div class="day-square"><div class="day-title">${escapeHtml(day.title)}</div><div class="day-date">${dateText}</div><div class="day-content">${mealHtml}</div></div>`;
+            return `<div class="day-square"><div class="day-title"><span class="day-title-icon" aria-hidden="true">${iconSvg('calendar')}</span><span>${escapeHtml(day.title)}</span></div><div class="day-date">${dateText}</div><div class="day-content">${mealHtml}</div></div>`;
         }).join('');
 
         cards.innerHTML = `<div class="dual-days ${dayBlocks.length === 1 ? 'single-day' : ''}">${daysHtml}</div>`;
@@ -881,7 +941,45 @@
         return `${y}-${m}-${d}`;
     }
 
-    async function fetchMenuData(settings, dateValue, exactDate) {
+    function createDebugState() {
+        return { lines: [] };
+    }
+
+    function pushDebug(debugState, message) {
+        if (!debugState || !Array.isArray(debugState.lines)) return;
+        const clean = String(message || '').trim();
+        if (!clean) return;
+        debugState.lines.push(clean);
+        if (debugState.lines.length > 10) {
+            debugState.lines = debugState.lines.slice(-10);
+        }
+    }
+
+    function renderDebugStatus(debugState, rendered) {
+        const statusEl = document.getElementById('status');
+        if (!statusEl) return;
+
+        if (rendered === true) {
+            statusEl.classList.remove('is-debug');
+            statusEl.style.display = 'none';
+            statusEl.textContent = '';
+            return;
+        }
+
+        const lines = (debugState && Array.isArray(debugState.lines)) ? debugState.lines : [];
+        if (!lines.length) {
+            statusEl.classList.remove('is-debug');
+            statusEl.style.display = 'none';
+            statusEl.textContent = '';
+            return;
+        }
+
+        statusEl.classList.add('is-debug');
+        statusEl.style.display = 'block';
+        statusEl.textContent = `⚠️ Meal debug\n${lines.join('\n')}`;
+    }
+
+    async function fetchMenuData(settings, dateValue, exactDate, debugState) {
         const queryParams = new URLSearchParams({
             action: 'menu',
             site_key: settings.siteKey,
@@ -902,12 +1000,18 @@
         }
 
         const url = appendToken(resolveApiUrl(settings.apiBaseUrl, queryParams.toString()));
-        const response = await fetchWithTimeout(url, 6000);
-        const payload = await response.json();
-        if (!response.ok || !payload || payload.success !== true) {
+        try {
+            const response = await fetchWithTimeout(url, 6000);
+            const payload = await response.json();
+            if (!response.ok || !payload || payload.success !== true) {
+                pushDebug(debugState, `API fail (${response.status || 'n/a'}) ${dateValue}`);
+                return null;
+            }
+            return payload.data || null;
+        } catch (error) {
+            pushDebug(debugState, `API exception ${dateValue}: ${String(error?.message || error || 'unknown')}`);
             return null;
         }
-        return payload.data || null;
     }
 
     async function fetchWithTimeout(url, timeoutMs) {
@@ -920,19 +1024,25 @@
         }
     }
 
-    async function loadOfflineMealFile(pathValue) {
+    async function loadOfflineMealFile(pathValue, debugState, label) {
         const path = String(pathValue || '').trim();
         if (!path) {
+            pushDebug(debugState, `Offline file missing (${String(label || 'unknown')})`);
             return null;
         }
         try {
             const response = await fetch(path, { method: 'GET', cache: 'no-store' });
             if (!response.ok) {
+                pushDebug(debugState, `Offline file fail ${String(label || '')}: ${response.status}`);
                 return null;
             }
             const payload = await response.json();
+            if (!(payload && typeof payload === 'object')) {
+                pushDebug(debugState, `Offline file invalid JSON (${String(label || '')})`);
+            }
             return payload && typeof payload === 'object' ? payload : null;
-        } catch (_) {
+        } catch (error) {
+            pushDebug(debugState, `Offline file exception ${String(label || '')}: ${String(error?.message || error || 'unknown')}`);
             return null;
         }
     }
@@ -942,6 +1052,7 @@
         applyVisualSettings(settings);
         applyOverlays(settings);
         const cacheKey = `meal_menu_cache_${settings.companyId}_${settings.siteKey}_${settings.institutionId}`;
+        const debugState = createDebugState();
 
         let rendered = false;
 
@@ -950,8 +1061,8 @@
                 const todayDate = isoDateOffset(0);
                 const tomorrowDate = isoDateOffset(1);
                 const [todayData, tomorrowData] = await Promise.all([
-                    fetchMenuData(settings, todayDate, false),
-                    settings.showTomorrowInSquare !== false ? fetchMenuData(settings, tomorrowDate, true) : Promise.resolve(null)
+                    fetchMenuData(settings, todayDate, false, debugState),
+                    settings.showTomorrowInSquare !== false ? fetchMenuData(settings, tomorrowDate, true, debugState) : Promise.resolve(null)
                 ]);
 
                 if (todayData || tomorrowData) {
@@ -961,9 +1072,11 @@
                         localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayData, tomorrow: tomorrowData } }));
                     } catch (_) {
                     }
+                } else {
+                    pushDebug(debugState, 'API empty (square mode)');
                 }
             } else {
-                const data = await fetchMenuData(settings, isoDateOffset(0), false);
+                const data = await fetchMenuData(settings, isoDateOffset(0), false, debugState);
                 if (data) {
                     render(data, settings);
                     rendered = true;
@@ -971,17 +1084,20 @@
                         localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data }));
                     } catch (_) {
                     }
+                } else {
+                    pushDebug(debugState, 'API empty (single mode)');
                 }
             }
-        } catch (_) {
+        } catch (error) {
+            pushDebug(debugState, `Init API phase exception: ${String(error?.message || error || 'unknown')}`);
         }
 
         if (!rendered) {
             const todayFile = String(settings.offlinePrefetchedTodayFile || '').trim();
             const tomorrowFile = String(settings.offlinePrefetchedTomorrowFile || '').trim();
             if (settings.layoutMode === 'square_dual_day') {
-                const todayFromFile = await loadOfflineMealFile(todayFile);
-                const tomorrowFromFile = settings.showTomorrowInSquare !== false ? await loadOfflineMealFile(tomorrowFile) : null;
+                const todayFromFile = await loadOfflineMealFile(todayFile, debugState, 'today');
+                const tomorrowFromFile = settings.showTomorrowInSquare !== false ? await loadOfflineMealFile(tomorrowFile, debugState, 'tomorrow') : null;
                 if (todayFromFile || tomorrowFromFile) {
                     renderSquareDual(
                         todayFromFile || { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
@@ -993,9 +1109,11 @@
                         localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayFromFile, tomorrow: tomorrowFromFile } }));
                     } catch (_) {
                     }
+                } else {
+                    pushDebug(debugState, 'Offline files empty (square mode)');
                 }
             } else {
-                const todayFromFile = await loadOfflineMealFile(todayFile);
+                const todayFromFile = await loadOfflineMealFile(todayFile, debugState, 'today');
                 if (todayFromFile) {
                     render(todayFromFile, settings);
                     rendered = true;
@@ -1003,6 +1121,8 @@
                         localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: todayFromFile }));
                     } catch (_) {
                     }
+                } else {
+                    pushDebug(debugState, 'Offline file empty (single mode)');
                 }
             }
         }
@@ -1019,6 +1139,8 @@
                         localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayPref, tomorrow: tomorrowPref } }));
                     } catch (_) {
                     }
+                } else {
+                    pushDebug(debugState, 'Inline prefetched data empty (square mode)');
                 }
             } else if (prefetched && Array.isArray(prefetched.meals)) {
                 render(prefetched, settings);
@@ -1027,6 +1149,8 @@
                     localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: prefetched }));
                 } catch (_) {
                 }
+            } else {
+                pushDebug(debugState, 'Inline prefetched data empty (single mode)');
             }
         }
 
@@ -1044,9 +1168,14 @@
                     } else if (cached.data.meals || cached.mode === 'single') {
                         render(cached.data, settings);
                         rendered = true;
+                    } else {
+                        pushDebug(debugState, 'Cache present but unusable');
                     }
+                } else {
+                    pushDebug(debugState, 'No local cache');
                 }
-            } catch (_) {
+            } catch (error) {
+                pushDebug(debugState, `Cache exception: ${String(error?.message || error || 'unknown')}`);
             }
         }
 
@@ -1060,7 +1189,10 @@
             } else {
                 render({ institution_name: '', menu_date: isoDateOffset(0), meals: [] }, settings);
             }
+            pushDebug(debugState, 'Rendered hard fallback (empty meals)');
         }
+
+        renderDebugStatus(debugState, rendered);
     }
 
     init();

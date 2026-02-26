@@ -342,11 +342,11 @@ if ($selected_kijelzo_id) {
                             </div>
                             <div class="form-group">
                                 <label for="start_time">Kezdés:</label>
-                                <input type="time" name="start_time" id="start_time" required>
+                                <input type="text" name="start_time" id="start_time" required inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\d|2[0-3]):[0-5]\d$" title="24 órás formátum: HH:MM">
                             </div>
                             <div class="form-group">
                                 <label for="end_time">Vége:</label>
-                                <input type="time" name="end_time" id="end_time" required>
+                                <input type="text" name="end_time" id="end_time" required inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\d|2[0-3]):[0-5]\d$" title="24 órás formátum: HH:MM">
                             </div>
                             <div class="form-group">
                                 <label>
