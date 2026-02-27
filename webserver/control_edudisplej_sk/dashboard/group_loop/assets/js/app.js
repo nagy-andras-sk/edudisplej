@@ -3789,6 +3789,8 @@
                     type: 'digital',
                     format: '24h',
                     dateFormat: 'dmy',
+                    dateInline: false,
+                    weekdayPosition: 'left',
                     timeColor: '#ffffff',
                     dateColor: '#ffffff',
                     bgColor: '#000000',
@@ -4996,6 +4998,8 @@
 
             const showDateCheckbox = document.getElementById('setting-showDate');
             const dateFormatSelect = document.getElementById('setting-dateFormat');
+            const dateInlineCheckbox = document.getElementById('setting-dateInline');
+            const weekdayPositionSelect = document.getElementById('setting-weekdayPosition');
             if (showDateCheckbox && dateFormatSelect) {
                 const syncDateFormatState = () => {
                     dateFormatSelect.disabled = !showDateCheckbox.checked;
@@ -5005,7 +5009,18 @@
                     } else if (dateFormatSelect.value === 'none') {
                         dateFormatSelect.value = dateFormatSelect.dataset.lastValue || 'dmy';
                     }
+
+                    if (dateInlineCheckbox) {
+                        dateInlineCheckbox.disabled = !showDateCheckbox.checked;
+                    }
+
+                    if (weekdayPositionSelect) {
+                        weekdayPositionSelect.disabled = !showDateCheckbox.checked || !(dateInlineCheckbox && dateInlineCheckbox.checked);
+                    }
                 };
+                if (dateInlineCheckbox) {
+                    dateInlineCheckbox.addEventListener('change', syncDateFormatState);
+                }
                 showDateCheckbox.addEventListener('change', syncDateFormatState);
                 syncDateFormatState();
             }
@@ -5100,6 +5115,8 @@
         }
 
         function buildClockCustomizationHtml(settings) {
+            const dateInlineEnabled = settings.dateInline === true || String(settings.dateInline) === 'true';
+            const weekdayPosition = String(settings.weekdayPosition || 'left').toLowerCase() === 'right' ? 'right' : 'left';
             return `
                 <div style="display: grid; gap: 15px;">
                     <div>
@@ -5184,6 +5201,21 @@
                             <input type="checkbox" id="setting-showDate" ${(settings.showDate !== false && settings.dateFormat !== 'none') ? 'checked' : ''} style="width: 20px; height: 20px;">
                             <span style="font-weight: bold;">Dátum megjelenítése</span>
                         </label>
+                    </div>
+
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="setting-dateInline" ${dateInlineEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
+                            <span style="font-weight: bold;">Nap + dátum egy sorban</span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nap pozíció:</label>
+                        <select id="setting-weekdayPosition" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="left" ${weekdayPosition === 'left' ? 'selected' : ''}>Nap bal oldalon</option>
+                            <option value="right" ${weekdayPosition === 'right' ? 'selected' : ''}>Nap jobb oldalon</option>
+                        </select>
                     </div>
                 </div>
             `;
@@ -5967,6 +5999,8 @@
             settings.clockSize = parseInt(document.getElementById('setting-clockSize')?.value) || 300;
             settings.showSeconds = document.getElementById('setting-showSeconds')?.checked !== false;
             settings.showDate = document.getElementById('setting-showDate')?.checked !== false;
+            settings.dateInline = document.getElementById('setting-dateInline')?.checked === true;
+            settings.weekdayPosition = (document.getElementById('setting-weekdayPosition')?.value === 'right') ? 'right' : 'left';
             if (!settings.showDate) {
                 settings.dateFormat = 'none';
             }
@@ -6405,6 +6439,8 @@
             if (settings.type) params.append('type', settings.type);
             if (settings.format) params.append('format', settings.format);
             if (settings.dateFormat) params.append('dateFormat', settings.dateFormat);
+            if (settings.dateInline !== undefined) params.append('dateInline', settings.dateInline);
+            if (settings.weekdayPosition) params.append('weekdayPosition', settings.weekdayPosition);
             if (settings.timeColor) params.append('timeColor', settings.timeColor);
             if (settings.dateColor) params.append('dateColor', settings.dateColor);
             if (settings.bgColor) params.append('bgColor', settings.bgColor);
@@ -6672,9 +6708,14 @@
         function getClockLoopItemSummary(settings) {
             const type = settings.type === 'analog' ? 'Analóg' : 'Digitális';
             const details = [type];
+            const dateInlineEnabled = settings.dateInline === true || String(settings.dateInline) === 'true';
 
             if ((settings.type || 'digital') !== 'analog') {
                 details.push('24h');
+            }
+
+            if (dateInlineEnabled) {
+                details.push(settings.weekdayPosition === 'right' ? 'dátum|nap' : 'nap|dátum');
             }
 
             const language = formatLanguageCode(settings.language);

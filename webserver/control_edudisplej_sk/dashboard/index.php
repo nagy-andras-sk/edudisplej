@@ -536,6 +536,10 @@ var STATUS_ONLINE_ERROR_TEXT = <?php
     $status_online_error_text_json = json_encode(t_def('dashboard.status.online_error', 'Online-Hiba'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $status_online_error_text_json !== false ? $status_online_error_text_json : '"Online error"';
 ?>;
+var STATUS_ONLINE_PENDING_TEXT = <?php
+    $status_online_pending_text_json = json_encode(t_def('dashboard.status.online_pending', 'Frissítésre vár'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $status_online_pending_text_json !== false ? $status_online_pending_text_json : '"Waiting for refresh"';
+?>;
 var DASHBOARD_COL_NAME_TEXT = <?php
     $dashboard_col_name_text_json = json_encode(t_def('dashboard.col.name', 'Megnevezés'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_col_name_text_json !== false ? $dashboard_col_name_text_json : '"Name"';
@@ -583,6 +587,10 @@ var DASHBOARD_LOOP_STATUS_OFFLINE_TEXT = <?php
 var DASHBOARD_LOOP_STATUS_MISMATCH_TEXT = <?php
     $dashboard_loop_status_mismatch_text_json = json_encode(t_def('dashboard.loop.status_mismatch', '⚠️ Hiba (nem egyezik)'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_loop_status_mismatch_text_json !== false ? $dashboard_loop_status_mismatch_text_json : '"⚠️ Mismatch"';
+?>;
+var DASHBOARD_LOOP_STATUS_PENDING_TEXT = <?php
+    $dashboard_loop_status_pending_text_json = json_encode(t_def('dashboard.loop.status_pending', '⏳ Várakozás frissítésre (max. 15 perc)'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $dashboard_loop_status_pending_text_json !== false ? $dashboard_loop_status_pending_text_json : '"⏳ Waiting for refresh"';
 ?>;
 var DASHBOARD_LOOP_STATUS_MATCH_TEXT = <?php
     $dashboard_loop_status_match_text_json = json_encode(t_def('dashboard.loop.status_match', '✓ Egyezik'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
@@ -646,7 +654,7 @@ function applyCombinedFilters() {
         if (_summaryFilter === 'all') {
             showBySummary = true;
         } else if (_summaryFilter === 'online') {
-            showBySummary = (status === 'online' || status === 'online_error');
+            showBySummary = (status === 'online' || status === 'online_error' || status === 'online_pending');
         } else if (_summaryFilter === 'offline') {
             showBySummary = status === 'offline';
         } else {
@@ -668,7 +676,7 @@ function applyCombinedFilters() {
 
 function filterByStatusValue(status) {
     var normalized = String(status || '').toLowerCase();
-    filterByGroup((normalized === 'online' || normalized === 'online_error') ? 'online' : 'offline');
+    filterByGroup((normalized === 'online' || normalized === 'online_error' || normalized === 'online_pending') ? 'online' : 'offline');
 }
 
 function filterByLocationValue(location) {
@@ -1201,7 +1209,18 @@ function buildKioskModalHTML(data) {
         + '<div style="height:12px;"></div>'
         + '<table class="minimal-table"><tbody>'
         + '<tr><th>ID</th><td>' + escapeHtml(data.id || '—') + '</td></tr>'
-        + '<tr><th>' + escapeHtml(DASHBOARD_COL_STATUS_TEXT) + '</th><td>' + (data.status === 'online_error' ? ('⚠️ ' + escapeHtml(STATUS_ONLINE_ERROR_TEXT)) : (data.status === 'online' ? ('🟢 ' + escapeHtml(STATUS_ONLINE_TEXT)) : ('🔴 ' + escapeHtml(STATUS_OFFLINE_TEXT))) ) + '</td></tr>'
+        + '<tr><th>' + escapeHtml(DASHBOARD_COL_STATUS_TEXT) + '</th><td>'
+        + (data.status === 'online_error'
+            ? ('⚠️ ' + escapeHtml(STATUS_ONLINE_ERROR_TEXT))
+            : (data.status === 'online_pending'
+                ? ('⏳ ' + escapeHtml(STATUS_ONLINE_PENDING_TEXT))
+                : (data.status === 'online'
+                    ? ('🟢 ' + escapeHtml(STATUS_ONLINE_TEXT))
+                    : ('🔴 ' + escapeHtml(STATUS_OFFLINE_TEXT))
+                )
+            )
+        )
+        + '</td></tr>'
         + '<tr><th>Hostname</th><td class="mono">' + escapeHtml(data.hostname || '—') + '</td></tr>'
         + '<tr><th>' + escapeHtml(DASHBOARD_COL_GROUP_TEXT) + '</th><td>' + escapeHtml(data.group_names || '—') + '</td></tr>'
         + '<tr><th>' + escapeHtml(DASHBOARD_COL_LAST_SYNC_TEXT) + '</th><td>' + escapeHtml(data.last_seen || '—') + '</td></tr>'
@@ -1209,7 +1228,18 @@ function buildKioskModalHTML(data) {
         + '<tr><th>' + escapeHtml(DASHBOARD_COL_VERSION_TEXT) + '</th><td>' + escapeHtml(data.version || COMMON_UNKNOWN_TEXT) + '</td></tr>'
         + '<tr><th>' + escapeHtml(DASHBOARD_LOOP_KIOSK_VERSION_TEXT) + '</th><td class="mono">' + escapeHtml(data.kiosk_loop_version || 'n/a') + '</td></tr>'
         + '<tr><th>' + escapeHtml(DASHBOARD_LOOP_SERVER_VERSION_TEXT) + '</th><td class="mono">' + escapeHtml(data.server_loop_version || 'n/a') + '</td></tr>'
-        + '<tr><th>' + escapeHtml(DASHBOARD_LOOP_STATUS_TEXT) + '</th><td>' + (data.status === 'offline' ? escapeHtml(DASHBOARD_LOOP_STATUS_OFFLINE_TEXT) : (data.loop_version_mismatch ? escapeHtml(DASHBOARD_LOOP_STATUS_MISMATCH_TEXT) : escapeHtml(DASHBOARD_LOOP_STATUS_MATCH_TEXT))) + '</td></tr>'
+        + '<tr><th>' + escapeHtml(DASHBOARD_LOOP_STATUS_TEXT) + '</th><td>'
+        + (data.status === 'offline'
+            ? escapeHtml(DASHBOARD_LOOP_STATUS_OFFLINE_TEXT)
+            : ((data.loop_update_grace_active === true || data.status === 'online_pending')
+                ? escapeHtml(DASHBOARD_LOOP_STATUS_PENDING_TEXT)
+                : (data.loop_version_mismatch
+                    ? escapeHtml(DASHBOARD_LOOP_STATUS_MISMATCH_TEXT)
+                    : escapeHtml(DASHBOARD_LOOP_STATUS_MATCH_TEXT)
+                )
+            )
+        )
+        + '</td></tr>'
         + '<tr><th>' + escapeHtml(DASHBOARD_COL_MODULES_TEXT) + '</th><td>' + escapeHtml(modulesText) + '</td></tr>'
         + '</tbody></table>'
         + '</div>'
@@ -1280,7 +1310,7 @@ function refreshSummaryCounters() {
     var total = rows.length;
     var online = rows.filter(function (row) {
         var status = String(row.dataset.status || '').toLowerCase();
-        return status === 'online' || status === 'online_error';
+        return status === 'online' || status === 'online_error' || status === 'online_pending';
     }).length;
     var offline = total - online;
 
@@ -1335,10 +1365,12 @@ function refreshDashboardData() {
 
                 var statusBadge = row.querySelector('.kiosk-status-badge');
                 if (statusBadge) {
-                    statusBadge.classList.remove('status-online', 'status-offline', 'status-warning', 'status-unconfigured', 'status-pending', 'status-error', 'status-online_error');
+                    statusBadge.classList.remove('status-online', 'status-offline', 'status-warning', 'status-unconfigured', 'status-pending', 'status-error', 'status-online_error', 'status-online_pending');
                     statusBadge.classList.add('status-' + status);
                     if (status === 'online_error') {
                         statusBadge.textContent = '⚠️ ' + STATUS_ONLINE_ERROR_TEXT;
+                    } else if (status === 'online_pending') {
+                        statusBadge.textContent = '⏳ ' + STATUS_ONLINE_PENDING_TEXT;
                     } else if (status === 'online') {
                         statusBadge.textContent = '🟢 ' + STATUS_ONLINE_TEXT;
                     } else {

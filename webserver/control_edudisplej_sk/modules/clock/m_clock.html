@@ -130,6 +130,8 @@
             type: urlParams.get('type') || 'digital',           // 'digital' or 'analog'
             format: urlParams.get('format') || '24h',           // '12h' or '24h'
             dateFormat: urlParams.get('dateFormat') || 'dmy',   // 'full', 'short', 'dmy', 'numeric', 'none'
+            dateInline: urlParams.get('dateInline') === 'true',
+            weekdayPosition: (urlParams.get('weekdayPosition') || 'left') === 'right' ? 'right' : 'left',
             timeColor: urlParams.get('timeColor') || '#ffffff',
             dateColor: urlParams.get('dateColor') || '#ffffff',
             bgColor: urlParams.get('bgColor') || '#000000',
@@ -207,6 +209,18 @@
                     return `${year}. ${monthName} ${day}.`;
             }
         }
+
+        function formatInlineWeekdayDate(date) {
+            const weekday = formatWeekday(date);
+            const dateValue = formatDateValue(date);
+            if (!dateValue) {
+                return weekday;
+            }
+            if (settings.weekdayPosition === 'right') {
+                return `${dateValue} • ${weekday}`;
+            }
+            return `${weekday} • ${dateValue}`;
+        }
         
         // Digital Clock
         function createDigitalClock() {
@@ -246,10 +260,17 @@
                 }
                 
                 timeEl.textContent = timeString;
-                weekdayEl.textContent = formatWeekday(now);
-                dateEl.textContent = formatDateValue(now);
-                weekdayEl.style.display = settings.showDate ? '' : 'none';
-                dateEl.style.display = (settings.showDate && settings.dateFormat !== 'none') ? '' : 'none';
+                const showDateLine = settings.showDate && settings.dateFormat !== 'none';
+                if (settings.dateInline) {
+                    dateEl.textContent = showDateLine ? formatInlineWeekdayDate(now) : '';
+                    weekdayEl.style.display = 'none';
+                    dateEl.style.display = showDateLine ? '' : 'none';
+                } else {
+                    weekdayEl.textContent = formatWeekday(now);
+                    dateEl.textContent = formatDateValue(now);
+                    weekdayEl.style.display = settings.showDate ? '' : 'none';
+                    dateEl.style.display = showDateLine ? '' : 'none';
+                }
             }
             
             updateDigitalClock();
@@ -330,10 +351,17 @@
                     document.getElementById('secondHand').style.transform = `rotate(${secondDeg}deg)`;
                 }
                 
-                weekdayEl.textContent = formatWeekday(now);
-                dateEl.textContent = formatDateValue(now);
-                weekdayEl.style.display = settings.showDate ? '' : 'none';
-                dateEl.style.display = (settings.showDate && settings.dateFormat !== 'none') ? '' : 'none';
+                const showDateLine = settings.showDate && settings.dateFormat !== 'none';
+                if (settings.dateInline) {
+                    dateEl.textContent = showDateLine ? formatInlineWeekdayDate(now) : '';
+                    weekdayEl.style.display = 'none';
+                    dateEl.style.display = showDateLine ? '' : 'none';
+                } else {
+                    weekdayEl.textContent = formatWeekday(now);
+                    dateEl.textContent = formatDateValue(now);
+                    weekdayEl.style.display = settings.showDate ? '' : 'none';
+                    dateEl.style.display = showDateLine ? '' : 'none';
+                }
             }
             
             updateAnalogClock();
