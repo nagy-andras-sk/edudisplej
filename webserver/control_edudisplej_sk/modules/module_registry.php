@@ -24,7 +24,7 @@ function edudisplej_module_registry(): array
                 'config_dir' => 'modules/clock/config',
                 'default_settings_file' => 'modules/clock/config/default_settings.json',
                 'functions' => ['digital', 'analog', 'dateDisplay', 'language', 'colorTheme'],
-                'settings_schema' => ['type', 'format', 'dateFormat', 'timeColor', 'dateColor', 'bgColor', 'fontSize', 'timeFontSize', 'dateFontSize', 'clockSize', 'showSeconds', 'showDate', 'language'],
+                'settings_schema' => ['type', 'format', 'dateFormat', 'timeColor', 'dateColor', 'bgColor', 'fontSize', 'timeFontSize', 'dateFontSize', 'clockSize', 'showSeconds', 'showDate', 'language', 'digitalOverlayEnabled', 'digitalOverlayPosition'],
             ],
             'default-logo' => [
                 'folder_key' => 'default',
@@ -87,7 +87,7 @@ function edudisplej_module_registry(): array
                 'config_dir' => 'modules/meal-menu/config',
                 'default_settings_file' => 'modules/meal-menu/config/default_settings.json',
                 'functions' => ['remoteMealFetch', 'offlineFallback', 'mealTypeFiltering'],
-                'settings_schema' => ['companyId', 'siteKey', 'institutionId', 'language', 'showHeaderTitle', 'customHeaderTitle', 'showInstitutionName', 'showBreakfast', 'showSnackAm', 'showLunch', 'showSnackPm', 'showDinner', 'showMealTypeEmojis', 'showMealTypeSvgIcons', 'showAllergenEmojis', 'centerAlign', 'slowScrollOnOverflow', 'slowScrollSpeedPxPerSec', 'scrollStartDelayMs', 'scrollLoopPauseMs', 'layoutMode', 'showTomorrowInSquare', 'fontFamily', 'mealTitleFontSize', 'mealTextFontSize', 'textFontWeight', 'lineHeight', 'wrapText', 'showAppetiteMessage', 'appetiteMessageText', 'showSourceUrl', 'sourceUrl', 'clockOverlayEnabled', 'clockOverlayPosition', 'clockOverlayHeightPercent', 'clockOverlayTimeColor', 'clockOverlayDateColor', 'textOverlayEnabled', 'textOverlayPosition', 'textOverlayHeightPercent', 'textOverlaySourceType', 'textOverlayText', 'textOverlayCollectionJson', 'textOverlayExternalUrl', 'textOverlayFontSize', 'textOverlayColor', 'textOverlaySpeedPxPerSec', 'apiBaseUrl'],
+                'settings_schema' => ['companyId', 'siteKey', 'institutionId', 'language', 'showHeaderTitle', 'customHeaderTitle', 'showInstitutionName', 'showBreakfast', 'showSnackAm', 'showLunch', 'showSnackPm', 'showDinner', 'mealScheduleEnabled', 'scheduleBreakfastUntil', 'scheduleSnackAmUntil', 'scheduleLunchUntil', 'scheduleSnackPmUntil', 'scheduleDinnerUntil', 'showMealTypeEmojis', 'showMealTypeSvgIcons', 'showAllergenEmojis', 'centerAlign', 'slowScrollOnOverflow', 'slowScrollSpeedPxPerSec', 'scrollStartDelayMs', 'scrollLoopPauseMs', 'layoutMode', 'showTomorrowInSquare', 'showTomorrowAfterEvening', 'tomorrowAfterMeal', 'fontFamily', 'mealTitleFontSize', 'mealTextFontSize', 'textFontWeight', 'lineHeight', 'wrapText', 'showAppetiteMessage', 'appetiteMessageText', 'showSourceUrl', 'sourceUrl', 'clockOverlayEnabled', 'clockOverlayPosition', 'clockOverlayHeightPercent', 'clockOverlayTimeColor', 'clockOverlayDateColor', 'textOverlayEnabled', 'textOverlayPosition', 'textOverlayHeightPercent', 'textOverlaySourceType', 'textOverlayText', 'textOverlayCollectionJson', 'textOverlayExternalUrl', 'textOverlayFontSize', 'textOverlayColor', 'textOverlaySpeedPxPerSec', 'apiBaseUrl'],
             ],
             'room-occupancy' => [
                 'folder_key' => 'room-occupancy',

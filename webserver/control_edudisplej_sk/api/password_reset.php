@@ -5,11 +5,20 @@
  */
 
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/../admin/db_autofix_bootstrap.php';
 require_once '../security_config.php';
 require_once '../logging.php';
 require_once '../email_helper.php';
 
 header('Content-Type: application/json');
+
+$script_name = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+$base_prefix = preg_replace('~/api(?:/password_reset(?:\.php)?)?$~i', '', $script_name);
+$base_prefix = rtrim((string)$base_prefix, '/');
+if ($base_prefix === '.' || $base_prefix === '/') {
+    $base_prefix = '';
+}
+$login_path = $base_prefix . '/login';
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
@@ -51,7 +60,7 @@ try {
 
                     $reset_link = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
                         . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
-                        . '/password_reset.php?token=' . urlencode($plain_token);
+                        . $login_path . '?token=' . urlencode($plain_token);
 
                     send_email_from_template('password_reset', $email, $user['username'], [
                         'name'       => $user['username'],

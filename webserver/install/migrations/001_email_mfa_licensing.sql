@@ -35,6 +35,36 @@ CREATE TABLE IF NOT EXISTS email_logs (
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Email queue
+CREATE TABLE IF NOT EXISTS email_queue (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    template_key  VARCHAR(100) NULL,
+    to_email      VARCHAR(255) NOT NULL,
+    to_name       VARCHAR(255) NULL,
+    subject       VARCHAR(255) NOT NULL,
+    body_html     LONGTEXT NULL,
+    body_text     LONGTEXT NULL,
+    status        ENUM('queued','processing','sent','failed','archived') NOT NULL DEFAULT 'queued',
+    attempts      INT NOT NULL DEFAULT 0,
+    last_error    TEXT NULL,
+    sent_at       DATETIME NULL,
+    archived_at   DATETIME NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_status_created (status, created_at),
+    INDEX idx_template (template_key),
+    INDEX idx_to_email (to_email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Base HTML layout for all emails
+INSERT INTO system_settings (setting_key, setting_value, is_encrypted)
+VALUES (
+    'email_base_layout_html',
+    '<!doctype html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#f3f6fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2937;">\n<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f6fb;padding:24px 12px;">\n  <tr><td align="center">\n    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">\n      <tr><td style="background:linear-gradient(135deg,#1e40af 0%,#0369a1 100%);padding:20px 24px;color:#ffffff;font-size:20px;font-weight:700;">{{site_name}}</td></tr>\n      <tr><td style="padding:24px;">\n        <h2 style="margin:0 0 14px 0;font-size:20px;color:#0f172a;">{{subject}}</h2>\n        {{content}}\n      </td></tr>\n      <tr><td style="padding:16px 24px;color:#64748b;font-size:12px;border-top:1px solid #e5e7eb;">This is an automated message from {{site_name}}.</td></tr>\n    </table>\n  </td></tr>\n</table>\n</body></html>',
+    0
+)
+ON DUPLICATE KEY UPDATE setting_value = IF(setting_value IS NULL OR setting_value = '', VALUES(setting_value), setting_value);
+
 -- Password reset tokens
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id          INT AUTO_INCREMENT PRIMARY KEY,

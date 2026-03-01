@@ -66,17 +66,44 @@ function maintenance_truthy($value): bool {
     return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
 }
 
+function readIntCliOption(array $argv, string $prefix, int $default): int {
+    foreach ($argv as $arg) {
+        if (strpos((string)$arg, $prefix) === 0) {
+            $raw = trim((string)substr((string)$arg, strlen($prefix)));
+            if ($raw === '' || !is_numeric($raw)) {
+                return $default;
+            }
+            return (int)$raw;
+        }
+    }
+    return $default;
+}
+
 $forceJedalenSync = false;
 $onlyJedalenSync = false;
 $jedalenFetchInstitutionsOnly = false;
 $jedalenFetchMenusOnly = false;
 $jedalenInstitutionIdsCsv = '';
+$forceMaintenanceRun = false;
+$forceEmailQueueRun = false;
+$maintenanceMinIntervalMinutes = 15;
+$emailMinIntervalMinutes = 5;
+$emailBatchLimit = 50;
 if ($isCli) {
     $argv = $_SERVER['argv'] ?? [];
     $forceJedalenSync = in_array('--force-jedalen-sync', $argv, true);
     $onlyJedalenSync = in_array('--only-jedalen-sync', $argv, true);
     $jedalenFetchInstitutionsOnly = in_array('--jedalen-fetch-institutions-only', $argv, true);
     $jedalenFetchMenusOnly = in_array('--jedalen-fetch-menus-only', $argv, true);
+    $forceMaintenanceRun = in_array('--force-maintenance', $argv, true);
+    $forceEmailQueueRun = in_array('--force-email-queue', $argv, true);
+    $maintenanceMinIntervalMinutes = readIntCliOption($argv, '--maintenance-min-interval-minutes=', 15);
+    if ($maintenanceMinIntervalMinutes === 15) {
+        // backward compatibility with previous option name
+        $maintenanceMinIntervalMinutes = readIntCliOption($argv, '--min-interval-minutes=', 15);
+    }
+    $emailMinIntervalMinutes = readIntCliOption($argv, '--email-min-interval-minutes=', 5);
+    $emailBatchLimit = readIntCliOption($argv, '--email-limit=', 50);
     foreach ($argv as $arg) {
         if (strpos((string)$arg, '--jedalen-institution-ids=') === 0) {
             $jedalenInstitutionIdsCsv = (string)substr((string)$arg, strlen('--jedalen-institution-ids='));
@@ -89,6 +116,32 @@ if ($isCli) {
     $jedalenFetchInstitutionsOnly = maintenance_truthy($_GET['jedalen_fetch_institutions_only'] ?? $_POST['jedalen_fetch_institutions_only'] ?? false);
     $jedalenFetchMenusOnly = maintenance_truthy($_GET['jedalen_fetch_menus_only'] ?? $_POST['jedalen_fetch_menus_only'] ?? false);
     $jedalenInstitutionIdsCsv = trim((string)($_GET['jedalen_institution_ids'] ?? $_POST['jedalen_institution_ids'] ?? ''));
+    $forceMaintenanceRun = maintenance_truthy($_GET['force_maintenance'] ?? $_POST['force_maintenance'] ?? false);
+    $forceEmailQueueRun = maintenance_truthy($_GET['force_email_queue'] ?? $_POST['force_email_queue'] ?? false);
+    $maintenanceMinIntervalMinutes = (int)($_GET['maintenance_min_interval_minutes'] ?? $_POST['maintenance_min_interval_minutes'] ?? 15);
+    $emailMinIntervalMinutes = (int)($_GET['email_min_interval_minutes'] ?? $_POST['email_min_interval_minutes'] ?? 5);
+    $emailBatchLimit = (int)($_GET['email_limit'] ?? $_POST['email_limit'] ?? 50);
+}
+
+if ($maintenanceMinIntervalMinutes < 1) {
+    $maintenanceMinIntervalMinutes = 1;
+}
+if ($maintenanceMinIntervalMinutes > 1440) {
+    $maintenanceMinIntervalMinutes = 1440;
+}
+
+if ($emailMinIntervalMinutes < 1) {
+    $emailMinIntervalMinutes = 1;
+}
+if ($emailMinIntervalMinutes > 1440) {
+    $emailMinIntervalMinutes = 1440;
+}
+
+if ($emailBatchLimit < 1) {
+    $emailBatchLimit = 1;
+}
+if ($emailBatchLimit > 500) {
+    $emailBatchLimit = 500;
 }
 
 function emitMaintenanceOutput(string $line, bool $isCli, bool $isRed = false): void {
@@ -206,57 +259,126 @@ if (is_resource($lockHandle)) {
 }
 
 $start = microtime(true);
-$startLine = "[$timestamp] [INFO] Maintenance start\n";
+$startLine = "[$timestamp] [INFO] Unified cron scheduler start\n";
 appendCronLog($cronLog, $startLine);
 emitMaintenanceOutput($startLine, $isCli);
 
-ob_start();
+$emailLastRunMarker = rtrim($runtimeDir, '/\\') . '/email-queue-last-run.txt';
+$maintenanceLastRunMarker = rtrim($runtimeDir, '/\\') . '/maintenance-last-run.txt';
 
-define('EDUDISPLEJ_DBJAVITO_NO_HTML', true);
-define('EDUDISPLEJ_DBJAVITO_ECHO', true);
-define('EDUDISPLEJ_MAINTENANCE_MIGRATE_ASSET_URLS', true);
-define('EDUDISPLEJ_FORCE_JEDALEN_SYNC', $forceJedalenSync);
-define('EDUDISPLEJ_MAINTENANCE_ONLY_JEDALEN_SYNC', $onlyJedalenSync);
-define('EDUDISPLEJ_JEDALEN_FETCH_INSTITUTIONS_ONLY', $jedalenFetchInstitutionsOnly);
-define('EDUDISPLEJ_JEDALEN_FETCH_MENUS_ONLY', $jedalenFetchMenusOnly);
-define('EDUDISPLEJ_JEDALEN_SELECTED_INSTITUTION_IDS_CSV', $jedalenInstitutionIdsCsv);
+$shouldRunEmailQueue = true;
+if (!$forceEmailQueueRun) {
+    $lastEmailRunTs = 0;
+    if (is_file($emailLastRunMarker)) {
+        $rawLastEmail = trim((string)@file_get_contents($emailLastRunMarker));
+        if ($rawLastEmail !== '' && ctype_digit($rawLastEmail)) {
+            $lastEmailRunTs = (int)$rawLastEmail;
+        }
+    }
 
-if ($forceJedalenSync) {
-    $forcedLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Jedalen sync forced by runtime flag\n";
-    appendCronLog($cronLog, $forcedLine);
-    emitMaintenanceOutput($forcedLine, $isCli);
-}
-
-require __DIR__ . '/maintenance_task.php';
-
-$output = trim((string)ob_get_clean());
-if ($output !== '') {
-    $taskOutput = $output . "\n";
-    appendCronLog($cronLog, $taskOutput);
-    emitMaintenanceOutput($taskOutput, $isCli);
-
-    if (stripos($output, 'A modul tárhely nem írható') !== false || stripos($output, 'module storage is not writable') !== false) {
-        emitMaintenanceIssue(
-            'PDF upload error detected: module storage is not writable.',
-            [
-                'Fix write permissions for uploads/companies/.../modules directory.',
-                'Ensure the runtime user has write access to the module storage path.',
-            ],
-            $isCli,
-            $cronLog
-        );
+    $emailAge = time() - $lastEmailRunTs;
+    $emailMinIntervalSeconds = $emailMinIntervalMinutes * 60;
+    if ($lastEmailRunTs > 0 && $emailAge < $emailMinIntervalSeconds) {
+        $shouldRunEmailQueue = false;
+        $emailSkipLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Email queue skipped by interval guard (min={$emailMinIntervalMinutes}m, next in " . ($emailMinIntervalSeconds - $emailAge) . "s).\n";
+        appendCronLog($cronLog, $emailSkipLine);
+        emitMaintenanceOutput($emailSkipLine, $isCli);
     }
 }
 
-$storageHealth = checkModuleStorageHealth($baseDir);
-if (!$storageHealth['ok']) {
-    foreach ($storageHealth['errors'] as $storageError) {
-        emitMaintenanceIssue($storageError, $storageHealth['recommendations'], $isCli, $cronLog);
+if ($shouldRunEmailQueue) {
+    $stepEmailLine = '[' . date('Y-m-d H:i:s') . "] [STEP] Email queue step started\n";
+    appendCronLog($cronLog, $stepEmailLine);
+    emitMaintenanceOutput($stepEmailLine, $isCli);
+
+    @file_put_contents($emailLastRunMarker, (string)time());
+    require_once $baseDir . '/admin/db_autofix_bootstrap.php';
+    require_once $baseDir . '/email_helper.php';
+
+    $emailQueueResult = process_email_queue($emailBatchLimit);
+    $emailLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Email queue: processed={$emailQueueResult['processed']} sent={$emailQueueResult['sent']} failed={$emailQueueResult['failed']} limit={$emailBatchLimit}\n";
+    appendCronLog($cronLog, $emailLine);
+    emitMaintenanceOutput($emailLine, $isCli);
+}
+
+$hasJedalenSpecificFlags = $forceJedalenSync || $onlyJedalenSync || $jedalenFetchInstitutionsOnly || $jedalenFetchMenusOnly || $jedalenInstitutionIdsCsv !== '';
+$shouldRunMaintenance = true;
+
+if (!$forceMaintenanceRun && !$hasJedalenSpecificFlags) {
+    $lastRunTs = 0;
+    if (is_file($maintenanceLastRunMarker)) {
+        $rawLast = trim((string)@file_get_contents($maintenanceLastRunMarker));
+        if ($rawLast !== '' && ctype_digit($rawLast)) {
+            $lastRunTs = (int)$rawLast;
+        }
+    }
+
+    $age = time() - $lastRunTs;
+    $minIntervalSeconds = $maintenanceMinIntervalMinutes * 60;
+    if ($lastRunTs > 0 && $age < $minIntervalSeconds) {
+        $shouldRunMaintenance = false;
+        $nextIn = $minIntervalSeconds - $age;
+        $skipLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Maintenance skipped by interval guard (min={$maintenanceMinIntervalMinutes}m, next in {$nextIn}s).\n";
+        appendCronLog($cronLog, $skipLine);
+        emitMaintenanceOutput($skipLine, $isCli);
+    }
+}
+
+if ($shouldRunMaintenance) {
+    $stepMaintenanceLine = '[' . date('Y-m-d H:i:s') . "] [STEP] Maintenance step started\n";
+    appendCronLog($cronLog, $stepMaintenanceLine);
+    emitMaintenanceOutput($stepMaintenanceLine, $isCli);
+
+    @file_put_contents($maintenanceLastRunMarker, (string)time());
+
+    ob_start();
+
+    define('EDUDISPLEJ_DBJAVITO_NO_HTML', true);
+    define('EDUDISPLEJ_DBJAVITO_ECHO', true);
+    define('EDUDISPLEJ_MAINTENANCE_MIGRATE_ASSET_URLS', true);
+    define('EDUDISPLEJ_FORCE_JEDALEN_SYNC', $forceJedalenSync);
+    define('EDUDISPLEJ_MAINTENANCE_ONLY_JEDALEN_SYNC', $onlyJedalenSync);
+    define('EDUDISPLEJ_JEDALEN_FETCH_INSTITUTIONS_ONLY', $jedalenFetchInstitutionsOnly);
+    define('EDUDISPLEJ_JEDALEN_FETCH_MENUS_ONLY', $jedalenFetchMenusOnly);
+    define('EDUDISPLEJ_JEDALEN_SELECTED_INSTITUTION_IDS_CSV', $jedalenInstitutionIdsCsv);
+
+    if ($forceJedalenSync) {
+        $forcedLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Jedalen sync forced by runtime flag\n";
+        appendCronLog($cronLog, $forcedLine);
+        emitMaintenanceOutput($forcedLine, $isCli);
+    }
+
+    require __DIR__ . '/maintenance_task.php';
+
+    $output = trim((string)ob_get_clean());
+    if ($output !== '') {
+        $taskOutput = $output . "\n";
+        appendCronLog($cronLog, $taskOutput);
+        emitMaintenanceOutput($taskOutput, $isCli);
+
+        if (stripos($output, 'A modul tárhely nem írható') !== false || stripos($output, 'module storage is not writable') !== false) {
+            emitMaintenanceIssue(
+                'PDF upload error detected: module storage is not writable.',
+                [
+                    'Fix write permissions for uploads/companies/.../modules directory.',
+                    'Ensure the runtime user has write access to the module storage path.',
+                ],
+                $isCli,
+                $cronLog
+            );
+        }
+    }
+
+    $storageHealth = checkModuleStorageHealth($baseDir);
+    if (!$storageHealth['ok']) {
+        foreach ($storageHealth['errors'] as $storageError) {
+            emitMaintenanceIssue($storageError, $storageHealth['recommendations'], $isCli, $cronLog);
+        }
     }
 }
 
 $duration = round(microtime(true) - $start, 3);
-$finishedLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Maintenance finished in {$duration}s\n";
+$finishedLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Unified cron scheduler finished in {$duration}s\n";
 appendCronLog($cronLog, $finishedLine);
 emitMaintenanceOutput($finishedLine, $isCli);
 

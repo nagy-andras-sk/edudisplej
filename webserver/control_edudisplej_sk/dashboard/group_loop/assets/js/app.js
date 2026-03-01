@@ -31,6 +31,257 @@
             return text;
         }
 
+        function resolveUiLang() {
+            const htmlLang = String(document?.documentElement?.lang || '').toLowerCase();
+            if (htmlLang.startsWith('hu')) return 'hu';
+            if (htmlLang.startsWith('sk')) return 'sk';
+            if (htmlLang.startsWith('en')) return 'en';
+
+            const loopHeader = String(i18nCatalog['group_loop.header.title'] || '').toLowerCase();
+            if (loopHeader.includes('testresz')) return 'hu';
+            if (loopHeader.includes('prispôsob') || loopHeader.includes('prisposob')) return 'sk';
+            return 'en';
+        }
+
+        function overlayUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    header: '🧩 Overlay modulok (ráhúzható óra/szöveg)',
+                    clock_toggle: 'Óra overlay bekapcsolása',
+                    text_toggle: 'Szöveg overlay bekapcsolása',
+                    position: 'Pozíció',
+                    top: 'FENT',
+                    bottom: 'LENT',
+                    band_height: 'Sáv magasság (%)',
+                    clock_color: 'Óra szín',
+                    date_color: 'Dátum szín',
+                    text_source: 'Szöveg forrása',
+                    source_manual: 'Kézi szöveg',
+                    source_collection: 'Szöveggyűjtemény',
+                    source_external: 'Külső forrás (URL)',
+                    font_size: 'Betűméret (px)',
+                    color: 'Szín',
+                    speed: 'Gördülési sebesség (px/s)',
+                    text: 'Szöveg',
+                    collection: 'Szöveggyűjtemény (1 sor = 1 elem)',
+                    external_url: 'Külső forrás URL',
+                    drop_clock_ok: '✓ Óra overlay hozzáadva a modulhoz',
+                    drop_text_ok: '✓ Szöveg overlay hozzáadva a modulhoz'
+                },
+                sk: {
+                    header: '🧩 Overlay moduly (pretiahnuteľné hodiny/text)',
+                    clock_toggle: 'Zapnúť overlay hodín',
+                    text_toggle: 'Zapnúť textový overlay',
+                    position: 'Pozícia',
+                    top: 'HORE',
+                    bottom: 'DOLE',
+                    band_height: 'Výška pásu (%)',
+                    clock_color: 'Farba času',
+                    date_color: 'Farba dátumu',
+                    text_source: 'Zdroj textu',
+                    source_manual: 'Ručný text',
+                    source_collection: 'Kolekcia textov',
+                    source_external: 'Externý zdroj (URL)',
+                    font_size: 'Veľkosť písma (px)',
+                    color: 'Farba',
+                    speed: 'Rýchlosť posuvu (px/s)',
+                    text: 'Text',
+                    collection: 'Kolekcia textov (1 riadok = 1 položka)',
+                    external_url: 'URL externého zdroja',
+                    drop_clock_ok: '✓ Overlay hodín pridaný do modulu',
+                    drop_text_ok: '✓ Textový overlay pridaný do modulu'
+                },
+                en: {
+                    header: '🧩 Overlay modules (draggable clock/text)',
+                    clock_toggle: 'Enable clock overlay',
+                    text_toggle: 'Enable text overlay',
+                    position: 'Position',
+                    top: 'TOP',
+                    bottom: 'BOTTOM',
+                    band_height: 'Band height (%)',
+                    clock_color: 'Clock color',
+                    date_color: 'Date color',
+                    text_source: 'Text source',
+                    source_manual: 'Manual text',
+                    source_collection: 'Text collection',
+                    source_external: 'External source (URL)',
+                    font_size: 'Font size (px)',
+                    color: 'Color',
+                    speed: 'Scroll speed (px/s)',
+                    text: 'Text',
+                    collection: 'Text collection (1 line = 1 item)',
+                    external_url: 'External source URL',
+                    drop_clock_ok: '✓ Clock overlay added to module',
+                    drop_text_ok: '✓ Text overlay added to module'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function mealUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    module_title: 'Étrend',
+                    customization: 'Testreszabás',
+                    source_type: 'Adatforrás',
+                    source_manual: 'Manuális naptár',
+                    source_server: 'Szerver (szinkron)',
+                    static_language: 'Statikus nyelv',
+                    display_profile: 'Kijelző profil',
+                    mode_small: 'A) KIS KIJELZŐ — teljes képernyő, nagy sorok, lapozás (nem scroll)',
+                    mode_large: 'B) NAGY KIJELZŐ — 4 egyenlő táblázatos blokk',
+                    mode_hint: 'A betűméret automatikusan igazodik, manuális méretállítás nincs.',
+                    page_switch: 'Kis kijelző lapozás (másodperc)',
+                    page_switch_hint: 'Csak A) KIS KIJELZŐ módban érvényes.',
+                    join_breakfast_snack: 'Raňajky + Desiata összevonás (kis kijelzőn)',
+                    join_lunch_snack: 'Obed + Olovrant összevonás (kis kijelzőn)',
+                    site: 'Forrás oldal',
+                    institution: 'Intézmény',
+                    refresh: 'Frissít',
+                    loading_sources: 'Források betöltése...',
+                    visible_meals: 'Megjelenítendő étkezések',
+                    show_header: 'Főcím megjelenítése (Dnešné menu)',
+                    custom_header: 'Egyedi főcím (opcionális)',
+                    show_institution: 'Étkezde neve megjelenítése',
+                    breakfast: 'Reggeli',
+                    snack_am: 'Tízórai',
+                    lunch: 'Ebéd',
+                    snack_pm: 'Uzsonna',
+                    dinner: 'Vacsora',
+                    show_icons: 'Étkezés ikonok megjelenítése',
+                    allergens_large_only: 'Allergén számok (csak nagy kijelző profilnál)',
+                    appetite_toggle: '„Prajeme dobrú chuť” sor megjelenítése',
+                    appetite_text: 'Dobrú chuť szöveg',
+                    source_url_toggle: 'Forrás URL megjelenítése alul',
+                    source_url: 'Forrás URL',
+                    choose_site_first: 'Válassz előbb forrás oldalt.',
+                    loading_institutions: 'Intézmények betöltése...',
+                    institutions_count: 'Intézmények: {count} db',
+                    institution_error: 'Intézmény betöltési hiba.',
+                    loading_sites: 'Forrás oldalak betöltése...',
+                    no_sites: 'Nincs elérhető forrás oldal.',
+                    site_error: 'Forrás oldal betöltési hiba.',
+                    option_site: '-- Válassz forrás oldalt --',
+                    option_institution: '-- Válassz intézményt --',
+                    option_loading: 'Betöltés...',
+                    no_meals_selected: 'Nincs kijelölt étkezés',
+                    institution_short: 'intézmény',
+                    language_short: 'nyelv',
+                    allergens_on: 'allergének: be',
+                    allergens_off: 'allergének: ki',
+                    icons_on: 'SVG ikon: be',
+                    icons_off: 'SVG ikon: ki'
+                },
+                sk: {
+                    module_title: 'Jedálny lístok',
+                    customization: 'Prispôsobenie',
+                    source_type: 'Zdroj dát',
+                    source_manual: 'Manuálny kalendár',
+                    source_server: 'Server (synchronizácia)',
+                    static_language: 'Statický jazyk',
+                    display_profile: 'Profil displeja',
+                    mode_small: 'A) MALÝ DISPLEJ — celá obrazovka, veľké riadky, prepínanie strán (bez scrollu)',
+                    mode_large: 'B) VEĽKÝ DISPLEJ — 4 rovnaké tabuľkové bloky',
+                    mode_hint: 'Veľkosť písma sa prispôsobuje automaticky, manuálne nastavenie sa nepoužíva.',
+                    page_switch: 'Prepínanie strán na malom displeji (sekundy)',
+                    page_switch_hint: 'Platí len pre režim A) MALÝ DISPLEJ.',
+                    join_breakfast_snack: 'Spojiť Raňajky + Desiata (na malom displeji)',
+                    join_lunch_snack: 'Spojiť Obed + Olovrant (na malom displeji)',
+                    site: 'Zdrojová stránka',
+                    institution: 'Inštitúcia',
+                    refresh: 'Obnoviť',
+                    loading_sources: 'Načítavam zdroje...',
+                    visible_meals: 'Zobrazené jedlá',
+                    show_header: 'Zobraziť hlavičku (Dnešné menu)',
+                    custom_header: 'Vlastný nadpis (voliteľné)',
+                    show_institution: 'Zobraziť názov jedálne',
+                    breakfast: 'Raňajky',
+                    snack_am: 'Desiata',
+                    lunch: 'Obed',
+                    snack_pm: 'Olovrant',
+                    dinner: 'Večera',
+                    show_icons: 'Zobraziť ikony jedál',
+                    allergens_large_only: 'Čísla alergénov (len pre veľký displej)',
+                    appetite_toggle: 'Zobraziť riadok „Prajeme dobrú chuť”',
+                    appetite_text: 'Text „Dobrú chuť”',
+                    source_url_toggle: 'Zobraziť URL zdroja dole',
+                    source_url: 'URL zdroja',
+                    choose_site_first: 'Najprv vyberte zdrojovú stránku.',
+                    loading_institutions: 'Načítavam inštitúcie...',
+                    institutions_count: 'Inštitúcie: {count}',
+                    institution_error: 'Chyba načítania inštitúcií.',
+                    loading_sites: 'Načítavam zdrojové stránky...',
+                    no_sites: 'Nie je dostupná žiadna zdrojová stránka.',
+                    site_error: 'Chyba načítania zdrojovej stránky.',
+                    option_site: '-- Vyber zdrojovú stránku --',
+                    option_institution: '-- Vyber inštitúciu --',
+                    option_loading: 'Načítavam...',
+                    no_meals_selected: 'Nie je vybrané žiadne jedlo',
+                    institution_short: 'inštitúcia',
+                    language_short: 'jazyk',
+                    allergens_on: 'alergény: zap',
+                    allergens_off: 'alergény: vyp',
+                    icons_on: 'SVG ikony: zap',
+                    icons_off: 'SVG ikony: vyp'
+                },
+                en: {
+                    module_title: 'Meal menu',
+                    customization: 'Customization',
+                    source_type: 'Data source',
+                    source_manual: 'Manual calendar',
+                    source_server: 'Server (sync)',
+                    static_language: 'Static language',
+                    display_profile: 'Display profile',
+                    mode_small: 'A) SMALL SCREEN — fullscreen, large rows, page switching (no scroll)',
+                    mode_large: 'B) LARGE SCREEN — 4 equal table blocks',
+                    mode_hint: 'Font size is auto-adaptive; manual size control is disabled.',
+                    page_switch: 'Small-screen page switch (seconds)',
+                    page_switch_hint: 'Applies only to A) SMALL SCREEN mode.',
+                    join_breakfast_snack: 'Join Breakfast + Morning snack (small screen)',
+                    join_lunch_snack: 'Join Lunch + Afternoon snack (small screen)',
+                    site: 'Source site',
+                    institution: 'Institution',
+                    refresh: 'Refresh',
+                    loading_sources: 'Loading sources...',
+                    visible_meals: 'Visible meals',
+                    show_header: 'Show header (Dnešné menu)',
+                    custom_header: 'Custom title (optional)',
+                    show_institution: 'Show canteen name',
+                    breakfast: 'Breakfast',
+                    snack_am: 'Morning snack',
+                    lunch: 'Lunch',
+                    snack_pm: 'Afternoon snack',
+                    dinner: 'Dinner',
+                    show_icons: 'Show meal icons',
+                    allergens_large_only: 'Allergen numbers (large-screen only)',
+                    appetite_toggle: 'Show “Prajeme dobrú chuť” line',
+                    appetite_text: '“Dobrú chuť” text',
+                    source_url_toggle: 'Show source URL at bottom',
+                    source_url: 'Source URL',
+                    choose_site_first: 'Select a source site first.',
+                    loading_institutions: 'Loading institutions...',
+                    institutions_count: 'Institutions: {count}',
+                    institution_error: 'Institution loading error.',
+                    loading_sites: 'Loading source sites...',
+                    no_sites: 'No source site available.',
+                    site_error: 'Source site loading error.',
+                    option_site: '-- Select source site --',
+                    option_institution: '-- Select institution --',
+                    option_loading: 'Loading...',
+                    no_meals_selected: 'No meal selected',
+                    institution_short: 'institution',
+                    language_short: 'language',
+                    allergens_on: 'allergens: on',
+                    allergens_off: 'allergens: off',
+                    icons_on: 'SVG icons: on',
+                    icons_off: 'SVG icons: off'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
         function getLocalizedModuleName(moduleKey, fallbackName = '') {
             const normalizedKey = String(moduleKey || '').toLowerCase();
             const fallback = String(fallbackName || '').trim();
@@ -2866,8 +3117,8 @@
             renderLoop();
             scheduleAutoSave();
             showAutosaveToast(droppedModuleKey === 'clock'
-                ? '✓ Óra overlay hozzáadva a modulhoz'
-                : '✓ Szöveg overlay hozzáadva a modulhoz');
+                ? overlayUiText('drop_clock_ok')
+                : overlayUiText('drop_text_ok'));
             return true;
         }
 
@@ -3800,7 +4051,9 @@
                     clockSize: 300,
                     showSeconds: true,
                     showDate: true,
-                    language: 'sk'
+                    language: 'sk',
+                    digitalOverlayEnabled: false,
+                    digitalOverlayPosition: 'auto'
                 },
                 'default-logo': {
                     text: 'edudisplej.sk',
@@ -3852,28 +4105,30 @@
                     siteKey: 'jedalen.sk',
                     institutionId: 0,
                     sourceType: 'server',
-                    language: 'hu',
+                    mealDisplayMode: 'small_screen',
+                    smallScreenPageSwitchSec: 12,
+                    language: 'sk',
                     showHeaderTitle: true,
                     customHeaderTitle: '',
                     showInstitutionName: true,
                     showBreakfast: true,
                     showSnackAm: true,
                     showLunch: true,
-                    showSnackPm: false,
-                    showDinner: false,
+                    showSnackPm: true,
+                    showDinner: true,
                     showMealTypeEmojis: false,
                     showMealTypeSvgIcons: true,
-                    showAllergenEmojis: false,
+                    showAllergenEmojis: true,
                     centerAlign: false,
-                    slowScrollOnOverflow: false,
-                    slowScrollSpeedPxPerSec: 28,
+                    slowScrollOnOverflow: true,
+                    slowScrollSpeedPxPerSec: 40,
                     showAppetiteMessage: false,
-                    appetiteMessageText: 'Jó étvágyat kívánunk!',
+                    appetiteMessageText: 'Prajeme dobrú chuť!',
                     showSourceUrl: false,
                     sourceUrl: '',
                     fontFamily: 'Segoe UI, Tahoma, sans-serif',
-                    mealTitleFontSize: 2.1,
-                    mealTextFontSize: 1.85,
+                    mealTitleFontSize: 3.6,
+                    mealTextFontSize: 2.4,
                     textFontWeight: 600,
                     lineHeight: 1.4,
                     wrapText: true,
@@ -4128,7 +4383,7 @@
             });
             const payload = await response.json();
             if (!response.ok || !payload?.success) {
-                throw new Error(payload?.message || 'Nem sikerült betölteni a forrás oldalak listáját.');
+                throw new Error(payload?.message || mealUiText('site_error'));
             }
             return Array.isArray(payload.items) ? payload.items : [];
         }
@@ -4153,13 +4408,41 @@
             });
             const payload = await response.json();
             if (!response.ok || !payload?.success) {
-                throw new Error(payload?.message || 'Nem sikerült betölteni az intézményeket.');
+                throw new Error(payload?.message || mealUiText('institution_error'));
             }
 
-            return Array.isArray(payload.items) ? payload.items : [];
+            const institutions = Array.isArray(payload.items) ? payload.items : [];
+            const seenByIdentity = new Set();
+            const deduped = [];
+
+            institutions.forEach((institution) => {
+                const id = parseInt(institution?.id || 0, 10) || 0;
+                const name = String(institution?.institution_name || '').trim().toLowerCase();
+                const city = String(institution?.city || '').trim().toLowerCase();
+                const byLabel = `${name}|${city}`;
+                const identity = byLabel !== '|' ? `label:${byLabel}` : (id > 0 ? `id:${id}` : '');
+
+                if (!identity || seenByIdentity.has(identity)) {
+                    return;
+                }
+
+                seenByIdentity.add(identity);
+                deduped.push(institution);
+            });
+
+            return deduped;
         }
 
         function bindMealModuleModalEvents(initialSettings) {
+            const mt = (key, vars = null) => {
+                let text = mealUiText(key);
+                if (vars && typeof vars === 'object') {
+                    Object.entries(vars).forEach(([name, value]) => {
+                        text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value ?? ''));
+                    });
+                }
+                return text;
+            };
             const siteSelect = document.getElementById('setting-mealSiteKey');
             const institutionSelect = document.getElementById('setting-mealInstitutionId');
             const siteRefreshBtn = document.getElementById('setting-mealReloadSites');
@@ -4168,6 +4451,38 @@
 
             if (!siteSelect || !institutionSelect) {
                 return;
+            }
+
+            const displayModeSelect = document.getElementById('setting-mealDisplayMode');
+            const mealOverlayWrap = document.getElementById('meal-overlay-wrap');
+            const syncMealOverlayVisibility = () => {
+                if (!mealOverlayWrap) {
+                    return;
+                }
+                const mode = String(displayModeSelect?.value || 'small_screen').toLowerCase() === 'large_screen'
+                    ? 'large_screen'
+                    : 'small_screen';
+                mealOverlayWrap.style.display = mode === 'large_screen' ? 'grid' : 'none';
+            };
+
+            if (displayModeSelect) {
+                displayModeSelect.addEventListener('change', syncMealOverlayVisibility);
+            }
+            syncMealOverlayVisibility();
+
+            const mealTextSizeInput = document.getElementById('setting-mealTextFontSize');
+            const mealTitleSizeInput = document.getElementById('setting-mealTitleFontSize');
+            const syncMealTitleFromText = () => {
+                if (!mealTextSizeInput || !mealTitleSizeInput) {
+                    return;
+                }
+                const textValue = Math.max(0.8, Math.min(4, parseFloat(mealTextSizeInput.value || '1.85') || 1.85));
+                mealTitleSizeInput.value = (textValue * 1.5).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+            };
+            if (mealTextSizeInput && mealTitleSizeInput) {
+                mealTextSizeInput.addEventListener('input', syncMealTitleFromText);
+                mealTextSizeInput.addEventListener('change', syncMealTitleFromText);
+                syncMealTitleFromText();
             }
 
             const selectedSite = String(initialSettings.siteKey || 'jedalen.sk');
@@ -4182,7 +4497,7 @@
             };
 
             const renderSiteOptions = (sites) => {
-                const options = ['<option value="">-- Válassz forrás oldalt --</option>'];
+                const options = [`<option value="">${escapeHtml(mt('option_site'))}</option>`];
                 sites.forEach((site) => {
                     const key = String(site?.site_key || '').trim();
                     if (!key) {
@@ -4195,7 +4510,8 @@
             };
 
             const renderInstitutionOptions = (institutions, preferredInstitutionId = 0) => {
-                const options = ['<option value="0">-- Válassz intézményt --</option>'];
+                const options = [`<option value="0">${escapeHtml(mt('option_institution'))}</option>`];
+                const renderedKeys = new Set();
                 institutions.forEach((institution) => {
                     const id = parseInt(institution?.id || 0, 10) || 0;
                     if (id <= 0) {
@@ -4204,6 +4520,11 @@
                     const name = String(institution?.institution_name || '').trim();
                     const city = String(institution?.city || '').trim();
                     const label = city ? `${name} (${city})` : name;
+                    const renderKey = `${id}|${label.toLowerCase()}`;
+                    if (renderedKeys.has(renderKey)) {
+                        return;
+                    }
+                    renderedKeys.add(renderKey);
                     options.push(`<option value="${id}">${escapeHtml(label)}</option>`);
                 });
                 institutionSelect.innerHTML = options.join('');
@@ -4215,27 +4536,47 @@
                 }
             };
 
+            const dedupeInstitutions = (institutions) => {
+                const list = Array.isArray(institutions) ? institutions : [];
+                const uniqueByIdentity = new Map();
+
+                list.forEach((institution) => {
+                    const id = parseInt(institution?.id || 0, 10) || 0;
+                    const name = String(institution?.institution_name || '').trim().toLowerCase();
+                    const city = String(institution?.city || '').trim().toLowerCase();
+                    const byLabel = `${name}|${city}`;
+                    const key = byLabel !== '|' ? `label:${byLabel}` : (id > 0 ? `id:${id}` : '');
+
+                    if (!key || uniqueByIdentity.has(key)) {
+                        return;
+                    }
+                    uniqueByIdentity.set(key, institution);
+                });
+
+                return Array.from(uniqueByIdentity.values());
+            };
+
             const refreshInstitutions = async (preferredInstitutionId = 0) => {
                 const siteKey = String(siteSelect.value || '').trim();
                 if (!siteKey) {
                     renderInstitutionOptions([], 0);
-                    setStatus('Válassz előbb forrás oldalt.');
+                    setStatus(mt('choose_site_first'));
                     return;
                 }
 
-                setStatus('Intézmények betöltése...');
+                setStatus(mt('loading_institutions'));
                 try {
-                    const institutions = await loadMealInstitutionsForModal(siteKey);
+                    const institutions = dedupeInstitutions(await loadMealInstitutionsForModal(siteKey));
                     renderInstitutionOptions(institutions, preferredInstitutionId);
-                    setStatus(`Intézmények: ${institutions.length} db`);
+                    setStatus(mt('institutions_count', { count: institutions.length }));
                 } catch (error) {
                     renderInstitutionOptions([], 0);
-                    setStatus(error.message || 'Intézmény betöltési hiba.', true);
+                    setStatus(error.message || mt('institution_error'), true);
                 }
             };
 
             const refreshSites = async () => {
-                setStatus('Forrás oldalak betöltése...');
+                setStatus(mt('loading_sites'));
                 try {
                     const sites = await loadMealSitesForModal();
                     renderSiteOptions(sites);
@@ -4250,10 +4591,10 @@
                         await refreshInstitutions(selectedInstitutionId);
                     } else {
                         renderInstitutionOptions([], 0);
-                        setStatus('Nincs elérhető forrás oldal.', true);
+                        setStatus(mt('no_sites'), true);
                     }
                 } catch (error) {
-                    setStatus(error.message || 'Forrás oldal betöltési hiba.', true);
+                    setStatus(error.message || mt('site_error'), true);
                 }
             };
 
@@ -4973,7 +5314,11 @@
             }
 
             if (isOverlayCarrierModule(moduleKey)) {
-                formHtml += buildOverlayCustomizationHtml(overlaySettings);
+                if (moduleKey === 'meal-menu') {
+                    formHtml += `<div id="meal-overlay-wrap">${buildOverlayCustomizationHtml(overlaySettings)}</div>`;
+                } else {
+                    formHtml += buildOverlayCustomizationHtml(overlaySettings);
+                }
             }
 
             const modal = createCustomizationModalElement(item, index, formHtml, moduleKey);
@@ -4986,12 +5331,19 @@
                 typeSelect.addEventListener('change', function() {
                     const digitalSettings = document.getElementById('digitalSettings');
                     const analogSettings = document.getElementById('analogSettings');
+                    const analogOverlaySettings = document.getElementById('analogOverlaySettings');
                     if (this.value === 'digital') {
                         digitalSettings.style.display = 'block';
                         analogSettings.style.display = 'none';
+                        if (analogOverlaySettings) {
+                            analogOverlaySettings.style.display = 'none';
+                        }
                     } else {
                         digitalSettings.style.display = 'none';
                         analogSettings.style.display = 'block';
+                        if (analogOverlaySettings) {
+                            analogOverlaySettings.style.display = 'block';
+                        }
                     }
                 });
             }
@@ -5117,6 +5469,10 @@
         function buildClockCustomizationHtml(settings) {
             const dateInlineEnabled = settings.dateInline === true || String(settings.dateInline) === 'true';
             const weekdayPosition = String(settings.weekdayPosition || 'left').toLowerCase() === 'right' ? 'right' : 'left';
+            const digitalOverlayEnabled = settings.digitalOverlayEnabled === true || String(settings.digitalOverlayEnabled) === 'true';
+            const digitalOverlayPosition = ['auto', 'top', 'center', 'bottom'].includes(String(settings.digitalOverlayPosition || 'auto').toLowerCase())
+                ? String(settings.digitalOverlayPosition || 'auto').toLowerCase()
+                : 'auto';
             return `
                 <div style="display: grid; gap: 15px;">
                     <div>
@@ -5215,6 +5571,20 @@
                         <select id="setting-weekdayPosition" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                             <option value="left" ${weekdayPosition === 'left' ? 'selected' : ''}>Nap bal oldalon</option>
                             <option value="right" ${weekdayPosition === 'right' ? 'selected' : ''}>Nap jobb oldalon</option>
+                        </select>
+                    </div>
+
+                    <div id="analogOverlaySettings" style="${settings.type === 'digital' ? 'display: none;' : ''}">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom:8px;">
+                            <input type="checkbox" id="setting-digitalOverlayEnabled" ${digitalOverlayEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
+                            <span style="font-weight: bold;">Digitális óra a középen (analógra)</span>
+                        </label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Digitális óra pozíció:</label>
+                        <select id="setting-digitalOverlayPosition" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="auto" ${digitalOverlayPosition === 'auto' ? 'selected' : ''}>Automatikus (fent/lent mutatók alapján)</option>
+                            <option value="top" ${digitalOverlayPosition === 'top' ? 'selected' : ''}>Fent-közép</option>
+                            <option value="center" ${digitalOverlayPosition === 'center' ? 'selected' : ''}>Közép</option>
+                            <option value="bottom" ${digitalOverlayPosition === 'bottom' ? 'selected' : ''}>Lent-közép</option>
                         </select>
                     </div>
                 </div>
@@ -5370,32 +5740,39 @@
         }
 
         function buildMealMenuCustomizationHtml(settings) {
+            const mt = (key, vars = null) => {
+                let text = mealUiText(key);
+                if (vars && typeof vars === 'object') {
+                    Object.entries(vars).forEach(([name, value]) => {
+                        text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value ?? ''));
+                    });
+                }
+                return text;
+            };
             const siteKey = escapeHtml(String(settings.siteKey || 'jedalen.sk'));
             const institutionId = parseInt(settings.institutionId || 0, 10) || 0;
             const sourceType = String(settings.sourceType || 'manual').toLowerCase() === 'server' ? 'server' : 'manual';
-            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'hu';
-            const fontFamily = escapeHtml(String(settings.fontFamily || 'Segoe UI, Tahoma, sans-serif'));
+            const mealDisplayMode = String(settings.mealDisplayMode || 'small_screen').toLowerCase() === 'large_screen' ? 'large_screen' : 'small_screen';
+            const smallScreenPageSwitchSec = Math.max(5, Math.min(60, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const mergeBreakfastSnack = settings.mergeBreakfastSnack !== false;
+            const mergeLunchSnack = settings.mergeLunchSnack !== false;
+            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'sk';
             const customHeaderTitle = escapeHtml(String(settings.customHeaderTitle || ''));
-            const appetiteMessageText = escapeHtml(String(settings.appetiteMessageText || 'Jó étvágyat kívánunk!'));
+            const appetiteMessageText = escapeHtml(String(settings.appetiteMessageText || 'Prajeme dobrú chuť!'));
             const sourceUrl = escapeHtml(String(settings.sourceUrl || ''));
-            const mealTitleFontSize = Number(settings.mealTitleFontSize || 1.5);
-            const mealTextFontSize = Number(settings.mealTextFontSize || 1.35);
-            const textFontWeight = parseInt(settings.textFontWeight || 600, 10) || 600;
-            const lineHeight = Number(settings.lineHeight || 1.35);
 
             return `
                 <div style="display:grid; gap:14px;">
                     <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#f8fafc; display:grid; gap:10px;">
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Adatforrás</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('source_type')}</label>
                             <select id="setting-mealSourceType" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                <option value="manual" ${sourceType === 'manual' ? 'selected' : ''}>Manuális naptár</option>
-                                <option value="server" ${sourceType === 'server' ? 'selected' : ''}>Szerver (szinkron)</option>
+                                <option value="manual" ${sourceType === 'manual' ? 'selected' : ''}>${mt('source_manual')}</option>
+                                <option value="server" ${sourceType === 'server' ? 'selected' : ''}>${mt('source_server')}</option>
                             </select>
                         </div>
-
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Statikus nyelv</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('static_language')}</label>
                             <select id="setting-mealLanguage" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                                 <option value="hu" ${language === 'hu' ? 'selected' : ''}>Magyar</option>
                                 <option value="sk" ${language === 'sk' ? 'selected' : ''}>Slovenčina</option>
@@ -5403,91 +5780,70 @@
                             </select>
                         </div>
 
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('display_profile')}</label>
+                            <select id="setting-mealDisplayMode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                <option value="small_screen" ${mealDisplayMode === 'small_screen' ? 'selected' : ''}>${mt('mode_small')}</option>
+                                <option value="large_screen" ${mealDisplayMode === 'large_screen' ? 'selected' : ''}>${mt('mode_large')}</option>
+                            </select>
+                            <div style="font-size:12px; color:#64748b; margin-top:4px;">${mt('mode_hint')}</div>
+                        </div>
+
+                        <div>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('page_switch')}</label>
+                            <input type="number" id="setting-smallScreenPageSwitchSec" min="5" max="60" step="1" value="${smallScreenPageSwitchSec}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            <div style="font-size:12px; color:#64748b; margin-top:4px;">${mt('page_switch_hint')}</div>
+                        </div>
+
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mergeBreakfastSnack" ${mergeBreakfastSnack ? 'checked' : ''}> ${mt('join_breakfast_snack')}</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mergeLunchSnack" ${mergeLunchSnack ? 'checked' : ''}> ${mt('join_lunch_snack')}</label>
+
                         <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Forrás oldal</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('site')}</label>
                                 <select id="setting-mealSiteKey" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="${siteKey}">${siteKey || '-- Válassz forrás oldalt --'}</option>
+                                    <option value="${siteKey}">${siteKey || mt('option_site')}</option>
                                 </select>
                             </div>
-                            <button type="button" id="setting-mealReloadSites" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">Frissít</button>
+                            <button type="button" id="setting-mealReloadSites" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">${mt('refresh')}</button>
                         </div>
 
                         <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Intézmény</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('institution')}</label>
                                 <select id="setting-mealInstitutionId" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="${institutionId}">${institutionId > 0 ? 'Betöltés...' : '-- Válassz intézményt --'}</option>
+                                    <option value="${institutionId}">${institutionId > 0 ? mt('option_loading') : mt('option_institution')}</option>
                                 </select>
                             </div>
-                            <button type="button" id="setting-mealReloadInstitutions" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">Frissít</button>
+                            <button type="button" id="setting-mealReloadInstitutions" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">${mt('refresh')}</button>
                         </div>
 
-                        <div id="setting-mealStatus" style="font-size:12px; color:#475569;">Források betöltése...</div>
+                        <div id="setting-mealStatus" style="font-size:12px; color:#475569;">${mt('loading_sources')}</div>
                     </div>
 
                     <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#fff; display:grid; gap:8px;">
-                        <div style="font-weight:700; color:#1f2937;">Megjelenítendő étkezések</div>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showHeaderTitle" ${settings.showHeaderTitle !== false ? 'checked' : ''}> Főcím megjelenítése (Dnešné menu)</label>
+                        <div style="font-weight:700; color:#1f2937;">${mt('visible_meals')}</div>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showHeaderTitle" ${settings.showHeaderTitle !== false ? 'checked' : ''}> ${mt('show_header')}</label>
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Egyedi főcím (opcionális)</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('custom_header')}</label>
                             <input type="text" id="setting-customHeaderTitle" value="${customHeaderTitle}" placeholder="pl. Dnešné menu" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                         </div>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showInstitutionName" ${settings.showInstitutionName !== false ? 'checked' : ''}> Étkezde neve megjelenítése</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showBreakfast" ${settings.showBreakfast !== false ? 'checked' : ''}> Reggeli</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackAm" ${settings.showSnackAm !== false ? 'checked' : ''}> Tízórai</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showLunch" ${settings.showLunch !== false ? 'checked' : ''}> Ebéd</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackPm" ${settings.showSnackPm === true ? 'checked' : ''}> Uzsonna</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showDinner" ${settings.showDinner === true ? 'checked' : ''}> Vacsora</label>
-                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showMealTypeSvgIcons" ${settings.showMealTypeSvgIcons !== false ? 'checked' : ''}> Étkezés SVG ikonok megjelenítése</label>
-                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showAllergenEmojis" ${settings.showAllergenEmojis === true ? 'checked' : ''}> Allergén emoji-k megjelenítése</label>
-                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-mealCenterAlign" ${settings.centerAlign === true ? 'checked' : ''}> Középre igazított elrendezés</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mealSlowScrollOnOverflow" ${settings.slowScrollOnOverflow === true ? 'checked' : ''}> Lassú auto-scroll, ha nem fér ki</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showInstitutionName" ${settings.showInstitutionName !== false ? 'checked' : ''}> ${mt('show_institution')}</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showBreakfast" ${settings.showBreakfast !== false ? 'checked' : ''}> ${mt('breakfast')}</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackAm" ${settings.showSnackAm !== false ? 'checked' : ''}> ${mt('snack_am')}</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showLunch" ${settings.showLunch !== false ? 'checked' : ''}> ${mt('lunch')}</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackPm" ${settings.showSnackPm === true ? 'checked' : ''}> ${mt('snack_pm')}</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showDinner" ${settings.showDinner === true ? 'checked' : ''}> ${mt('dinner')}</label>
+                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showMealTypeSvgIcons" ${settings.showMealTypeSvgIcons !== false ? 'checked' : ''}> ${mt('show_icons')}</label>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showAllergenEmojis" ${settings.showAllergenEmojis === true ? 'checked' : ''}> ${mt('allergens_large_only')}</label>
+                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showAppetiteMessage" ${settings.showAppetiteMessage === true ? 'checked' : ''}> ${mt('appetite_toggle')}</label>
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Scroll sebesség (px/s)</label>
-                            <input type="number" id="setting-mealSlowScrollSpeedPxPerSec" min="8" max="120" step="1" value="${Math.max(8, Math.min(120, parseInt(settings.slowScrollSpeedPxPerSec || 28, 10) || 28))}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('appetite_text')}</label>
+                            <input type="text" id="setting-appetiteMessageText" value="${appetiteMessageText}" placeholder="Prajeme dobrú chuť!" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                         </div>
-                    </div>
-
-                    <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#fff; display:grid; gap:10px;">
-                        <div style="font-weight:700; color:#1f2937;">Szöveg megjelenés</div>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSourceUrl" ${settings.showSourceUrl === true ? 'checked' : ''}> ${mt('source_url_toggle')}</label>
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Betűtípus</label>
-                            <input type="text" id="setting-mealFontFamily" value="${fontFamily}" placeholder="Segoe UI, Tahoma, sans-serif" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                        </div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Címsor méret (vw)</label>
-                                <input type="number" id="setting-mealTitleFontSize" min="0.8" max="4" step="0.05" value="${Number.isFinite(mealTitleFontSize) ? mealTitleFontSize : 1.5}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg méret (vw)</label>
-                                <input type="number" id="setting-mealTextFontSize" min="0.8" max="4" step="0.05" value="${Number.isFinite(mealTextFontSize) ? mealTextFontSize : 1.35}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                            </div>
-                        </div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Vastagság</label>
-                                <select id="setting-mealTextFontWeight" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="400" ${textFontWeight <= 450 ? 'selected' : ''}>Normál (400)</option>
-                                    <option value="500" ${textFontWeight > 450 && textFontWeight < 650 ? 'selected' : ''}>Közepes (500)</option>
-                                    <option value="700" ${textFontWeight >= 650 ? 'selected' : ''}>Félkövér (700)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Sorköz</label>
-                                <input type="number" id="setting-mealLineHeight" min="1" max="2.2" step="0.05" value="${Number.isFinite(lineHeight) ? lineHeight : 1.35}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                            </div>
-                        </div>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mealWrapText" ${settings.wrapText !== false ? 'checked' : ''}> Szövegtördelés engedélyezése</label>
-                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showAppetiteMessage" ${settings.showAppetiteMessage === true ? 'checked' : ''}> „Jó étvágyat kívánunk” sor megjelenítése</label>
-                        <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Jó étvágyat szöveg</label>
-                            <input type="text" id="setting-appetiteMessageText" value="${appetiteMessageText}" placeholder="Jó étvágyat kívánunk!" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                        </div>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSourceUrl" ${settings.showSourceUrl === true ? 'checked' : ''}> Forrás URL megjelenítése alul</label>
-                        <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Forrás URL</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('source_url')}</label>
                             <input type="url" id="setting-sourceUrl" value="${sourceUrl}" placeholder="https://www.jedalen.sk/Pages/EatMenu?Ident=..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                         </div>
                     </div>
@@ -5698,11 +6054,11 @@
             return `
                 <div style="display:grid; gap:14px;">
                     <div>
-                        <label style="display:block; margin-bottom:6px; font-weight:bold;">🎬 Videó feltöltés (MP4)</label>
+                        <label style="display:block; margin-bottom:6px; font-weight:bold;">🎬 Videó feltöltés (automatikus optimalizálás)</label>
                         <div id="video-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
-                            <input type="file" id="video-file-input" accept="video/mp4,.mp4" style="display:none;">
+                            <input type="file" id="video-file-input" accept="video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v" style="display:none;">
                             <div style="font-size:14px; color:#425466;">Húzz ide videót vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
-                            <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Csak MP4 (H.264/AAC), max 80 MB</div>
+                            <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Böngészőben automatikus konvertálás: MP4 (H.264/AAC), max 1280×720, max 120 mp, max 25 MB</div>
                         </div>
                         <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
                             <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
@@ -5747,7 +6103,7 @@
                         <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
                             <iframe id="video-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
                         </div>
-                        <div id="video-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${settings.videoAssetUrl ? 'none' : 'block'};">Tölts fel MP4 videót az előnézethez.</div>
+                        <div id="video-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${settings.videoAssetUrl ? 'none' : 'block'};">Tölts fel videót az előnézethez.</div>
                     </div>
                 </div>
             `;
@@ -5767,31 +6123,31 @@
 
             return `
                 <div style="display:grid; gap:12px; margin-top:16px; border:1px solid #d6dde8; border-radius:8px; padding:12px; background:#f8fafc;">
-                    <div style="font-weight:700; color:#1f2a37;">🧩 Overlay modulok (ráhúzható óra/szöveg)</div>
+                    <div style="font-weight:700; color:#1f2a37;">${overlayUiText('header')}</div>
 
                     <div style="padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; display:grid; gap:10px;">
                         <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
                             <input type="checkbox" id="setting-clockOverlayEnabled" ${overlaySettings.clockOverlayEnabled ? 'checked' : ''} style="width:20px; height:20px;">
-                            <span style="font-weight:600;">Óra overlay bekapcsolása</span>
+                            <span style="font-weight:600;">${overlayUiText('clock_toggle')}</span>
                         </label>
                         <div id="clockOverlaySettings" style="display:${overlaySettings.clockOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Pozíció</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('position')}</label>
                                 <select id="setting-clockOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="top" ${overlaySettings.clockOverlayPosition === 'top' ? 'selected' : ''}>FENT</option>
-                                    <option value="bottom" ${overlaySettings.clockOverlayPosition === 'bottom' ? 'selected' : ''}>LENT</option>
+                                    <option value="top" ${overlaySettings.clockOverlayPosition === 'top' ? 'selected' : ''}>${overlayUiText('top')}</option>
+                                    <option value="bottom" ${overlaySettings.clockOverlayPosition === 'bottom' ? 'selected' : ''}>${overlayUiText('bottom')}</option>
                                 </select>
                             </div>
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Sáv magasság (%)</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('band_height')}</label>
                                 <input type="number" id="setting-clockOverlayHeightPercent" value="${overlaySettings.clockOverlayHeightPercent || 40}" min="20" max="40" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Óra szín</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('clock_color')}</label>
                                 <input type="color" id="setting-clockOverlayTimeColor" value="${overlaySettings.clockOverlayTimeColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Dátum szín</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('date_color')}</label>
                                 <input type="color" id="setting-clockOverlayDateColor" value="${overlaySettings.clockOverlayDateColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                         </div>
@@ -5800,50 +6156,50 @@
                     <div style="padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; display:grid; gap:10px;">
                         <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
                             <input type="checkbox" id="setting-textOverlayEnabled" ${overlaySettings.textOverlayEnabled ? 'checked' : ''} style="width:20px; height:20px;">
-                            <span style="font-weight:600;">Szöveg overlay bekapcsolása</span>
+                            <span style="font-weight:600;">${overlayUiText('text_toggle')}</span>
                         </label>
                         <div id="textOverlaySettings" style="display:${overlaySettings.textOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Pozíció</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('position')}</label>
                                 <select id="setting-textOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="top" ${overlaySettings.textOverlayPosition === 'top' ? 'selected' : ''}>FENT</option>
-                                    <option value="bottom" ${overlaySettings.textOverlayPosition === 'bottom' ? 'selected' : ''}>LENT</option>
+                                    <option value="top" ${overlaySettings.textOverlayPosition === 'top' ? 'selected' : ''}>${overlayUiText('top')}</option>
+                                    <option value="bottom" ${overlaySettings.textOverlayPosition === 'bottom' ? 'selected' : ''}>${overlayUiText('bottom')}</option>
                                 </select>
                             </div>
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Sáv magasság (%)</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('band_height')}</label>
                                 <input type="number" id="setting-textOverlayHeightPercent" value="${overlaySettings.textOverlayHeightPercent || 20}" min="12" max="40" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                             <div style="grid-column:1 / span 2;">
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg forrása</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('text_source')}</label>
                                 <select id="setting-textOverlaySourceType" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="manual" ${(overlaySettings.textOverlaySourceType || 'manual') === 'manual' ? 'selected' : ''}>Kézi szöveg</option>
-                                    <option value="collection" ${overlaySettings.textOverlaySourceType === 'collection' ? 'selected' : ''}>Szöveggyűjtemény</option>
-                                    <option value="external" ${overlaySettings.textOverlaySourceType === 'external' ? 'selected' : ''}>Külső forrás (URL)</option>
+                                    <option value="manual" ${(overlaySettings.textOverlaySourceType || 'manual') === 'manual' ? 'selected' : ''}>${overlayUiText('source_manual')}</option>
+                                    <option value="collection" ${overlaySettings.textOverlaySourceType === 'collection' ? 'selected' : ''}>${overlayUiText('source_collection')}</option>
+                                    <option value="external" ${overlaySettings.textOverlaySourceType === 'external' ? 'selected' : ''}>${overlayUiText('source_external')}</option>
                                 </select>
                             </div>
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Betűméret (px)</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('font_size')}</label>
                                 <input type="number" id="setting-textOverlayFontSize" value="${overlaySettings.textOverlayFontSize || 52}" min="18" max="120" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szín</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('color')}</label>
                                 <input type="color" id="setting-textOverlayColor" value="${overlaySettings.textOverlayColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                             <div style="grid-column:1 / span 2;">
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Gördülési sebesség (px/s)</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('speed')}</label>
                                 <input type="number" id="setting-textOverlaySpeedPxPerSec" value="${overlaySettings.textOverlaySpeedPxPerSec || 120}" min="40" max="320" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                             <div id="textOverlayManualWrap" style="grid-column:1 / span 2;">
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('text')}</label>
                                 <input type="text" id="setting-textOverlayText" value="${escapeHtml(overlaySettings.textOverlayText || 'Sem vložte text...')}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                             <div id="textOverlayCollectionWrap" style="grid-column:1 / span 2;">
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveggyűjtemény (1 sor = 1 elem)</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('collection')}</label>
                                 <textarea id="setting-textOverlayCollection" rows="5" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px; resize:vertical;">${escapeHtml(overlayCollectionText)}</textarea>
                             </div>
                             <div id="textOverlayExternalWrap" style="grid-column:1 / span 2;">
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Külső forrás URL</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${overlayUiText('external_url')}</label>
                                 <input type="url" id="setting-textOverlayExternalUrl" value="${escapeHtml(overlaySettings.textOverlayExternalUrl || '')}" placeholder="https://..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                             </div>
                         </div>
@@ -5876,6 +6232,13 @@
 
             const modalWidthStyle = getCustomizationModalWidthStyle(moduleKey);
 
+            const modalModuleTitle = moduleKey === 'meal-menu'
+                ? mealUiText('module_title')
+                : resolveLoopItemModuleName(item);
+            const modalCustomizationLabel = moduleKey === 'meal-menu'
+                ? mealUiText('customization')
+                : tr('group_loop.customization', 'Customization');
+
             modal.innerHTML = `
                 <div style="
                     background: white;
@@ -5887,7 +6250,7 @@
                     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="margin: 0;">⚙️ ${resolveLoopItemModuleName(item)} - ${tr('group_loop.customization', 'Customization')}</h2>
+                        <h2 style="margin: 0;">⚙️ ${modalModuleTitle} - ${modalCustomizationLabel}</h2>
                         <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
                             background: #1e40af;
                             color: white;
@@ -6001,6 +6364,9 @@
             settings.showDate = document.getElementById('setting-showDate')?.checked !== false;
             settings.dateInline = document.getElementById('setting-dateInline')?.checked === true;
             settings.weekdayPosition = (document.getElementById('setting-weekdayPosition')?.value === 'right') ? 'right' : 'left';
+            settings.digitalOverlayEnabled = document.getElementById('setting-digitalOverlayEnabled')?.checked === true;
+            const overlayPositionValue = String(document.getElementById('setting-digitalOverlayPosition')?.value || 'auto').toLowerCase();
+            settings.digitalOverlayPosition = ['auto', 'top', 'center', 'bottom'].includes(overlayPositionValue) ? overlayPositionValue : 'auto';
             if (!settings.showDate) {
                 settings.dateFormat = 'none';
             }
@@ -6144,14 +6510,24 @@
         }
 
         function collectMealMenuSettingsFromForm() {
+            const mealDisplayMode = String(document.getElementById('setting-mealDisplayMode')?.value || 'small_screen').toLowerCase() === 'large_screen'
+                ? 'large_screen'
+                : 'small_screen';
+            const smallScreenPageSwitchSec = Math.max(5, Math.min(60, parseInt(document.getElementById('setting-smallScreenPageSwitchSec')?.value || '12', 10) || 12));
+            const mealTextFontSize = mealDisplayMode === 'large_screen' ? 1.9 : 3.0;
+            const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
             return {
                 companyId: Math.max(0, parseInt(companyId || 0, 10) || 0),
                 siteKey: String(document.getElementById('setting-mealSiteKey')?.value || 'jedalen.sk').trim() || 'jedalen.sk',
                 institutionId: parseInt(document.getElementById('setting-mealInstitutionId')?.value || '0', 10) || 0,
                 sourceType: (String(document.getElementById('setting-mealSourceType')?.value || 'manual').toLowerCase() === 'server') ? 'server' : 'manual',
+                mealDisplayMode,
+                smallScreenPageSwitchSec,
+                mergeBreakfastSnack: document.getElementById('setting-mergeBreakfastSnack')?.checked !== false,
+                mergeLunchSnack: document.getElementById('setting-mergeLunchSnack')?.checked !== false,
                 language: (() => {
-                    const raw = String(document.getElementById('setting-mealLanguage')?.value || 'hu').toLowerCase().trim();
-                    return ['hu', 'sk', 'en'].includes(raw) ? raw : 'hu';
+                    const raw = String(document.getElementById('setting-mealLanguage')?.value || 'sk').toLowerCase().trim();
+                    return ['hu', 'sk', 'en'].includes(raw) ? raw : 'sk';
                 })(),
                 showHeaderTitle: document.getElementById('setting-showHeaderTitle')?.checked !== false,
                 customHeaderTitle: String(document.getElementById('setting-customHeaderTitle')?.value || '').trim(),
@@ -6164,17 +6540,17 @@
                 showMealTypeEmojis: false,
                 showMealTypeSvgIcons: document.getElementById('setting-showMealTypeSvgIcons')?.checked !== false,
                 showAllergenEmojis: document.getElementById('setting-showAllergenEmojis')?.checked === true,
-                centerAlign: document.getElementById('setting-mealCenterAlign')?.checked === true,
-                slowScrollOnOverflow: document.getElementById('setting-mealSlowScrollOnOverflow')?.checked === true,
-                slowScrollSpeedPxPerSec: Math.max(8, Math.min(120, parseInt(document.getElementById('setting-mealSlowScrollSpeedPxPerSec')?.value || '28', 10) || 28)),
-                fontFamily: String(document.getElementById('setting-mealFontFamily')?.value || 'Segoe UI, Tahoma, sans-serif').trim() || 'Segoe UI, Tahoma, sans-serif',
-                mealTitleFontSize: Math.max(0.8, Math.min(4, parseFloat(document.getElementById('setting-mealTitleFontSize')?.value || '1.5') || 1.5)),
-                mealTextFontSize: Math.max(0.8, Math.min(4, parseFloat(document.getElementById('setting-mealTextFontSize')?.value || '1.35') || 1.35)),
-                textFontWeight: parseInt(document.getElementById('setting-mealTextFontWeight')?.value || '600', 10) || 600,
-                lineHeight: Math.max(1, Math.min(2.2, parseFloat(document.getElementById('setting-mealLineHeight')?.value || '1.35') || 1.35)),
-                wrapText: document.getElementById('setting-mealWrapText')?.checked !== false,
+                centerAlign: false,
+                slowScrollOnOverflow: false,
+                slowScrollSpeedPxPerSec: 40,
+                fontFamily: 'Segoe UI, Tahoma, sans-serif',
+                mealTitleFontSize,
+                mealTextFontSize,
+                textFontWeight: 700,
+                lineHeight: 1.24,
+                wrapText: true,
                 showAppetiteMessage: document.getElementById('setting-showAppetiteMessage')?.checked === true,
-                appetiteMessageText: String(document.getElementById('setting-appetiteMessageText')?.value || 'Jó étvágyat kívánunk!').trim(),
+                appetiteMessageText: String(document.getElementById('setting-appetiteMessageText')?.value || 'Prajeme dobrú chuť!').trim(),
                 showSourceUrl: document.getElementById('setting-showSourceUrl')?.checked === true,
                 sourceUrl: String(document.getElementById('setting-sourceUrl')?.value || '').trim(),
                 apiBaseUrl: '../../api/meal_plan.php'
@@ -6229,6 +6605,11 @@
                     ...newSettings
                 });
                 Object.assign(newSettings, withOverlay);
+            }
+
+            if (moduleKey === 'meal-menu' && String(newSettings.mealDisplayMode || 'small_screen').toLowerCase() !== 'large_screen') {
+                newSettings.clockOverlayEnabled = false;
+                newSettings.textOverlayEnabled = false;
             }
             
             loopItems[index].settings = newSettings;
@@ -6451,6 +6832,8 @@
             if (settings.showSeconds !== undefined) params.append('showSeconds', settings.showSeconds);
             if (settings.showDate !== undefined) params.append('showDate', settings.showDate);
             if (settings.language) params.append('language', settings.language);
+            if (settings.digitalOverlayEnabled !== undefined) params.append('digitalOverlayEnabled', settings.digitalOverlayEnabled);
+            if (settings.digitalOverlayPosition) params.append('digitalOverlayPosition', settings.digitalOverlayPosition);
         }
 
         function appendDefaultLogoPreviewParams(params) {
@@ -6534,9 +6917,16 @@
         }
 
         function appendMealMenuPreviewParams(params, settings) {
+            const mealTextFontSize = Math.max(0.8, Math.min(4, parseFloat(settings.mealTextFontSize || 1.85) || 1.85));
+            const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
+            const smallScreenPageSwitchSec = Math.max(5, Math.min(60, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
             params.append('siteKey', String(settings.siteKey || 'jedalen.sk'));
             params.append('institutionId', String(parseInt(settings.institutionId || 0, 10) || 0));
-            params.append('language', ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'hu');
+            params.append('mealDisplayMode', String(settings.mealDisplayMode || 'small_screen'));
+            params.append('smallScreenPageSwitchSec', String(smallScreenPageSwitchSec));
+            params.append('mergeBreakfastSnack', settings.mergeBreakfastSnack === false ? 'false' : 'true');
+            params.append('mergeLunchSnack', settings.mergeLunchSnack === false ? 'false' : 'true');
+            params.append('language', ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'sk');
             params.append('showHeaderTitle', settings.showHeaderTitle === false ? 'false' : 'true');
             params.append('customHeaderTitle', String(settings.customHeaderTitle || ''));
             params.append('showInstitutionName', settings.showInstitutionName === false ? 'false' : 'true');
@@ -6550,8 +6940,8 @@
             params.append('centerAlign', settings.centerAlign === true ? 'true' : 'false');
             params.append('slowScrollOnOverflow', settings.slowScrollOnOverflow === true ? 'true' : 'false');
             params.append('slowScrollSpeedPxPerSec', String(Math.max(8, Math.min(120, parseInt(settings.slowScrollSpeedPxPerSec || 28, 10) || 28))));
-            params.append('mealTitleFontSize', String(Math.max(0.8, Math.min(4, parseFloat(settings.mealTitleFontSize || 2.1) || 2.1))));
-            params.append('mealTextFontSize', String(Math.max(0.8, Math.min(4, parseFloat(settings.mealTextFontSize || 1.85) || 1.85))));
+            params.append('mealTitleFontSize', String(mealTitleFontSize));
+            params.append('mealTextFontSize', String(mealTextFontSize));
             params.append('textFontWeight', String(parseInt(settings.textFontWeight || 600, 10) || 600));
             params.append('lineHeight', String(Math.max(1, Math.min(2.2, parseFloat(settings.lineHeight || 1.4) || 1.4))));
             params.append('fontFamily', String(settings.fontFamily || 'Segoe UI, Tahoma, sans-serif'));
@@ -6781,20 +7171,21 @@
         }
 
         function getMealMenuLoopItemSummary(settings) {
+            const mt = (key) => mealUiText(key);
             const siteKey = String(settings.siteKey || 'jedalen.sk').trim() || 'jedalen.sk';
             const institutionId = parseInt(settings.institutionId || 0, 10) || 0;
-            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'hu';
+            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'sk';
             const visibleMeals = [];
-            if (settings.showBreakfast !== false) visibleMeals.push('Reggeli');
-            if (settings.showSnackAm !== false) visibleMeals.push('Tízórai');
-            if (settings.showLunch !== false) visibleMeals.push('Ebéd');
-            if (settings.showSnackPm === true) visibleMeals.push('Uzsonna');
-            if (settings.showDinner === true) visibleMeals.push('Vacsora');
+            if (settings.showBreakfast !== false) visibleMeals.push(mt('breakfast'));
+            if (settings.showSnackAm !== false) visibleMeals.push(mt('snack_am'));
+            if (settings.showLunch !== false) visibleMeals.push(mt('lunch'));
+            if (settings.showSnackPm === true) visibleMeals.push(mt('snack_pm'));
+            if (settings.showDinner === true) visibleMeals.push(mt('dinner'));
 
-            const mealsText = visibleMeals.length > 0 ? visibleMeals.join(', ') : 'Nincs kijelölt étkezés';
-            const allergenText = settings.showAllergenEmojis === true ? ' • allergének: be' : '';
-            const iconText = settings.showMealTypeSvgIcons === false ? ' • SVG ikon: ki' : ' • SVG ikon: be';
-            return `${siteKey} • intézmény #${institutionId} • nyelv: ${language.toUpperCase()}<br>${mealsText}${allergenText}${iconText}`;
+            const mealsText = visibleMeals.length > 0 ? visibleMeals.join(', ') : mt('no_meals_selected');
+            const allergenText = ` • ${settings.showAllergenEmojis === true ? mt('allergens_on') : mt('allergens_off')}`;
+            const iconText = ` • ${settings.showMealTypeSvgIcons === false ? mt('icons_off') : mt('icons_on')}`;
+            return `${siteKey} • ${mt('institution_short')} #${institutionId} • ${mt('language_short')}: ${language.toUpperCase()}<br>${mealsText}${allergenText}${iconText}`;
         }
 
         function getRoomOccupancyLoopItemSummary(settings) {

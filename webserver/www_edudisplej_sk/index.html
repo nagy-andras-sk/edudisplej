@@ -200,6 +200,195 @@
             font-size: .92rem;
         }
 
+        .display-shell {
+            width: min(860px, 100%);
+            margin: 8px auto 0;
+            background: linear-gradient(165deg, #101726, #1f2d47);
+            border-radius: 22px;
+            border: 2px solid #2a3e63;
+            box-shadow: 0 20px 40px rgba(10, 24, 45, .28);
+            padding: 14px;
+            position: relative;
+        }
+        .display-shell::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: -16px;
+            width: 140px;
+            height: 14px;
+            transform: translateX(-50%);
+            background: linear-gradient(180deg, #2f476f, #1b2d4a);
+            border-radius: 0 0 10px 10px;
+            border: 1px solid #334a70;
+        }
+        .display-screen {
+            background: linear-gradient(140deg, #eef5ff, #f7fbff);
+            border-radius: 16px;
+            border: 1px solid #c9dbf8;
+            padding: 14px;
+            min-height: 280px;
+            position: relative;
+            overflow: hidden;
+        }
+        .display-screen::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(115deg, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 45%);
+            pointer-events: none;
+        }
+        .screen-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .screen-head h3 {
+            margin: 0;
+            font-size: 1.05rem;
+            color: #173357;
+        }
+        .screen-head p {
+            margin: 0;
+            color: #4d6382;
+            font-size: .88rem;
+        }
+        .screen-content {
+            display: grid;
+            grid-template-columns: 1.1fr .9fr;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        .screen-panel {
+            background: #ffffff;
+            border: 1px solid #d4e1f6;
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .screen-panel h4 {
+            margin-bottom: 8px;
+            font-size: .98rem;
+            color: #1d3f6c;
+        }
+        .dish-list {
+            list-style: none;
+            display: grid;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .dish-list li {
+            background: #f3f7ff;
+            border: 1px solid #d7e3fa;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: .9rem;
+            animation: pulseItem 5.5s ease-in-out infinite;
+        }
+        .dish-list li:nth-child(2) { animation-delay: .25s; }
+        .dish-list li:nth-child(3) { animation-delay: .5s; }
+        .dish-list li:nth-child(4) { animation-delay: .75s; }
+
+        .weather-now {
+            margin-top: 4px;
+            display: grid;
+            gap: 8px;
+        }
+        .weather-main {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.65rem;
+            font-weight: 700;
+            color: #0b3f87;
+        }
+        .weather-city {
+            color: #31537e;
+            font-weight: 600;
+            font-size: .92rem;
+        }
+        .weather-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            width: fit-content;
+            border: 1px solid #c8daf8;
+            background: #eef4ff;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: .85rem;
+        }
+        .ticker {
+            margin-top: 10px;
+            border-radius: 10px;
+            border: 1px solid #d7e3fa;
+            background: #f8fbff;
+            overflow: hidden;
+        }
+        .ticker-track {
+            white-space: nowrap;
+            display: inline-block;
+            padding: 8px 0;
+            animation: tickerMove 12s linear infinite;
+            color: #39597e;
+            font-size: .88rem;
+        }
+
+        .contact-wrap {
+            display: grid;
+            gap: 12px;
+        }
+        .contact-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .contact-form label {
+            display: grid;
+            gap: 4px;
+            color: #274263;
+            font-size: .86rem;
+            font-weight: 600;
+        }
+        .contact-form label.full {
+            grid-column: 1 / -1;
+        }
+        .contact-form input,
+        .contact-form textarea {
+            width: 100%;
+            border: 1px solid #b8cdf1;
+            border-radius: 10px;
+            padding: 9px 10px;
+            font: inherit;
+            color: var(--text);
+            background: #fff;
+        }
+        .contact-form textarea {
+            min-height: 96px;
+            resize: vertical;
+        }
+        .form-note {
+            color: #4f6481;
+            font-size: .85rem;
+        }
+        .form-status {
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: .9rem;
+        }
+        .form-status.ok {
+            color: #0b644f;
+            border: 1px solid #9bd7c8;
+            background: #e8faf5;
+        }
+        .form-status.err {
+            color: #8d2e2e;
+            border: 1px solid #efc2c2;
+            background: #fff1f1;
+        }
+
         .contact {
             margin: 18px 0 36px;
             background: linear-gradient(145deg, #e9f2ff, #f8fbff);
@@ -241,13 +430,24 @@
             from { transform: translateX(-130%) rotate(8deg); }
             to { transform: translateX(130%) rotate(8deg); }
         }
+        @keyframes pulseItem {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+        @keyframes tickerMove {
+            from { transform: translateX(100%); }
+            to { transform: translateX(-100%); }
+        }
 
         @media (max-width: 940px) {
             .hero-grid,
             .how-grid,
-            .module-grid {
+            .module-grid,
+            .screen-content,
+            .contact-form {
                 grid-template-columns: 1fr;
             }
+            .display-shell { margin-bottom: 10px; }
             .hero { padding-top: 46px; }
         }
     </style>
@@ -297,6 +497,52 @@
     </header>
 
     <main>
+        <section class="section" id="live-ukazka">
+            <div class="wrap">
+                <h2>Live ukážka displeja</h2>
+                <p class="section-lead">Takto môže vyzerať obsah na škole počas dňa: jedálny lístok a počasie v animovanej podobe.</p>
+
+                <div class="display-shell" aria-label="Ukážka reálneho školského displeja">
+                    <div class="display-screen">
+                        <div class="screen-head">
+                            <div>
+                                <h3>EDUDISPLEJ · Denný prehľad</h3>
+                                <p>Obsah beží automaticky podľa školského harmonogramu</p>
+                            </div>
+                            <span class="weather-chip">LIVE</span>
+                        </div>
+
+                        <div class="screen-content">
+                            <article class="screen-panel" aria-label="Ukážka jedálneho menu">
+                                <h4>🍽️ Jedálny lístok – dnes</h4>
+                                <ul class="dish-list">
+                                    <li>Polievka: paradajková s cestovinou</li>
+                                    <li>Hlavné jedlo: kuracie rizoto</li>
+                                    <li>Vegetariánske: zeleninové lasagne</li>
+                                    <li>Dezert: jablkový koláč</li>
+                                </ul>
+                            </article>
+
+                            <article class="screen-panel" aria-label="Ukážka počasia">
+                                <h4>🌤️ Počasie pri škole</h4>
+                                <div class="weather-now">
+                                    <div class="weather-main">
+                                        <span id="weather-icon">☀️</span>
+                                        <span id="weather-temp">21°C</span>
+                                    </div>
+                                    <div class="weather-city" id="weather-city">Bratislava · dnes</div>
+                                    <div class="weather-chip" id="weather-desc">Jasno, slabý vietor</div>
+                                </div>
+                                <div class="ticker" aria-hidden="true">
+                                    <div class="ticker-track">☀️ Ráno 16°C · 🌤️ Obed 21°C · 🌦️ Večer 18°C · 💨 Vietor do 12 km/h ·</div>
+                                </div>
+                            </article>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section class="section">
             <div class="wrap">
                 <h2>Čo je EduDisplej?</h2>
@@ -325,6 +571,34 @@
             </div>
         </section>
 
+        <section class="section" id="technologia">
+            <div class="wrap">
+                <h2>Technológia a hardware</h2>
+                <p class="section-lead">
+                    EduDisplej je pripravený softvér, ktorý je možné nasadiť aj na malé zariadenie Raspberry Pi.
+                    Vďaka tomu škola získa cenovo dostupné riešenie s nízkou spotrebou energie a stabilnou prevádzkou.
+                </p>
+
+                <div class="how-grid">
+                    <article class="step">
+                        <div class="num">1</div>
+                        <h3>Lacný hardware</h3>
+                        <p>Raspberry Pi je cenovo výhodná platforma, ktorú je možné jednoducho pripojiť k TV alebo monitoru.</p>
+                    </article>
+                    <article class="step">
+                        <div class="num">2</div>
+                        <h3>Stabilná prevádzka</h3>
+                        <p>Systém je navrhnutý pre dlhodobé zobrazenie obsahu v škole počas celého dňa.</p>
+                    </article>
+                    <article class="step">
+                        <div class="num">3</div>
+                        <h3>Jednoduché nasadenie</h3>
+                        <p>Software sa dá pripraviť ako hotové riešenie: zariadenie zapojiť, prihlásiť a displej funguje.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
         <section class="section" id="moduly">
             <div class="wrap">
                 <h2>Moduly systému</h2>
@@ -346,17 +620,71 @@
 
         <section class="section" id="kontakt">
             <div class="wrap contact">
-                <div>
+                <div class="contact-wrap">
                     <h2>Viac informácií</h2>
                     <p>Ak máte záujem o nasadenie v škole alebo chcete ukážku systému, kontaktujte nás.</p>
+                    <a class="mail" href="mailto:edudisplej@gmail.com">✉️ edudisplej@gmail.com</a>
+
+                    <form class="contact-form" method="post" action="send_contact.php">
+                        <label>
+                            Meno
+                            <input type="text" name="name" required maxlength="100" autocomplete="name">
+                        </label>
+                        <label>
+                            E-mail
+                            <input type="email" name="email" required maxlength="150" autocomplete="email">
+                        </label>
+                        <label class="full">
+                            Správa
+                            <textarea name="message" required maxlength="2000"></textarea>
+                        </label>
+                        <label class="full" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                            <span class="form-note">Správa bude odoslaná na edudisplej@gmail.com</span>
+                            <button class="btn btn-primary" type="submit">Odoslať správu</button>
+                        </label>
+                    </form>
+                    <div id="form-status" aria-live="polite"></div>
                 </div>
-                <a class="mail" href="mailto:info@edudisplej.sk">✉️ info@edudisplej.sk</a>
             </div>
         </section>
     </main>
 
     <footer>
-        <div class="wrap">EduDisplej · školský informačný displejový softvér</div>
+        <div class="wrap">
+            Bakalárska práca András Nagy 2026 · Projekt vyvinul András Nagy ako vysokoškolská bakalárska práca.
+        </div>
     </footer>
+    <script>
+        const weatherData = [
+            { icon: "☀️", temp: "21°C", city: "Bratislava · dnes", desc: "Jasno, slabý vietor" },
+            { icon: "🌤️", temp: "19°C", city: "Nitra · dnes", desc: "Polooblačno, príjemne" },
+            { icon: "🌦️", temp: "17°C", city: "Trnava · dnes", desc: "Prehánky popoludní" }
+        ];
+
+        let weatherIndex = 0;
+        const weatherIcon = document.getElementById("weather-icon");
+        const weatherTemp = document.getElementById("weather-temp");
+        const weatherCity = document.getElementById("weather-city");
+        const weatherDesc = document.getElementById("weather-desc");
+
+        setInterval(() => {
+            weatherIndex = (weatherIndex + 1) % weatherData.length;
+            const current = weatherData[weatherIndex];
+            weatherIcon.textContent = current.icon;
+            weatherTemp.textContent = current.temp;
+            weatherCity.textContent = current.city;
+            weatherDesc.textContent = current.desc;
+        }, 3500);
+
+        const params = new URLSearchParams(window.location.search);
+        const formStatus = document.getElementById("form-status");
+        if (formStatus) {
+            if (params.get("status") === "ok") {
+                formStatus.innerHTML = '<div class="form-status ok">Správa bola úspešne odoslaná.</div>';
+            } else if (params.get("status") === "err") {
+                formStatus.innerHTML = '<div class="form-status err">Správu sa nepodarilo odoslať. Skúste to znova.</div>';
+            }
+        }
+    </script>
 </body>
 </html>

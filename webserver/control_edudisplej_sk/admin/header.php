@@ -149,6 +149,7 @@ $admin_nav_pages = [
     'services.php'        => ['href' => 'services.php',        'label' => t_def('nav.admin.services', 'Service Updates')],
     'email_settings.php'  => ['href' => 'email_settings.php',  'label' => t_def('nav.admin.email_settings', 'Email Settings')],
     'email_templates.php' => ['href' => 'email_templates.php', 'label' => t_def('nav.admin.email_templates', 'Email Templates')],
+    'email_queue.php'     => ['href' => 'email_queue.php',     'label' => t_def('nav.admin.email_queue', 'Email Queue')],
     'api_logs.php'        => ['href' => 'api_logs.php',        'label' => t_def('nav.admin.api_logs', 'API Logs')],
     'security_logs.php'   => ['href' => 'security_logs.php',   'label' => t_def('nav.admin.security_logs', 'Security Logs')],
 ];
@@ -165,7 +166,7 @@ $dashboard_nav_pages = [
 if (!$is_admin_user) {
     if ($current_user_role === 'easy_user') {
         $dashboard_nav_pages = [
-            'easy_user.php' => ['href' => 'easy_user.php', 'label' => '✨ Egyszerű vezérlő', 'key' => 'easy_user'],
+            'index.php' => ['href' => 'easy_user/', 'label' => t_def('nav.easy_user.control', 'Easy Control'), 'key' => 'easy_user'],
             'settings.php' => ['href' => 'settings.php', 'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
         ];
     }

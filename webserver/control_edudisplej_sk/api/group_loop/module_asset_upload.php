@@ -42,6 +42,85 @@ if ((int)($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
 $tmp_path = (string)($file['tmp_name'] ?? '');
 $original_name = (string)($file['name'] ?? 'asset.bin');
 $file_size = (int)($file['size'] ?? 0);
+$client_processing = strtolower(trim((string)($_POST['client_processing'] ?? '')));
+
+function edudisplej_ffprobe_available(): bool {
+    if (!function_exists('shell_exec')) {
+        return false;
+    }
+
+    $disabled = array_map('trim', explode(',', (string)ini_get('disable_functions')));
+    if (in_array('shell_exec', $disabled, true)) {
+        return false;
+    }
+
+    return true;
+}
+
+function edudisplej_probe_video_file(string $file_path): array {
+    if (!is_file($file_path)) {
+        return ['success' => false, 'message' => 'Hiányzó feltöltött videó'];
+    }
+
+    if (!edudisplej_ffprobe_available()) {
+        return ['success' => false, 'message' => 'A szerver oldali videóellenőrzés nem érhető el (ffprobe szükséges)'];
+    }
+
+    $ffprobe_binary = PHP_OS_FAMILY === 'Windows' ? 'ffprobe.exe' : 'ffprobe';
+    $cmd = escapeshellcmd($ffprobe_binary)
+        . ' -v error -print_format json -show_format -show_streams '
+        . escapeshellarg($file_path) . ' 2>&1';
+
+    $raw = (string)@shell_exec($cmd);
+    if (trim($raw) === '') {
+        return ['success' => false, 'message' => 'A videó technikai ellenőrzése sikertelen (üres ffprobe válasz)'];
+    }
+
+    $parsed = json_decode($raw, true);
+    if (!is_array($parsed)) {
+        return ['success' => false, 'message' => 'A videó technikai ellenőrzése sikertelen (érvénytelen ffprobe kimenet)'];
+    }
+
+    $format = is_array($parsed['format'] ?? null) ? $parsed['format'] : [];
+    $streams = is_array($parsed['streams'] ?? null) ? $parsed['streams'] : [];
+
+    $video_stream = null;
+    $audio_stream = null;
+    foreach ($streams as $stream) {
+        if (!is_array($stream)) {
+            continue;
+        }
+        $type = strtolower((string)($stream['codec_type'] ?? ''));
+        if ($type === 'video' && $video_stream === null) {
+            $video_stream = $stream;
+            continue;
+        }
+        if ($type === 'audio' && $audio_stream === null) {
+            $audio_stream = $stream;
+        }
+    }
+
+    if (!is_array($video_stream)) {
+        return ['success' => false, 'message' => 'A feltöltött fájl nem tartalmaz videó streamet'];
+    }
+
+    $duration = 0.0;
+    if (isset($video_stream['duration']) && is_numeric($video_stream['duration'])) {
+        $duration = (float)$video_stream['duration'];
+    } elseif (isset($format['duration']) && is_numeric($format['duration'])) {
+        $duration = (float)$format['duration'];
+    }
+
+    return [
+        'success' => true,
+        'format_name' => strtolower((string)($format['format_name'] ?? '')),
+        'video_codec' => strtolower((string)($video_stream['codec_name'] ?? '')),
+        'audio_codec' => is_array($audio_stream) ? strtolower((string)($audio_stream['codec_name'] ?? '')) : '',
+        'duration' => $duration,
+        'width' => (int)($video_stream['width'] ?? 0),
+        'height' => (int)($video_stream['height'] ?? 0),
+    ];
+}
 
 function edudisplej_compress_uploaded_image(string $source_path, string $target_dir_abs): array {
     if (!is_file($source_path)) {
@@ -133,15 +212,57 @@ if ($module_key === 'pdf') {
         exit();
     }
 } elseif ($module_key === 'video') {
-    if ($file_size <= 0 || $file_size > 80 * 1024 * 1024) {
-        echo json_encode(['success' => false, 'message' => 'A videó mérete érvénytelen (max. 80 MB)']);
+    if ($client_processing !== 'ffmpeg_wasm_v1') {
+        echo json_encode(['success' => false, 'message' => 'A videó csak kliens oldali optimalizálás után tölthető fel']);
+        exit();
+    }
+
+    if ($file_size <= 0 || $file_size > 25 * 1024 * 1024) {
+        echo json_encode(['success' => false, 'message' => 'A videó mérete érvénytelen (max. 25 MB)']);
         exit();
     }
 
     $mime = strtolower((string)mime_content_type($tmp_path));
     $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
     if ($ext !== 'mp4' || !in_array($mime, ['video/mp4', 'application/octet-stream'], true)) {
-        echo json_encode(['success' => false, 'message' => 'Csak MP4 (H.264/AAC) videó tölthető fel']);
+        echo json_encode(['success' => false, 'message' => 'Csak MP4 videó tölthető fel']);
+        exit();
+    }
+
+    $probe = edudisplej_probe_video_file($tmp_path);
+    if (empty($probe['success'])) {
+        echo json_encode(['success' => false, 'message' => (string)($probe['message'] ?? 'A videó ellenőrzése sikertelen')]);
+        exit();
+    }
+
+    $format_name = (string)($probe['format_name'] ?? '');
+    if ($format_name === '' || strpos($format_name, 'mp4') === false) {
+        echo json_encode(['success' => false, 'message' => 'A videó konténere nem támogatott (csak MP4)']);
+        exit();
+    }
+
+    $duration = (float)($probe['duration'] ?? 0);
+    if ($duration <= 0 || $duration > 120.0) {
+        echo json_encode(['success' => false, 'message' => 'A videó hossza érvénytelen (max. 120 mp)']);
+        exit();
+    }
+
+    $width = (int)($probe['width'] ?? 0);
+    $height = (int)($probe['height'] ?? 0);
+    if ($width <= 0 || $height <= 0 || $width > 1280 || $height > 720) {
+        echo json_encode(['success' => false, 'message' => 'A videó felbontása érvénytelen (max. 1280×720)']);
+        exit();
+    }
+
+    $video_codec = (string)($probe['video_codec'] ?? '');
+    if ($video_codec !== 'h264') {
+        echo json_encode(['success' => false, 'message' => 'A videó kodekje nem támogatott (csak H.264)']);
+        exit();
+    }
+
+    $audio_codec = (string)($probe['audio_codec'] ?? '');
+    if ($audio_codec !== '' && $audio_codec !== 'aac') {
+        echo json_encode(['success' => false, 'message' => 'A videó audió kodekje nem támogatott (csak AAC)']);
         exit();
     }
 } else {

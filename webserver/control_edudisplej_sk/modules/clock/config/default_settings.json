@@ -11,5 +11,7 @@
   "clockSize": 300,
   "showSeconds": true,
   "showDate": true,
-  "language": "sk"
+  "language": "sk",
+  "digitalOverlayEnabled": false,
+  "digitalOverlayPosition": "auto"
 }

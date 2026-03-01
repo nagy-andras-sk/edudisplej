@@ -196,14 +196,24 @@ if (isset($_GET['refresh_list'])) {
             $kiosk_loop_version = normalize_loop_version_value($row['loop_last_update'] ?? null);
             $server_loop_version = normalize_loop_version_value($row['group_server_loop_version'] ?? null)
                 ?? normalize_loop_version_value($row['kiosk_server_loop_version'] ?? null);
+            $kiosk_loop_ts = parse_loop_version_timestamp($kiosk_loop_version);
+            $server_loop_ts = parse_loop_version_timestamp($server_loop_version);
+            $server_loop_is_newer = false;
+            if ($kiosk_loop_version !== null && $server_loop_version !== null && $kiosk_loop_version !== $server_loop_version) {
+                if ($kiosk_loop_ts !== null && $server_loop_ts !== null) {
+                    $server_loop_is_newer = $server_loop_ts > $kiosk_loop_ts;
+                } else {
+                    $server_loop_is_newer = strcmp((string)$server_loop_version, (string)$kiosk_loop_version) > 0;
+                }
+            }
+
             $loop_version_mismatch_raw = (
                 ($row['status'] ?? '') !== 'offline'
                 && $kiosk_loop_version !== null
                 && $server_loop_version !== null
-                && $kiosk_loop_version !== $server_loop_version
+                && $server_loop_is_newer
             );
 
-            $server_loop_ts = parse_loop_version_timestamp($server_loop_version);
             $loop_update_grace_active = (
                 $loop_version_mismatch_raw
                 && $server_loop_ts !== null
@@ -378,14 +388,24 @@ try {
         $kiosk_loop_version = normalize_loop_version_value($kiosk['loop_last_update'] ?? null);
         $server_loop_version = normalize_loop_version_value($kiosk['group_server_loop_version'] ?? null)
             ?? normalize_loop_version_value($kiosk['kiosk_server_loop_version'] ?? null);
+        $kiosk_loop_ts = parse_loop_version_timestamp($kiosk_loop_version);
+        $server_loop_ts = parse_loop_version_timestamp($server_loop_version);
+        $server_loop_is_newer = false;
+        if ($kiosk_loop_version !== null && $server_loop_version !== null && $kiosk_loop_version !== $server_loop_version) {
+            if ($kiosk_loop_ts !== null && $server_loop_ts !== null) {
+                $server_loop_is_newer = $server_loop_ts > $kiosk_loop_ts;
+            } else {
+                $server_loop_is_newer = strcmp((string)$server_loop_version, (string)$kiosk_loop_version) > 0;
+            }
+        }
+
         $loop_version_mismatch_raw = (
             ($kiosk['status'] ?? '') !== 'offline'
             && $kiosk_loop_version !== null
             && $server_loop_version !== null
-            && $kiosk_loop_version !== $server_loop_version
+            && $server_loop_is_newer
         );
 
-        $server_loop_ts = parse_loop_version_timestamp($server_loop_version);
         $loop_update_grace_active = (
             $loop_version_mismatch_raw
             && $server_loop_ts !== null

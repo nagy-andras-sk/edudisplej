@@ -157,6 +157,37 @@ function v1_parse_ts($value): ?int {
     return $ts ? $ts : null;
 }
 
+function v1_hostname_from_mac(string $mac): string {
+    $mac_clean = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+    if (strlen($mac_clean) >= 6) {
+        return 'edudisplej-' . substr($mac_clean, -6);
+    }
+    return 'edudisplej';
+}
+
+function v1_normalize_hostname(string $hostname, string $mac): string {
+    $value = trim($hostname);
+    $lower = strtolower($value);
+    $invalid = [
+        '',
+        'unknown',
+        'localhost',
+        'localhost.localdomain',
+        'raspberrypi',
+        'edudisplej'
+    ];
+
+    if (in_array($lower, $invalid, true)) {
+        return v1_hostname_from_mac($mac);
+    }
+
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$/', $value)) {
+        return v1_hostname_from_mac($mac);
+    }
+
+    return $value;
+}
+
 try {
     $conn = getDbConnection();
     v1_ensure_debug_mode_column($conn);
@@ -164,8 +195,8 @@ try {
     // -----------------------------------------------------------------------
     // 1. Identify kiosk
     // -----------------------------------------------------------------------
-    $mac      = $data['mac']      ?? '';
-    $hostname = $data['hostname'] ?? '';
+    $mac      = (string)($data['mac'] ?? '');
+    $hostname = v1_normalize_hostname((string)($data['hostname'] ?? ''), $mac);
 
     if (empty($mac)) {
         $response['message'] = 'MAC address required';

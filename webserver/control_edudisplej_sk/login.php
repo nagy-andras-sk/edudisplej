@@ -7,19 +7,57 @@
 
 session_start();
 require_once 'dbkonfiguracia.php';
+require_once __DIR__ . '/admin/db_autofix_bootstrap.php';
 require_once 'logging.php';
 require_once 'i18n.php';
 require_once 'auth_roles.php';
+require_once 'security_config.php';
+require_once 'email_helper.php';
+
+$script_name = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+if (preg_match('~/login\.php$~i', $script_name)) {
+    $base_dir = rtrim(dirname($script_name), '/');
+    if ($base_dir === '.' || $base_dir === '/') {
+        $base_dir = '';
+    }
+    $qs = $_SERVER['QUERY_STRING'] ?? '';
+    $target = $base_dir . '/login';
+    if ($qs !== '') {
+        $target .= '?' . $qs;
+    }
+    header('Location: ' . $target, true, 302);
+    exit();
+}
+
+$script_name_for_base = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+$base_prefix = preg_replace('~/login(?:/index\.php)?$~i', '', $script_name_for_base);
+$base_prefix = rtrim((string)$base_prefix, '/');
+if ($base_prefix === '.' || $base_prefix === '/') {
+    $base_prefix = '';
+}
+$base_href = $base_prefix === '' ? '/' : ($base_prefix . '/');
+$login_path = $base_prefix . '/login';
+$admin_dashboard_path = $base_prefix . '/admin/dashboard.php';
+$easy_user_dashboard_path = $base_prefix . '/dashboard/easy_user/';
+$default_dashboard_path = $base_prefix . '/dashboard/index.php';
 
 $current_lang = edudisplej_apply_language_preferences();
 
 $error = '';
 $success = '';
+$view = 'login';
+$token_param = trim($_GET['token'] ?? '');
+
+if ($token_param !== '') {
+    $view = 'reset_apply';
+} elseif (isset($_GET['reset'])) {
+    $view = 'reset_request';
+}
 
 // Handle logout
 if (isset($_GET['logout'])) {
     session_destroy();
-    header('Location: login.php');
+    header('Location: ' . $login_path);
     exit();
 }
 
@@ -27,17 +65,144 @@ if (isset($_GET['logout'])) {
 if (isset($_SESSION['user_id']) && isset($_SESSION['username'])) {
     // Redirect based on role
     if (isset($_SESSION['isadmin']) && $_SESSION['isadmin']) {
-        header('Location: admin/dashboard.php');
+        header('Location: ' . $admin_dashboard_path);
     } elseif (edudisplej_get_session_role() === 'easy_user') {
-        header('Location: dashboard/easy_user.php');
+        header('Location: ' . $easy_user_dashboard_path);
     } else {
-        header('Location: dashboard/index.php');
+        header('Location: ' . $default_dashboard_path);
     }
     exit();
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $form_action = $_POST['form_action'] ?? '';
+
+    if ($form_action === 'request_reset') {
+        $view = 'reset_request';
+        $email = trim($_POST['reset_email'] ?? '');
+
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = t_def('password_reset.error.invalid_email', 'Érvényes email cím szükséges.');
+        } else {
+            try {
+                $conn = getDbConnection();
+
+                $stmt = $conn->prepare("SELECT id, username FROM users WHERE email = ?");
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $user = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                if ($user) {
+                    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM password_reset_tokens WHERE user_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR) AND used_at IS NULL");
+                    $stmt->bind_param("i", $user['id']);
+                    $stmt->execute();
+                    $cnt = (int)($stmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+                    $stmt->close();
+
+                    if ($cnt >= 3) {
+                        $error = t_def('password_reset.error.rate_limit', 'Túl sok jelszó-visszaállítási kérés. Próbálja újra egy óra múlva.');
+                    } else {
+                        $plain_token = bin2hex(random_bytes(32));
+                        $token_hash  = hash('sha256', $plain_token);
+                        $expires_at  = date('Y-m-d H:i:s', time() + 3600);
+                        $ip          = $_SERVER['REMOTE_ADDR'] ?? '';
+
+                        $stmt = $conn->prepare("INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, ip_address) VALUES (?,?,?,?)");
+                        $stmt->bind_param("isss", $user['id'], $token_hash, $expires_at, $ip);
+                        $stmt->execute();
+                        $stmt->close();
+
+                        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                        $reset_link = $scheme . '://' . $host . $login_path . '?token=' . urlencode($plain_token);
+
+                        send_email_from_template('password_reset', $email, $user['username'], [
+                            'name'       => $user['username'],
+                            'reset_link' => $reset_link,
+                            'site_name'  => 'EduDisplej',
+                        ], $current_lang);
+
+                        log_security_event('password_reset_request', $user['id'], $user['username'], $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', ['email' => $email]);
+                    }
+                }
+
+                closeDbConnection($conn);
+
+                if (empty($error)) {
+                    $success = t_def('password_reset.success.requested', 'Ha az email cím regisztrált, hamarosan kap egy visszaállítási linket.');
+                    $view = 'reset_done';
+                }
+            } catch (Exception $e) {
+                error_log('login request_reset error: ' . $e->getMessage());
+                $error = t_def('password_reset.error.server', 'Szerverhiba. Kérjük, próbálja újra.');
+            }
+        }
+    } elseif ($form_action === 'apply_reset') {
+        $view = 'reset_apply';
+        $token_val = trim($_POST['token'] ?? '');
+        $new_pass = $_POST['new_password'] ?? '';
+        $confirm_pass = $_POST['confirm_password'] ?? '';
+        $token_param = $token_val;
+
+        if (empty($token_val)) {
+            $error = t_def('password_reset.error.invalid_token', 'Érvénytelen token.');
+        } elseif (strlen($new_pass) < 8) {
+            $error = t_def('password_reset.error.password_short', 'A jelszónak legalább 8 karakter hosszúnak kell lennie.');
+        } elseif ($new_pass !== $confirm_pass) {
+            $error = t_def('password_reset.error.password_mismatch', 'A jelszavak nem egyeznek.');
+        } else {
+            try {
+                $conn = getDbConnection();
+                $token_hash = hash('sha256', $token_val);
+
+                $stmt = $conn->prepare("SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at, u.username FROM password_reset_tokens prt JOIN users u ON u.id = prt.user_id WHERE prt.token_hash = ?");
+                $stmt->bind_param("s", $token_hash);
+                $stmt->execute();
+                $token_row = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                if (!$token_row) {
+                    $error = t_def('password_reset.error.token_expired', 'Érvénytelen vagy lejárt token.');
+                } elseif ($token_row['used_at'] !== null) {
+                    $error = t_def('password_reset.error.token_used', 'Ez a link már fel lett használva.');
+                } elseif (strtotime($token_row['expires_at']) < time()) {
+                    $error = t_def('password_reset.error.token_expired_request_new', 'A link lejárt. Kérjen újat.');
+                } else {
+                    $hashed_pass = password_hash($new_pass, PASSWORD_BCRYPT);
+                    $uid = (int)$token_row['user_id'];
+
+                    $stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+                    $stmt->bind_param("si", $hashed_pass, $uid);
+                    $stmt->execute();
+                    $stmt->close();
+
+                    $used_now = date('Y-m-d H:i:s');
+                    $tid = (int)$token_row['id'];
+                    $stmt = $conn->prepare("UPDATE password_reset_tokens SET used_at = ? WHERE id = ?");
+                    $stmt->bind_param("si", $used_now, $tid);
+                    $stmt->execute();
+                    $stmt->close();
+
+                    log_security_event('password_reset_success', $uid, $token_row['username'], $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', []);
+
+                    $success = t_def('password_reset.success.changed', 'Jelszava sikeresen megváltozott. Most bejelentkezhet.');
+                    $view = 'reset_done';
+                    $token_param = '';
+                }
+
+                closeDbConnection($conn);
+            } catch (Exception $e) {
+                error_log('login apply_reset error: ' . $e->getMessage());
+                $error = t_def('password_reset.error.server', 'Szerverhiba. Kérjük, próbálja újra.');
+            }
+        }
+    }
+}
+
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
+    $view = 'login';
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $otp_code = trim($_POST['otp_code'] ?? '');
@@ -51,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             edudisplej_ensure_user_role_column($conn);
             
             // Get user with OTP settings
-            $stmt = $conn->prepare("SELECT id, username, email, password, isadmin, user_role, company_id, otp_enabled, otp_secret, otp_verified, lang FROM users WHERE email = ?");
+            $stmt = $conn->prepare("SELECT id, username, email, password, isadmin, user_role, company_id, otp_enabled, otp_secret, otp_verified, backup_codes, lang FROM users WHERE email = ?");
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -142,11 +307,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                         
                                         // Redirect based on role
                                         if ($user['isadmin']) {
-                                            header('Location: admin/dashboard.php');
+                                            header('Location: ' . $admin_dashboard_path);
                                         } elseif (edudisplej_normalize_user_role($user['user_role'] ?? null, false) === 'easy_user') {
-                                            header('Location: dashboard/easy_user.php');
+                                            header('Location: ' . $easy_user_dashboard_path);
                                         } else {
-                                            header('Location: dashboard/index.php');
+                                            header('Location: ' . $default_dashboard_path);
                                         }
                                         exit();
                                     } else {
@@ -183,11 +348,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         
                         // Redirect based on role
                         if ($user['isadmin']) {
-                            header('Location: admin/dashboard.php');
+                            header('Location: ' . $admin_dashboard_path);
                         } elseif (edudisplej_normalize_user_role($user['user_role'] ?? null, false) === 'easy_user') {
-                            header('Location: dashboard/easy_user.php');
+                            header('Location: ' . $easy_user_dashboard_path);
                         } else {
-                            header('Location: dashboard/index.php');
+                            header('Location: ' . $default_dashboard_path);
                         }
                         exit();
                     }
@@ -217,6 +382,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="<?php echo htmlspecialchars($base_href); ?>">
     <title><?php echo htmlspecialchars(t('login.title')); ?></title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style>
@@ -239,24 +405,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         .login-container {
             background: white;
             padding: 50px 40px;
-                    .lang-selector {
-                        display: flex;
-                        justify-content: flex-end;
-                        margin-bottom: 20px;
-                        font-size: 12px;
-                    }
-
-                    .lang-selector select {
-                        padding: 6px 8px;
-                        border: 1px solid #d9dde2;
-                        border-radius: 4px;
-                        font-size: 12px;
-                    }
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             max-width: 450px;
             width: 100%;
             animation: slideUp 0.5s ease;
+        }
+
+        .lang-selector {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .lang-selector select {
+            padding: 6px 8px;
+            border: 1px solid #d9dde2;
+            border-radius: 4px;
+            font-size: 12px;
         }
         
         @keyframes slideUp {
@@ -281,7 +448,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             margin-bottom: 10px;
         }
         
-        .login-header h1 {
+        .login-header p {
             color: #666;
             font-size: 14px;
         }
@@ -405,16 +572,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             color: #0369a1;
         }
         
-        .info-box {
-            background: #f0f4ff;
-            border: 1px solid #1e40af;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 30px;
-            font-size: 12px;
-            color: #555;
-            line-height: 1.6;
-        }
     </style>
 </head>
 <body>
@@ -445,6 +602,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             </div>
         <?php endif; ?>
         
+        <?php if ($view === 'login'): ?>
         <form method="POST" action="" autocomplete="off">
             <div class="form-group">
                 <label for="email"><?php echo htmlspecialchars(t('login.email')); ?></label>
@@ -500,17 +658,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         </form>
         
         <div class="form-footer">
-            <p><a href="password_reset.php" style="color:#1e40af;font-size:13px;">Elfelejtette jelszavát?</a></p>
-            <p><?php echo htmlspecialchars(t('login.no_account')); ?></p>
-            <a href="userregistration.php"><?php echo htmlspecialchars(t('login.create_account')); ?></a>
+            <p><a href="<?php echo htmlspecialchars($login_path); ?>?reset=1" style="color:#1e40af;font-size:13px;"><?php echo htmlspecialchars(t_def('login.forgot_password', 'Elfelejtette jelszavát?')); ?></a></p>
+            <p><?php echo htmlspecialchars(t_def('login.account_admin_only', 'Új fiókot csak adminisztrátor hozhat létre.')); ?></p>
         </div>
+        <?php elseif ($view === 'reset_apply'): ?>
+        <form method="POST" action="" autocomplete="off">
+            <input type="hidden" name="form_action" value="apply_reset">
+            <input type="hidden" name="token" value="<?php echo htmlspecialchars($token_param); ?>">
+            <div class="form-group">
+                <label for="new_password"><?php echo htmlspecialchars(t_def('password_reset.new_password', 'Új jelszó')); ?></label>
+                <input type="password" id="new_password" name="new_password" minlength="8" required autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="confirm_password"><?php echo htmlspecialchars(t_def('password_reset.confirm_password', 'Jelszó megerősítése')); ?></label>
+                <input type="password" id="confirm_password" name="confirm_password" minlength="8" required autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn-submit"><?php echo htmlspecialchars(t_def('password_reset.submit_new_password', 'Jelszó megváltoztatása')); ?></button>
+        </form>
+        <div class="form-footer">
+            <p><a href="<?php echo htmlspecialchars($login_path); ?>" style="color:#1e40af;font-size:13px;"><?php echo htmlspecialchars(t_def('password_reset.back_to_login', '← Vissza a bejelentkezéshez')); ?></a></p>
+        </div>
+        <?php elseif ($view === 'reset_done'): ?>
+        <div class="success">✓ <?php echo htmlspecialchars($success); ?></div>
+        <div class="form-footer">
+            <p><a href="<?php echo htmlspecialchars($login_path); ?>" style="color:#1e40af;font-size:13px;"><?php echo htmlspecialchars(t_def('password_reset.back_to_login', '← Vissza a bejelentkezéshez')); ?></a></p>
+        </div>
+        <?php else: ?>
+        <form method="POST" action="" autocomplete="off">
+            <input type="hidden" name="form_action" value="request_reset">
+            <div class="form-group">
+                <label for="reset_email"><?php echo htmlspecialchars(t_def('password_reset.email', 'Email cím')); ?></label>
+                <input type="email" id="reset_email" name="reset_email" placeholder="<?php echo htmlspecialchars(t_def('password_reset.email_placeholder', 'Add meg az emailed')); ?>" required autofocus autocomplete="email">
+            </div>
+            <button type="submit" class="btn-submit"><?php echo htmlspecialchars(t_def('password_reset.send_link', 'Visszaállítási link küldése')); ?></button>
+        </form>
+        <div class="form-footer">
+            <p><a href="<?php echo htmlspecialchars($login_path); ?>" style="color:#1e40af;font-size:13px;"><?php echo htmlspecialchars(t_def('password_reset.back_to_login', '← Vissza a bejelentkezéshez')); ?></a></p>
+        </div>
+        <?php endif; ?>
         
-        <div class="info-box">
-            <strong><?php echo htmlspecialchars(t('login.info_title')); ?></strong><br>
-            • <?php echo htmlspecialchars(t('login.info_admin')); ?><br>
-            • <?php echo htmlspecialchars(t('login.info_user')); ?><br>
-            • <?php echo htmlspecialchars(t('login.info_last_login')); ?>
-        </div>
     </div>
     <script>
         function changeLanguage(lang) {

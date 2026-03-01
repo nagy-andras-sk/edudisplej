@@ -28,12 +28,43 @@ function parse_unix_timestamp($value) {
     return $ts ? $ts : null;
 }
 
+function legacy_hostname_from_mac(string $mac): string {
+    $mac_clean = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+    if (strlen($mac_clean) >= 6) {
+        return 'edudisplej-' . substr($mac_clean, -6);
+    }
+    return 'edudisplej';
+}
+
+function legacy_normalize_hostname(string $hostname, string $mac): string {
+    $value = trim($hostname);
+    $lower = strtolower($value);
+    $invalid = [
+        '',
+        'unknown',
+        'localhost',
+        'localhost.localdomain',
+        'raspberrypi',
+        'edudisplej'
+    ];
+
+    if (in_array($lower, $invalid, true)) {
+        return legacy_hostname_from_mac($mac);
+    }
+
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$/', $value)) {
+        return legacy_hostname_from_mac($mac);
+    }
+
+    return $value;
+}
+
 try {
     // Get request data
     $data = json_decode(file_get_contents('php://input'), true);
     
-    $mac = $data['mac'] ?? '';
-    $hostname = $data['hostname'] ?? '';
+    $mac = (string)($data['mac'] ?? '');
+    $hostname = legacy_normalize_hostname((string)($data['hostname'] ?? ''), $mac);
     $hw_info = json_encode($data['hw_info'] ?? []);
     $public_ip = $_SERVER['REMOTE_ADDR'] ?? '';
     $client_last_update = $data['last_update'] ?? null; // Timestamp from kiosk's loop.json

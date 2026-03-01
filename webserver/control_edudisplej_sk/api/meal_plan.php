@@ -129,6 +129,17 @@ function edudisplej_meal_plan_generate_external_key(string $institutionName, str
     return '__auto__' . $base . '-' . substr(sha1($institutionName . '|' . $city . '|' . microtime(true) . '|' . random_int(1000, 9999)), 0, 12);
 }
 
+function edudisplej_meal_plan_institution_unique_key(array $row): string {
+    $external = strtolower(trim((string)($row['external_key'] ?? '')));
+    if ($external !== '') {
+        return 'ext:' . $external;
+    }
+
+    $name = strtolower(trim((string)($row['institution_name'] ?? '')));
+    $city = strtolower(trim((string)($row['city'] ?? '')));
+    return 'name:' . $name . '|' . $city;
+}
+
 $action = strtolower(trim((string)($_REQUEST['action'] ?? 'sites')));
 
 try {
@@ -182,13 +193,20 @@ try {
             exit();
         }
 
-        $stmt = $conn->prepare("SELECT id, institution_name, city, external_key FROM meal_plan_institutions WHERE site_id = ? AND is_active = 1 AND (company_id = 0 OR company_id = ?) ORDER BY institution_name ASC");
+        $stmt = $conn->prepare("SELECT id, company_id, institution_name, city, external_key FROM meal_plan_institutions WHERE site_id = ? AND is_active = 1 AND (company_id = 0 OR company_id = ?) ORDER BY company_id DESC, institution_name ASC");
         $stmt->bind_param('ii', $site_id, $company_id);
         $stmt->execute();
         $result = $stmt->get_result();
 
         $items = [];
+        $seen = [];
         while ($row = $result->fetch_assoc()) {
+            $uniqueKey = edudisplej_meal_plan_institution_unique_key($row);
+            if (isset($seen[$uniqueKey])) {
+                continue;
+            }
+            $seen[$uniqueKey] = true;
+
             $items[] = [
                 'id' => (int)$row['id'],
                 'institution_name' => (string)$row['institution_name'],
@@ -213,9 +231,14 @@ try {
         $source_type_raw = strtolower(trim((string)($_GET['source_type'] ?? $_POST['source_type'] ?? $_GET['source'] ?? $_POST['source'] ?? '')));
         $source_type = in_array($source_type_raw, ['manual', 'server'], true) ? $source_type_raw : '';
 
+        $emptyMeta = [
+            'server_data_available' => false,
+            'pending_server_sync' => false,
+        ];
+
         if ($institution_id <= 0 || $site_key === '' || !edudisplej_meal_plan_is_allowed_site_key($site_key)) {
             closeDbConnection($conn);
-            echo json_encode(['success' => true, 'data' => ['institution_name' => '', 'menu_date' => $date_value, 'meals' => []]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            echo json_encode(['success' => true, 'data' => ['institution_name' => '', 'menu_date' => $date_value, 'meals' => []], 'meta' => $emptyMeta], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit();
         }
 
@@ -233,8 +256,21 @@ try {
 
         if (!$inst) {
             closeDbConnection($conn);
-            echo json_encode(['success' => true, 'data' => ['institution_name' => '', 'menu_date' => $date_value, 'meals' => []]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            echo json_encode(['success' => true, 'data' => ['institution_name' => '', 'menu_date' => $date_value, 'meals' => []], 'meta' => $emptyMeta], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit();
+        }
+
+        $serverDataAvailable = false;
+        $availability_stmt = $conn->prepare("SELECT id FROM meal_plan_items
+                                            WHERE institution_id = ?
+                                              AND (company_id = 0 OR company_id = ?)
+                                              AND source_type IN ('server', 'auto_jedalen')
+                                            LIMIT 1");
+        if ($availability_stmt) {
+            $availability_stmt->bind_param('ii', $institution_id, $company_id);
+            $availability_stmt->execute();
+            $serverDataAvailable = (bool)$availability_stmt->get_result()->fetch_assoc();
+            $availability_stmt->close();
         }
 
                 $menu_stmt = $conn->prepare("SELECT menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type, updated_at
@@ -373,8 +409,13 @@ try {
             'updated_at' => (string)($menu['updated_at'] ?? ''),
         ];
 
+        $meta = [
+            'server_data_available' => $serverDataAvailable,
+            'pending_server_sync' => ($source_type === 'server' && !$serverDataAvailable),
+        ];
+
         closeDbConnection($conn);
-        echo json_encode(['success' => true, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        echo json_encode(['success' => true, 'data' => $data, 'meta' => $meta], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit();
     }
 

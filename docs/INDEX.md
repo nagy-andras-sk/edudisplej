@@ -200,6 +200,41 @@ Ez a teljes audit a **EduDisplej Control Panel** biztonsági és teljesítmény 
 
 ---
 
+### 8. 🕒 [CLOCK_SVG_MODULE_GUIDE.md](CLOCK_SVG_MODULE_GUIDE.md)
+**Olvasási idő:** 8-12 perc  
+**Típus:** Technikai modul dokumentáció
+
+🎯 **Clock modul SVG működése és szerkesztési útmutató**
+
+**Tartalma:**
+- ✅ analóg óra SVG koordináta-rendszere
+- ✅ mutatók mozgásának matematikája
+- ✅ másodperchatárhoz igazított időzítés magyarázata
+- ✅ digitális overlay (top/center/bottom/auto) működése
+- ✅ mit érdemes szerkeszteni és mit nem
+
+🛠️ **Ajánlott olvasmány, ha a clock modul megjelenését vagy logikáját módosítod.**
+
+---
+
+### 9. 🧱 [MODULE_STRUCTURAL_SPLIT_EXAMPLE.md](MODULE_STRUCTURAL_SPLIT_EXAMPLE.md)
+**Olvasási idő:** 6-10 perc  
+**Típus:** Fejlesztési mintadokumentáció
+
+🎯 **Valós példa arra, hogyan történjen a modulok strukturált réteges módosítása**
+
+**Tartalma:**
+- ✅ admin konfigurációs réteg szerepe (`app.js`)
+- ✅ runtime renderer réteg szerepe (`m_meal_menu.html`)
+- ✅ API/adatréteg szerepe és deduplikáció
+- ✅ az étrend modulon végzett valós módosítások bontása
+- ✅ a felosztás gyakorlati előnyei (gyorsabb hibakeresés, kisebb regresszió)
+- ✅ javasolt fejlesztői minta új modulokhoz
+
+🧩 **Ajánlott olvasmány minden modulfejlesztőnek és karbantartónak.**
+
+---
+
 ## 🗺️ DOKUMENTUM VÁLASZTÁSI FÁ
 
 ```

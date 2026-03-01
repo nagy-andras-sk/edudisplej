@@ -18,6 +18,7 @@ $success = '';
 
 $allowed_keys  = ['password_reset', 'mfa_enabled', 'mfa_disabled', 'license_expiring', 'welcome'];
 $allowed_langs = ['hu', 'en', 'sk'];
+$base_layout_html = get_email_base_layout_html();
 
 // Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -47,6 +48,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = 'Template saved.';
             } catch (Exception $e) {
                 $error = 'Hiba: ' . htmlspecialchars($e->getMessage());
+            }
+        }
+    } elseif ($action === 'save_layout') {
+        $layout_html = $_POST['email_base_layout_html'] ?? '';
+        if (trim($layout_html) === '' || strpos($layout_html, '{{content}}') === false) {
+            $error = 'Layout cannot be empty and must contain {{content}} placeholder.';
+        } else {
+            try {
+                $conn = getDbConnection();
+                $k = 'email_base_layout_html';
+                $enc = 0;
+                $stmt = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value, is_encrypted) VALUES (?,?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value), is_encrypted=VALUES(is_encrypted)");
+                $stmt->bind_param("ssi", $k, $layout_html, $enc);
+                $stmt->execute();
+                $stmt->close();
+                closeDbConnection($conn);
+                $base_layout_html = $layout_html;
+                $success = 'Base email layout saved.';
+            } catch (Exception $e) {
+                $error = 'Layout save error: ' . htmlspecialchars($e->getMessage());
             }
         }
     } elseif ($action === 'delete') {
@@ -224,6 +245,19 @@ require_once 'header.php';
         <?php if ($edit_template): ?>
             <a href="email_templates.php" class="btn btn-secondary">Cancel</a>
         <?php endif; ?>
+    </form>
+</div>
+
+<div class="panel" style="margin-top:20px;">
+    <div class="panel-title">Base HTML Layout</div>
+    <p class="muted" style="margin-bottom:8px;">Use placeholders: <code>{{subject}}</code>, <code>{{content}}</code>, <code>{{site_name}}</code>. Every HTML email is wrapped into this layout.</p>
+    <form method="POST" action="email_templates.php">
+        <input type="hidden" name="action" value="save_layout">
+        <div class="form-field">
+            <label>Layout HTML</label>
+            <textarea name="email_base_layout_html" rows="14" style="width:100%;font-family:monospace;font-size:13px;" required><?php echo htmlspecialchars($base_layout_html); ?></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Save layout</button>
     </form>
 </div>
 

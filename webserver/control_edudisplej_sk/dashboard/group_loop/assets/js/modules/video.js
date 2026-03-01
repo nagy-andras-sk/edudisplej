@@ -2,7 +2,17 @@ const GroupLoopVideoModule = (() => {
     'use strict';
 
     const MAX_LIBRARY_ITEMS = 200;
+    const VIDEO_MAX_OUTPUT_SIZE_BYTES = 25 * 1024 * 1024;
+    const VIDEO_MAX_DURATION_SEC = 120;
+    const VIDEO_MAX_WIDTH = 1280;
+    const VIDEO_MAX_HEIGHT = 720;
+    const VIDEO_MAX_INPUT_SIZE_BYTES = 700 * 1024 * 1024;
+    const FFMPEG_SCRIPT_URL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+    const FFMPEG_CORE_JS_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js';
+    const FFMPEG_CORE_WASM_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm';
+
     let globalDropGuardsCleanup = null;
+    let ffmpegInstancePromise = null;
 
     const parseIntSafe = (value, fallback) => {
         const parsed = parseInt(value, 10);
@@ -24,7 +34,7 @@ const GroupLoopVideoModule = (() => {
         return `${size.toFixed(1)} ${units[unitIndex]}`;
     };
 
-    const getDurationFromFile = (file) => {
+    const getVideoMetadataFromFile = (file) => {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
             video.preload = 'metadata';
@@ -39,8 +49,10 @@ const GroupLoopVideoModule = (() => {
 
             video.onloadedmetadata = () => {
                 const duration = Math.max(1, Math.ceil(Number(video.duration) || 0));
+                const width = Math.max(1, parseInt(video.videoWidth || 0, 10) || 0);
+                const height = Math.max(1, parseInt(video.videoHeight || 0, 10) || 0);
                 cleanup();
-                resolve(duration);
+                resolve({ duration, width, height });
             };
             video.onerror = () => {
                 cleanup();
@@ -49,6 +61,134 @@ const GroupLoopVideoModule = (() => {
 
             video.src = objectUrl;
         });
+    };
+
+    const getDurationFromFile = async (file) => {
+        const meta = await getVideoMetadataFromFile(file);
+        return meta.duration;
+    };
+
+    const loadScriptOnce = (url, globalKey) => {
+        return new Promise((resolve, reject) => {
+            if (window[globalKey]) {
+                resolve();
+                return;
+            }
+
+            const existing = document.querySelector(`script[data-runtime="${globalKey}"]`);
+            if (existing) {
+                existing.addEventListener('load', () => resolve(), { once: true });
+                existing.addEventListener('error', () => reject(new Error(`Nem tölthető be: ${url}`)), { once: true });
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = url;
+            script.async = true;
+            script.defer = true;
+            script.setAttribute('data-runtime', globalKey);
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Nem tölthető be: ${url}`));
+            document.head.appendChild(script);
+        });
+    };
+
+    const getFfmpeg = async (setStatus) => {
+        if (!ffmpegInstancePromise) {
+            ffmpegInstancePromise = (async () => {
+                setStatus?.('Konvertáló motor letöltése...');
+                await loadScriptOnce(FFMPEG_SCRIPT_URL, 'FFmpegWASM');
+
+                if (!window.FFmpegWASM?.FFmpeg) {
+                    throw new Error('FFmpeg WebAssembly nem érhető el');
+                }
+
+                const ffmpeg = new window.FFmpegWASM.FFmpeg();
+                setStatus?.('Konvertáló motor inicializálása...');
+                await ffmpeg.load({
+                    coreURL: FFMPEG_CORE_JS_URL,
+                    wasmURL: FFMPEG_CORE_WASM_URL
+                });
+                return ffmpeg;
+            })();
+        }
+
+        return ffmpegInstancePromise;
+    };
+
+    const isLikelyVideoFile = (file) => {
+        const type = String(file?.type || '').toLowerCase();
+        const ext = (String(file?.name || '').split('.').pop() || '').toLowerCase();
+        const allowedExt = new Set(['mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v']);
+        return type.startsWith('video/') || allowedExt.has(ext);
+    };
+
+    const getBaseFilename = (name) => String(name || 'video').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_') || 'video';
+
+    const transcodeVideoForDisplay = async (file, setStatus) => {
+        if (!isLikelyVideoFile(file)) {
+            throw new Error('Csak videófájl választható.');
+        }
+
+        if ((file.size || 0) <= 0) {
+            throw new Error('A kiválasztott fájl üres.');
+        }
+
+        if ((file.size || 0) > VIDEO_MAX_INPUT_SIZE_BYTES) {
+            throw new Error('A forrásvideó túl nagy a böngészős konvertáláshoz (max 700 MB).');
+        }
+
+        const ffmpeg = await getFfmpeg(setStatus);
+        const sourceExt = (String(file.name || 'input.bin').split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'bin';
+        const inputName = `input_${Date.now()}.${sourceExt}`;
+        const outputName = `output_${Date.now()}.mp4`;
+
+        try {
+            setStatus?.('Videó konvertálása (ez eltarthat pár percig)...');
+            const inputData = new Uint8Array(await file.arrayBuffer());
+            await ffmpeg.writeFile(inputName, inputData);
+
+            await ffmpeg.exec([
+                '-i', inputName,
+                '-map', '0:v:0',
+                '-map', '0:a:0?',
+                '-vf', `scale=w=${VIDEO_MAX_WIDTH}:h=${VIDEO_MAX_HEIGHT}:force_original_aspect_ratio=decrease,fps=30`,
+                '-t', String(VIDEO_MAX_DURATION_SEC),
+                '-c:v', 'libx264',
+                '-preset', 'veryfast',
+                '-profile:v', 'baseline',
+                '-level', '3.1',
+                '-pix_fmt', 'yuv420p',
+                '-crf', '28',
+                '-movflags', '+faststart',
+                '-c:a', 'aac',
+                '-b:a', '96k',
+                '-ac', '2',
+                '-ar', '44100',
+                outputName
+            ]);
+
+            const outputData = await ffmpeg.readFile(outputName);
+            const outputBlob = new Blob([outputData], { type: 'video/mp4' });
+            if (outputBlob.size <= 0) {
+                throw new Error('A konvertált videó üres lett.');
+            }
+
+            if (outputBlob.size > VIDEO_MAX_OUTPUT_SIZE_BYTES) {
+                throw new Error('A konvertált videó túl nagy (max 25 MB).');
+            }
+
+            return new File(
+                [outputBlob],
+                `${getBaseFilename(file.name)}_optimized.mp4`,
+                { type: 'video/mp4', lastModified: Date.now() }
+            );
+        } catch (error) {
+            throw new Error(error?.message || 'A kliens oldali konvertálás sikertelen');
+        } finally {
+            try { await ffmpeg.deleteFile(inputName); } catch (_) {}
+            try { await ffmpeg.deleteFile(outputName); } catch (_) {}
+        }
     };
 
     const getDurationFromUrl = (url) => {
@@ -171,6 +311,7 @@ const GroupLoopVideoModule = (() => {
         formData.append('group_id', String(groupId));
         formData.append('module_key', 'video');
         formData.append('asset_kind', 'video');
+        formData.append('client_processing', 'ffmpeg_wasm_v1');
         formData.append('asset', file, file.name || 'video.mp4');
 
         const response = await fetch('../../api/group_loop/module_asset_upload.php', {
@@ -188,23 +329,39 @@ const GroupLoopVideoModule = (() => {
 
     const handleVideoFile = async (file) => {
         const status = document.getElementById('video-upload-status');
-        const ext = (String(file?.name || '').split('.').pop() || '').toLowerCase();
-        if (ext !== 'mp4') {
-            alert('Csak MP4 fájl tölthető fel.');
-            return;
-        }
-
-        if ((file.size || 0) > 80 * 1024 * 1024) {
-            alert('A videó túl nagy (max 80 MB).');
+        if (!isLikelyVideoFile(file)) {
+            alert('Csak videófájl tölthető fel.');
             return;
         }
 
         try {
-            if (status) status.textContent = 'Metaadat olvasás...';
-            const durationSec = await getDurationFromFile(file);
+            if (status) status.textContent = 'Kliens oldali optimalizálás indul...';
+
+            const optimizedFile = await transcodeVideoForDisplay(file, (message) => {
+                if (status) {
+                    status.textContent = message;
+                }
+            });
+
+            if (status) status.textContent = 'Konvertált videó ellenőrzése...';
+            const metadata = await getVideoMetadataFromFile(optimizedFile);
+            const durationSec = parseInt(metadata.duration || 0, 10);
+
+            if (!durationSec || durationSec > VIDEO_MAX_DURATION_SEC) {
+                throw new Error(`A konvertált videó hossza legfeljebb ${VIDEO_MAX_DURATION_SEC} mp lehet.`);
+            }
+
+            if ((metadata.width || 0) > VIDEO_MAX_WIDTH || (metadata.height || 0) > VIDEO_MAX_HEIGHT) {
+                throw new Error(`A konvertált videó felbontása legfeljebb ${VIDEO_MAX_WIDTH}×${VIDEO_MAX_HEIGHT} lehet.`);
+            }
+
+            if ((optimizedFile.size || 0) > VIDEO_MAX_OUTPUT_SIZE_BYTES) {
+                throw new Error('A konvertált videó túl nagy (max 25 MB).');
+            }
+
             if (status) status.textContent = 'Feltöltés...';
 
-            const uploaded = await uploadVideoAsset(file);
+            const uploaded = await uploadVideoAsset(optimizedFile);
             window.videoModuleSettings = {
                 ...(window.videoModuleSettings || {}),
                 videoAssetUrl: String(uploaded.asset_url || ''),
@@ -213,13 +370,13 @@ const GroupLoopVideoModule = (() => {
             };
 
             if (status) {
-                status.textContent = `Feltöltve: ${file.name} (${formatBytes(file.size || 0)}, ${durationSec}s)`;
+                status.textContent = `Feltöltve (optimalizált): ${optimizedFile.name} (${formatBytes(optimizedFile.size || 0)}, ${durationSec}s, ${metadata.width}×${metadata.height})`;
             }
             updatePreview();
             renderLibrary();
         } catch (error) {
             if (status) {
-                status.textContent = `Hiba: ${error?.message || 'ismeretlen hiba'}`;
+                status.textContent = `Hiba: ${error?.message || 'ismeretlen hiba'} (eredeti fájl nem került feltöltésre)`;
             }
         }
     };

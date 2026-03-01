@@ -7,6 +7,7 @@
 
 session_start();
 require_once '../dbkonfiguracia.php';
+require_once __DIR__ . '/../admin/db_autofix_bootstrap.php';
 require_once '../email_helper.php';
 
 header('Content-Type: application/json');
@@ -85,11 +86,15 @@ try {
             // Replace sample variables
             $sample = ['name' => 'Minta Felhasználó', 'reset_link' => 'https://example.com/reset?token=sample', 'site_name' => 'EduDisplej'];
             $html = $tpl['body_html'];
+            $subject = $tpl['subject'];
             foreach ($sample as $k => $v) {
-                $html = str_replace('{{' . $k . '}}', htmlspecialchars($v), $html);
+                $html = str_replace('{{' . $k . '}}', (string)$v, $html);
+                $subject = str_replace('{{' . $k . '}}', (string)$v, $subject);
             }
 
-            echo json_encode(['success' => true, 'html' => $html, 'subject' => $tpl['subject']]);
+            $html = render_email_html_with_layout($subject, $html, $sample);
+
+            echo json_encode(['success' => true, 'html' => $html, 'subject' => $subject]);
             break;
 
         case 'test_send':

@@ -186,6 +186,37 @@ function assign_highest_priority_group(mysqli $conn, int $kiosk_id, int $company
     ];
 }
 
+function registration_hostname_from_mac(string $mac): string {
+    $mac_clean = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+    if (strlen($mac_clean) >= 6) {
+        return 'edudisplej-' . substr($mac_clean, -6);
+    }
+    return 'edudisplej';
+}
+
+function registration_normalize_hostname(string $hostname, string $mac): string {
+    $value = trim($hostname);
+    $lower = strtolower($value);
+    $invalid = [
+        '',
+        'unknown',
+        'localhost',
+        'localhost.localdomain',
+        'raspberrypi',
+        'edudisplej'
+    ];
+
+    if (in_array($lower, $invalid, true)) {
+        return registration_hostname_from_mac($mac);
+    }
+
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$/', $value)) {
+        return registration_hostname_from_mac($mac);
+    }
+
+    return $value;
+}
+
 try {
     add_debug('timestamp', date('Y-m-d H:i:s'));
     add_debug('php_version', PHP_VERSION);
@@ -223,8 +254,8 @@ try {
     add_debug('data_keys', array_keys($data));
     
     // Step 3: Extract parameters
-    $mac = $data['mac'] ?? '';
-    $hostname = $data['hostname'] ?? '';
+    $mac = (string)($data['mac'] ?? '');
+    $hostname = registration_normalize_hostname((string)($data['hostname'] ?? ''), $mac);
     $hw_info = json_encode($data['hw_info'] ?? []);
     $public_ip = $_SERVER['REMOTE_ADDR'] ?? '';
     

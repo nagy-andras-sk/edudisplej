@@ -25,7 +25,7 @@ $session_role = edudisplej_get_session_role();
 $can_edit_kiosk_details = true;
 
 if ($session_role === 'easy_user') {
-    header('Location: easy_user.php');
+    header('Location: easy_user/');
     exit();
 }
 
@@ -109,14 +109,24 @@ try {
             }
         }
         $server_loop_version = $row['group_server_loop_version'] ?: $row['kiosk_server_loop_version'];
+        $kiosk_loop_ts = edudisplej_parse_loop_version_timestamp($kiosk_loop_version);
+        $server_loop_ts = edudisplej_parse_loop_version_timestamp($server_loop_version);
+        $server_loop_is_newer = false;
+        if ($kiosk_loop_version !== null && !empty($server_loop_version) && $kiosk_loop_version !== $server_loop_version) {
+            if ($kiosk_loop_ts !== null && $server_loop_ts !== null) {
+                $server_loop_is_newer = $server_loop_ts > $kiosk_loop_ts;
+            } else {
+                $server_loop_is_newer = strcmp((string)$server_loop_version, (string)$kiosk_loop_version) > 0;
+            }
+        }
+
         $loop_version_mismatch_raw = (
             $row['status'] !== 'offline'
             && $kiosk_loop_version !== null
             && !empty($server_loop_version)
-            && $kiosk_loop_version !== $server_loop_version
+            && $server_loop_is_newer
         );
 
-        $server_loop_ts = edudisplej_parse_loop_version_timestamp($server_loop_version);
         $loop_update_grace_active = (
             $loop_version_mismatch_raw
             && $server_loop_ts !== null

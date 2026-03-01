@@ -10,8 +10,9 @@ if [ -z "${PHP_BIN:-}" ]; then
   exit 1
 fi
 
-CRON_LINE="*/5 * * * * ${PHP_BIN} ${SCRIPT_DIR}/run_maintenance.php >> ${PROJECT_ROOT}/logs/maintenance-cron.log 2>&1"
+UNIFIED_CRON_LINE="*/5 * * * * ${PHP_BIN} ${PROJECT_ROOT}/cron.php --maintenance-min-interval-minutes=15 --email-min-interval-minutes=5 --email-limit=50 >> ${PROJECT_ROOT}/logs/maintenance-cron.log 2>&1"
 
-( crontab -l 2>/dev/null | grep -v "run_maintenance.php"; echo "$CRON_LINE" ) | crontab -
+( crontab -l 2>/dev/null | grep -v "run_maintenance.php" | grep -v "run_email_queue.php"; echo "$UNIFIED_CRON_LINE" ) | crontab -
 
-echo "[OK] Installed cron job: $CRON_LINE"
+echo "[OK] Installed unified cron job:"
+echo "  - $UNIFIED_CRON_LINE"

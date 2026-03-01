@@ -3,376 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clock & Time - EduDisplej</title>
+    <title>Clock - EduDisplej</title>
     <style>
-        * {
+        * { box-sizing: border-box; }
+        html, body {
             margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
-            margin: 0;
-            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        .clock-container {
-            text-align: center;
-            max-width: 100%;
-            max-height: 100%;
+        body {
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            background: #000;
         }
-        
-        /* Digital Clock */
-        .digital-clock {
-            font-weight: bold;
-            line-height: 1.1;
-            letter-spacing: 0.05em;
-            max-width: 100%;
-            word-wrap: break-word;
-        }
-        
-        .digital-time {
-            margin-bottom: 10px;
-        }
-
-        .digital-weekday {
-            opacity: 0.95;
-            margin-bottom: 6px;
-            font-weight: 700;
-        }
-        
-        .digital-date {
-            opacity: 0.8;
-        }
-        
-        /* Analog Clock */
-        .analog-clock {
+        #clock-root {
             position: relative;
-            border-radius: 50%;
-            border: 8px solid;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        
-        .analog-clock::before {
-            content: '';
+        #analog-svg {
+            display: block;
+            height: 100vh;
+            width: auto;
+            max-width: 100vw;
+        }
+        #digital-overlay {
             position: absolute;
-            top: 50%;
             left: 50%;
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
-        }
-        
-        .clock-hand {
-            position: absolute;
-            bottom: 50%;
-            left: 50%;
-            transform-origin: bottom center;
-            border-radius: 10px;
-        }
-        
-        .hour-hand {
-            width: 6px;
-            margin-left: -3px;
-            z-index: 3;
-        }
-        
-        .minute-hand {
-            width: 4px;
-            margin-left: -2px;
-            z-index: 2;
-        }
-        
-        .second-hand {
-            width: 2px;
-            margin-left: -1px;
-            z-index: 1;
-        }
-        
-        .clock-number {
-            position: absolute;
-            font-weight: bold;
-        }
-        
-        .analog-date {
-            margin-top: 8px;
-            font-weight: 600;
-        }
-
-        .analog-weekday {
-            margin-top: 20px;
+            transform: translateX(-50%);
             font-weight: 700;
-            opacity: 0.95;
+            line-height: 1;
+            letter-spacing: 0.03em;
+            text-align: center;
+            pointer-events: none;
+            user-select: none;
+            white-space: nowrap;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+        }
+        #digital-overlay.pos-top { top: 33%; }
+        #digital-overlay.pos-center { top: 50%; transform: translate(-50%, -50%); }
+        #digital-overlay.pos-bottom { top: 67%; }
+        #digital-full {
+            color: #fff;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0.04em;
+            text-align: center;
+            white-space: nowrap;
         }
     </style>
 </head>
 <body>
-    <div class="clock-container" id="clockContainer"></div>
-    
+    <div id="clock-root"></div>
+
     <script>
-        // Get settings from URL parameters or use defaults
-        const urlParams = new URLSearchParams(window.location.search);
-        
+        const params = new URLSearchParams(window.location.search);
         const settings = {
-            type: urlParams.get('type') || 'digital',           // 'digital' or 'analog'
-            format: urlParams.get('format') || '24h',           // '12h' or '24h'
-            dateFormat: urlParams.get('dateFormat') || 'dmy',   // 'full', 'short', 'dmy', 'numeric', 'none'
-            dateInline: urlParams.get('dateInline') === 'true',
-            weekdayPosition: (urlParams.get('weekdayPosition') || 'left') === 'right' ? 'right' : 'left',
-            timeColor: urlParams.get('timeColor') || '#ffffff',
-            dateColor: urlParams.get('dateColor') || '#ffffff',
-            bgColor: urlParams.get('bgColor') || '#000000',
-            fontSize: parseInt(urlParams.get('fontSize')) || 150,
-            timeFontSize: parseInt(urlParams.get('timeFontSize')) || parseInt(urlParams.get('fontSize')) || 150,
-            dateFontSize: parseInt(urlParams.get('dateFontSize')) || Math.max(18, Math.round((parseInt(urlParams.get('timeFontSize')) || parseInt(urlParams.get('fontSize')) || 150) * 0.32)),
-            clockSize: parseInt(urlParams.get('clockSize')) || 300,
-            showSeconds: urlParams.get('showSeconds') !== 'false',
-            showDate: urlParams.get('showDate') !== 'false',
-            language: urlParams.get('language') || 'sk'         // 'hu' | 'sk' | 'en'
+            type: (params.get('type') || 'analog').toLowerCase() === 'digital' ? 'digital' : 'analog',
+            format: (params.get('format') || '24h').toLowerCase() === '12h' ? '12h' : '24h',
+            timeColor: params.get('timeColor') || '#ffffff',
+            dateColor: params.get('dateColor') || '#ffffff',
+            bgColor: params.get('bgColor') || '#000000',
+            showSeconds: params.get('showSeconds') !== 'false',
+            timeFontSize: parseInt(params.get('timeFontSize'), 10) || parseInt(params.get('fontSize'), 10) || 150,
+            digitalOverlayEnabled: params.get('digitalOverlayEnabled') === 'true',
+            digitalOverlayPosition: (() => {
+                const value = String(params.get('digitalOverlayPosition') || 'auto').toLowerCase();
+                return ['auto', 'top', 'center', 'bottom'].includes(value) ? value : 'auto';
+            })()
         };
-        
-        // Set background color
+
         document.body.style.backgroundColor = settings.bgColor;
-        
-        // Auto-scale content to fit viewport
-        function scaleToFit() {
-            const container = document.getElementById('clockContainer');
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-            
-            // Calculate scale based on viewport
-            const scaleX = viewportWidth / 1920; // Base width
-            const scaleY = viewportHeight / 1080; // Base height
-            const scale = Math.min(scaleX, scaleY, 1);
-            
-            // Adjust font sizes if they would overflow
-            if (scale < 1) {
-                settings.fontSize = Math.floor(settings.fontSize * scale);
-                settings.clockSize = Math.floor(settings.clockSize * scale);
-            }
-        }
-        
-        scaleToFit();
-        window.addEventListener('resize', scaleToFit);
-        
-        // Date formatting functions
-        const monthNames = {
-            hu: ['január', 'február', 'március', 'április', 'május', 'június', 
-                 'július', 'augusztus', 'szeptember', 'október', 'november', 'december'],
-            sk: ['január', 'február', 'marec', 'apríl', 'máj', 'jún',
-                  'júl', 'august', 'september', 'október', 'november', 'december'],
-              en: ['January', 'February', 'March', 'April', 'May', 'June',
-                  'July', 'August', 'September', 'October', 'November', 'December']
-        };
-        
-        const dayNames = {
-            hu: ['vasárnap', 'hétfő', 'kedd', 'szerda', 'csütörtök', 'péntek', 'szombat'],
-            sk: ['nedeľa', 'pondelok', 'utorok', 'streda', 'štvrtok', 'piatok', 'sobota'],
-            en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-        };
-        
-        function formatWeekday(date) {
-            return dayNames[settings.language][date.getDay()];
+
+        function pad2(value) {
+            return String(value).padStart(2, '0');
         }
 
-        function formatDateValue(date) {
-            const year = date.getFullYear();
-            const month = date.getMonth();
-            const day = date.getDate();
-            const monthName = monthNames[settings.language][month];
-            
-            switch(settings.dateFormat) {
-                case 'full':
-                    return `${year}. ${monthName} ${day}.`;
-                case 'short':
-                    return `${year}. ${monthName} ${day}.`;
-                case 'dmy':
-                    return `${String(day).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year}`;
-                case 'numeric':
-                    return `${year}.${String(month + 1).padStart(2, '0')}.${String(day).padStart(2, '0')}.`;
-                case 'none':
-                    return '';
-                default:
-                    return `${year}. ${monthName} ${day}.`;
+        function formatDigitalTime(dateObj) {
+            let hours = dateObj.getHours();
+            const minutes = pad2(dateObj.getMinutes());
+            const seconds = pad2(dateObj.getSeconds());
+            if (settings.format === '12h') {
+                const suffix = hours >= 12 ? ' PM' : ' AM';
+                hours = hours % 12 || 12;
+                return `${hours}:${minutes}${settings.showSeconds ? ':' + seconds : ''}${suffix}`;
             }
+            return `${pad2(hours)}:${minutes}${settings.showSeconds ? ':' + seconds : ''}`;
         }
 
-        function formatInlineWeekdayDate(date) {
-            const weekday = formatWeekday(date);
-            const dateValue = formatDateValue(date);
-            if (!dateValue) {
-                return weekday;
-            }
-            if (settings.weekdayPosition === 'right') {
-                return `${dateValue} • ${weekday}`;
-            }
-            return `${weekday} • ${dateValue}`;
+        function topZoneBusy(angles) {
+            return angles.some((angle) => {
+                const radians = (angle - 90) * Math.PI / 180;
+                const x = Math.cos(radians);
+                const y = Math.sin(radians);
+                return y < -0.25 && Math.abs(x) < 0.55;
+            });
         }
-        
-        // Digital Clock
-        function createDigitalClock() {
-            const container = document.getElementById('clockContainer');
-            container.innerHTML = `
-                <div class="digital-clock">
-                    <div class="digital-time" id="digitalTime"></div>
-                    <div class="digital-weekday" id="digitalWeekday"></div>
-                    <div class="digital-date" id="digitalDate"></div>
-                </div>
-            `;
-            
-            const timeEl = document.getElementById('digitalTime');
-            const weekdayEl = document.getElementById('digitalWeekday');
-            const dateEl = document.getElementById('digitalDate');
-            
-            timeEl.style.fontSize = (settings.timeFontSize || settings.fontSize) + 'px';
-            timeEl.style.color = settings.timeColor;
-            weekdayEl.style.fontSize = Math.max(16, Math.round((settings.dateFontSize || Math.round((settings.timeFontSize || settings.fontSize) * 0.32)) * 1.05)) + 'px';
-            weekdayEl.style.color = settings.dateColor;
-            dateEl.style.fontSize = (settings.dateFontSize || Math.round((settings.timeFontSize || settings.fontSize) * 0.3)) + 'px';
-            dateEl.style.color = settings.dateColor;
-            
-            function updateDigitalClock() {
+
+        function renderDigitalOnly(root) {
+            const el = document.createElement('div');
+            el.id = 'digital-full';
+            el.style.fontSize = `clamp(56px, ${Math.max(6, Math.min(14, settings.timeFontSize / 16))}vw, 220px)`;
+            el.style.color = settings.timeColor;
+            root.appendChild(el);
+
+            const tick = () => {
+                el.textContent = formatDigitalTime(new Date());
                 const now = new Date();
-                let hours = now.getHours();
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                const seconds = String(now.getSeconds()).padStart(2, '0');
-                
-                let timeString = '';
-                if (settings.format === '12h') {
-                    const ampm = hours >= 12 ? 'PM' : 'AM';
-                    hours = hours % 12 || 12;
-                    timeString = `${hours}:${minutes}${settings.showSeconds ? ':' + seconds : ''} ${ampm}`;
-                } else {
-                    timeString = `${String(hours).padStart(2, '0')}:${minutes}${settings.showSeconds ? ':' + seconds : ''}`;
-                }
-                
-                timeEl.textContent = timeString;
-                const showDateLine = settings.showDate && settings.dateFormat !== 'none';
-                if (settings.dateInline) {
-                    dateEl.textContent = showDateLine ? formatInlineWeekdayDate(now) : '';
-                    weekdayEl.style.display = 'none';
-                    dateEl.style.display = showDateLine ? '' : 'none';
-                } else {
-                    weekdayEl.textContent = formatWeekday(now);
-                    dateEl.textContent = formatDateValue(now);
-                    weekdayEl.style.display = settings.showDate ? '' : 'none';
-                    dateEl.style.display = showDateLine ? '' : 'none';
-                }
-            }
-            
-            updateDigitalClock();
-            setInterval(updateDigitalClock, 1000);
+                setTimeout(tick, 1000 - (now.getTime() % 1000) + 20);
+            };
+            tick();
         }
-        
-        // Analog Clock
-        function createAnalogClock() {
-            const container = document.getElementById('clockContainer');
-            const size = settings.clockSize;
-            
-            container.innerHTML = `
-                <div class="analog-clock" id="analogClock" style="width: ${size}px; height: ${size}px; border-color: ${settings.timeColor};">
-                    <div class="clock-hand hour-hand" id="hourHand" style="height: ${size * 0.25}px; background: ${settings.timeColor};"></div>
-                    <div class="clock-hand minute-hand" id="minuteHand" style="height: ${size * 0.35}px; background: ${settings.timeColor};"></div>
-                    ${settings.showSeconds ? `<div class="clock-hand second-hand" id="secondHand" style="height: ${size * 0.4}px; background: ${settings.dateColor};"></div>` : ''}
-                </div>
-                <div class="analog-weekday" id="analogWeekday" style="color: ${settings.timeColor}; font-size: ${Math.max(16, Math.round((settings.dateFontSize || size * 0.08) * 1.05))}px;"></div>
-                <div class="analog-date" id="analogDate" style="color: ${settings.timeColor}; font-size: ${settings.dateFontSize || size * 0.08}px;"></div>
+
+        function renderAnalog(root) {
+            root.innerHTML = `
+                <svg id="analog-svg" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-1 -1 2 2" stroke="none" fill="none" style="background-color:${settings.bgColor}">
+                    <defs>
+                        <circle id="hour-mark" cx="0" cy="-0.95" r="0.04"/>
+                    </defs>
+                    <g id="hour-marks" fill="${settings.timeColor}"/>
+                    <g id="hands" stroke="${settings.timeColor}" stroke-linecap="round" style="display:none">
+                        <line id="hour-hand" x1="0" y1="0" x2="0" y2="-0.50" stroke-width="0.11"/>
+                        <line id="minute-hand" x1="0" y1="0" x2="0" y2="-0.75" stroke-width="0.07"/>
+                        <line id="second-hand" x1="0" y1="0" x2="0" y2="-0.85" stroke-width="0.04" stroke="${settings.dateColor}"/>
+                    </g>
+                </svg>
             `;
-            
-            // Add clock numbers
-            const clockEl = document.getElementById('analogClock');
-            clockEl.style.setProperty('--center-color', settings.timeColor);
-            clockEl.querySelector('::before')?.style.setProperty('background', settings.timeColor);
-            
-            // Add center dot
-            const centerDot = document.createElement('div');
-            centerDot.style.cssText = `
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                width: 15px;
-                height: 15px;
-                border-radius: 50%;
-                background: ${settings.timeColor};
-                transform: translate(-50%, -50%);
-                z-index: 10;
-            `;
-            clockEl.appendChild(centerDot);
-            
-            // Add numbers
-            for (let i = 1; i <= 12; i++) {
-                const angle = (i * 30 - 90) * Math.PI / 180;
-                const radius = size * 0.4;
-                const x = Math.cos(angle) * radius + size / 2;
-                const y = Math.sin(angle) * radius + size / 2;
-                
-                const number = document.createElement('div');
-                number.className = 'clock-number';
-                number.textContent = i;
-                number.style.cssText = `
-                    left: ${x}px;
-                    top: ${y}px;
-                    transform: translate(-50%, -50%);
-                    color: ${settings.timeColor};
-                    font-size: ${size * 0.08}px;
-                `;
-                clockEl.appendChild(number);
+
+            const namespace = 'http://www.w3.org/2000/svg';
+            const marks = document.getElementById('hour-marks');
+            const hands = document.getElementById('hands');
+            const hourHand = document.getElementById('hour-hand');
+            const minuteHand = document.getElementById('minute-hand');
+            const secondHand = document.getElementById('second-hand');
+
+            for (let i = 0; i < 12; i += 1) {
+                const mark = document.createElementNS(namespace, 'use');
+                mark.setAttribute('href', '#hour-mark');
+                mark.setAttribute('transform', `rotate(${i / 12 * 360})`);
+                marks.appendChild(mark);
             }
-            
-            const weekdayEl = document.getElementById('analogWeekday');
-            const dateEl = document.getElementById('analogDate');
-            
-            function updateAnalogClock() {
+
+            if (!settings.showSeconds) {
+                secondHand.setAttribute('style', 'display:none');
+            }
+
+            let overlayEl = null;
+            if (settings.digitalOverlayEnabled) {
+                overlayEl = document.createElement('div');
+                overlayEl.id = 'digital-overlay';
+                overlayEl.style.color = settings.timeColor;
+                overlayEl.style.fontSize = `clamp(28px, ${Math.max(2.8, Math.min(7.5, settings.timeFontSize / 25))}vw, 96px)`;
+                root.appendChild(overlayEl);
+            }
+
+            hands.removeAttribute('style');
+
+            const tick = () => {
                 const now = new Date();
-                const hours = now.getHours() % 12;
+                const hours = now.getHours();
                 const minutes = now.getMinutes();
                 const seconds = now.getSeconds();
-                
-                const hourDeg = (hours * 30) + (minutes * 0.5);
-                const minuteDeg = minutes * 6;
-                const secondDeg = seconds * 6;
-                
-                document.getElementById('hourHand').style.transform = `rotate(${hourDeg}deg)`;
-                document.getElementById('minuteHand').style.transform = `rotate(${minuteDeg}deg)`;
+
+                const hourDeg = ((hours + minutes / 60 + seconds / 3600) / 12) * 360;
+                const minuteDeg = ((minutes + seconds / 60) / 60) * 360;
+                const secondDeg = (seconds / 60) * 360;
+
+                hourHand.setAttribute('transform', `rotate(${hourDeg})`);
+                minuteHand.setAttribute('transform', `rotate(${minuteDeg})`);
                 if (settings.showSeconds) {
-                    document.getElementById('secondHand').style.transform = `rotate(${secondDeg}deg)`;
+                    secondHand.setAttribute('transform', `rotate(${secondDeg})`);
                 }
-                
-                const showDateLine = settings.showDate && settings.dateFormat !== 'none';
-                if (settings.dateInline) {
-                    dateEl.textContent = showDateLine ? formatInlineWeekdayDate(now) : '';
-                    weekdayEl.style.display = 'none';
-                    dateEl.style.display = showDateLine ? '' : 'none';
-                } else {
-                    weekdayEl.textContent = formatWeekday(now);
-                    dateEl.textContent = formatDateValue(now);
-                    weekdayEl.style.display = settings.showDate ? '' : 'none';
-                    dateEl.style.display = showDateLine ? '' : 'none';
+
+                if (overlayEl) {
+                    overlayEl.textContent = formatDigitalTime(now);
+                    let position = settings.digitalOverlayPosition;
+                    if (position === 'auto') {
+                        const busyTop = topZoneBusy(settings.showSeconds ? [hourDeg, minuteDeg, secondDeg] : [hourDeg, minuteDeg]);
+                        position = busyTop ? 'bottom' : 'top';
+                    }
+                    overlayEl.className = '';
+                    overlayEl.classList.add(`pos-${position}`);
                 }
-            }
-            
-            updateAnalogClock();
-            setInterval(updateAnalogClock, 1000);
+
+                setTimeout(tick, 1000 - (now.getTime() % 1000) + 20);
+            };
+
+            tick();
         }
-        
-        // Initialize clock based on type
-        if (settings.type === 'analog') {
-            createAnalogClock();
+
+        const root = document.getElementById('clock-root');
+        if (settings.type === 'digital') {
+            renderDigitalOnly(root);
         } else {
-            createDigitalClock();
+            renderAnalog(root);
         }
     </script>
 </body>

@@ -185,6 +185,42 @@ function edudisplej_group_loop_module_name(array $module): string {
 
     return t_def('group_loop.module_name.' . str_replace('-', '_', $module_key), $fallback);
 }
+
+function edudisplej_group_loop_module_description(array $module): string {
+    $module_key = strtolower(trim((string)($module['module_key'] ?? '')));
+    $fallback = trim((string)($module['description'] ?? ''));
+
+    if ($module_key === '') {
+        return $fallback;
+    }
+
+    if ($module_key === 'turned-off') {
+        return t_def('group_loop.turned_off.description', $fallback !== '' ? $fallback : 'Scheduled display power off (content service stop + HDMI off).');
+    }
+
+    return t_def('group_loop.module_desc.' . str_replace('-', '_', $module_key), $fallback);
+}
+
+$available_modules = array_map(static function (array $module): array {
+    $module['name'] = edudisplej_group_loop_module_name($module);
+    $module['description'] = edudisplej_group_loop_module_description($module);
+    return $module;
+}, $available_modules);
+
+if ($unconfigured_module) {
+    $unconfigured_module['name'] = edudisplej_group_loop_module_name($unconfigured_module);
+    $unconfigured_module['description'] = edudisplej_group_loop_module_description($unconfigured_module);
+}
+
+$group_loop_modules_catalog = array_values(array_merge($available_modules, $unconfigured_module ? [$unconfigured_module] : []));
+$group_loop_localized_module_names = [];
+foreach ($group_loop_modules_catalog as $module) {
+    $module_key = strtolower(trim((string)($module['module_key'] ?? '')));
+    if ($module_key !== '') {
+        $group_loop_localized_module_names[$module_key] = (string)($module['name'] ?? '');
+    }
+}
+$group_loop_localized_module_names['turned-off'] = t_def('group_loop.turned_off.name', 'Turned Off');
 ?>
 <?php include '../../admin/header.php'; ?>
     <link rel="stylesheet" href="assets/css/app.css?v=<?php echo rawurlencode($group_loop_css_version); ?>">
@@ -1396,6 +1432,7 @@ function edudisplej_group_loop_module_name(array $module): string {
                 'group_loop.schedule_button' => t_def('group_loop.schedule_button', 'Schedule'),
                 'group_loop.no_schedulable' => t_def('group_loop.no_schedulable', 'No schedulable loops.'),
                 'group_loop.create' => t_def('common.create', 'Create'),
+                'common.update' => t_def('common.update', 'Update'),
                 'group_loop.add' => t_def('group_loop.add', 'Add'),
                 'group_loop.selected_loop' => t_def('group_loop.selected_loop', 'Selected loop: {name}'),
                 'group_loop.selected_loop_empty' => t_def('group_loop.selected_loop_empty', 'Selected loop: —'),

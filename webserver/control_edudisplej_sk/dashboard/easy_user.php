@@ -1,32 +1,53 @@
 <?php
 session_start();
-require_once '../dbkonfiguracia.php';
-require_once '../i18n.php';
-require_once '../kiosk_status.php';
-require_once '../auth_roles.php';
+require_once __DIR__ . '/../dbkonfiguracia.php';
+require_once __DIR__ . '/../i18n.php';
+require_once __DIR__ . '/../kiosk_status.php';
+require_once __DIR__ . '/../auth_roles.php';
 require_once __DIR__ . '/dashboard_helpers.php';
+
+$script_name = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+if (preg_match('~/dashboard/easy_user\.php$~i', $script_name)) {
+    $target = preg_replace('~/dashboard/easy_user\.php$~i', '/dashboard/easy_user/', $script_name);
+    $query_string = $_SERVER['QUERY_STRING'] ?? '';
+    if ($query_string !== '') {
+        $target .= '?' . $query_string;
+    }
+    header('Location: ' . $target, true, 302);
+    exit();
+}
 
 $current_lang = edudisplej_apply_language_preferences();
 
+$app_root = preg_replace('~/dashboard/easy_user(?:/index\.php)?$~i', '', $script_name);
+$app_root = rtrim((string)$app_root, '/');
+if ($app_root === '.' || $app_root === '/') {
+    $app_root = '';
+}
+$login_path = $app_root . '/login';
+$admin_dashboard_path = $app_root . '/admin/dashboard.php';
+$dashboard_index_path = $app_root . '/dashboard/index.php';
+$api_prefix = $app_root . '/api';
+
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../login.php');
+    header('Location: ' . $login_path);
     exit();
 }
 
 if (!empty($_SESSION['isadmin'])) {
-    header('Location: ../admin/dashboard.php');
+    header('Location: ' . $admin_dashboard_path);
     exit();
 }
 
 $session_role = edudisplej_get_session_role();
 if ($session_role !== 'easy_user') {
-    header('Location: index.php');
+    header('Location: ' . $dashboard_index_path);
     exit();
 }
 
 $company_id = (int)($_SESSION['company_id'] ?? 0);
 if ($company_id <= 0) {
-    header('Location: ../login.php');
+    header('Location: ' . $login_path);
     exit();
 }
 
@@ -109,12 +130,78 @@ try {
     error_log('easy_user.php: ' . $e->getMessage());
 }
 
-include '../admin/header.php';
+include __DIR__ . '/../admin/header.php';
 ?>
 
-<div class="panel" style="margin-bottom:12px;">
-    <div class="panel-title">Egyszerű kezelő</div>
-    <div class="muted">Csoportonként látod a kijelzőket, az aktív tervet és az alap tartalom szerkesztést.</div>
+<style>
+    .easy-page-grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .easy-step {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 12px;
+        margin-top: 12px;
+        background: #ffffff;
+    }
+    .easy-step h4 {
+        margin: 0 0 6px;
+        font-size: 14px;
+    }
+    .easy-kiosk-table,
+    .easy-schedule-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        font-size: 13px;
+    }
+    .easy-kiosk-table th,
+    .easy-kiosk-table td,
+    .easy-schedule-table th,
+    .easy-schedule-table td {
+        border: 1px solid #e5e7eb;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+    }
+    .easy-kiosk-table th,
+    .easy-schedule-table th {
+        background: #f9fafb;
+    }
+    .easy-group-card {
+        border-left: 4px solid #2563eb;
+    }
+    .easy-tutorial-list {
+        margin: 0;
+        padding-left: 18px;
+        color: #374151;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    @media (max-width: 980px) {
+        .easy-page-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="easy-page-grid">
+    <div class="panel">
+        <div class="panel-title">Gyors útmutató</div>
+        <ol class="easy-tutorial-list">
+            <li>Nézd át az aktív tervet és az időzített blokkokat.</li>
+            <li>Csak azokat a modulokat szerkeszd, amelyek szerepelnek a tervben.</li>
+            <li>Az azonnali szöveg kiírást 24 órás formátumban add meg, legfeljebb 3 órára.</li>
+            <li>Több azonnali kiírás is létrehozható egymás után.</li>
+        </ol>
+    </div>
+    <div class="panel">
+        <div class="panel-title">Munkamenet lépései</div>
+        <div class="muted"><strong>1.</strong> Aktív terv áttekintése • <strong>2.</strong> Terv tartalmainak módosítása • <strong>3.</strong> Azonnali szöveg kiírás ütemezése</div>
+    </div>
 </div>
 
 <?php if ($error !== ''): ?>
@@ -137,31 +224,44 @@ include '../admin/header.php';
                 <div class="muted" id="easy-save-state-<?php echo $gid; ?>"></div>
             </div>
 
-            <div style="margin-top:10px;">
-                <strong>Kijelzők</strong>
-                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+            <div class="easy-step" style="margin-top:10px;">
+                <h4>Kijelzők a csoportban</h4>
+                <div style="margin-top:6px;">
                     <?php if (empty($kiosks_by_group[$gid])): ?>
                         <span class="muted">Nincs hozzárendelt kijelző.</span>
                     <?php else: ?>
-                        <?php foreach ($kiosks_by_group[$gid] as $kiosk): ?>
-                            <?php $online = in_array($kiosk['status'], ['online', 'online_error'], true); ?>
-                            <span class="status-badge status-<?php echo htmlspecialchars($kiosk['status']); ?>" style="display:inline-flex; gap:6px; align-items:center;">
-                                <span><?php echo $online ? '🟢' : '🔴'; ?></span>
-                                <span><?php echo htmlspecialchars($kiosk['name']); ?></span>
-                            </span>
-                        <?php endforeach; ?>
+                        <table class="easy-kiosk-table">
+                            <thead>
+                                <tr>
+                                    <th>Kijelző</th>
+                                    <th>Hely</th>
+                                    <th>Állapot</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($kiosks_by_group[$gid] as $kiosk): ?>
+                                    <?php $online = in_array($kiosk['status'], ['online', 'online_error'], true); ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($kiosk['name']); ?></td>
+                                        <td><?php echo htmlspecialchars($kiosk['location'] !== '' ? $kiosk['location'] : '—'); ?></td>
+                                        <td><?php echo $online ? '🟢 Online' : '🔴 Offline'; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <div style="margin-top:12px;">
-                <strong>Ütemezés (mi lesz megjelenítve mikor)</strong>
+            <div class="easy-step">
+                <h4>1. Aktív terv áttekintése</h4>
+                <div class="muted">A DEFAULT terv akkor fut, amikor nincs aktív időzített blokk.</div>
                 <div id="easy-schedule-<?php echo $gid; ?>" class="muted" style="margin-top:6px;">Betöltés…</div>
             </div>
 
-            <div style="margin-top:12px; border-top:1px solid #e5e7eb; padding-top:12px;">
-                <strong>Gyors szerkesztés</strong>
-                <div class="muted" style="margin-top:2px;">Csak azok a modulok látszanak, amik ütemezve vannak.</div>
+            <div class="easy-step">
+                <h4>2. Terv tartalmainak módosítása</h4>
+                <div class="muted" style="margin-top:2px;">Csak azok a modulok szerkeszthetők, amelyek szerepelnek a tervben.</div>
 
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
                     <button type="button" class="btn" data-action="open-text" data-group-id="<?php echo $gid; ?>" style="display:none;">Szöveg szerkesztése</button>
@@ -196,9 +296,9 @@ include '../admin/header.php';
                 </div>
             </div>
 
-            <div style="margin-top:12px; border-top:1px solid #e5e7eb; padding-top:12px;">
-                <strong>Azonnali szöveg kiírás (SOS)</strong>
-                <div class="muted" style="margin-top:2px;">Speciális loopot hoz létre, ami az adott időablakban felülírja az aktuális tartalmat.</div>
+            <div class="easy-step">
+                <h4>3. Azonnali szöveg kiírás</h4>
+                <div class="muted" style="margin-top:2px;">24 órás időformátum, maximum 3 órás időtartam. Több kiírás is menthető.</div>
 
                 <label for="easy-sos-text-<?php echo $gid; ?>" style="display:block; margin-top:8px;">Szöveg</label>
                 <textarea id="easy-sos-text-<?php echo $gid; ?>" rows="4" style="width:100%;"></textarea>
@@ -206,11 +306,11 @@ include '../admin/header.php';
                 <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin-top:8px;">
                     <div>
                         <label for="easy-sos-start-<?php echo $gid; ?>">Kezdés</label>
-                        <input type="datetime-local" id="easy-sos-start-<?php echo $gid; ?>" style="width:100%;">
+                        <input type="datetime-local" id="easy-sos-start-<?php echo $gid; ?>" style="width:100%;" step="60">
                     </div>
                     <div>
                         <label for="easy-sos-end-<?php echo $gid; ?>">Vége</label>
-                        <input type="datetime-local" id="easy-sos-end-<?php echo $gid; ?>" style="width:100%;">
+                        <input type="datetime-local" id="easy-sos-end-<?php echo $gid; ?>" style="width:100%;" step="60">
                     </div>
                 </div>
 
@@ -220,7 +320,7 @@ include '../admin/header.php';
                 </label>
 
                 <div style="margin-top:8px;">
-                    <button type="button" class="btn btn-primary" data-action="save-sos" data-group-id="<?php echo $gid; ?>">SOS ütemezés mentése</button>
+                    <button type="button" class="btn btn-primary" data-action="save-sos" data-group-id="<?php echo $gid; ?>">Azonnali kiírás mentése</button>
                 </div>
             </div>
         </div>
@@ -233,7 +333,8 @@ include '../admin/header.php';
 
     const bootstrap = {
         moduleCatalog: <?php echo json_encode($module_catalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        groups: <?php echo json_encode(array_map(static fn($g) => ['id' => (int)$g['id'], 'name' => (string)$g['name']], $groups), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+        groups: <?php echo json_encode(array_map(static fn($g) => ['id' => (int)$g['id'], 'name' => (string)$g['name']], $groups), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        apiPrefix: <?php echo json_encode($api_prefix, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
     };
 
     const planState = new Map();
@@ -318,7 +419,7 @@ include '../admin/header.php';
         (Array.isArray(plan.loop_styles) ? plan.loop_styles : []).forEach((style) => {
             const id = parseInt(style.id || 0, 10);
             if (id > 0) {
-                map.set(id, String(style.name || `Loop #${id}`));
+                map.set(id, String(style.name || `Terv #${id}`));
             }
         });
         return map;
@@ -331,7 +432,7 @@ include '../admin/header.php';
     const formatScheduleHtml = (plan) => {
         const blocks = Array.isArray(plan.schedule_blocks) ? plan.schedule_blocks : [];
         if (blocks.length === 0) {
-            return '<span class="muted">Nincs időzített blokk. A default loop megy egész nap.</span>';
+            return '<span class="muted">Nincs időzített blokk. A DEFAULT terv fut egész nap.</span>';
         }
 
         const styleMap = styleNameMap(plan);
@@ -345,7 +446,7 @@ include '../admin/header.php';
             const start = String(block.start_time || '00:00:00').slice(0, 5);
             const end = String(block.end_time || '00:00:00').slice(0, 5);
             const styleId = parseInt(block.loop_style_id || 0, 10);
-            const styleLabel = escapeHtml(styleMap.get(styleId) || `Loop #${styleId || 0}`);
+            const styleLabel = escapeHtml(styleMap.get(styleId) || (styleId > 0 ? `Terv #${styleId}` : 'DEFAULT (nincs terv)'));
             let when = '';
             if (type === 'date') {
                 when = escapeHtml(String(block.specific_date || '—'));
@@ -362,8 +463,8 @@ include '../admin/header.php';
         });
 
         return `
-            <table style="width:100%; border-collapse:collapse; margin-top:6px;">
-                <thead><tr><th style="text-align:left;">Mikor</th><th style="text-align:left;">Idő</th><th style="text-align:left;">Loop</th></tr></thead>
+            <table class="easy-schedule-table">
+                <thead><tr><th>Mikor</th><th>Idő</th><th>Terv</th></tr></thead>
                 <tbody>${rows.join('')}</tbody>
             </table>
         `;
@@ -377,7 +478,7 @@ include '../admin/header.php';
     };
 
     const apiGetPlan = async (groupId) => {
-        const response = await fetch(`../api/group_loop/config.php?group_id=${encodeURIComponent(String(groupId))}`, {
+        const response = await fetch(`${bootstrap.apiPrefix}/group_loop/config.php?group_id=${encodeURIComponent(String(groupId))}`, {
             credentials: 'same-origin'
         });
         const data = await response.json();
@@ -389,7 +490,7 @@ include '../admin/header.php';
 
     const apiSavePlan = async (groupId, plan) => {
         const payload = getPayloadFromPlan(plan);
-        const response = await fetch(`../api/group_loop/config.php?group_id=${encodeURIComponent(String(groupId))}`, {
+        const response = await fetch(`${bootstrap.apiPrefix}/group_loop/config.php?group_id=${encodeURIComponent(String(groupId))}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -488,7 +589,7 @@ include '../admin/header.php';
                 if (mods.gallery) labels.push('képgaléria');
                 if (mods.pdf) labels.push('pdf');
                 summaryEl.textContent = labels.length > 0
-                    ? `Ütemezett szerkeszthető modulok: ${labels.join(', ')}`
+                    ? `A tervben szerkeszthető modulok: ${labels.join(', ')}`
                     : 'Nincs ütemezett text/képgaléria/pdf modul.';
             }
 
@@ -573,7 +674,7 @@ include '../admin/header.php';
             formData.append('asset_kind', 'image');
             formData.append('asset', file, file.name || 'image.jpg');
 
-            const response = await fetch('../api/group_loop/module_asset_upload.php', {
+            const response = await fetch(`${bootstrap.apiPrefix}/group_loop/module_asset_upload.php`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 body: formData
@@ -611,7 +712,7 @@ include '../admin/header.php';
         formData.append('asset_kind', 'pdf');
         formData.append('asset', file, file.name || 'document.pdf');
 
-        const response = await fetch('../api/group_loop/module_asset_upload.php', {
+        const response = await fetch(`${bootstrap.apiPrefix}/group_loop/module_asset_upload.php`, {
             method: 'POST',
             credentials: 'same-origin',
             body: formData
@@ -662,14 +763,14 @@ include '../admin/header.php';
             throw new Error('Legfeljebb 1 hétre lehet előre ütemezni.');
         }
 
-        const maxDurationMs = 24 * 60 * 60 * 1000;
+        const maxDurationMs = 3 * 60 * 60 * 1000;
         if ((end.getTime() - start.getTime()) > maxDurationMs) {
-            throw new Error('Legfeljebb 24 órás SOS kiírás adható meg.');
+            throw new Error('Legfeljebb 3 órás azonnali kiírás adható meg.');
         }
 
         const rawText = String(textInput?.value || '').trim();
         if (rawText === '') {
-            throw new Error('SOS szöveg megadása kötelező.');
+            throw new Error('Azonnali kiírás szövegének megadása kötelező.');
         }
 
         const textModuleMeta = bootstrap.moduleCatalog.text || { id: 0, name: 'Text' };
@@ -691,16 +792,16 @@ include '../admin/header.php';
 
         const sosStyle = {
             id: nextStyleId,
-            name: `SOS ${dateLabel}`,
+            name: `Azonnali ${dateLabel}`,
             items: [{
                 module_id: parseInt(textModuleMeta.id || 0, 10),
                 module_name: String(textModuleMeta.name || 'Text'),
                 module_key: 'text',
-                description: 'SOS üzenet',
+                description: 'Azonnali szöveg kiírás',
                 duration_seconds: Math.max(10, Math.min(60, Math.floor((end.getTime() - start.getTime()) / 1000))),
                 settings: {
                     text: finalText,
-                    bgColor: '#8b0000',
+                    bgColor: '#0f172a',
                     textColor: '#ffffff',
                     textAnimationEntry: 'none',
                     scrollMode: false
@@ -711,7 +812,7 @@ include '../admin/header.php';
         const nextBlockId = Math.min(-1, ...plan.schedule_blocks.map((b) => parseInt(b.id || 0, 10)).filter((n) => Number.isFinite(n) && n < 0)) - 1;
         const sosBlock = {
             id: nextBlockId,
-            block_name: 'SOS üzenet',
+            block_name: 'Azonnali szöveg',
             block_type: 'date',
             specific_date: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
             start_time: `${pad(start.getHours())}:${pad(start.getMinutes())}:00`,
@@ -791,7 +892,7 @@ include '../admin/header.php';
 
             if (action === 'save-sos') {
                 await saveSos(groupId);
-                setSaveState(groupId, 'SOS ütemezés mentve.');
+                setSaveState(groupId, 'Azonnali kiírás mentve.');
                 return;
             }
 

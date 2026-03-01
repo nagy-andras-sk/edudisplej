@@ -74,6 +74,40 @@ function edudisplej_db_autofix_run(): void {
             INDEX idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        $conn->query("CREATE TABLE IF NOT EXISTS email_queue (
+            id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            template_key VARCHAR(100) DEFAULT NULL,
+            to_email VARCHAR(255) NOT NULL,
+            to_name VARCHAR(255) DEFAULT NULL,
+            subject VARCHAR(255) NOT NULL,
+            body_html LONGTEXT DEFAULT NULL,
+            body_text LONGTEXT DEFAULT NULL,
+            status ENUM('queued','processing','sent','failed','archived') NOT NULL DEFAULT 'queued',
+            attempts INT(11) NOT NULL DEFAULT 0,
+            last_error TEXT DEFAULT NULL,
+            sent_at DATETIME DEFAULT NULL,
+            archived_at DATETIME DEFAULT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_status_created (status, created_at),
+            INDEX idx_template (template_key),
+            INDEX idx_to_email (to_email)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $conn->query("CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            token_hash VARCHAR(64) NOT NULL,
+            expires_at DATETIME NOT NULL,
+            used_at DATETIME NULL,
+            ip_address VARCHAR(45) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_token (token_hash),
+            INDEX idx_user (user_id),
+            INDEX idx_expires (expires_at),
+            CONSTRAINT password_reset_tokens_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
         $conn->query("CREATE TABLE IF NOT EXISTS service_versions (
             id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
             service_name VARCHAR(255) NOT NULL,
@@ -118,6 +152,11 @@ function edudisplej_db_autofix_run(): void {
         $user_last_activity_check = $conn->query("SHOW COLUMNS FROM users LIKE 'last_activity_at'");
         if (!$user_last_activity_check || $user_last_activity_check->num_rows === 0) {
             $conn->query("ALTER TABLE users ADD COLUMN last_activity_at DATETIME NULL DEFAULT NULL AFTER last_login");
+        }
+
+        $user_backup_codes_check = $conn->query("SHOW COLUMNS FROM users LIKE 'backup_codes'");
+        if (!$user_backup_codes_check || $user_backup_codes_check->num_rows === 0) {
+            $conn->query("ALTER TABLE users ADD COLUMN backup_codes TEXT NULL COMMENT 'JSON array of hashed backup codes'");
         }
 
         $conn->query("CREATE TABLE IF NOT EXISTS archived_users (
@@ -174,6 +213,30 @@ function edudisplej_db_autofix_run(): void {
             CONSTRAINT kiosk_migrations_requested_by_fk FOREIGN KEY (requested_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
             CONSTRAINT kiosk_migrations_command_fk FOREIGN KEY (command_queue_id) REFERENCES kiosk_command_queue(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $layout_key = 'email_base_layout_html';
+        $layout_value = '<!doctype html>\n<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#f3f6fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2937;">\n<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f6fb;padding:24px 12px;">\n  <tr><td align="center">\n    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">\n      <tr><td style="background:linear-gradient(135deg,#1e40af 0%,#0369a1 100%);padding:20px 24px;color:#ffffff;font-size:20px;font-weight:700;">{{site_name}}</td></tr>\n      <tr><td style="padding:24px;">\n        <h2 style="margin:0 0 14px 0;font-size:20px;color:#0f172a;">{{subject}}</h2>\n        {{content}}\n      </td></tr>\n      <tr><td style="padding:16px 24px;color:#64748b;font-size:12px;border-top:1px solid #e5e7eb;">This is an automated message from {{site_name}}.</td></tr>\n    </table>\n  </td></tr>\n</table>\n</body></html>';
+        $ins_layout = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value, is_encrypted) VALUES (?, ?, 0) ON DUPLICATE KEY UPDATE setting_value = IF(setting_value IS NULL OR setting_value = '', VALUES(setting_value), setting_value)");
+        if ($ins_layout) {
+            $ins_layout->bind_param('ss', $layout_key, $layout_value);
+            $ins_layout->execute();
+            $ins_layout->close();
+        }
+
+        $seed_templates = [
+            ['password_reset', 'hu', 'Jelszó visszaállítás', '<p>Kedves {{name}},</p><p>Új jelszó beállításához kattintson az alábbi gombra:</p><p><a href="{{reset_link}}" style="display:inline-block;padding:10px 16px;background:#1e40af;color:#fff;text-decoration:none;border-radius:6px;">Jelszó visszaállítása</a></p><p>Ha nem Ön kérte, hagyja figyelmen kívül ezt az üzenetet.</p>', "Kedves {{name}},\n\nÚj jelszó beállításához nyissa meg: {{reset_link}}\n\nHa nem Ön kérte, hagyja figyelmen kívül ezt az üzenetet."],
+            ['password_reset', 'en', 'Password reset', '<p>Hello {{name}},</p><p>To set a new password, click the button below:</p><p><a href="{{reset_link}}" style="display:inline-block;padding:10px 16px;background:#1e40af;color:#fff;text-decoration:none;border-radius:6px;">Reset password</a></p><p>If you did not request this, you can ignore this message.</p>', "Hello {{name}},\n\nTo set a new password, open: {{reset_link}}\n\nIf you did not request this, you can ignore this message."],
+            ['password_reset', 'sk', 'Obnovenie hesla', '<p>Dobrý deň {{name}},</p><p>Pre nastavenie nového hesla kliknite na tlačidlo nižšie:</p><p><a href="{{reset_link}}" style="display:inline-block;padding:10px 16px;background:#1e40af;color:#fff;text-decoration:none;border-radius:6px;">Obnoviť heslo</a></p><p>Ak ste o to nepožiadali, tento email ignorujte.</p>', "Dobrý deň {{name}},\n\nPre nastavenie nového hesla otvorte: {{reset_link}}\n\nAk ste o to nepožiadali, tento email ignorujte."],
+        ];
+
+        $seed_stmt = $conn->prepare("INSERT INTO email_templates (template_key, lang, subject, body_html, body_text) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE subject = IF(subject IS NULL OR subject = '', VALUES(subject), subject), body_html = IF(body_html IS NULL OR body_html = '', VALUES(body_html), body_html), body_text = IF(body_text IS NULL OR body_text = '', VALUES(body_text), body_text)");
+        if ($seed_stmt) {
+            foreach ($seed_templates as $tpl) {
+                $seed_stmt->bind_param('sssss', $tpl[0], $tpl[1], $tpl[2], $tpl[3], $tpl[4]);
+                $seed_stmt->execute();
+            }
+            $seed_stmt->close();
+        }
 
         closeDbConnection($conn);
     } catch (Throwable $e) {

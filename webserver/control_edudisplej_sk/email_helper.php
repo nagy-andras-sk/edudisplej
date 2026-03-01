@@ -7,6 +7,12 @@
 require_once __DIR__ . '/dbkonfiguracia.php';
 require_once __DIR__ . '/security_config.php';
 
+function normalize_escaped_whitespace($value) {
+    $text = (string)$value;
+    $text = str_replace(["\\r\\n", "\\n", "\\r", "\\t"], ["\r\n", "\n", "\r", "\t"], $text);
+    return $text;
+}
+
 /**
  * Load SMTP settings from the `system_settings` table and decrypt the password.
  *
@@ -79,6 +85,254 @@ function get_email_template($key, $lang = 'hu') {
     }
 }
 
+function get_email_base_layout_html() {
+    $default_layout = "<!doctype html>\n"
+        . "<html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body style=\"margin:0;padding:0;background:#f3f6fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2937;\">\n"
+        . "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f3f6fb;padding:24px 12px;\">\n"
+        . "  <tr><td align=\"center\">\n"
+        . "    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;\">\n"
+        . "      <tr><td style=\"background:linear-gradient(135deg,#1e40af 0%,#0369a1 100%);padding:20px 24px;color:#ffffff;font-size:20px;font-weight:700;\">{{site_name}}</td></tr>\n"
+        . "      <tr><td style=\"padding:24px;\">\n"
+        . "        <h2 style=\"margin:0 0 14px 0;font-size:20px;color:#0f172a;\">{{subject}}</h2>\n"
+        . "        {{content}}\n"
+        . "      </td></tr>\n"
+        . "      <tr><td style=\"padding:16px 24px;color:#64748b;font-size:12px;border-top:1px solid #e5e7eb;\">This is an automated message from {{site_name}}.</td></tr>\n"
+        . "    </table>\n"
+        . "  </td></tr>\n"
+        . "</table>\n"
+        . "</body></html>";
+
+    try {
+        $conn = getDbConnection();
+        $k = 'email_base_layout_html';
+        $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1");
+        $stmt->bind_param("s", $k);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        closeDbConnection($conn);
+
+        $layout = trim((string)($row['setting_value'] ?? ''));
+        if ($layout === '') {
+            return normalize_escaped_whitespace($default_layout);
+        }
+        return normalize_escaped_whitespace($layout);
+    } catch (Exception $e) {
+        error_log('email_helper: get_email_base_layout_html error: ' . $e->getMessage());
+        return normalize_escaped_whitespace($default_layout);
+    }
+}
+
+function render_email_html_with_layout($subject, $body_html, $variables = []) {
+    $site_name = trim((string)($variables['site_name'] ?? 'EduDisplej'));
+    if ($site_name === '') {
+        $site_name = 'EduDisplej';
+    }
+
+    $layout = get_email_base_layout_html();
+    $static_footer_en = 'This is an automated message from {{site_name}}.';
+    $layout = str_replace(
+        [
+            'Ez egy automatikus üzenet a(z) {{site_name}} rendszertől.',
+            'Toto je automatická správa zo systému {{site_name}}.',
+            '{{static_footer_text}}',
+        ],
+        [$static_footer_en, $static_footer_en, $static_footer_en],
+        $layout
+    );
+    $wrapped = str_replace(
+        ['{{subject}}', '{{content}}', '{{site_name}}'],
+        [$subject, $body_html, $site_name],
+        $layout
+    );
+
+    foreach ($variables as $k => $v) {
+        $wrapped = str_replace('{{' . $k . '}}', (string)$v, $wrapped);
+    }
+
+    return $wrapped;
+}
+
+function _get_default_email_template($template_key, $lang = 'en') {
+    $lang = strtolower(trim((string)$lang));
+    if (!in_array($lang, ['hu', 'en', 'sk'], true)) {
+        $lang = 'en';
+    }
+
+    if ($template_key === 'password_reset') {
+        if ($lang === 'hu') {
+            return [
+                'subject' => 'Jelszó visszaállítás',
+                'body_html' => '<p>Kedves {{name}},</p><p>Új jelszó beállításához kattintson az alábbi gombra:</p><p><a href="{{reset_link}}" style="display:inline-block;padding:10px 16px;background:#1e40af;color:#fff;text-decoration:none;border-radius:6px;">Jelszó visszaállítása</a></p><p>Ha nem Ön kérte, hagyja figyelmen kívül ezt az üzenetet.</p>',
+                'body_text' => "Kedves {{name}},\n\nÚj jelszó beállításához nyissa meg: {{reset_link}}\n\nHa nem Ön kérte, hagyja figyelmen kívül ezt az üzenetet.",
+            ];
+        }
+        if ($lang === 'sk') {
+            return [
+                'subject' => 'Obnovenie hesla',
+                'body_html' => '<p>Dobrý deň {{name}},</p><p>Pre nastavenie nového hesla kliknite na tlačidlo nižšie:</p><p><a href="{{reset_link}}" style="display:inline-block;padding:10px 16px;background:#1e40af;color:#fff;text-decoration:none;border-radius:6px;">Obnoviť heslo</a></p><p>Ak ste o to nepožiadali, tento email ignorujte.</p>',
+                'body_text' => "Dobrý deň {{name}},\n\nPre nastavenie nového hesla otvorte: {{reset_link}}\n\nAk ste o to nepožiadali, tento email ignorujte.",
+            ];
+        }
+        return [
+            'subject' => 'Password reset',
+            'body_html' => '<p>Hello {{name}},</p><p>To set a new password, click the button below:</p><p><a href="{{reset_link}}" style="display:inline-block;padding:10px 16px;background:#1e40af;color:#fff;text-decoration:none;border-radius:6px;">Reset password</a></p><p>If you did not request this, you can ignore this message.</p>',
+            'body_text' => "Hello {{name}},\n\nTo set a new password, open: {{reset_link}}\n\nIf you did not request this, you can ignore this message.",
+        ];
+    }
+
+    return null;
+}
+
+function queue_raw_email($to_email, $to_name, $subject, $body_html, $body_text = '', $template_key = null) {
+    try {
+        $conn = getDbConnection();
+        $status = 'queued';
+        $stmt = $conn->prepare("INSERT INTO email_queue (template_key, to_email, to_name, subject, body_html, body_text, status, attempts) VALUES (?,?,?,?,?,?,?,0)");
+        $stmt->bind_param("sssssss", $template_key, $to_email, $to_name, $subject, $body_html, $body_text, $status);
+        $stmt->execute();
+        $id = (int)$conn->insert_id;
+        $stmt->close();
+        closeDbConnection($conn);
+        return $id;
+    } catch (Exception $e) {
+        error_log('email_helper: queue_raw_email error: ' . $e->getMessage());
+        return 0;
+    }
+}
+
+function process_email_queue_item($queue_id) {
+    $queue_id = (int)$queue_id;
+    if ($queue_id <= 0) {
+        return false;
+    }
+
+    try {
+        $conn = getDbConnection();
+        $processing = 'processing';
+        $allowedA = 'queued';
+        $allowedB = 'failed';
+        $u = $conn->prepare("UPDATE email_queue SET status = ?, updated_at = NOW() WHERE id = ? AND status IN (?, ?)");
+        $u->bind_param("siss", $processing, $queue_id, $allowedA, $allowedB);
+        $u->execute();
+        $rows = $u->affected_rows;
+        $u->close();
+
+        if ($rows < 1) {
+            closeDbConnection($conn);
+            return false;
+        }
+
+        $s = $conn->prepare("SELECT id, template_key, to_email, to_name, subject, body_html, body_text, attempts FROM email_queue WHERE id = ? LIMIT 1");
+        $s->bind_param("i", $queue_id);
+        $s->execute();
+        $row = $s->get_result()->fetch_assoc();
+        $s->close();
+
+        if (!$row) {
+            closeDbConnection($conn);
+            return false;
+        }
+
+        $smtp = get_smtp_settings();
+        if (empty($smtp['host']) || empty($smtp['from_email'])) {
+            $newStatus = 'failed';
+            $err = 'SMTP not configured';
+            $attempts = (int)$row['attempts'] + 1;
+            $f = $conn->prepare("UPDATE email_queue SET status = ?, attempts = ?, last_error = ?, updated_at = NOW() WHERE id = ?");
+            $f->bind_param("sisi", $newStatus, $attempts, $err, $queue_id);
+            $f->execute();
+            $f->close();
+            closeDbConnection($conn);
+
+            _log_email($row['template_key'], $row['to_email'], $row['subject'], 'error', $err);
+            return false;
+        }
+
+        $sendResult = _smtp_send($smtp, $row['to_email'], $row['to_name'], $row['subject'], $row['body_html'], $row['body_text']);
+        $attempts = (int)$row['attempts'] + 1;
+
+        if ($sendResult === true) {
+            $sent = 'sent';
+            $ok = $conn->prepare("UPDATE email_queue SET status = ?, attempts = ?, last_error = NULL, sent_at = NOW(), updated_at = NOW() WHERE id = ?");
+            $ok->bind_param("sii", $sent, $attempts, $queue_id);
+            $ok->execute();
+            $ok->close();
+            closeDbConnection($conn);
+
+            _log_email($row['template_key'], $row['to_email'], $row['subject'], 'success', null);
+            return true;
+        }
+
+        $failed = 'failed';
+        $err = (string)$sendResult;
+        $ko = $conn->prepare("UPDATE email_queue SET status = ?, attempts = ?, last_error = ?, updated_at = NOW() WHERE id = ?");
+        $ko->bind_param("sisi", $failed, $attempts, $err, $queue_id);
+        $ko->execute();
+        $ko->close();
+        closeDbConnection($conn);
+
+        _log_email($row['template_key'], $row['to_email'], $row['subject'], 'error', $err);
+        return false;
+    } catch (Exception $e) {
+        error_log('email_helper: process_email_queue_item error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+function process_email_queue($limit = 20) {
+    $limit = max(1, min(200, (int)$limit));
+    $processed = 0;
+    $sent = 0;
+
+    try {
+        $conn = getDbConnection();
+        $q = $conn->prepare("SELECT id FROM email_queue WHERE status IN ('queued','failed') ORDER BY created_at ASC LIMIT ?");
+        $q->bind_param("i", $limit);
+        $q->execute();
+        $res = $q->get_result();
+        $ids = [];
+        while ($row = $res->fetch_assoc()) {
+            $ids[] = (int)$row['id'];
+        }
+        $q->close();
+        closeDbConnection($conn);
+
+        foreach ($ids as $id) {
+            $processed++;
+            if (process_email_queue_item($id)) {
+                $sent++;
+            }
+        }
+    } catch (Exception $e) {
+        error_log('email_helper: process_email_queue error: ' . $e->getMessage());
+    }
+
+    return ['processed' => $processed, 'sent' => $sent, 'failed' => max(0, $processed - $sent)];
+}
+
+function archive_email_queue_item($queue_id) {
+    $queue_id = (int)$queue_id;
+    if ($queue_id <= 0) {
+        return false;
+    }
+
+    try {
+        $conn = getDbConnection();
+        $archived = 'archived';
+        $stmt = $conn->prepare("UPDATE email_queue SET status = ?, archived_at = NOW(), updated_at = NOW() WHERE id = ? AND status IN ('sent','failed')");
+        $stmt->bind_param("si", $archived, $queue_id);
+        $stmt->execute();
+        $ok = $stmt->affected_rows > 0;
+        $stmt->close();
+        closeDbConnection($conn);
+        return $ok;
+    } catch (Exception $e) {
+        error_log('email_helper: archive_email_queue_item error: ' . $e->getMessage());
+        return false;
+    }
+}
+
 /**
  * Persist an email send attempt to the `email_logs` table.
  *
@@ -118,6 +372,10 @@ function _log_email($template_key, $to_email, $subject, $result, $error_msg = nu
 function send_email_from_template($template_key, $to_email, $to_name, $variables = [], $lang = 'hu') {
     $tpl = get_email_template($template_key, $lang);
     if (!$tpl) {
+        $tpl = _get_default_email_template($template_key, $lang);
+    }
+
+    if (!$tpl) {
         _log_email($template_key, $to_email, '', 'error', 'Template not found: ' . $template_key);
         return false;
     }
@@ -131,6 +389,15 @@ function send_email_from_template($template_key, $to_email, $to_name, $variables
         $body_html = str_replace('{{' . $k . '}}', $v, $body_html);
         $body_text = str_replace('{{' . $k . '}}', $v, $body_text);
     }
+
+    $body_text = normalize_escaped_whitespace($body_text);
+    if (trim($body_text) === '') {
+        $plain_source = preg_replace('/<br\s*\/?>/i', "\n", (string)$body_html);
+        $plain_source = preg_replace('/<\/p>/i', "\n\n", (string)$plain_source);
+        $body_text = trim(html_entity_decode(strip_tags((string)$plain_source), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
+    $body_html = render_email_html_with_layout($subject, $body_html, $variables);
 
     return send_raw_email(
         ['email' => $to_email, 'name' => $to_name],
@@ -152,20 +419,33 @@ function send_email_from_template($template_key, $to_email, $to_name, $variables
  * @return bool                     True on success, false on any failure
  */
 function send_raw_email($to, $subject, $body_html, $body_text = '', $template_key = null) {
-    $smtp = get_smtp_settings();
-
-    if (empty($smtp['host']) || empty($smtp['from_email'])) {
-        _log_email($template_key, is_array($to) ? $to['email'] : $to, $subject, 'error', 'SMTP not configured');
-        return false;
-    }
-
     $to_email = is_array($to) ? ($to['email'] ?? '') : $to;
     $to_name  = is_array($to) ? ($to['name']  ?? '') : '';
 
+    if (empty($to_email) || !filter_var($to_email, FILTER_VALIDATE_EMAIL)) {
+        _log_email($template_key, $to_email, $subject, 'error', 'Invalid recipient email');
+        return false;
+    }
+
+    if (stripos((string)$body_html, '<html') === false) {
+        $body_html = render_email_html_with_layout($subject, (string)$body_html, ['site_name' => 'EduDisplej']);
+    }
+
+    $body_text = normalize_escaped_whitespace($body_text);
+    if (trim((string)$body_text) === '') {
+        $plain_source = preg_replace('/<br\s*\/?>/i', "\n", (string)$body_html);
+        $plain_source = preg_replace('/<\/p>/i', "\n\n", (string)$plain_source);
+        $body_text = trim(html_entity_decode(strip_tags((string)$plain_source), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
+    $queue_id = queue_raw_email($to_email, $to_name, $subject, $body_html, $body_text, $template_key);
+    if ($queue_id <= 0) {
+        _log_email($template_key, $to_email, $subject, 'error', 'Queue insert failed');
+        return false;
+    }
+
     try {
-        $result = _smtp_send($smtp, $to_email, $to_name, $subject, $body_html, $body_text);
-        _log_email($template_key, $to_email, $subject, $result ? 'success' : 'error', $result === true ? null : $result);
-        return $result === true;
+        return process_email_queue_item($queue_id);
     } catch (Exception $e) {
         _log_email($template_key, $to_email, $subject, 'error', $e->getMessage());
         return false;
@@ -319,6 +599,7 @@ function _smtp_send(array $smtp, $to_email, $to_name, $subject, $body_html, $bod
     $headers .= "X-Mailer: EduDisplej\r\n";
 
     $plain = !empty($body_text) ? $body_text : strip_tags($body_html);
+    $plain = normalize_escaped_whitespace($plain);
 
     $body  = "--{$boundary}\r\n";
     $body .= "Content-Type: text/plain; charset=UTF-8\r\n";
