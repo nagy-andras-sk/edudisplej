@@ -54,5 +54,6 @@
   "textOverlayFontSize": 52,
   "textOverlayColor": "#ffffff",
   "textOverlaySpeedPxPerSec": 120,
-  "apiBaseUrl": "../../api/meal_plan.php"
+  "apiBaseUrl": "../../api/meal_plan.php",
+  "runtimeApiFetchEnabled": false
 }

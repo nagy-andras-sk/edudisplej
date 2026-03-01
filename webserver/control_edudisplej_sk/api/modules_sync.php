@@ -427,6 +427,7 @@ function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company
         if ((int)($normalized['companyId'] ?? 0) <= 0 && $company_id > 0) {
             $normalized['companyId'] = $company_id;
         }
+        $normalized['runtimeApiFetchEnabled'] = false;
         $prefetched = edudisplej_sync_prefetch_meal_menu_payload($conn, $company_id, $normalized);
         if ($prefetched) {
             $normalized['offlinePrefetchedMenuData'] = $prefetched;

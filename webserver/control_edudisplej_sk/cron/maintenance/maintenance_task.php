@@ -1763,21 +1763,18 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
         logResult('Jedalen sync: using auto-bootstrapped targets for this run.', 'info');
     }
 
-    $forceRun = edudisplej_maintenance_should_force_jedalen_sync_for_missing_data($conn, $targets);
-    $updatedTodayRun = edudisplej_maintenance_should_run_jedalen_by_updated_today($conn, $targets);
     $everyCycle = !empty($syncConfig['every_cycle']);
+    $dailyGate = edudisplej_maintenance_should_run_jedalen_today($conn, $jobKey, $syncConfig);
 
     if ($menusOnly) {
         logResult('Jedalen sync: manual menus-only mode (selected institutions).', 'info');
     } elseif ($everyCycle) {
         logResult('Jedalen sync: running on every maintenance cycle for loop-linked institutions (every_cycle=1).', 'info');
-    } elseif (!empty($forceRun['run'])) {
-        logResult('Jedalen sync: running now (missing cached data for used institutions: ' . (int)($forceRun['missing_count'] ?? 0) . ').', 'info');
-    } elseif (empty($updatedTodayRun['run'])) {
-        logResult('Jedalen sync skipped: all loop-linked institutions already updated today (updated_at).', 'info');
+    } elseif (empty($dailyGate['run'])) {
+        logResult('Jedalen sync skipped: daily gate blocked run (' . (string)($dailyGate['reason'] ?? 'unknown') . ').', 'info');
         return;
     } else {
-        logResult('Jedalen sync: running now (institutions not updated today: ' . (int)($updatedTodayRun['missing_count'] ?? 0) . ').', 'info');
+        logResult('Jedalen sync: daily run started (' . (string)($dailyGate['reason'] ?? 'scheduled') . ').', 'info');
     }
 
     try {

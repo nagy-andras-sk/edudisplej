@@ -6950,6 +6950,7 @@
             params.append('showSourceUrl', settings.showSourceUrl === true ? 'true' : 'false');
             params.append('sourceUrl', String(settings.sourceUrl || ''));
             params.append('apiBaseUrl', settings.apiBaseUrl || '../../api/meal_plan.php');
+            params.append('runtimeApiFetchEnabled', 'true');
             if (companyId > 0) {
                 params.append('company_id', String(companyId));
             }

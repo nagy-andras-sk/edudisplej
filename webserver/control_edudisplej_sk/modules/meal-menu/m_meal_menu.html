@@ -49,7 +49,7 @@
         .meal-row { display:grid; grid-template-columns: clamp(30px, 1.9vw, 42px) 1fr; align-items:flex-start; gap:12px; border:1px solid rgba(148,163,184,.24); border-radius:13px; background: rgba(30, 41, 59, 0.66); padding:10px 12px; }
         .meal-row-icon { width: clamp(24px, 1.5vw, 34px); height: clamp(24px, 1.5vw, 34px); display:inline-flex; color:#bfdbfe; margin-top: 4px; flex: 0 0 auto; }
         .meal-row-text { font-size: clamp(28px, var(--meal-text-font-size, 2.3vw), 54px); line-height: var(--meal-line-height, 1.38); font-weight: var(--meal-text-weight, 650); color: #f8fafc; white-space: var(--meal-white-space, pre-wrap); word-break: var(--meal-word-break, break-word); }
-        .meal-row-line { display: inline; }
+        .meal-row-line { display: inline; white-space: nowrap; }
         .meal-inline-allergens { display:inline-flex; align-items:center; gap:6px; margin-left: 10px; vertical-align: middle; }
         .meal-inline-allergen-num { display:inline-flex; align-items:center; justify-content:center; min-width:1.8em; border-radius:999px; padding:3px 9px; font-size:.84em; line-height:1; font-weight:800; color:#111827; background:#fbbf24; border:1px solid rgba(251, 191, 36, .8); }
         .allergen-wrap { margin-top: 6px; padding: 10px 10px 0; border-top: 1px solid rgba(148, 163, 184, 0.2); background: rgba(15, 23, 42, 0.38); border-radius: 12px; }
@@ -86,6 +86,7 @@
         }
         .empty { grid-column: 1 / -1; border: 1px dashed rgba(148,163,184,.35); border-radius: 12px; padding: 16px; color: #cbd5e1; font-size: clamp(18px, 1.7vw, 32px); }
         .foot { font-size: clamp(16px, 1.2vw, 24px); color: #94a3b8; }
+        .foot-allergens { display:block; margin-top:4px; font-size: clamp(11px, .8vw, 14px); color:#cbd5e1; opacity:.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .root.scroll-mode { justify-items: center; text-align: center; }
         .root.scroll-mode .head { width: 100%; justify-content: center; }
         .root.scroll-mode .title-wrap { display:flex; flex-direction:column; align-items:center; }
@@ -113,7 +114,7 @@
         .root.small-mode .small-page-table { height: 100%; display:grid; grid-template-rows: repeat(var(--small-page-rows, 6), minmax(0, 1fr)); gap: .4vh; }
         .root.small-mode .small-page-row { border:1px solid rgba(148,163,184,.26); border-radius:12px; background: rgba(30, 41, 59, 0.68); min-height:0; display:flex; align-items:center; justify-content:center; text-align:center; padding: 0 .9vw; }
         .root.small-mode .small-page-row-title { background: rgba(30, 58, 138, 0.86); border-color: rgba(147, 197, 253, 0.62); }
-        .root.small-mode .small-page-row-text { width:100%; line-height: 1.02; font-size: clamp(54px, 7vw, 168px); font-weight: 800; color:#f8fafc; }
+        .root.small-mode .small-page-row-text { width:100%; line-height: .96; font-size: clamp(72px, 10vw, 320px); font-weight: 800; color:#f8fafc; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
         .root.small-mode .small-page-row-title .small-page-row-text { font-weight: 900; color: #dbeafe; }
         .root.small-mode .foot { text-align: center; font-size: clamp(14px, 1.8vw, 28px); color: #cbd5e1; }
 
@@ -283,6 +284,8 @@
             sourceType: 'server',
             mealDisplayMode: 'small_screen',
             smallScreenPageSwitchSec: 12,
+            smallScreenUseCustomMealSelection: false,
+            smallScreenVisibleMeals: 'breakfast,snack_am,lunch,snack_pm,dinner',
             showBreakfast: true,
             showSnackAm: true,
             showLunch: true,
@@ -338,6 +341,9 @@
             textOverlayColor: '#ffffff',
             textOverlaySpeedPxPerSec: 120,
             apiBaseUrl: '../../api/meal_plan.php',
+            runtimeApiFetchEnabled: false,
+            apiTimeoutMs: 3500,
+            maxFallbackDaysAhead: 2,
             offlinePrefetchedMenuData: null,
             offlinePrefetchedMenuSavedAt: ''
         };
@@ -358,6 +364,8 @@
                 return legacyLayout === 'square_dual_day' ? 'large_screen' : 'small_screen';
             })(),
             smallScreenPageSwitchSec: Math.max(5, Math.min(60, parseNum(params.get('smallScreenPageSwitchSec') ?? injected.smallScreenPageSwitchSec, defaults.smallScreenPageSwitchSec))),
+            smallScreenUseCustomMealSelection: parseBool(params.get('smallScreenUseCustomMealSelection') ?? injected.smallScreenUseCustomMealSelection, defaults.smallScreenUseCustomMealSelection),
+            smallScreenVisibleMeals: String(params.get('smallScreenVisibleMeals') ?? injected.smallScreenVisibleMeals ?? defaults.smallScreenVisibleMeals),
             showBreakfast: parseBool(params.get('showBreakfast') ?? injected.showBreakfast, defaults.showBreakfast),
             showSnackAm: parseBool(params.get('showSnackAm') ?? injected.showSnackAm, defaults.showSnackAm),
             showLunch: parseBool(params.get('showLunch') ?? injected.showLunch, defaults.showLunch),
@@ -422,6 +430,9 @@
             textOverlayColor: String(params.get('textOverlayColor') ?? injected.textOverlayColor ?? defaults.textOverlayColor),
             textOverlaySpeedPxPerSec: parseNum(params.get('textOverlaySpeedPxPerSec') ?? injected.textOverlaySpeedPxPerSec, defaults.textOverlaySpeedPxPerSec),
             apiBaseUrl: String(params.get('apiBaseUrl') ?? injected.apiBaseUrl ?? defaults.apiBaseUrl),
+            runtimeApiFetchEnabled: parseBool(params.get('runtimeApiFetchEnabled') ?? injected.runtimeApiFetchEnabled, defaults.runtimeApiFetchEnabled),
+            apiTimeoutMs: Math.max(1500, Math.min(6000, parseNum(params.get('apiTimeoutMs') ?? injected.apiTimeoutMs, defaults.apiTimeoutMs))),
+            maxFallbackDaysAhead: Math.max(0, Math.min(3, parseNum(params.get('maxFallbackDaysAhead') ?? injected.maxFallbackDaysAhead, defaults.maxFallbackDaysAhead))),
             offlinePrefetchedTodayFile: String(params.get('offlinePrefetchedTodayFile') ?? injected.offlinePrefetchedTodayFile ?? ''),
             offlinePrefetchedTomorrowFile: String(params.get('offlinePrefetchedTomorrowFile') ?? injected.offlinePrefetchedTomorrowFile ?? ''),
             offlinePrefetchedMenuData: (() => {
@@ -1016,14 +1027,38 @@
     function fitCardText(cardEl, minPx, maxPx) {
         if (!cardEl) return;
         const rows = Array.from(cardEl.querySelectorAll('.meal-row-text'));
+        const shared = fitSharedTextSize(rows, Math.round(minPx), Math.round(maxPx));
         rows.forEach((row) => {
-            row.style.fontSize = `${Math.round(maxPx)}px`;
-            let current = Math.round(maxPx);
-            while (current > minPx && (row.scrollHeight > row.clientHeight + 2 || row.scrollWidth > row.clientWidth + 2)) {
-                current -= 1;
-                row.style.fontSize = `${current}px`;
-            }
+            row.style.fontSize = `${shared}px`;
         });
+    }
+
+    function fitSharedTextSize(rows, minPx, maxPx) {
+        const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
+        if (!list.length) {
+            return Math.max(1, Math.round(minPx));
+        }
+
+        let low = Math.max(1, Math.round(minPx));
+        let high = Math.max(low, Math.round(maxPx));
+        let best = low;
+
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            list.forEach((row) => {
+                row.style.fontSize = `${mid}px`;
+            });
+
+            const allFit = list.every((row) => row.scrollHeight <= row.clientHeight + 2 && row.scrollWidth <= row.clientWidth + 2);
+            if (allFit) {
+                best = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+
+        return best;
     }
 
     function fitVisibleMealCards(displayMode) {
@@ -1033,15 +1068,78 @@
 
         if (isSmall) {
             const smallRows = Array.from(document.querySelectorAll('#cards .small-page-row-text'));
+            const viewportMax = Math.max(220, Math.floor(window.innerHeight * 0.7));
+            const rowHeightMax = smallRows.length > 0
+                ? Math.max(...smallRows.map((row) => Math.floor(row.clientHeight * 1.25)))
+                : viewportMax;
+            const sharedSmall = fitSharedTextSize(smallRows, 64, Math.max(viewportMax, rowHeightMax));
             smallRows.forEach((row) => {
-                row.style.fontSize = '160px';
-                let current = 160;
-                while (current > 40 && (row.scrollHeight > row.clientHeight + 2 || row.scrollWidth > row.clientWidth + 2)) {
-                    current -= 1;
-                    row.style.fontSize = `${current}px`;
-                }
+                row.style.fontSize = `${sharedSmall}px`;
             });
         }
+    }
+
+    function toDisplaySingleLine(text, language) {
+        const raw = String(text || '').replace(/\s+/g, ' ').trim();
+        if (raw === '') {
+            return '—';
+        }
+
+        const lang = String(language || 'sk').toLowerCase();
+        try {
+            if (lang === 'hu') {
+                return raw.toLocaleUpperCase('hu-HU');
+            }
+            if (lang === 'sk') {
+                return raw.toLocaleUpperCase('sk-SK');
+            }
+            if (lang === 'en') {
+                return raw.toLocaleUpperCase('en-US');
+            }
+            return raw.toLocaleUpperCase();
+        } catch (_) {
+            return raw.toUpperCase();
+        }
+    }
+
+    function normalizeMealAlias(value) {
+        return String(value || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z]/g, '');
+    }
+
+    function mealAliasToKey(value) {
+        const n = normalizeMealAlias(value);
+        if (n === 'breakfast' || n === 'ranajky' || n === 'reggeli') return 'breakfast';
+        if (n === 'snackam' || n === 'desiata' || n === 'tizorai') return 'snack_am';
+        if (n === 'lunch' || n === 'obed' || n === 'ebed') return 'lunch';
+        if (n === 'snackpm' || n === 'olovrant' || n === 'uzsonna') return 'snack_pm';
+        if (n === 'dinner' || n === 'vecera' || n === 'vacsora') return 'dinner';
+        return '';
+    }
+
+    function resolveSmallScreenAllowedMealKeys(settings) {
+        if (!(settings && settings.smallScreenUseCustomMealSelection === true)) {
+            return null;
+        }
+
+        const raw = String(settings.smallScreenVisibleMeals || '').trim();
+        if (raw === '') {
+            return new Set();
+        }
+
+        const tokens = raw.split(/[\n,;|]+/).map((part) => part.trim()).filter(Boolean);
+        const keys = new Set();
+        tokens.forEach((token) => {
+            const resolved = mealAliasToKey(token);
+            if (resolved) {
+                keys.add(resolved);
+            }
+        });
+
+        return keys;
     }
 
     function renderSmallScreenPagedMeals(meals, settings, t) {
@@ -1055,7 +1153,7 @@
             return;
         }
 
-        const sections = [];
+        const pages = [];
         list.forEach((meal) => {
             const key = String(meal?.key || '').trim();
             const localized = String(t.mealLabels?.[key] || '').trim();
@@ -1067,60 +1165,69 @@
                 .map((line) => normalizeMealLine(line))
                 .filter((line) => line !== '');
 
-            const sectionRows = [];
+            const pageRows = [];
             (lines.length ? lines : ['—']).forEach((line) => {
                 const inlineParsed = extractInlineAllergenCodesFromLine(line);
-                sectionRows.push({
+                pageRows.push({
                     type: 'line',
                     text: inlineParsed.text || line,
                     codes: inlineParsed.codes
                 });
             });
 
-            sections.push({
+            pages.push({
                 label: mealName,
-                rows: sectionRows
+                rows: pageRows
             });
         });
 
-        const rowsPerPage = 6;
-        const pages = [];
-        sections.forEach((section) => {
-            const rows = Array.isArray(section.rows) ? section.rows : [];
-            if (!rows.length) {
-                pages.push({ label: section.label, rows: [{ type: 'line', text: '—', codes: [] }] });
-                return;
-            }
-            for (let start = 0; start < rows.length; start += rowsPerPage) {
-                pages.push({ label: section.label, rows: rows.slice(start, start + rowsPerPage) });
-            }
-        });
-
         const renderRow = (row) => {
-            const text = escapeHtml(String(row?.text || '—'));
-            const inlineCodes = inlineAllergenCodesHtml(row?.codes || []);
-            return `<div class="small-page-row"><div class="small-page-row-text"><span class="meal-row-line">${text}</span>${inlineCodes}</div></div>`;
+            const rawText = String(row?.text || '—');
+            const text = escapeHtml(toDisplaySingleLine(rawText, settings.language));
+            return `<div class="small-page-row"><div class="small-page-row-text"><span class="meal-row-line">${text}</span></div></div>`;
         };
 
         let pageIndex = 0;
-        const renderPage = () => {
-            const page = pages[pageIndex] || pages[0] || { label: t.title, rows: [] };
-            const titleEl = document.getElementById('title');
-            if (titleEl) {
-                titleEl.textContent = String(page.label || t.title || '').trim() || t.title;
-            }
+        const renderPageHtml = (page) => {
             const pageRows = Array.isArray(page.rows) ? page.rows : [];
             const renderedRows = pageRows.map(renderRow).join('');
-            cards.innerHTML = `<div class="card band-other small-page-card"><div class="small-page-table" style="--small-page-rows:${Math.max(1, pageRows.length)};">${renderedRows}</div></div>`;
-            fitVisibleMealCards('small_screen');
+            return `<div class="card band-other small-page-card"><div class="small-page-table" style="--small-page-rows:${Math.max(1, pageRows.length)};">${renderedRows}</div></div>`;
+        };
+
+        const renderPage = () => {
+            const page = pages[pageIndex] || pages[0] || { label: t.title, rows: [] };
+            cards.setAttribute('data-page-index', String(pageIndex));
+            cards.setAttribute('data-page-label', String(page.label || '').trim());
+            cards.innerHTML = renderPageHtml(page);
+            const titleEl = document.getElementById('title');
+            if (titleEl) {
+                const label = String(page.label || '').trim();
+                titleEl.textContent = label !== '' ? label : (String(t.title || '').trim() || 'Menu');
+            }
+            requestAnimationFrame(() => {
+                fitVisibleMealCards('small_screen');
+            });
         };
 
         renderPage();
         if (pages.length > 1) {
             const switchMs = Math.max(5000, Math.min(60000, Number(settings.smallScreenPageSwitchSec || 12) * 1000));
+            let switchInProgress = false;
             mealPageSwitchTimer = setInterval(() => {
+                if (switchInProgress) {
+                    return;
+                }
+                switchInProgress = true;
                 pageIndex = (pageIndex + 1) % pages.length;
-                renderPage();
+                requestAnimationFrame(() => {
+                    try {
+                        renderPage();
+                    } finally {
+                        setTimeout(() => {
+                            switchInProgress = false;
+                        }, 120);
+                    }
+                });
             }, switchMs);
         }
     }
@@ -1180,6 +1287,27 @@
         panel.classList.add('show');
     }
 
+    function footerAllergenSummary(meals, t) {
+        const list = Array.isArray(meals) ? meals : [];
+        const codes = new Set();
+        list.forEach((meal) => {
+            const raw = stripSourceNoise(String(meal?.text || '').trim());
+            extractAllergenCodes(raw).forEach((code) => {
+                const normalized = parseInt(code, 10);
+                if (normalized >= 1 && normalized <= 14) {
+                    codes.add(normalized);
+                }
+            });
+        });
+
+        const sorted = Array.from(codes).sort((a, b) => a - b);
+        if (!sorted.length) {
+            return '';
+        }
+
+        return `${String(t.allergens || 'Allergens')}: ${sorted.join(', ')}`;
+    }
+
     function render(data, settings) {
         const cards = document.getElementById('cards');
         const cardsWrap = document.getElementById('cards-wrap');
@@ -1191,15 +1319,21 @@
         const dayText = String(data?.menu_date || '').trim();
         const institutionName = String(data?.institution_name || '').trim();
 
-        const mealsRaw = Array.isArray(data?.meals) ? data.meals : [];
-        const mealsUnmerged = isFutureMenuDate(dayText)
-            ? mealsRaw
-            : filterMealsForCurrentTime(mealsRaw, settings, nowMinutesLocal());
-        const mealsForSmall = mergeStandardMealBands(mealsUnmerged, t, settings);
-        const mealsForLarge = mergeStandardMealBands(mealsUnmerged, t, settings);
         const displayMode = String(settings.mealDisplayMode || 'small_screen').toLowerCase() === 'large_screen'
             ? 'large_screen'
             : 'small_screen';
+
+        const mealsRaw = Array.isArray(data?.meals) ? data.meals : [];
+        const mealsUnmergedLarge = isFutureMenuDate(dayText)
+            ? mealsRaw
+            : filterMealsForCurrentTime(mealsRaw, settings, nowMinutesLocal());
+        const mealsUnmergedSmall = mealsRaw;
+        const mealsForSmall = mergeStandardMealBands(mealsUnmergedSmall, t, settings);
+        const mealsForLarge = mergeStandardMealBands(mealsUnmergedLarge, t, settings);
+        const smallAllowedKeys = resolveSmallScreenAllowedMealKeys(settings);
+        const mealsForSmallSelected = smallAllowedKeys === null
+            ? mealsForSmall
+            : mealsForSmall.filter((meal) => smallAllowedKeys.has(String(meal?.key || '').trim()));
 
         if (displayMode === 'small_screen') {
             if (title) {
@@ -1230,7 +1364,8 @@
         cards.classList.toggle('single-card', displayMode === 'small_screen');
         stopSlowScroll();
         stopMealPageSwitch();
-        const displayMeals = displayMode === 'large_screen' ? mealsForLarge : mealsForSmall;
+        const displayMealsRaw = displayMode === 'large_screen' ? mealsForLarge : mealsForSmallSelected;
+        const displayMeals = displayMealsRaw.filter((meal) => mealHasRenderableRows(meal));
         if (!displayMeals.length) {
             cards.innerHTML = `<div class="empty">${escapeHtml(emptyStateMessage(data, t))}</div>`;
         } else {
@@ -1243,7 +1378,12 @@
         renderFixedAllergenPanel(displayMode === 'large_screen' ? displayMeals : [], settings, t);
 
         if (displayMode === 'small_screen') {
-            foot.innerHTML = `<span class="foot-line">${escapeHtml(dayText || '')}</span>`;
+            const allergensLine = footerAllergenSummary(displayMeals, t);
+            const lines = [`<span class="foot-line">${escapeHtml(dayText || '')}</span>`];
+            if (allergensLine !== '') {
+                lines.push(`<span class="foot-allergens">${escapeHtml(allergensLine)}</span>`);
+            }
+            foot.innerHTML = lines.join('');
         } else {
             const serverTs = String(data?.updated_at || '').trim();
             const appetiteText = String(settings.appetiteMessageText || '').trim();
@@ -1258,6 +1398,10 @@
             }
             if (settings.showSourceUrl === true && sourceUrl !== '') {
                 lines.push(`<span class="foot-source">${escapeHtml(`${String(t.sourcePrefix || 'Menu source')}: ${sourceUrl}`)}</span>`);
+            }
+            const allergensLine = footerAllergenSummary(displayMeals, t);
+            if (allergensLine !== '') {
+                lines.push(`<span class="foot-allergens">${escapeHtml(allergensLine)}</span>`);
             }
             foot.innerHTML = lines.join('');
         }
@@ -1345,6 +1489,10 @@
         }
         if (settings.showSourceUrl === true && sourceUrl !== '') {
             lines.push(`<span class="foot-source">${escapeHtml(`${String(t.sourcePrefix || 'Menu source')}: ${sourceUrl}`)}</span>`);
+        }
+        const allVisibleMealsSummary = footerAllergenSummary(allVisibleMeals, t);
+        if (allVisibleMealsSummary !== '') {
+            lines.push(`<span class="foot-allergens">${escapeHtml(allVisibleMealsSummary)}</span>`);
         }
         foot.innerHTML = lines.join('');
     }
@@ -1524,18 +1672,20 @@
 
     function hasAnyMeals(data) {
         const meals = Array.isArray(data?.meals) ? data.meals : [];
-        return meals.some((meal) => {
-            const rawText = stripSourceNoise(String(meal?.text || '').trim());
-            const cleanText = String(stripAllergenAnnotations(rawText) || rawText || '').trim();
-            if (!cleanText) {
-                return false;
-            }
-            const normalizedLines = cleanText
-                .split(/\r?\n/)
-                .map((line) => normalizeMealLine(line))
-                .filter((line) => line !== '' && line !== '—');
-            return normalizedLines.length > 0;
-        });
+        return meals.some((meal) => mealHasRenderableRows(meal));
+    }
+
+    function mealHasRenderableRows(meal) {
+        const rawText = stripSourceNoise(String(meal?.text || '').trim());
+        const cleanText = String(stripAllergenAnnotations(rawText) || rawText || '').trim();
+        if (!cleanText) {
+            return false;
+        }
+        const normalizedLines = cleanText
+            .split(/\r?\n/)
+            .map((line) => normalizeMealLine(line))
+            .filter((line) => line !== '' && line !== '—');
+        return normalizedLines.length > 0;
     }
 
     function createDebugState() {
@@ -1598,7 +1748,7 @@
 
         const url = appendToken(resolveApiUrl(settings.apiBaseUrl, queryParams.toString()));
         try {
-            const response = await fetchWithTimeout(url, 6000);
+            const response = await fetchWithTimeout(url, settings.apiTimeoutMs);
             const payload = await response.json();
             if (!response.ok || !payload || payload.success !== true) {
                 pushDebug(debugState, `API fail (${response.status || 'n/a'}) ${dateValue}`);
@@ -1676,13 +1826,61 @@
 
         let rendered = false;
 
-        try {
+        if (!rendered) {
+            const prefetched = settings.offlinePrefetchedMenuData;
             if (settings.layoutMode === 'square_dual_day') {
+                const todayPref = prefetched && typeof prefetched === 'object' ? (prefetched.today || null) : null;
+                const tomorrowPref = prefetched && typeof prefetched === 'object' ? (prefetched.tomorrow || null) : null;
+                if (todayPref || tomorrowPref) {
+                    renderSquareDual(todayPref || { institution_name: '', menu_date: isoDateOffset(0), meals: [] }, tomorrowPref || { institution_name: '', menu_date: isoDateOffset(1), meals: [] }, settings);
+                    rendered = true;
+                    pushDebug(debugState, 'Rendered from inline prefetched data (startup fast path)');
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayPref, tomorrow: tomorrowPref } }));
+                    } catch (_) {
+                    }
+                }
+            } else if (prefetched && Array.isArray(prefetched.meals)) {
+                render(prefetched, settings);
+                rendered = true;
+                pushDebug(debugState, 'Rendered from inline prefetched data (startup fast path)');
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: prefetched }));
+                } catch (_) {
+                }
+            }
+        }
+
+        if (!rendered) {
+            try {
+                const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+                if (cached && cached.data) {
+                    if (settings.layoutMode === 'square_dual_day') {
+                        const todayCached = cached.data.today || null;
+                        const tomorrowCached = cached.data.tomorrow || null;
+                        if (todayCached || tomorrowCached) {
+                            renderSquareDual(todayCached || { institution_name: '', menu_date: isoDateOffset(0), meals: [] }, tomorrowCached || { institution_name: '', menu_date: isoDateOffset(1), meals: [] }, settings);
+                            rendered = true;
+                            pushDebug(debugState, 'Rendered from local cache (startup fast path)');
+                        }
+                    } else if (cached.data.meals || cached.mode === 'single') {
+                        render(cached.data, settings);
+                        rendered = true;
+                        pushDebug(debugState, 'Rendered from local cache (startup fast path)');
+                    }
+                }
+            } catch (_) {
+            }
+        }
+
+        try {
+            if (!rendered && settings.runtimeApiFetchEnabled === true && settings.layoutMode === 'square_dual_day') {
                 const todayDate = isoDateOffset(0);
                 const tomorrowDate = isoDateOffset(1);
                 let todayData = await fetchMenuData(settings, todayDate, false, debugState);
-                if (!todayData || !hasAnyMeals(todayData)) {
-                    const fallbackToday = await findNextMenuWithMeals(settings, 1, 7, debugState);
+                const shouldProbeFallbackToday = (!todayData || todayData.__serverDataAvailable !== false) && settings.maxFallbackDaysAhead > 0;
+                if ((!todayData || !hasAnyMeals(todayData)) && shouldProbeFallbackToday) {
+                    const fallbackToday = await findNextMenuWithMeals(settings, 1, settings.maxFallbackDaysAhead, debugState);
                     if (fallbackToday) {
                         todayData = fallbackToday;
                     }
@@ -1704,10 +1902,11 @@
                 } else {
                     pushDebug(debugState, 'API empty (square mode)');
                 }
-            } else {
+            } else if (!rendered && settings.runtimeApiFetchEnabled === true) {
                 let data = await fetchMenuData(settings, isoDateOffset(0), false, debugState);
-                if (!data || !hasAnyMeals(data)) {
-                    const fallbackData = await findNextMenuWithMeals(settings, 1, 7, debugState);
+                const shouldProbeFallback = (!data || data.__serverDataAvailable !== false) && settings.maxFallbackDaysAhead > 0;
+                if ((!data || !hasAnyMeals(data)) && shouldProbeFallback) {
+                    const fallbackData = await findNextMenuWithMeals(settings, 1, settings.maxFallbackDaysAhead, debugState);
                     if (fallbackData) {
                         data = fallbackData;
                     }
@@ -1723,6 +1922,8 @@
                 } else {
                     pushDebug(debugState, 'API empty (single mode)');
                 }
+            } else {
+                pushDebug(debugState, 'Runtime API fetch disabled; using prefetched/local data only');
             }
         } catch (error) {
             pushDebug(debugState, `Init API phase exception: ${String(error?.message || error || 'unknown')}`);
