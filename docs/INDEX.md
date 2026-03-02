@@ -22,6 +22,9 @@ Ez a teljes audit a **EduDisplej Control Panel** biztonsági és teljesítmény 
 
 ### 🧭 ÜZEMELTETÉSI / SZINKRON DOKUMENTÁCIÓK
 
+- [JEDALEN_TECH_DISCOVERY.md](JEDALEN_TECH_DISCOVERY.md)  
+  Technikai feltárási dokumentáció arról, hogyan azonosítottuk a Jedalen oldal működését (web scraping + WebForms jellegű postback), és miért erre a gyűjtési stratégiára épül a szinkron.
+
 - [MODUL_SYNC_KEPEK_ETREND_ADATFOLYAM.md](MODUL_SYNC_KEPEK_ETREND_ADATFOLYAM.md)  
   Részletes, implementáció-közeli leírás a modul sync folyamatáról (képek, PDF/videó assetek, étrend prefetch/offline cache, loop frissítési trigger logika).
 

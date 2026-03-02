@@ -2299,16 +2299,27 @@
         }
 
         function dayName(day) {
-            const names = {
-                1: 'H',
-                2: 'K',
-                3: 'Sze',
-                4: 'Cs',
-                5: 'P',
-                6: 'Szo',
-                7: 'V'
+            return getDayShortLabel(String(day));
+        }
+
+        function getWeeklyGridText(token) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    hour: 'Óra',
+                    today: 'Ma'
+                },
+                sk: {
+                    hour: 'Hod',
+                    today: 'Dnes'
+                },
+                en: {
+                    hour: 'Hour',
+                    today: 'Today'
+                }
             };
-            return names[day] || '?';
+
+            return (dict[lang] && dict[lang][token]) || dict.en[token] || String(token || '');
         }
 
         function getWeekStartDate(offsetWeeks) {
@@ -2557,12 +2568,12 @@
             const todayKey = toDateKey(new Date());
             const isCurrentWeek = scheduleWeekOffset === 0;
             const rows = [];
-            rows.push('<thead><tr><th class="hour-col">Óra</th>' + [1,2,3,4,5,6,7].map((d) => {
+            rows.push(`<thead><tr><th class="hour-col">${getWeeklyGridText('hour')}</th>` + [1,2,3,4,5,6,7].map((d) => {
                 const dt = getDateForDayInOffsetWeek(d);
                 const dateKey = toDateKey(dt);
                 const isToday = isCurrentWeek && dateKey === todayKey;
                 const thClass = isToday ? ' class="schedule-day-today"' : '';
-                const marker = isToday ? '<br><span style="font-size:10px; color:#1f3e56; font-weight:700;">Ma</span>' : '';
+                const marker = isToday ? `<br><span style="font-size:10px; color:#1f3e56; font-weight:700;">${getWeeklyGridText('today')}</span>` : '';
                 return `<th${thClass}>${dayName(d)}<br><span style="font-size:10px; color:#607083;">${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')}</span>${marker}</th>`;
             }).join('') + '</tr></thead>');
             rows.push('<tbody>');
@@ -4124,16 +4135,38 @@
         }
 
         function getDayShortLabel(day) {
-            const map = {
-                '1': 'H',
-                '2': 'K',
-                '3': 'Sze',
-                '4': 'Cs',
-                '5': 'P',
-                '6': 'Szo',
-                '7': 'V'
+            const lang = resolveUiLang();
+            const maps = {
+                hu: {
+                    '1': 'H',
+                    '2': 'K',
+                    '3': 'Sze',
+                    '4': 'Cs',
+                    '5': 'P',
+                    '6': 'Szo',
+                    '7': 'V'
+                },
+                sk: {
+                    '1': 'Po',
+                    '2': 'Ut',
+                    '3': 'St',
+                    '4': 'Št',
+                    '5': 'Pi',
+                    '6': 'So',
+                    '7': 'Ne'
+                },
+                en: {
+                    '1': 'Mon',
+                    '2': 'Tue',
+                    '3': 'Wed',
+                    '4': 'Thu',
+                    '5': 'Fri',
+                    '6': 'Sat',
+                    '7': 'Sun'
+                }
             };
-            return map[String(day)] || '?';
+            const selectedMap = maps[lang] || maps.en;
+            return selectedMap[String(day)] || '?';
         }
 
         function hasBlockOverlap(candidate, ignoredId = null) {
