@@ -50,7 +50,7 @@ try {
 
     if ($module_key === 'image-gallery' || $module_key === 'gallery') {
         $stmt = $conn->prepare(
-            'SELECT id, original_name, mime_type, file_size, created_at, group_id
+            'SELECT id, original_name, mime_type, file_size, duration_sec, created_at, group_id
              FROM module_asset_store
              WHERE company_id = ? AND module_key IN ("image-gallery", "gallery") AND asset_kind = ? AND is_active = 1
              ORDER BY created_at DESC, id DESC
@@ -59,7 +59,7 @@ try {
         $stmt->bind_param('isi', $company_id, $asset_kind, $limit);
     } else {
         $stmt = $conn->prepare(
-            'SELECT id, original_name, mime_type, file_size, created_at, group_id
+            'SELECT id, original_name, mime_type, file_size, duration_sec, created_at, group_id
              FROM module_asset_store
              WHERE company_id = ? AND module_key = ? AND asset_kind = ? AND is_active = 1
              ORDER BY created_at DESC, id DESC
@@ -83,6 +83,7 @@ try {
             'original_name' => (string)($row['original_name'] ?? ''),
             'mime_type' => (string)($row['mime_type'] ?? ''),
             'file_size' => (int)($row['file_size'] ?? 0),
+            'duration_sec' => (int)($row['duration_sec'] ?? 0),
             'created_at' => (string)($row['created_at'] ?? ''),
             'group_id' => (int)($row['group_id'] ?? 0),
         ];

@@ -42,7 +42,7 @@ function edudisplej_module_registry(): array
                 'config_dir' => 'modules/text/config',
                 'default_settings_file' => 'modules/text/config/default_settings.json',
                 'functions' => ['formattedText', 'scrollMode', 'backgroundImage'],
-                'settings_schema' => ['textSourceType', 'textCollectionId', 'textCollectionLabel', 'textCollectionVersionTs', 'text', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'textAlign', 'textColor', 'bgColor', 'bgImageData', 'scrollMode', 'scrollStartPauseMs', 'scrollEndPauseMs', 'scrollSpeedPxPerSec'],
+                'settings_schema' => ['textSourceType', 'textCollectionId', 'textCollectionLabel', 'textCollectionVersionTs', 'textExternalUrl', 'text', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'textAlign', 'textColor', 'bgColor', 'bgImageData', 'scrollMode', 'scrollStartPauseMs', 'scrollEndPauseMs', 'scrollSpeedPxPerSec', 'clockOverlayEnabled', 'clockOverlayPosition', 'clockOverlayHeightPercent', 'clockOverlayTimeColor', 'clockOverlayDateColor'],
             ],
             'unconfigured' => [
                 'folder_key' => 'default',
@@ -60,7 +60,7 @@ function edudisplej_module_registry(): array
                 'config_dir' => 'modules/pdf/config',
                 'default_settings_file' => 'modules/pdf/config/default_settings.json',
                 'functions' => ['pdfViewer', 'zoom', 'autoScroll'],
-                'settings_schema' => ['pdfDataBase64', 'pdfAssetUrl', 'pdfAssetId', 'zoomLevel', 'autoScrollEnabled', 'autoScrollSpeedPxPerSec', 'autoScrollStartPauseMs', 'autoScrollEndPauseMs', 'pauseAtPercent', 'pauseDurationMs'],
+                'settings_schema' => ['pdfDataBase64', 'pdfAssetUrl', 'pdfAssetId', 'zoomLevel', 'horizontalStartPercent', 'autoScrollEnabled', 'autoScrollSpeedPxPerSec', 'autoScrollStartPauseMs', 'autoScrollEndPauseMs', 'pauseAtPercent', 'pauseDurationMs', 'autoScrollSectionsJson'],
             ],
             'image-gallery' => [
                 'folder_key' => 'gallery',

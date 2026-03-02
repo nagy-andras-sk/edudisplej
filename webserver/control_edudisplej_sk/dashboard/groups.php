@@ -20,6 +20,16 @@ if (!edudisplej_can_manage_loops()) {
     exit();
 }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+function dashboard_groups_verify_csrf_token(): bool {
+    $submitted = (string)($_POST['csrf_token'] ?? '');
+    $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+    return $submitted !== '' && $sessionToken !== '' && hash_equals($sessionToken, $submitted);
+}
+
 $error = '';
 $success = '';
 $user_id = $_SESSION['user_id'];
@@ -251,6 +261,9 @@ try {
 
 // Handle group creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_group'])) {
+    if (!dashboard_groups_verify_csrf_token()) {
+        $error = t_def('groups.error.access_denied', 'Hozzáférés megtagadva');
+    } else {
     $name = trim($_POST['group_name'] ?? '');
     $description = trim($_POST['description'] ?? '');
     
@@ -329,11 +342,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_group'])) {
             }
         }
     }
+    }
 }
 
 // Handle group deletion
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    $group_id = intval($_GET['delete']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_group'])) {
+    if (!dashboard_groups_verify_csrf_token()) {
+        $error = t_def('groups.error.access_denied', 'Hozzáférés megtagadva');
+    } else {
+    $group_id = intval($_POST['delete_group_id'] ?? 0);
     
     try {
         $stmt = $conn->prepare("SELECT company_id, is_default FROM kiosk_groups WHERE id = ?");
@@ -376,6 +393,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     } catch (Exception $e) {
         $error = t_def('groups.error.db', 'Adatbázis hiba');
         error_log($e->getMessage());
+    }
     }
 }
 
@@ -563,6 +581,7 @@ closeDbConnection($conn);
             </div>
             
             <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['csrf_token']); ?>">
                 <table>
                     <thead>
                         <tr>
@@ -620,7 +639,11 @@ closeDbConnection($conn);
                                     <?php else: ?>
                                         <div class="group-action-row">
                                             <a href="group_loop/index.php?id=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-primary">⚙️ <?php echo htmlspecialchars(t_def('groups.customize', 'Testreszabás')); ?></a>
-                                            <a href="?delete=<?php echo htmlspecialchars($group['id'], ENT_QUOTES, 'UTF-8'); ?>" class="group-action-btn group-action-btn-danger" onclick="return confirm('<?php echo htmlspecialchars(t_def('groups.confirm_delete', 'Biztosan törlöd ezt a csoportot?'), ENT_QUOTES, 'UTF-8'); ?>');">🗑️</a>
+                                            <form method="post" style="display:inline;">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['csrf_token']); ?>">
+                                                <input type="hidden" name="delete_group_id" value="<?php echo (int)$group['id']; ?>">
+                                                <button type="submit" name="delete_group" class="group-action-btn group-action-btn-danger" onclick="return confirm('<?php echo htmlspecialchars(t_def('groups.confirm_delete', 'Biztosan törlöd ezt a csoportot?'), ENT_QUOTES, 'UTF-8'); ?>');">🗑️</button>
+                                            </form>
                                         </div>
                                     <?php endif; ?>
                                 </td>

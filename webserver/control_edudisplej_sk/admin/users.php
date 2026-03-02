@@ -16,11 +16,24 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['
     exit();
 }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+function admin_users_verify_csrf_token(): bool {
+    $submitted = (string)($_POST['csrf_token'] ?? '');
+    $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+    return $submitted !== '' && $sessionToken !== '' && hash_equals($sessionToken, $submitted);
+}
+
 $error = '';
 $success = '';
 
-if (isset($_GET['disable_otp']) && is_numeric($_GET['disable_otp'])) {
-    $user_id = (int)$_GET['disable_otp'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['disable_otp'])) {
+    if (!admin_users_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
+    $user_id = (int)($_POST['disable_otp_user_id'] ?? 0);
 
     try {
         $conn = getDbConnection();
@@ -39,9 +52,13 @@ if (isset($_GET['disable_otp']) && is_numeric($_GET['disable_otp'])) {
         $error = 'Database error occurred';
         error_log($e->getMessage());
     }
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
+    if (!admin_users_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
     $username = trim($_POST['username'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -93,10 +110,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
             error_log($e->getMessage());
         }
     }
+    }
 }
 
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    $user_id = (int)$_GET['delete'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+    if (!admin_users_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
+    $user_id = (int)($_POST['delete_user_id'] ?? 0);
 
     if ($user_id === (int)$_SESSION['user_id']) {
         $error = 'Cannot delete your own account';
@@ -136,6 +157,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
             error_log($e->getMessage());
         }
     }
+    }
 }
 
 $edit_user = null;
@@ -161,6 +183,9 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
+    if (!admin_users_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
     $user_id = (int)($_POST['user_id'] ?? 0);
     $username = trim($_POST['username'] ?? '');
     $email = trim($_POST['email'] ?? '');
@@ -213,6 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
             error_log($e->getMessage());
         }
     }
+    }
 }
 
 $users = [];
@@ -258,6 +284,7 @@ include 'header.php';
 <div class="panel">
     <div class="panel-title"><?php echo $edit_user ? 'Felhasznalo szerkesztes' : 'Uj felhasznalo'; ?></div>
     <form method="post" class="form-row">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['csrf_token']); ?>">
         <?php if ($edit_user): ?>
             <input type="hidden" name="user_id" value="<?php echo (int)$edit_user['id']; ?>">
         <?php endif; ?>
@@ -373,9 +400,17 @@ include 'header.php';
                             <td class="nowrap"><?php echo $user['last_login'] ? date('Y-m-d H:i:s', strtotime($user['last_login'])) : '-'; ?></td>
                             <td class="nowrap">
                                 <a class="btn btn-small" href="users.php?edit=<?php echo (int)$user['id']; ?>">Szerkeszt</a>
-                                <a class="btn btn-small btn-danger" href="users.php?delete=<?php echo (int)$user['id']; ?>" onclick="return confirm('Archivaljuk a felhasznalot?')">Archival</a>
+                                <form method="post" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['csrf_token']); ?>">
+                                    <input type="hidden" name="delete_user_id" value="<?php echo (int)$user['id']; ?>">
+                                    <button type="submit" name="delete_user" class="btn btn-small btn-danger" onclick="return confirm('Archivaljuk a felhasznalot?')">Archival</button>
+                                </form>
                                 <?php if ((int)$user['otp_enabled'] === 1): ?>
-                                    <a class="btn btn-small" href="users.php?disable_otp=<?php echo (int)$user['id']; ?>" onclick="return confirm('Kikapcsoljuk a 2FA-t?')">2FA Off</a>
+                                    <form method="post" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['csrf_token']); ?>">
+                                        <input type="hidden" name="disable_otp_user_id" value="<?php echo (int)$user['id']; ?>">
+                                        <button type="submit" name="disable_otp" class="btn btn-small" onclick="return confirm('Kikapcsoljuk a 2FA-t?')">2FA Off</button>
+                                    </form>
                                 <?php endif; ?>
                             </td>
                         </tr>

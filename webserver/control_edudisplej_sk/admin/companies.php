@@ -14,6 +14,16 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['
     exit();
 }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+function admin_companies_verify_csrf_token(): bool {
+    $submitted = (string)($_POST['csrf_token'] ?? '');
+    $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+    return $submitted !== '' && $sessionToken !== '' && hash_equals($sessionToken, $submitted);
+}
+
 $error = '';
 $success = '';
 
@@ -242,8 +252,11 @@ if (isset($_GET['stop_act_as']) && (int)$_GET['stop_act_as'] === 1) {
     $success = 'Admin company context cleared';
 }
 
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    $company_id = (int)$_GET['delete'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_company'])) {
+    if (!admin_companies_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
+    $company_id = (int)($_POST['delete_company_id'] ?? 0);
 
     try {
         $conn = getDbConnection();
@@ -378,9 +391,13 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
         }
         error_log($e->getMessage());
     }
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_company'])) {
+    if (!admin_companies_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
     $company_id = isset($_POST['company_id']) ? (int)$_POST['company_id'] : 0;
     $name = trim($_POST['company_name'] ?? '');
     $address = trim($_POST['company_address'] ?? '');
@@ -434,6 +451,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_company'])) {
             $error = 'Failed to save institution';
             error_log('admin companies save_company: ' . $e->getMessage());
         }
+    }
     }
 }
 
@@ -507,6 +525,7 @@ include 'header.php';
 <div class="panel">
     <div class="panel-title"><?php echo $edit_company ? 'Edit institution' : 'New institution'; ?></div>
     <form method="post" class="form-row">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['csrf_token']); ?>">
         <input type="hidden" name="company_id" value="<?php echo $edit_company ? (int)$edit_company['id'] : 0; ?>">
         <div class="form-field" style="min-width: 260px;">
             <label for="company_name">Institution name</label>
@@ -589,7 +608,11 @@ include 'header.php';
                             <td class="nowrap">
                                 <a class="btn btn-small btn-primary" href="companies.php?act_as=<?php echo (int)$company['id']; ?>">Impersonate</a>
                                 <a class="btn btn-small" href="companies.php?edit=<?php echo (int)$company['id']; ?>">Edit</a>
-                                <a class="btn btn-small btn-danger" href="companies.php?delete=<?php echo (int)$company['id']; ?>" onclick="return confirm('Delete institution? Users will be archived and kiosks moved to default company.')">Delete</a>
+                                <form method="post" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['csrf_token']); ?>">
+                                    <input type="hidden" name="delete_company_id" value="<?php echo (int)$company['id']; ?>">
+                                    <button type="submit" name="delete_company" class="btn btn-small btn-danger" onclick="return confirm('Delete institution? Users will be archived and kiosks moved to default company.')">Delete</button>
+                                </form>
                             </td>
                         </tr>
                     <?php endforeach; ?>

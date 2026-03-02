@@ -6,6 +6,7 @@ function edudisplej_canonical_module_key(string $moduleKey): string
     $key = strtolower(trim($moduleKey));
 
     static $aliases = [
+        'datetime' => 'clock',
         'meal_menu' => 'meal-menu',
         'room_occupancy' => 'room-occupancy',
         'default_logo' => 'default-logo',

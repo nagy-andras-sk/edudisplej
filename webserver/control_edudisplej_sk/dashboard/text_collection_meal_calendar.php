@@ -78,13 +78,12 @@ include '../admin/header.php';
 ?>
 
 <div class="panel" style="margin-bottom:12px;">
-    <div class="panel-title"><?php echo htmlspecialchars(t_def('meal.calendar.panel.title', 'Manuális étrend naptár (slide gyűjtemény)')); ?></div>
-    <div class="muted"><?php echo htmlspecialchars(t_def('meal.calendar.panel.desc', 'Tartalomszerkesztő és végfelhasználó előre töltheti a napi menüket dátum szerint.')); ?></div>
+    <div class="panel-title"><?php echo htmlspecialchars(t_def('meal.calendar.panel.title', 'Manuális étrend naptár')); ?></div>
 </div>
 
 <div style="display:grid; grid-template-columns: 1.1fr 1fr; gap:12px; align-items:start;">
     <div class="panel">
-        <div class="panel-title"><?php echo htmlspecialchars(t_def('meal.calendar.entry.title', 'Napi bejegyzés')); ?></div>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('meal.calendar.entry.title', 'Hozzáadás / szerkesztés')); ?></div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
             <input type="date" id="mc-date" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
             <input type="text" id="mc-institution" placeholder="<?php echo htmlspecialchars(t_def('meal.calendar.field.institution', 'Intézmény megnevezés')); ?>" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
@@ -102,7 +101,7 @@ include '../admin/header.php';
     </div>
 
     <div class="panel">
-        <div class="panel-title"><?php echo htmlspecialchars(t_def('meal.calendar.list.title', 'Naptár lista')); ?></div>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('meal.calendar.list.title', 'Mentett napok')); ?></div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
             <input type="date" id="mc-from" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
             <input type="date" id="mc-to" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">

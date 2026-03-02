@@ -7,6 +7,16 @@
 session_start();
 require_once 'dbkonfiguracia.php';
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+function companies_verify_csrf_token(): bool {
+    $submitted = (string)($_POST['csrf_token'] ?? '');
+    $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+    return $submitted !== '' && $sessionToken !== '' && hash_equals($sessionToken, $submitted);
+}
+
 // Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: admin.php');
@@ -17,8 +27,11 @@ $error = '';
 $success = '';
 
 // Handle company deletion
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    $company_id = intval($_GET['delete']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_company'])) {
+    if (!companies_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
+    $company_id = intval($_POST['delete_company_id'] ?? 0);
     
     try {
         $conn = getDbConnection();
@@ -55,10 +68,14 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
         $error = 'Database error occurred';
         error_log($e->getMessage());
     }
+    }
 }
 
 // Handle company edit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_company'])) {
+    if (!companies_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
     $company_id = intval($_POST['company_id'] ?? 0);
     $name = trim($_POST['company_name'] ?? '');
     
@@ -83,10 +100,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_company'])) {
             error_log($e->getMessage());
         }
     }
+    }
 }
 
 // Handle company creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_company'])) {
+    if (!companies_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
     $name = trim($_POST['company_name'] ?? '');
     
     if (empty($name)) {
@@ -110,10 +131,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_company'])) {
             error_log($e->getMessage());
         }
     }
+    }
 }
 
 // Handle kiosk assignment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_kiosk'])) {
+    if (!companies_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
     $kiosk_id = intval($_POST['kiosk_id'] ?? 0);
     $company_id = intval($_POST['company_id'] ?? 0);
     $location = trim($_POST['location'] ?? '');
@@ -135,6 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_kiosk'])) {
     } catch (Exception $e) {
         $error = 'Database error occurred';
         error_log($e->getMessage());
+    }
     }
 }
 
@@ -349,6 +375,7 @@ try {
             <div class="card">
                 <h2><?php echo $edit_company ? 'Edit Company' : 'Create Company'; ?></h2>
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                     <?php if ($edit_company): ?>
                         <input type="hidden" name="company_id" value="<?php echo $edit_company['id']; ?>">
                     <?php endif; ?>
@@ -386,9 +413,11 @@ try {
                                 <td><?php echo count(array_filter($kiosks, fn($k) => $k['company_id'] == $company['id'])); ?></td>
                                 <td>
                                     <a href="?edit=<?php echo $company['id']; ?>" style="display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #1e40af 0%, #0369a1 100%); color: white; text-decoration: none; border-radius: 5px; font-size: 12px;">✏️ Edit</a>
-                                    <a href="?delete=<?php echo $company['id']; ?>" 
-                                       style="display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; border-radius: 5px; font-size: 12px;" 
-                                       onclick="return confirm('Are you sure you want to delete this company?')">🗑️ Delete</a>
+                                    <form method="POST" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                        <input type="hidden" name="delete_company_id" value="<?php echo (int)$company['id']; ?>">
+                                        <button type="submit" name="delete_company" style="display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; border-radius: 5px; font-size: 12px;" onclick="return confirm('Are you sure you want to delete this company?')">🗑️ Delete</button>
+                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -400,6 +429,7 @@ try {
         <div class="card">
             <h2>Assign Kiosk to Company</h2>
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                 <div class="grid">
                     <div class="form-group">
                         <label for="kiosk_id">Select Kiosk</label>

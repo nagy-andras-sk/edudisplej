@@ -1,0 +1,1881 @@
+# i18n audit report
+
+- Missing translation keys referenced by `t(...)`: **125**
+- Potential hardcoded user-facing strings: **1744**
+
+## Missing keys
+- `common.action` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L85`, `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L105`, `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L127`
+- `common.active` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L53`, `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L79`, `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L121`
+- `common.choose_company` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L94`
+- `common.choose_server` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L172`
+- `common.company` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L105`
+- `common.date` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L111`
+- `common.edit_short` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L57`, `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L93`
+- `common.event` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L152`
+- `common.inactive` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L54`
+- `common.institution` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L111`
+- `common.key` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L85`, `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L127`
+- `common.manual` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L103`
+- `common.name` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L85`, `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L127`, `webserver/control_edudisplej_sk/dashboard/text_collections.php:L59`
+- `common.new` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L82`, `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L102`, `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L124`
+- `common.new_item` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L124`
+- `common.note_optional` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L144`, `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L98`
+- `common.refresh` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L110`
+- `common.server` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L105`
+- `common.source` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L152`
+- `common.status` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L85`, `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L105`
+- `common.time` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L152`
+- `common.updated` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L137`
+- `meal.calendar.action.edit_short` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L74`
+- `meal.calendar.confirm.delete` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L73`
+- `meal.calendar.empty` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L72`
+- `meal.calendar.entry.title` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L87`
+- `meal.calendar.error.delete` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L69`
+- `meal.calendar.error.general` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L70`
+- `meal.calendar.error.load` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L71`
+- `meal.calendar.field.institution` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L90`
+- `meal.calendar.list.title` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L105`
+- `meal.calendar.panel.desc` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L82`
+- `meal.calendar.panel.title` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L81`
+- `meal.calendar.status.deleted` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L68`
+- `meal.calendar.status.saved` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L67`
+- `meal.calendar.title` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L62`
+- `meal.title` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L61`
+- `meal.type.breakfast` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L93`
+- `meal.type.dinner` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L97`
+- `meal.type.lunch` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L95`
+- `meal.type.snack_am` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L94`
+- `meal.type.snack_pm` → `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:L96`
+- `nav.admin.archived_users` → `webserver/control_edudisplej_sk/admin/header.php:L140`
+- `nav.admin.email_queue` → `webserver/control_edudisplej_sk/admin/header.php:L152`
+- `nav.admin.kiosk_migrations` → `webserver/control_edudisplej_sk/admin/header.php:L141`
+- `nav.admin.meal_maintenance` → `webserver/control_edudisplej_sk/admin/header.php:L146`
+- `nav.admin.room_occupancy_maintenance` → `webserver/control_edudisplej_sk/admin/header.php:L147`
+- `profile.assets.col.select` → `webserver/control_edudisplej_sk/dashboard/profile.php:L722`
+- `profile.assets.confirm_delete_selected` → `webserver/control_edudisplej_sk/dashboard/profile.php:L825`
+- `profile.assets.delete_already_done_many` → `webserver/control_edudisplej_sk/dashboard/profile.php:L283`
+- `profile.assets.delete_failed_many` → `webserver/control_edudisplej_sk/dashboard/profile.php:L292`
+- `profile.assets.delete_not_found_many` → `webserver/control_edudisplej_sk/dashboard/profile.php:L289`
+- `profile.assets.delete_selected_unused` → `webserver/control_edudisplej_sk/dashboard/profile.php:L706`
+- `profile.assets.delete_success_many` → `webserver/control_edudisplej_sk/dashboard/profile.php:L280`
+- `profile.assets.delete_used_blocked_many` → `webserver/control_edudisplej_sk/dashboard/profile.php:L286`
+- `profile.assets.in_use_locked` → `webserver/control_edudisplej_sk/dashboard/profile.php:L768`
+- `profile.assets.select_all_unused` → `webserver/control_edudisplej_sk/dashboard/profile.php:L704`
+- `profile.assets.select_first` → `webserver/control_edudisplej_sk/dashboard/profile.php:L826`
+- `profile.role.easy_user` → `webserver/control_edudisplej_sk/dashboard/profile.php:L479`, `webserver/control_edudisplej_sk/dashboard/profile.php:L809`
+- `room_occ.admin.breadcrumb` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L42`
+- `room_occ.admin.empty.links` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L56`
+- `room_occ.admin.empty.servers` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L55`
+- `room_occ.admin.error.link_required` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L52`
+- `room_occ.admin.error.server_required` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L51`
+- `room_occ.admin.link.active` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L99`
+- `room_occ.admin.links.title` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L89`
+- `room_occ.admin.panel.desc` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L68`
+- `room_occ.admin.panel.title` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L67`
+- `room_occ.admin.server.key` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L76`
+- `room_occ.admin.server.name` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L77`
+- `room_occ.admin.server.url_optional` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L78`
+- `room_occ.admin.servers.title` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L73`
+- `room_occ.admin.status.link_saved` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L50`
+- `room_occ.admin.status.server_saved` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L49`
+- `room_occ.admin.sync_example` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L110`
+- `room_occ.choose.room` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L91`
+- `room_occ.confirm.delete` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L97`
+- `room_occ.daily.title` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L131`
+- `room_occ.empty.events` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L90`
+- `room_occ.empty.rooms` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L89`
+- `room_occ.error.choose_date` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L99`
+- `room_occ.error.choose_room` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L98`
+- `room_occ.error.general` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L48`, `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L88`
+- `room_occ.error.invalid_response` → `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:L47`, `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L87`
+- `room_occ.error.invalid_time` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L100`
+- `room_occ.error.time_order` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L101`
+- `room_occ.error.title_required` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L102`
+- `room_occ.event.save` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L146`
+- `room_occ.event.title` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L143`
+- `room_occ.external.readonly` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L92`
+- `room_occ.panel.desc` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L110`
+- `room_occ.panel.title` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L109`
+- `room_occ.room.capacity` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L120`
+- `room_occ.room.key` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L118`
+- `room_occ.room.name` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L119`
+- `room_occ.rooms.title` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L115`
+- `room_occ.status.event_deleted` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L96`
+- `room_occ.status.event_saved` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L95`
+- `room_occ.status.room_saved` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L94`
+- `room_occ.title` → `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:L82`
+- `slides.bg.remove` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L125`
+- `slides.collection.desc` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L50`
+- `slides.collection.title` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L49`
+- `slides.confirm.delete` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L32`
+- `slides.editor.title` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L55`
+- `slides.empty` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L33`
+- `slides.error.delete` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L27`
+- `slides.error.image_read` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L30`
+- `slides.error.image_type` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L29`
+- `slides.error.load` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L26`
+- `slides.error.name_required` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L31`
+- `slides.error.save` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L28`
+- `slides.external.empty` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L42`
+- `slides.external.error_json` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L41`
+- `slides.external.hint` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L38`, `webserver/control_edudisplej_sk/dashboard/text_collections.php:L101`
+- `slides.external.label` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L37`, `webserver/control_edudisplej_sk/dashboard/text_collections.php:L99`
+- `slides.external.preview` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L40`, `webserver/control_edudisplej_sk/dashboard/text_collections.php:L106`
+- `slides.external.template` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L39`, `webserver/control_edudisplej_sk/dashboard/text_collections.php:L102`
+- `slides.items.title` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L131`
+- `slides.name.placeholder` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L60`
+- `slides.status.deleted` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L24`
+- `slides.status.loaded_for_edit` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L23`
+- `slides.status.new_item` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L22`
+- `slides.status.saved` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L25`
+- `slides.title` → `webserver/control_edudisplej_sk/dashboard/text_collections.php:L17`
+
+## hardcoded_html_text
+- `webserver/control_edudisplej_sk/admin.php:156` → Admin Panel - EduDisplej Control
+- `webserver/control_edudisplej_sk/admin.php:399` → EduDisplej Admin Login
+- `webserver/control_edudisplej_sk/admin.php:420` → Register here
+- `webserver/control_edudisplej_sk/admin.php:426` → 🖥️ EduDisplej Control Panel
+- `webserver/control_edudisplej_sk/admin.php:428` → 👥 Users
+- `webserver/control_edudisplej_sk/admin.php:429` → 🏢 Companies
+- `webserver/control_edudisplej_sk/admin.php:430` → Welcome,
+- `webserver/control_edudisplej_sk/admin.php:454` → Total Kiosks
+- `webserver/control_edudisplej_sk/admin.php:471` → Kiosk Management
+- `webserver/control_edudisplej_sk/admin.php:475` → Kiosks by Company
+- `webserver/control_edudisplej_sk/admin.php:501` → View details →
+- `webserver/control_edudisplej_sk/admin.php:534` → View details →
+- `webserver/control_edudisplej_sk/admin.php:544` → All Kiosks - Detailed View
+- `webserver/control_edudisplej_sk/admin.php:551` → MAC Address
+- `webserver/control_edudisplej_sk/admin.php:554` → Last Seen
+- `webserver/control_edudisplej_sk/admin.php:555` → Sync Interval
+- `webserver/control_edudisplej_sk/admin.php:563` → No kiosks registered yet
+- `webserver/control_edudisplej_sk/admin.php:581` → 👁️ View
+- `webserver/control_edudisplej_sk/admin.php:582` → 📸 Screenshot
+- `webserver/control_edudisplej_sk/admin/api_logs.php:265` → Logok (
+- `webserver/control_edudisplej_sk/admin/api_logs.php:278` → Exec ms
+- `webserver/control_edudisplej_sk/admin/api_logs.php:285` → Nincs log.
+- `webserver/control_edudisplej_sk/admin/api_logs.php:312` → GET params:
+- `webserver/control_edudisplej_sk/admin/archived_users.php:180` → Archived users filters
+- `webserver/control_edudisplej_sk/admin/archived_users.php:201` → Archived only
+- `webserver/control_edudisplej_sk/admin/archived_users.php:202` → Restored only
+- `webserver/control_edudisplej_sk/admin/archived_users.php:215` → Archived users (
+- `webserver/control_edudisplej_sk/admin/archived_users.php:224` → Archived at
+- `webserver/control_edudisplej_sk/admin/archived_users.php:225` → Archived by
+- `webserver/control_edudisplej_sk/admin/archived_users.php:227` → Restored at
+- `webserver/control_edudisplej_sk/admin/archived_users.php:228` → Restored by
+- `webserver/control_edudisplej_sk/admin/archived_users.php:235` → No archived users.
+- `webserver/control_edudisplej_sk/admin/archived_users.php:281` → Archive/Restore logs (latest 100)
+- `webserver/control_edudisplej_sk/admin/archived_users.php:296` → No archive/restore logs.
+- `webserver/control_edudisplej_sk/admin/companies.php:488` → Admin company context
+- `webserver/control_edudisplej_sk/admin/companies.php:491` → Default institution ID:
+- `webserver/control_edudisplej_sk/admin/companies.php:497` → Open default company dashboard
+- `webserver/control_edudisplej_sk/admin/companies.php:501` → Stop company context
+- `webserver/control_edudisplej_sk/admin/companies.php:512` → Institution name
+- `webserver/control_edudisplej_sk/admin/companies.php:520` → Tax number
+- `webserver/control_edudisplej_sk/admin/companies.php:542` → Institution list
+- `webserver/control_edudisplej_sk/admin/companies.php:550` → Tax number
+- `webserver/control_edudisplej_sk/admin/companies.php:554` → License Key
+- `webserver/control_edudisplej_sk/admin/companies.php:555` → API Token
+- `webserver/control_edudisplej_sk/admin/companies.php:556` → Install command
+- `webserver/control_edudisplej_sk/admin/companies.php:557` → Token created
+- `webserver/control_edudisplej_sk/admin/companies.php:558` → Created at
+- `webserver/control_edudisplej_sk/admin/companies.php:565` → No institutions.
+- `webserver/control_edudisplej_sk/admin/companies.php:582` → Copy install
+- `webserver/control_edudisplej_sk/admin/dashboard.php:261` → Upgrade errors:
+- `webserver/control_edudisplej_sk/admin/dashboard.php:274` → Upgrade started
+- `webserver/control_edudisplej_sk/admin/dashboard.php:275` → Last seen
+- `webserver/control_edudisplej_sk/admin/dashboard.php:322` → License usage
+- `webserver/control_edudisplej_sk/admin/dashboard.php:325` → Overuse only
+- `webserver/control_edudisplej_sk/admin/dashboard.php:326` → Within purchased
+- `webserver/control_edudisplej_sk/admin/dashboard.php:334` → CPU min %
+- `webserver/control_edudisplej_sk/admin/dashboard.php:338` → RAM min %
+- `webserver/control_edudisplej_sk/admin/dashboard.php:342` → Disk min %
+- `webserver/control_edudisplej_sk/admin/dashboard.php:356` → No displays to show.
+- `webserver/control_edudisplej_sk/admin/dashboard.php:387` → Device ID
+- `webserver/control_edudisplej_sk/admin/dashboard.php:390` → Loop timestamp
+- `webserver/control_edudisplej_sk/admin/dashboard.php:391` → Last sync
+- `webserver/control_edudisplej_sk/admin/dashboard.php:392` → Last seen
+- `webserver/control_edudisplej_sk/admin/dashboard.php:393` → Network name
+- `webserver/control_edudisplej_sk/admin/dashboard.php:394` → Network strength
+- `webserver/control_edudisplej_sk/admin/dashboard.php:395` → CPU temp
+- `webserver/control_edudisplej_sk/admin/dashboard.php:396` → CPU %
+- `webserver/control_edudisplej_sk/admin/dashboard.php:397` → RAM %
+- `webserver/control_edudisplej_sk/admin/dashboard.php:398` → Disk %
+- `webserver/control_edudisplej_sk/admin/dashboard.php:399` → RPI version
+- `webserver/control_edudisplej_sk/admin/dashboard.php:400` → Screen resolution
+- `webserver/control_edudisplej_sk/admin/dashboard.php:401` → Last reboot
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:227` → Ha nem Ön kérte, hagyja figyelmen kívül ezt az üzenetet.
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:227` → Jelszó visszaállítása
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:227` → Új jelszó beállításához kattintson az alábbi gombra:
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:228` → If you did not request this, you can ignore this message.
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:228` → Reset password
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:228` → To set a new password, click the button below:
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:229` → Ak ste o to nepožiadali, tento email ignorujte.
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:229` → Obnoviť heslo
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:229` → Pre nastavenie nového hesla kliknite na tlačidlo nižšie:
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:70` → Kijelzo Ütemezés - Admin Panel
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:266` → 📅 Kijelzo Ütemezés Kezelés
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:267` → Állítsa be, hogy mikor legyenek bekapcsolt a kijelzők
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:282` → Kijelzo kiválasztása:
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:284` → -- Válasszon kijelzőt --
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:289` → Kijelzo 1
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:290` → Kijelzo 2
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:291` → Kijelzo 3
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:306` → ℹ️ Az ütemezés:
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:308` → Kijelzo ID:
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:309` → Ütemezés létrehozva:
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:316` → Heti Ütemezés
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:324` → Új Időblokk Hozzáadása
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:334` → Vasárnap
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:335` → Hétfő
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:338` → Csütörtök
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:339` → Péntek
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:357` → Hozzáadás
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:377` → 22:00-06:00 között kikapcsolt
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:383` → 💡 Útmutató:
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:385` → Az ütemezés a Raspberry Pi-n futó démonhoz csatlakozik
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:386` → A kijelző automatikusan bekapcsol/kikapcsol az ütemezés szerint
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:387` → Éjszaka (22:00-06:00) alapértelmezés szerint kikapcsolt a kijelző
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:388` → Nap 06:00-22:00 között bekapcsolt a kijelző
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:389` → A démon percenként ellenőrzi az aktuális státuszt
+- `webserver/control_edudisplej_sk/admin/email_queue.php:100` → Email Queue & Archive
+- `webserver/control_edudisplej_sk/admin/email_queue.php:110` → Queue status
+- `webserver/control_edudisplej_sk/admin/email_queue.php:121` → Process queue now
+- `webserver/control_edudisplej_sk/admin/email_queue.php:125` → Archive all sent
+- `webserver/control_edudisplej_sk/admin/email_queue.php:131` → Queue items (active + sent)
+- `webserver/control_edudisplej_sk/admin/email_queue.php:150` → No queue items.
+- `webserver/control_edudisplej_sk/admin/email_queue.php:206` → No archived emails.
+- `webserver/control_edudisplej_sk/admin/email_queue.php:228` → Delivery log archive
+- `webserver/control_edudisplej_sk/admin/email_queue.php:244` → No delivery logs.
+- `webserver/control_edudisplej_sk/admin/email_settings.php:81` → This is a test email from EduDisplej.
+- `webserver/control_edudisplej_sk/admin/email_settings.php:101` → Email Settings
+- `webserver/control_edudisplej_sk/admin/email_settings.php:111` → SMTP Configuration
+- `webserver/control_edudisplej_sk/admin/email_settings.php:116` → SMTP Host
+- `webserver/control_edudisplej_sk/admin/email_settings.php:120` → SMTP Port
+- `webserver/control_edudisplej_sk/admin/email_settings.php:128` → TLS (STARTTLS, port 587)
+- `webserver/control_edudisplej_sk/admin/email_settings.php:129` → SSL (port 465)
+- `webserver/control_edudisplej_sk/admin/email_settings.php:134` → Timeout (sec)
+- `webserver/control_edudisplej_sk/admin/email_settings.php:140` → SMTP Username
+- `webserver/control_edudisplej_sk/admin/email_settings.php:144` → (leave empty to keep current)
+- `webserver/control_edudisplej_sk/admin/email_settings.php:144` → SMTP Password
+- `webserver/control_edudisplej_sk/admin/email_settings.php:150` → From name
+- `webserver/control_edudisplej_sk/admin/email_settings.php:154` → From email
+- `webserver/control_edudisplej_sk/admin/email_settings.php:160` → (optional)
+- `webserver/control_edudisplej_sk/admin/email_settings.php:169` → Test Email
+- `webserver/control_edudisplej_sk/admin/email_settings.php:174` → Test email address
+- `webserver/control_edudisplej_sk/admin/email_settings.php:178` → Send Test Email
+- `webserver/control_edudisplej_sk/admin/email_templates.php:151` → Email Templates
+- `webserver/control_edudisplej_sk/admin/email_templates.php:162` → Existing templates
+- `webserver/control_edudisplej_sk/admin/email_templates.php:176` → No templates.
+- `webserver/control_edudisplej_sk/admin/email_templates.php:196` → Send test
+- `webserver/control_edudisplej_sk/admin/email_templates.php:216` → Template key
+- `webserver/control_edudisplej_sk/admin/email_templates.php:237` → HTML body
+- `webserver/control_edudisplej_sk/admin/email_templates.php:241` → (optional)
+- `webserver/control_edudisplej_sk/admin/email_templates.php:241` → Text body
+- `webserver/control_edudisplej_sk/admin/email_templates.php:252` → Base HTML Layout
+- `webserver/control_edudisplej_sk/admin/email_templates.php:253` → . Every HTML email is wrapped into this layout.
+- `webserver/control_edudisplej_sk/admin/email_templates.php:253` → Use placeholders:
+- `webserver/control_edudisplej_sk/admin/email_templates.php:257` → Layout HTML
+- `webserver/control_edudisplej_sk/admin/email_templates.php:260` → Save layout
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:118` → Kiosk reszletek
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:123` → Alap adatok
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:129` → Device ID
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:131` → Public IP
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:135` → Last seen
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:136` → Sync interval
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:137` → Screenshot policy
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:138` → Debug mód
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:147` → Screenshot policy
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:165` → Verzió és frissítés
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:170` → Jelenlegi verzió
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:174` → Legújabb verzió
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:178` → Státusz
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:183` → ⬆ Frissítés elérhető
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:185` → ✓ Naprakész
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:204` → Fast loop / gyors szinkron
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:223` → Debug mód (kijelzőnként)
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:243` → Végleges törlés
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:258` → Hardware info
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:262` → Nincs adat.
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:276` → Nincs screenshot.
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:282` → Recent sync logs
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:126` → Device ID
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:129` → Health status
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:131` → CPU temp
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:132` → CPU %
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:133` → RAM %
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:134` → Disk %
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:135` → Last reboot
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:142` → No data.
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:173` → Fast Loop
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:185` → Terminal -
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:70` → Kiosk Logok
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:76` → Kiosk info
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:81` → Device ID
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:159` → Nincs log.
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:168` → Kiosk not found.
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:186` → Bulk kiosk migration
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:192` → Target institution
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:206` → Queue migration
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:219` → Current institution
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:224` → No kiosks.
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:244` → Recent migration jobs
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:254` → Requested by
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:262` → No migration records.
+- `webserver/control_edudisplej_sk/admin/licenses.php:176` → Institution Licenses
+- `webserver/control_edudisplej_sk/admin/licenses.php:179` → Module Licenses
+- `webserver/control_edudisplej_sk/admin/licenses.php:191` → Institutions and Licenses
+- `webserver/control_edudisplej_sk/admin/licenses.php:197` → Valid from
+- `webserver/control_edudisplej_sk/admin/licenses.php:198` → Valid until
+- `webserver/control_edudisplej_sk/admin/licenses.php:221` → Expiring soon
+- `webserver/control_edudisplej_sk/admin/licenses.php:228` → Exceeded!
+- `webserver/control_edudisplej_sk/admin/licenses.php:239` → Module licenses
+- `webserver/control_edudisplej_sk/admin/licenses.php:262` → Valid from
+- `webserver/control_edudisplej_sk/admin/licenses.php:266` → Valid until
+- `webserver/control_edudisplej_sk/admin/licenses.php:272` → Device limit
+- `webserver/control_edudisplej_sk/admin/licenses.php:306` → ⚠️ Túlfelhasználás: used nagyobb mint purchased.
+- `webserver/control_edudisplej_sk/admin/licenses.php:313` → Device ID
+- `webserver/control_edudisplej_sk/admin/licenses.php:314` → Last activity
+- `webserver/control_edudisplej_sk/admin/licenses.php:315` → Activated at
+- `webserver/control_edudisplej_sk/admin/licenses.php:316` → License status
+- `webserver/control_edudisplej_sk/admin/licenses.php:322` → No devices.
+- `webserver/control_edudisplej_sk/admin/licenses.php:360` → ← Back
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:539` → Étrend modul – technikai vezérlés
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:540` → Itt állítható a Jedalen szinkron, és indítható kézi adatlekérés.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:544` → Jedalen automatikus szinkron beállítások
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:546` → Szinkron engedélyezve
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:551` → Futtatási ablak kezdő óra (0-23)
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:555` → Futtatási ablak záró óra (0-23)
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:561` → Régiók (vesszővel, pl.: TT,NR,TN,BB,PO,KE,BA,ZA)
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:566` → Beállítások mentése
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:572` → Kézi lekérdezés
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:573` → A Jedalen kézi lekérés két külön lépésre bontva futtatható. A menülekérdezés több hétre is próbálkozik (aktuális + következő hetek), ha az aktuális hét üres.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:574` → Technikai megjegyzés: a rendszer HTTPS-en kéri le az EatMenu oldalakat, mert HTTP alatt több intézménynél üres/noeat tartalom érkezik.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:577` → Jedalen intézménylista letöltése most
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:581` → Intézmények kiválasztása menü letöltéshez
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:583` → Nincs betöltött Jedalen intézménylista. Előbb futtasd az intézménylista letöltést.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:603` → Tipp: Ctrl/Shift billentyűvel több intézmény is választható.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:607` → Etrend letöltése a kiválasztott intézményekre
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:614` → Kézi futás kimenete
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:619` → A kiválasztott intézménynél a Jedalen oldalon nem található publikált menü a bejárt heteken sem. Ellenőrizd az intézmény EatMenu oldalát, vagy válassz másik intézményt.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:626` → Utolsó Jedalen futás állapota
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:629` → Utoljára futott:
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:633` → Még nincs futási rekord.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:638` → Lekérdezések manuális böngészése
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:642` → Dátumtól
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:646` → Dátumig
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:650` → Forrás
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:655` → auto_jedalen (legacy)
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:659` → Intézmény név
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:663` → Szűrés
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:669` → Nincs találat a megadott szűrőkre.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:675` → Dátum
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:676` → Forrás
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:677` → Intézmény
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:681` → Frissítve
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:718` → Maximum 250 rekord jelenik meg.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:723` → Tárolt menünapok (ma és jövő)
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:726` → Nincs tárolt menü ma vagy jövőbeli napra.
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:732` → Dátum
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:733` → Forrás
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:734` → Intézmény
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:738` → Frissítve
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:211` → Company module licenses
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:212` → Open a company, check enabled modules, set quantity, then save. Checking a module auto-sets quantity to 1.
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:215` → No companies.
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:287` → Save company licenses
+- `webserver/control_edudisplej_sk/admin/modules.php:449` → Module details:
+- `webserver/control_edudisplej_sk/admin/modules.php:455` → Module key
+- `webserver/control_edudisplej_sk/admin/modules.php:459` → Module folder
+- `webserver/control_edudisplej_sk/admin/modules.php:463` → Config folder
+- `webserver/control_edudisplej_sk/admin/modules.php:467` → Renderer file
+- `webserver/control_edudisplej_sk/admin/modules.php:471` → Default settings file
+- `webserver/control_edudisplej_sk/admin/modules.php:475` → Folder exists
+- `webserver/control_edudisplej_sk/admin/modules.php:493` → Settings schema keys:
+- `webserver/control_edudisplej_sk/admin/modules.php:504` → Required structure
+- `webserver/control_edudisplej_sk/admin/modules.php:510` → No registry requirements.
+- `webserver/control_edudisplej_sk/admin/modules.php:526` → Manifest (`module.json`)
+- `webserver/control_edudisplej_sk/admin/modules.php:530` → Default settings
+- `webserver/control_edudisplej_sk/admin/modules.php:536` → Close details
+- `webserver/control_edudisplej_sk/admin/modules.php:547` → Module key
+- `webserver/control_edudisplej_sk/admin/modules.php:585` → Import module package (ZIP)
+- `webserver/control_edudisplej_sk/admin/modules.php:588` → ZIP file
+- `webserver/control_edudisplej_sk/admin/modules.php:593` → Overwrite existing folder
+- `webserver/control_edudisplej_sk/admin/modules.php:601` → Import ZIP
+- `webserver/control_edudisplej_sk/admin/modules.php:605` → , and renderer file defined in
+- `webserver/control_edudisplej_sk/admin/modules.php:610` → Module list
+- `webserver/control_edudisplej_sk/admin/modules.php:616` → Module key
+- `webserver/control_edudisplej_sk/admin/modules.php:621` → Kiosk uses
+- `webserver/control_edudisplej_sk/admin/modules.php:622` → Group uses
+- `webserver/control_edudisplej_sk/admin/modules.php:623` → Created at
+- `webserver/control_edudisplej_sk/admin/modules.php:630` → No modules.
+- `webserver/control_edudisplej_sk/admin/security_logs.php:183` → Failed 24h
+- `webserver/control_edudisplej_sk/admin/security_logs.php:184` → Failed 7d
+- `webserver/control_edudisplej_sk/admin/security_logs.php:185` → Password change
+- `webserver/control_edudisplej_sk/admin/security_logs.php:186` → OTP setup
+- `webserver/control_edudisplej_sk/admin/security_logs.php:233` → Logok (
+- `webserver/control_edudisplej_sk/admin/security_logs.php:250` → Nincs log.
+- `webserver/control_edudisplej_sk/admin/services.php:115` → Service Versions
+- `webserver/control_edudisplej_sk/admin/services.php:125` → Manual upgrade trigger
+- `webserver/control_edudisplej_sk/admin/services.php:131` → Force upgrade all services
+- `webserver/control_edudisplej_sk/admin/services.php:139` → Default version
+- `webserver/control_edudisplej_sk/admin/services.php:140` → DB override
+- `webserver/control_edudisplej_sk/admin/services.php:141` → Effective version
+- `webserver/control_edudisplej_sk/admin/services.php:148` → No services found.
+- `webserver/control_edudisplej_sk/admin/services.php:167` → Trigger upgrade
+- `webserver/control_edudisplej_sk/admin/translations.php:46` → Fordítások kezelése
+- `webserver/control_edudisplej_sk/admin/translations.php:81` → Alap szöveg
+- `webserver/control_edudisplej_sk/admin/translations.php:82` → Felülírás
+- `webserver/control_edudisplej_sk/admin/translations.php:83` → Aktív
+- `webserver/control_edudisplej_sk/admin/translations.php:112` → Mentés
+- `webserver/control_edudisplej_sk/admin/translations.php:113` → Visszaállítás (űrlap)
+- `webserver/control_edudisplej_sk/admin/users.php:295` → Szerepkör
+- `webserver/control_edudisplej_sk/admin/users.php:298` → Felhasználó
+- `webserver/control_edudisplej_sk/admin/users.php:299` → Egyszerű felhasználó
+- `webserver/control_edudisplej_sk/admin/users.php:304` → 2FA kotelezo
+- `webserver/control_edudisplej_sk/admin/users.php:323` → Felhasznalo lista
+- `webserver/control_edudisplej_sk/admin/users.php:331` → Szerepkör
+- `webserver/control_edudisplej_sk/admin/users.php:335` → Last login
+- `webserver/control_edudisplej_sk/admin/users.php:342` → Nincs felhasznalo.
+- `webserver/control_edudisplej_sk/admin/users.php:378` → 2FA Off
+- `webserver/control_edudisplej_sk/api/email_settings.php:77` → This is a test email from EduDisplej.
+- `webserver/control_edudisplej_sk/companies.php:185` → Company Management - EduDisplej
+- `webserver/control_edudisplej_sk/companies.php:335` → 🏢 Company Management
+- `webserver/control_edudisplej_sk/companies.php:336` → ← Back to Dashboard
+- `webserver/control_edudisplej_sk/companies.php:356` → Company Name
+- `webserver/control_edudisplej_sk/companies.php:401` → Assign Kiosk to Company
+- `webserver/control_edudisplej_sk/companies.php:418` → Assign to Company
+- `webserver/control_edudisplej_sk/companies.php:420` → -- Unassigned --
+- `webserver/control_edudisplej_sk/companies.php:442` → Assign Kiosk
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3461` → Database Auto-Fixer - EduDisplej
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3554` → ⚙️ Database Structure Auto-Fixer
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3579` → ✓ All operations completed successfully
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3581` → ✗ Some operations failed - please check the log above
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3585` → ← Back to Admin Panel
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3586` → ↻ Run Again
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:733` → Heti időzítés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:743` → Mégse
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:744` → Hozzáadás
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1244` → = startMinute || slotEndMinuteExclusive
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1347` → = preview.startMinute && hour
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1717` → Szerkesztés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1742` → Ez a napi terv felülírja az aznapi heti tervet az érintett idősávokban.
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1745` → Nincs még speciális idősáv erre a napra.
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1750` → Szerkesztés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1751` → Törlés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1764` → Hozzáadás
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1767` → Bezárás
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1847` → = start && hhmmss
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1848` → = start || hhmmss
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2591` → Típus
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2594` → Speciális dátum
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2598` → Prioritás
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2602` → Loop stílus
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2610` → Dátum
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2614` → Kezdés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2633` → Mégse
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2863` → Digitális
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2864` → Analóg
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2871` → 24 órás
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2872` → 12 órás (AM/PM)
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2877` → Dátum formátum:
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2879` → Teljes (év, hónap, nap, napnév)
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2880` → Rövid (év, hónap, nap)
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2881` → Numerikus (ÉÉÉÉ.HH.NN)
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2882` → Nincs dátum
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2890` → Szlovák
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2896` → Óra szín:
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2901` → Dátum szín:
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2912` → Betűméret (px):
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2917` → Óra mérete (px):
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2924` → Másodpercek mutatása
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2938` → Betűméret (px):
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2943` → Szöveg szín:
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2955` → Verzió mutatása
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2960` → Verzió szöveg:
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2966` → Ez a modul nem rendelkezik testreszabási lehetőségekkel.
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3018` → Mégse
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3026` → 💾 Mentés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3362` → Nincs elem a loop-ban. Húzz ide modult az „Elérhető Modulok” panelről.
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3398` → Időtartam
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:193` → Gyors útmutató
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:195` → Nézd át az aktív tervet és az időzített blokkokat.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:196` → Csak azokat a modulokat szerkeszd, amelyek szerepelnek a tervben.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:197` → Az azonnali szöveg kiírást 24 órás formátumban add meg, legfeljebb 3 órára.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:198` → Több azonnali kiírás is létrehozható egymás után.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:202` → Munkamenet lépései
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:203` → Aktív terv áttekintése •
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:203` → Azonnali szöveg kiírás ütemezése
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:203` → Terv tartalmainak módosítása •
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:213` → Nincs csoport ehhez az intézményhez.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:222` → Terv betöltése…
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:228` → Kijelzők a csoportban
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:231` → Nincs hozzárendelt kijelző.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:236` → Kijelző
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:238` → Állapot
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:257` → 1. Aktív terv áttekintése
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:258` → A DEFAULT terv akkor fut, amikor nincs aktív időzített blokk.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:259` → Betöltés…
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:263` → 2. Terv tartalmainak módosítása
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:264` → Csak azok a modulok szerkeszthetők, amelyek szerepelnek a tervben.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:267` → Szöveg szerkesztése
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:268` → Képgaléria szerkesztése
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:269` → PDF szerkesztése
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:273` → Szöveg tartalom
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:276` → Mentés
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:281` → Kép URL-ek (soronként 1)
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:285` → Feltöltés és hozzáadás
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:286` → Mentés
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:291` → Nincs PDF kiválasztva.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:294` → PDF feltöltés és mentés
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:300` → 3. Azonnali szöveg kiírás
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:301` → 24 órás időformátum, maximum 3 órás időtartam. Több kiírás is menthető.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:303` → Szöveg
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:308` → Kezdés
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:319` → Dátum/óra megjelenítése a szövegben
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:323` → Azonnali kiírás mentése
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:435` → Nincs időzített blokk. A DEFAULT terv fut egész nap.
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:457` → = 1 && n
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:126` → Csoport Kijelzői - EDUDISPLEJ
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:272` → EDUDISPLEJ - Csoport Kijelzői
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:273` → ← Vissza
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:300` → Nincsenek kijelzők ebben a csoportban
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:323` → Nincsenek elérhető kijelzők
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:452` → 💾 Mentés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:847` → = 1 && v
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:907` → = 1 && v
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1983` → = startMinute || slotEndMinuteExclusive
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2089` → = preview.startMinute && hour
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2445` → Szerkesztés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2470` → Ez a napi terv felülírja az aznapi heti tervet az érintett idősávokban.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2473` → Nincs még speciális idősáv erre a napra.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2478` → Szerkesztés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2479` → Törlés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2492` → Hozzáadás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2495` → Bezárás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2578` → = start && hhmmss
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2579` → = start || hhmmss
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3725` → Típus
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3728` → Speciális dátum
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3732` → Prioritás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3736` → Loop stílus
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3744` → Dátum
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3748` → Kezdés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3767` → Mégse
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:4221` → 23 || mm
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:4422` → 0 && (now - textCollectionsCacheLoadedAt)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:4740` → -- Válassz termet --
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:4989` → -- Válassz slide elemet --
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5397` → Ez a modul nem rendelkezik testreszabási lehetőségekkel.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5540` → Fix tartalom:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5543` → With heart for education.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5565` → Digitális
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5566` → Analóg
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5573` → 24 órás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5578` → Dátum formátum:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5580` → Teljes (év, hónap, nap, napnév)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5581` → Rövid (év, hónap, nap)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5582` → Nap.Hónap.Év (NN.HH.ÉÉÉÉ)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5583` → Numerikus (ÉÉÉÉ.HH.NN)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5584` → Nincs dátum
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5592` → Szlovák
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5599` → Óra szín:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5604` → Dátum szín:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5617` → Óra betűméret (px):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5621` → Dátum betűméret (px):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5628` → Óra mérete (px):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5635` → Másodpercek mutatása
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5642` → Dátum megjelenítése
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5649` → Nap + dátum egy sorban
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5654` → Nap pozíció:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5656` → Nap bal oldalon
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5657` → Nap jobb oldalon
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5664` → Digitális óra a középen (analógra)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5666` → Digitális óra pozíció:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5668` → Automatikus (fent/lent mutatók alapján)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5669` → Fent-közép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5670` → Közép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5671` → Lent-közép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5697` → Szöveg forrása
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5699` → Kézi szerkesztés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5700` → Slide gyűjtemény
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5704` → Slide elem
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5709` → Frissít
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5712` → Slide gyűjtemény kezelése
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5724` → • Lista
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5726` → Közép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5729` → Háttér
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5736` → Times New Roman
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5737` → Courier New
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5753` → ▶ Play
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5754` → ■ Stop
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5766` → Élő előnézet:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5780` → Háttérkép feltöltés:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5785` → Kép törlése
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5790` → Megjelenítési animáció:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5792` → Nincs animáció
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5793` → Fade In (Halványulás)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5794` → Slide Up (Felsúslás)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5795` → Zoom In (Nagyítás)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5802` → Scroll mode (ha a szöveg nem fér ki)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5806` → Indulás előtti várakozás (s):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5810` → Végi várakozás (s):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5814` → Scroll sebesség (px/s):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5870` → Slovenčina
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5998` → Frissít
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6000` → Termek betöltése...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6004` → Megjelenítés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6005` → Csak aktuális foglaltság
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6007` → Következő események száma
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6030` → 🖼️ Képek feltöltése
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6033` → Húzz ide képeket vagy
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6033` → kattints a kiválasztáshoz
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6034` → Max 10 kép, képenként max 15 MB
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6038` → ☁️ Korábban feltöltött képek (Company Cloud)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6039` → Frissítés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6041` → Betöltés...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6043` → Kijelöltek importálása
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6058` → Megjelenítési mód
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6061` → Kollázs
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6062` → Egy kép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6066` → Kép igazítás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6074` → Slideshow váltás (s)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6080` → Áttűnés bekapcsolva
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6084` → Kollázs oszlopok
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6088` → Háttérszín
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6094` → Előnézet
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6098` → Tölts fel legalább 1 képet az előnézethez.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6117` → 📄 PDF Feltöltés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6129` → kattints a kiválasztáshoz
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6131` → Max. 50 MB
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6137` → Fix zoom (%):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6143` → Automatikus görgetés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6148` → Görgetési sebesség (px/s):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6152` → Indulás előtti várakozás (ms):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6156` → Ciklus végi várakozás (ms):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6160` → Megállás pozíció (%):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6162` → -1 = nincs köztes megállás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6165` → Megállás hossza (ms):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6171` → Előnézet
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6175` → Tölts fel PDF-et az előnézethez.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6187` → 🎬 Videó feltöltés (automatikus optimalizálás)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6190` → Húzz ide videót vagy
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6190` → kattints a kiválasztáshoz
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6191` → Böngészőben automatikus konvertálás: MP4 (H.264/AAC), max 1280×720, max 120 mp, max 25 MB
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6195` → ☁️ Korábban feltöltött videók
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6196` → Frissítés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6198` → Betöltés...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6200` → Kiválasztott importálása
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6207` → Kitöltés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6215` → Némítás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6218` → Lejátszás némítva
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6222` → Háttérszín
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6232` → Előnézet
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6236` → Tölts fel videót az előnézethez.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:7483` → Nincs elem a loop-ban. Húzz ide modult az „Elérhető Modulok” panelről.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:23` → Nincs ütemezés beállítva
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:125` → - Kijelző bekapcsolt
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:125` → ✓ Aktív
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:126` → - Kijelző kikapcsolt
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:126` → ✕ Ki
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:149` → = startMinutes || currentMinutes
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:153` → = startMinutes && currentMinutes
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:287` → ℹ️ Információ:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:289` → (✓): Kijelző bekapcsolt, tartalom megjelenik
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:290` → (✕): Kijelző kikapcsolt, szolgáltatás szünetel
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:291` → Alapértelmezés: 22:00 - 06:00 között kikapcsolt
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:228` → = 1024 && unitIndex
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:449` → = 200 && xhr.status
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:582` → Még nincs feltöltött kép.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:592` → Törlés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:667` → = 0 && removeIndex
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:30` → = 1024 && unitIndex
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1284` → 1920x1080 (16:9 Full HD)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1285` → 1280x720 (16:9 HD)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1286` → 1024x768 (4:3 XGA)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1287` → 1600x900 (16:9 HD+)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1288` → 1366x768 (16:9 WXGA)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1308` → 0s / 0s
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1847` → Időzíthető loopok (alap loop nélkül):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2413` → = startMinute || slotEndMinuteExclusive
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2516` → = preview.startMinute && hour
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2882` → Szerkesztés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2907` → = start && hhmmss
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2908` → = start || hhmmss
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3608` → Típus
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3611` → Speciális dátum
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3615` → Prioritás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3619` → Loop stílus
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3627` → Dátum
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3631` → Kezdés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3650` → Mégse
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3880` → Digitális
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3881` → Analóg
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3888` → 24 órás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3893` → Dátum formátum:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3895` → Teljes (év, hónap, nap, napnév)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3896` → Rövid (év, hónap, nap)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3897` → Numerikus (ÉÉÉÉ.HH.NN)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3898` → Nincs dátum
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3906` → Szlovák
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3912` → Óra szín:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3917` → Dátum szín:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3928` → Betűméret (px):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3933` → Óra mérete (px):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3940` → Másodpercek mutatása
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3954` → Betűméret (px):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3959` → Szöveg szín:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3971` → Verzió mutatása
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3976` → Verzió szöveg:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3990` → 📄 PDF Feltöltés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4002` → kattints a kiválasztáshoz
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4004` → Max. 50 MB
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4029` → Navigáció
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4038` → Haladó
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4046` → Fekvő (landscape)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4047` → Álló (portrait)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4052` → Zoom szint (%):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4065` → Navigációs mód:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4067` → Manuális (gombokkal)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4068` → Automatikus (görgetés)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4074` → Görgetési sebesség (px/s):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4079` → Kezdeti várakozás (ms):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4084` → Vég várakozás (ms):
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4095` → Rögzített oldal mód
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4101` → Megjelenítendő oldal:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4109` → Oldal számok mutatása
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4226` → Ez a modul nem rendelkezik testreszabási lehetőségekkel.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4278` → Mégse
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4286` → 💾 Mentés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4639` → Nincs elem a loop-ban. Húzz ide modult az „Elérhető Modulok” panelről.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4676` → Időtartam
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:138` → Csoport Modulok - EDUDISPLEJ
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:320` → EDUDISPLEJ - Csoport Modulok
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:321` → ← Vissza
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:336` → - Modulok Beállítása
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:345` → 📊 Module Flow Chain (Loop)
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:364` → ⚙️ Modulok Konfigurálása
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:371` → Modul Név
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:372` → Időtartam (mp)
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:373` → Beállítások
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:408` → ⚠️ Nincs licensz
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:417` → 💾 Beállítások Mentése
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:418` → Mégse
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:425` → ℹ️ Tudnivalók
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:427` → A kijelzők ebben a sorrendben váltanak a modulok között.
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:427` → Module Flow Chain:
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:428` → Minden modul ennyi másodpercig jelenik meg a képernyőn.
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:429` → Az utolsó modul után visszamegy az első modulra (végtelen hurok).
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:430` → Egy modulnak csak akkor lesz hozzárendelve, ha van rá licensz a vállalatnak.
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:431` → Egy modul többször is megjelenhet a loopban (pl. clock→nameday→clock→default...).
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:431` → Többszöri megjelenés:
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:138` → Csoport Modulok - EDUDISPLEJ
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:320` → EDUDISPLEJ - Csoport Modulok
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:321` → ← Vissza
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:336` → - Modulok Beállítása
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:345` → 📊 Module Flow Chain (Loop)
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:364` → ⚙️ Modulok Konfigurálása
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:371` → Modul Név
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:372` → Időtartam (mp)
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:373` → Beállítások
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:408` → ⚠️ Nincs licensz
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:417` → 💾 Beállítások Mentése
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:418` → Mégse
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:425` → ℹ️ Tudnivalók
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:427` → A kijelzők ebben a sorrendben váltanak a modulok között.
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:427` → Module Flow Chain:
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:428` → Minden modul ennyi másodpercig jelenik meg a képernyőn.
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:429` → Az utolsó modul után visszamegy az első modulra (végtelen hurok).
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:430` → Egy modulnak csak akkor lesz hozzárendelve, ha van rá licensz a vállalatnak.
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:431` → Egy modul többször is megjelenhet a loopban (pl. clock→nameday→clock→default...).
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:431` → Többszöri megjelenés:
+- `webserver/control_edudisplej_sk/dashboard/index.php:1205` → Engedélyezve
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:155` → Configure Kiosk Modules - EduDisplej
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:215` → ⚙️ Configure Kiosk Modules
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:216` → ← Back to Dashboard
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:249` → ⚠️ No license available for this module
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:251` → ⚠️ All licenses in use (
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:268` → Display Order:
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:279` → Duration (seconds):
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:292` → Module Settings:
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:299` → ][settings][
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:307` → ][settings][
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:314` → ][settings][
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:320` → ][settings][
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:331` → 💾 Save Configuration
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:261` → 📄 PDF Modul Beállítások
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:266` → PDF fájl feltöltése
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:267` → Kattints vagy húzz egy PDF-et ide (max 50 MB)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:273` → ✓ PDF betöltve
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:276` → Kódolás folyamatban...
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:277` → Törlés
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:282` → Alapvető
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:283` → Navigáció
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:284` → Haladó
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:291` → Orientáció
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:293` → Fekvő (landscape)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:294` → Álló (portrait)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:296` → A PDF nézet orientációja
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:302` → Zoom szint (%)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:304` → 50-400% között
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:308` → Megjelenítés mód
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:310` → Laphoz igazítás (fit-page)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:311` → Szélességhez igazítás (fit-width)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:312` → Magassághoz igazítás (fit-height)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:319` → Háttérszín
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:321` → PDF háttérszíne
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:325` → Oldalszámok megjelenítése
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:327` → Igen, mutasd
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:328` → Nem, rejtsd el
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:338` → Kezelés módja
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:340` → Kézi (Manual) - Felhasználó navigál gombok segítségével
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:341` → Automatikus (Auto) - Szoknya automatikus görgetés
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:343` → Manual: felhasználó kézzel navegál. Auto: szoknya automatikus előrehaladás
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:351` → Görgetés sebessége (px/sec)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:353` → 5-200 pixel per másodperc
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:357` → Kezdeti várakozás (ms)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:359` → Görgetés előtt várakozás (0-15000 ms)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:365` → Végső várakozás (ms)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:367` → Görgetés után várakozás (0-15000 ms)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:377` → Rögzített oldal mód
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:379` → Nem - Összes oldal megjelenítése
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:380` → Igen - Csak egy oldal
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:390` → Rögzített oldal száma
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:392` → Melyik oldal jelenjen meg (1-től kezdve)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:400` → Megállási pontok (JSON)
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:402` → Automatikus mód: megállási pontok ahol várunk. Üres lista = nincs megállás
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:403` → Pont szerkesztője
+- `webserver/control_edudisplej_sk/dashboard/profile.php:488` → 20; color:
+- `webserver/control_edudisplej_sk/dashboard/profile.php:890` → 0 && checkedCount
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:66` → • Lista
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:68` → Közép
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:75` → Trebuchet MS
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:77` → Times New Roman
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:78` → Courier New
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:83` → 12 px
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:84` → 14 px
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:85` → 16 px
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:86` → 18 px
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:87` → 24 px
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:88` → 32 px
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:89` → 48 px
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:93` → Háttér jelölés
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:112` → Háttérszín
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:116` → Háttérkép
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:67` → EDUDISPLEJ - Irányítási Panel
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:323` → Irányítási panel
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:331` → Kilépés
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:349` → Kijelzők
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:364` → 🖥️ Kijelzők
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:365` → ⚙️ Szerkesztés
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:371` → 📺 Kijelzők Listája
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:375` → Nincsenek kijelzők hozzárendelve a fiókodhoz.
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:382` → Kijelző Neve
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:383` → Státusz
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:385` → Utolsó Szinkronizálás
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:386` → Modulok / Csoport
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:418` → ⚙️ Kijelzők Szerkesztése
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:425` → Nincsenek kijelzők.
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:440` → Szerkesztés →
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:53` → Kijelző Szerkesztése - EDUDISPLEJ
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:198` → 🖥️ Kijelző Szerkesztése
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:199` → ← Vissza
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:231` → Utolsó szinkronizálás:
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:235` → MAC cím:
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:244` → Hardver információk
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:251` → Megjegyzések
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:264` → Az alapvető adatok módosításához fordulj az adminisztrátorhoz.
+- `webserver/control_edudisplej_sk/email_helper.php:166` → Ha nem Ön kérte, hagyja figyelmen kívül ezt az üzenetet.
+- `webserver/control_edudisplej_sk/email_helper.php:166` → Jelszó visszaállítása
+- `webserver/control_edudisplej_sk/email_helper.php:166` → Új jelszó beállításához kattintson az alábbi gombra:
+- `webserver/control_edudisplej_sk/email_helper.php:173` → Ak ste o to nepožiadali, tento email ignorujte.
+- `webserver/control_edudisplej_sk/email_helper.php:173` → Obnoviť heslo
+- `webserver/control_edudisplej_sk/email_helper.php:173` → Pre nastavenie nového hesla kliknite na tlačidlo nižšie:
+- `webserver/control_edudisplej_sk/email_helper.php:179` → If you did not request this, you can ignore this message.
+- `webserver/control_edudisplej_sk/email_helper.php:179` → Reset password
+- `webserver/control_edudisplej_sk/email_helper.php:179` → To set a new password, click the button below:
+- `webserver/control_edudisplej_sk/kiosk_details.php:65` → Kiosk Details -
+- `webserver/control_edudisplej_sk/kiosk_details.php:209` → 🖥️ Kiosk Details
+- `webserver/control_edudisplej_sk/kiosk_details.php:210` → ← Back to Dashboard
+- `webserver/control_edudisplej_sk/kiosk_details.php:225` → MAC Address:
+- `webserver/control_edudisplej_sk/kiosk_details.php:237` → Last Seen:
+- `webserver/control_edudisplej_sk/kiosk_details.php:240` → Sync Interval:
+- `webserver/control_edudisplej_sk/kiosk_details.php:248` → Hardware Information
+- `webserver/control_edudisplej_sk/kiosk_details.php:262` → No screenshot available
+- `webserver/control_edudisplej_sk/kiosk_details.php:269` → Recent Activity
+- `webserver/control_edudisplej_sk/modules/_template/m_my-module.html:6` → My Module
+- `webserver/control_edudisplej_sk/modules/_template/m_my-module.html:21` → My Module
+- `webserver/control_edudisplej_sk/modules/clock/m_clock.html:6` → Clock - EduDisplej
+- `webserver/control_edudisplej_sk/modules/datetime/m_datetime.html:6` → Clock & Time - EduDisplej
+- `webserver/control_edudisplej_sk/modules/default/m_default.html:81` → for edu
+- `webserver/control_edudisplej_sk/modules/default/m_default.html:81` → made with
+- `webserver/control_edudisplej_sk/modules/gallery/m_gallery.html:6` → EduDisplej Képgaléria Modul
+- `webserver/control_edudisplej_sk/modules/gallery/m_gallery.html:162` → Nincs betöltött kép a galériához
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:6` → EduDisplej Étrend Modul
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:204` → Étrend
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:205` → Betöltés...
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:211` → 🔄 Szerver lekérés
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:693` → = 1 && code
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:721` → 23 || mm
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1100` → = 1 && code
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1608` → = 1 && normalized
+- `webserver/control_edudisplej_sk/modules/meal-menu/meal_menu_utils.js:83` → = 1 && code
+- `webserver/control_edudisplej_sk/modules/pdf/m_pdf.html:6` → EduDisplej PDF Module
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:6` → EduDisplej Terem Foglaltság
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:32` → Terem foglaltság
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:33` → Betöltés...
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:134` → Nincs megjeleníthető foglaltság ehhez a nézethez.
+- `webserver/control_edudisplej_sk/modules/text/m_text.html:6` → EduDisplej Text Module
+- `webserver/control_edudisplej_sk/modules/video/m_video.html:6` → EduDisplej Video Module
+- `webserver/control_edudisplej_sk/userregistration.php:67` → User Registration - EduDisplej
+- `webserver/control_edudisplej_sk/userregistration.php:184` → EduDisplej Registration
+- `webserver/control_edudisplej_sk/userregistration.php:211` → Confirm Password
+- `webserver/control_edudisplej_sk/userregistration.php:219` → Login here
+- `webserver/control_edudisplej_sk/users.php:208` → User Management - EduDisplej
+- `webserver/control_edudisplej_sk/users.php:394` → 👥 User Management
+- `webserver/control_edudisplej_sk/users.php:395` → ← Back to Dashboard
+- `webserver/control_edudisplej_sk/users.php:416` → Username *
+- `webserver/control_edudisplej_sk/users.php:438` → Assign to Company
+- `webserver/control_edudisplej_sk/users.php:440` → -- Unassigned --
+- `webserver/control_edudisplej_sk/users.php:470` → All Users
+- `webserver/control_edudisplej_sk/users.php:480` → Last Login
+- `webserver/control_edudisplej_sk/users.php:487` → No users found
+- `webserver/control_edudisplej_sk/users.php:504` → ✏️ Edit
+
+## hardcoded_ui_literal
+- `webserver/control_edudisplej_sk/admin.php:440` → Screenshot requested successfully!
+- `webserver/control_edudisplej_sk/admin.php:471` → margin-bottom: 20px;
+- `webserver/control_edudisplej_sk/admin.php:475` → margin-bottom: 15px; color: #1e40af;
+- `webserver/control_edudisplej_sk/admin.php:484` → color: #999; font-size: 14px; font-weight: normal;
+- `webserver/control_edudisplej_sk/admin.php:492` → Kiosk #
+- `webserver/control_edudisplej_sk/admin.php:495` → No location
+- `webserver/control_edudisplej_sk/admin.php:501` → font-size: 11px; color: #1e40af;
+- `webserver/control_edudisplej_sk/admin.php:517` → color: #999; font-size: 14px; font-weight: normal;
+- `webserver/control_edudisplej_sk/admin.php:525` → Kiosk #
+- `webserver/control_edudisplej_sk/admin.php:528` → No location
+- `webserver/control_edudisplej_sk/admin.php:534` → font-size: 11px; color: #1e40af;
+- `webserver/control_edudisplej_sk/admin.php:544` → margin-bottom: 20px;
+- `webserver/control_edudisplej_sk/admin.php:577` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/admin.php:581` → btn btn-sm
+- `webserver/control_edudisplej_sk/admin.php:582` → btn btn-sm btn-success
+- `webserver/control_edudisplej_sk/admin.php:582` → return confirm(
+- `webserver/control_edudisplej_sk/admin.php:583` → btn btn-sm btn-warning
+- `webserver/control_edudisplej_sk/admin.php:584` → ⚡ Fast
+- `webserver/control_edudisplej_sk/admin.php:584` → 🐌 Slow
+- `webserver/control_edudisplej_sk/admin/api_logs.php:218` → alert error
+- `webserver/control_edudisplej_sk/admin/api_logs.php:222` → alert success
+- `webserver/control_edudisplej_sk/admin/api_logs.php:256` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/api_logs.php:259` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/api_logs.php:299` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/api_logs.php:313` → white-space:pre-wrap; margin:4px 0 0; background:#f6f8fa; padding:8px; border-radius:6px;
+- `webserver/control_edudisplej_sk/admin/api_logs.php:317` → white-space:pre-wrap; margin:4px 0 0; background:#f6f8fa; padding:8px; border-radius:6px;
+- `webserver/control_edudisplej_sk/admin/api_logs.php:321` → white-space:pre-wrap; margin:4px 0 0; background:#f6f8fa; padding:8px; border-radius:6px;
+- `webserver/control_edudisplej_sk/admin/archived_users.php:172` → alert error
+- `webserver/control_edudisplej_sk/admin/archived_users.php:176` → alert success
+- `webserver/control_edudisplej_sk/admin/archived_users.php:206` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/archived_users.php:209` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/archived_users.php:244` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/archived_users.php:247` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/archived_users.php:251` → return confirm(
+- `webserver/control_edudisplej_sk/admin/archived_users.php:253` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/archived_users.php:301` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/companies.php:480` → alert error
+- `webserver/control_edudisplej_sk/admin/companies.php:484` → alert success
+- `webserver/control_edudisplej_sk/admin/companies.php:491` → font-size:12px; color:#60788f;
+- `webserver/control_edudisplej_sk/admin/companies.php:493` → font-size:12px; color:#1f4d7a; margin-top:4px;
+- `webserver/control_edudisplej_sk/admin/companies.php:497` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/companies.php:501` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/companies.php:508` → Edit institution
+- `webserver/control_edudisplej_sk/admin/companies.php:508` → New institution
+- `webserver/control_edudisplej_sk/admin/companies.php:531` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/companies.php:535` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/companies.php:582` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/companies.php:582` → copyToClipboard(event)
+- `webserver/control_edudisplej_sk/admin/companies.php:587` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/companies.php:588` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/companies.php:590` → btn btn-small btn-primary
+- `webserver/control_edudisplej_sk/admin/companies.php:591` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/companies.php:592` → btn btn-small btn-danger
+- `webserver/control_edudisplej_sk/admin/companies.php:592` → return confirm(
+- `webserver/control_edudisplej_sk/admin/dashboard.php:252` → alert error
+- `webserver/control_edudisplej_sk/admin/dashboard.php:258` → badge success
+- `webserver/control_edudisplej_sk/admin/dashboard.php:260` → badge warning
+- `webserver/control_edudisplej_sk/admin/dashboard.php:261` → badge danger
+- `webserver/control_edudisplej_sk/admin/dashboard.php:262` → badge info
+- `webserver/control_edudisplej_sk/admin/dashboard.php:284` → badge danger
+- `webserver/control_edudisplej_sk/admin/dashboard.php:331` → hostname, mac, device id
+- `webserver/control_edudisplej_sk/admin/dashboard.php:346` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/dashboard.php:349` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/dashboard.php:377` → margin-left:8px; background:#b23b3b; color:#fff;
+- `webserver/control_edudisplej_sk/admin/dashboard.php:490` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:227` → Jelszó visszaállítás
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:228` → Password reset
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:229` → Obnovenie hesla
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:271` → alert alert-success
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:275` → alert alert-error
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:317` → color: #666; font-size: 13px;
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:372` → form-group button
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:376` → font-size: 13px; color: #666; margin-top: 10px;
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:394` → text-align: center; color: #999; padding: 40px 0;
+- `webserver/control_edudisplej_sk/admin/email_queue.php:103` → alert error
+- `webserver/control_edudisplej_sk/admin/email_queue.php:106` → alert success
+- `webserver/control_edudisplej_sk/admin/email_queue.php:121` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/email_queue.php:123` → return confirm(
+- `webserver/control_edudisplej_sk/admin/email_queue.php:125` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/email_queue.php:161` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/email_queue.php:162` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/email_queue.php:168` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/email_queue.php:172` → return confirm(
+- `webserver/control_edudisplej_sk/admin/email_queue.php:175` → btn btn-small btn-secondary
+- `webserver/control_edudisplej_sk/admin/email_queue.php:216` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/email_queue.php:217` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/email_queue.php:218` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/email_queue.php:254` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/email_settings.php:104` → alert error
+- `webserver/control_edudisplej_sk/admin/email_settings.php:107` → alert success
+- `webserver/control_edudisplej_sk/admin/email_settings.php:164` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/email_settings.php:175` → you@example.com
+- `webserver/control_edudisplej_sk/admin/email_settings.php:178` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/email_templates.php:154` → alert error
+- `webserver/control_edudisplej_sk/admin/email_templates.php:157` → alert success
+- `webserver/control_edudisplej_sk/admin/email_templates.php:183` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/email_templates.php:185` → btn btn-small btn-secondary
+- `webserver/control_edudisplej_sk/admin/email_templates.php:186` → return confirm(
+- `webserver/control_edudisplej_sk/admin/email_templates.php:190` → btn btn-small btn-danger
+- `webserver/control_edudisplej_sk/admin/email_templates.php:196` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/email_templates.php:199` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/email_templates.php:211` → Edit template
+- `webserver/control_edudisplej_sk/admin/email_templates.php:211` → New template
+- `webserver/control_edudisplej_sk/admin/email_templates.php:244` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/email_templates.php:246` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/email_templates.php:260` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/email_templates.php:269` → document.getElementById(
+- `webserver/control_edudisplej_sk/admin/header.php:239` → color: rgba(255,255,255,0.6);
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:134` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:135` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:248` → ]))), ENT_QUOTES,
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:260` → white-space: pre-wrap;
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:270` → Kiosk Screenshot
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:270` → max-width: 100%; border: 1px solid #ccc;
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:273` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:295` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:308` → Elindítja a teljes frissítést ezen a kioskon? A frissítés a következő parancskezelő ciklusban fut le.
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:312` → Küldés...
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:321` → ✓ Frissítési parancs elküldve (ID:
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:324` → ⚠ Hiba:
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:330` → ⚠ Hálózati hiba
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:338` → Küldés...
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:348` → ✓ Fast loop bekapcsolva
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:348` → ✓ Fast loop kikapcsolva
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:351` → ⚠ Hiba:
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:356` → ⚠ Hálózati hiba
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:363` → Küldés...
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:379` → Ismeretlen hiba
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:379` → ⚠ Hiba:
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:384` → ⚠ Hálózati hiba
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:391` → Küldés...
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:402` → ✓ Screenshot policy bekapcsolva
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:402` → ✓ Screenshot policy kikapcsolva
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:406` → Ismeretlen hiba
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:406` → ⚠ Hiba:
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:411` → ⚠ Hálózati hiba
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:430` → Törlés folyamatban...
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:446` → ✓ Kijelző véglegesen törölve
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:454` → Törlési hiba
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:454` → ⚠ Hiba:
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:464` → ⚠ Hálózati hiba
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:91` → alert error
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:165` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:172` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:173` → btn btn-small btn-warning
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:174` → btn btn-small btn-danger
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:192` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:192` → executeCommand()
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:193` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:193` → closeTerminal()
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:284` → Fast Loop OFF
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:284` → Fast Loop ON
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:71` → Ismeretlen kiosk
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:122` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:125` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:146` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:152` → margin-top: 6px;
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:47` → > /opt/edudisplej/lic/token && sync && sudo shutdown -r now
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:178` → alert error
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:182` → alert success
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:206` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:206` → return confirm(
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:228` → kiosk_ids[]
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:272` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:273` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:274` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/licenses.php:183` → alert error
+- `webserver/control_edudisplej_sk/admin/licenses.php:186` → alert success
+- `webserver/control_edudisplej_sk/admin/licenses.php:239` → btn btn-small btn-primary
+- `webserver/control_edudisplej_sk/admin/licenses.php:240` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/licenses.php:255` → Edit license
+- `webserver/control_edudisplej_sk/admin/licenses.php:255` → New license
+- `webserver/control_edudisplej_sk/admin/licenses.php:263` → ] ?? date(
+- `webserver/control_edudisplej_sk/admin/licenses.php:288` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/licenses.php:289` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/licenses.php:327` → mono muted
+- `webserver/control_edudisplej_sk/admin/licenses.php:328` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/licenses.php:329` → nowrap muted
+- `webserver/control_edudisplej_sk/admin/licenses.php:339` → return confirm(
+- `webserver/control_edudisplej_sk/admin/licenses.php:343` → btn btn-small btn-danger
+- `webserver/control_edudisplej_sk/admin/licenses.php:350` → btn btn-small btn-primary
+- `webserver/control_edudisplej_sk/admin/licenses.php:360` → btn btn-secondary btn-small
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:130` → ) && class_exists(
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:130` → . ((extension_loaded(
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:130` → . PHP_VERSION .
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:130` → echo PHP_SAPI .
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:531` → alert error
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:535` → alert success
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:566` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:577` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:607` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:621` → white-space:pre-wrap; max-height:340px; overflow:auto;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:660` → pl. Jedáleň ...
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:663` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:675` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:676` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:677` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:678` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:679` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:680` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:681` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:706` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:707` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:708` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:709` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:710` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:711` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:712` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:732` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:733` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:734` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:735` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:736` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:737` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:738` → text-align:left; padding:8px; border-bottom:1px solid #e5e7eb;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:763` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:764` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:765` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:766` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:767` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:768` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:769` → padding:8px; border-bottom:1px solid #f1f5f9;
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:203` → alert error
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:207` → alert success
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:268` → muted mono
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:287` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/modules.php:422` → alert error
+- `webserver/control_edudisplej_sk/admin/modules.php:426` → alert success
+- `webserver/control_edudisplej_sk/admin/modules.php:486` → badge info
+- `webserver/control_edudisplej_sk/admin/modules.php:527` → white-space: pre-wrap;
+- `webserver/control_edudisplej_sk/admin/modules.php:531` → white-space: pre-wrap;
+- `webserver/control_edudisplej_sk/admin/modules.php:536` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/modules.php:542` → Edit module
+- `webserver/control_edudisplej_sk/admin/modules.php:542` → New module
+- `webserver/control_edudisplej_sk/admin/modules.php:573` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/modules.php:578` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/modules.php:601` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/modules.php:644` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/modules.php:646` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/modules.php:647` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/modules.php:649` → btn btn-small btn-secondary
+- `webserver/control_edudisplej_sk/admin/modules.php:649` → opacity:0.6; cursor:not-allowed;
+- `webserver/control_edudisplej_sk/admin/modules.php:651` → btn btn-small btn-secondary
+- `webserver/control_edudisplej_sk/admin/modules.php:654` → return confirm(
+- `webserver/control_edudisplej_sk/admin/modules.php:656` → btn btn-small btn-danger
+- `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:63` → alert error
+- `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:111` → white-space:pre-wrap; overflow:auto; max-height:260px; background:#0f172a; color:#e2e8f0; padding:10px; border-radius:8px;
+- `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:189` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/room_occupancy_maintenance.php:216` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/script.js:3` → Are you sure?
+- `webserver/control_edudisplej_sk/admin/security_logs.php:170` → alert error
+- `webserver/control_edudisplej_sk/admin/security_logs.php:174` → alert success
+- `webserver/control_edudisplej_sk/admin/security_logs.php:224` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/security_logs.php:227` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/security_logs.php:257` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/services.php:118` → alert error
+- `webserver/control_edudisplej_sk/admin/services.php:121` → alert success
+- `webserver/control_edudisplej_sk/admin/services.php:131` → btn btn-danger
+- `webserver/control_edudisplej_sk/admin/services.php:131` → return confirm(
+- `webserver/control_edudisplej_sk/admin/services.php:167` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/services.php:167` → return confirm(
+- `webserver/control_edudisplej_sk/admin/translations.php:49` → alert error
+- `webserver/control_edudisplej_sk/admin/translations.php:52` → alert success
+- `webserver/control_edudisplej_sk/admin/translations.php:112` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/translations.php:113` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/users.php:251` → alert error
+- `webserver/control_edudisplej_sk/admin/users.php:255` → alert success
+- `webserver/control_edudisplej_sk/admin/users.php:259` → Felhasznalo szerkesztes
+- `webserver/control_edudisplej_sk/admin/users.php:259` → Uj felhasznalo
+- `webserver/control_edudisplej_sk/admin/users.php:273` → (csak ha valtozik)
+- `webserver/control_edudisplej_sk/admin/users.php:313` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/users.php:314` → btn btn-secondary
+- `webserver/control_edudisplej_sk/admin/users.php:316` → btn btn-primary
+- `webserver/control_edudisplej_sk/admin/users.php:372` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/users.php:373` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/admin/users.php:375` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/users.php:376` → btn btn-small btn-danger
+- `webserver/control_edudisplej_sk/admin/users.php:376` → return confirm(
+- `webserver/control_edudisplej_sk/admin/users.php:378` → btn btn-small
+- `webserver/control_edudisplej_sk/admin/users.php:378` → return confirm(
+- `webserver/control_edudisplej_sk/api/DEBUG_meal_check_8e5wb.php:47` → Site ID:
+- `webserver/control_edudisplej_sk/api/FIX_insert_test_meal_8e5wb.php:18` → , Group:
+- `webserver/control_edudisplej_sk/api/auth.php:188` → Request signing headers required
+- `webserver/control_edudisplej_sk/api/auth.php:199` → Request timestamp out of range
+- `webserver/control_edudisplej_sk/api/auth.php:207` → Invalid nonce format
+- `webserver/control_edudisplej_sk/api/auth.php:228` → Nonce already used
+- `webserver/control_edudisplej_sk/api/auth.php:246` → Request signing not configured for this company
+- `webserver/control_edudisplej_sk/api/auth.php:264` → Invalid request signature
+- `webserver/control_edudisplej_sk/api/auth.php:281` → Signature validation error
+- `webserver/control_edudisplej_sk/api/display_schedule_api.php:167` → Endpoint not found
+- `webserver/control_edudisplej_sk/api/email_settings.php:71` → Invalid email address
+- `webserver/control_edudisplej_sk/api/email_settings.php:81` → Send failed – check email_logs
+- `webserver/control_edudisplej_sk/api/email_settings.php:81` → Test email sent
+- `webserver/control_edudisplej_sk/api/email_settings.php:86` → Invalid action
+- `webserver/control_edudisplej_sk/api/email_settings.php:91` → Server error
+- `webserver/control_edudisplej_sk/api/email_templates.php:36` → Invalid key or lang
+- `webserver/control_edudisplej_sk/api/email_templates.php:40` → Subject required
+- `webserver/control_edudisplej_sk/api/email_templates.php:58` → Invalid key or lang
+- `webserver/control_edudisplej_sk/api/email_templates.php:76` → Invalid key or lang
+- `webserver/control_edudisplej_sk/api/email_templates.php:82` → Template not found
+- `webserver/control_edudisplej_sk/api/email_templates.php:105` → Invalid key or lang
+- `webserver/control_edudisplej_sk/api/email_templates.php:118` → Admin email not found
+- `webserver/control_edudisplej_sk/api/email_templates.php:127` → Send failed
+- `webserver/control_edudisplej_sk/api/email_templates.php:127` → Test email sent to
+- `webserver/control_edudisplej_sk/api/email_templates.php:132` → Invalid action
+- `webserver/control_edudisplej_sk/api/email_templates.php:137` → Server error
+- `webserver/control_edudisplej_sk/api/geolocation.php:14` → Not authenticated
+- `webserver/control_edudisplej_sk/api/get_group_kiosks.php:12` → Not authenticated
+- `webserver/control_edudisplej_sk/api/get_group_kiosks.php:34` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/get_group_kiosks.php:61` → Adatbázis hiba
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:14` → Not authenticated
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:252` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:278` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:294` → Az unconfigured modul nem elerheto
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:479` → Hibás loop konfiguráció
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:623` → Érvénytelen modul azonosító a loopban
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:639` → A default csoport loopja nem szerkesztheto
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:796` → Adatbázis hiba:
+- `webserver/control_edudisplej_sk/api/group_loop/kiosk_loop.php:15` → Not authenticated
+- `webserver/control_edudisplej_sk/api/group_loop/kiosk_loop.php:44` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/group_loop/kiosk_loop.php:160` → Adatbázis hiba
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_file.php:27` → Missing asset_id or path
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_file.php:71` → Asset not found
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_file.php:82` → Invalid asset path
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_file.php:111` → Asset file missing
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_file.php:193` → Server error
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_library.php:10` → Not authenticated
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_library.php:15` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_library.php:47` → Hiányzó company context
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_library.php:100` → Szerver hiba
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:10` → Not authenticated
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:15` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:27` → Hiányzó paraméter
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:32` → Nincs feltöltött fájl
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:38` → Feltöltési hiba
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:71` → -v error -print_format json -show_format -show_streams
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:192` → A fájl mérete érvénytelen (max. 50 MB)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:199` → Csak PDF fájl tölthető fel
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:204` → A kép mérete érvénytelen (max. 15 MB)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:211` → Csak képformátum tölthető fel (jpg/png/webp/gif)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:216` → A videó csak kliens oldali optimalizálás után tölthető fel
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:221` → A videó mérete érvénytelen (max. 25 MB)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:228` → Csak MP4 videó tölthető fel
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:234` → A videó ellenőrzése sikertelen
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:240` → A videó konténere nem támogatott (csak MP4)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:246` → A videó hossza érvénytelen (max. 120 mp)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:253` → A videó felbontása érvénytelen (max. 1280×720)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:259` → A videó kodekje nem támogatott (csak H.264)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:265` → A videó audió kodekje nem támogatott (csak AAC)
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:269` → Nem támogatott modul-tárhely típus
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:284` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:297` → A modul tárhely nem írható
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:317` → A fájl mentése sikertelen
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:358` → Szerver hiba történt a feltöltés során
+- `webserver/control_edudisplej_sk/api/licenses.php:40` → company_id, valid_from and valid_until required
+- `webserver/control_edudisplej_sk/api/licenses.php:56` → License created
+- `webserver/control_edudisplej_sk/api/licenses.php:62` → kiosk_id required
+- `webserver/control_edudisplej_sk/api/licenses.php:73` → Device deactivated
+- `webserver/control_edudisplej_sk/api/licenses.php:79` → kiosk_id required
+- `webserver/control_edudisplej_sk/api/licenses.php:91` → Device not found
+- `webserver/control_edudisplej_sk/api/licenses.php:104` → Device activated
+- `webserver/control_edudisplej_sk/api/licenses.php:109` → Invalid action
+- `webserver/control_edudisplej_sk/api/licenses.php:116` → Server error
+- `webserver/control_edudisplej_sk/api/meal_plan.php:933` → Étrend mentve
+- `webserver/control_edudisplej_sk/api/otp_setup.php:14` → Not authenticated
+- `webserver/control_edudisplej_sk/api/otp_setup.php:38` → User not found
+- `webserver/control_edudisplej_sk/api/otp_setup.php:66` → Invalid code format
+- `webserver/control_edudisplej_sk/api/otp_setup.php:79` → OTP not set up
+- `webserver/control_edudisplej_sk/api/otp_setup.php:114` → Password required to disable 2FA
+- `webserver/control_edudisplej_sk/api/otp_setup.php:127` → Invalid password
+- `webserver/control_edudisplej_sk/api/otp_setup.php:164` → Password required
+- `webserver/control_edudisplej_sk/api/otp_setup.php:176` → Invalid password
+- `webserver/control_edudisplej_sk/api/otp_setup.php:181` → 2FA is not enabled
+- `webserver/control_edudisplej_sk/api/otp_setup.php:202` → Invalid action
+- `webserver/control_edudisplej_sk/api/otp_setup.php:210` → Server error
+- `webserver/control_edudisplej_sk/api/password_reset.php:30` → Valid email required
+- `webserver/control_edudisplej_sk/api/password_reset.php:77` → If the email is registered, a reset link has been sent
+- `webserver/control_edudisplej_sk/api/password_reset.php:86` → Token required
+- `webserver/control_edudisplej_sk/api/password_reset.php:90` → Password must be at least 8 characters
+- `webserver/control_edudisplej_sk/api/password_reset.php:94` → Passwords do not match
+- `webserver/control_edudisplej_sk/api/password_reset.php:109` → Invalid or expired token
+- `webserver/control_edudisplej_sk/api/password_reset.php:114` → Token already used
+- `webserver/control_edudisplej_sk/api/password_reset.php:119` → Token expired
+- `webserver/control_edudisplej_sk/api/password_reset.php:147` → Invalid action
+- `webserver/control_edudisplej_sk/api/password_reset.php:152` → Server error
+- `webserver/control_edudisplej_sk/api/rename_group.php:12` → Not authenticated
+- `webserver/control_edudisplej_sk/api/rename_group.php:21` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/rename_group.php:26` → Invalid request method
+- `webserver/control_edudisplej_sk/api/rename_group.php:34` → A csoport neve nem lehet üres
+- `webserver/control_edudisplej_sk/api/rename_group.php:56` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/rename_group.php:61` → Az alapertelmezett csoport nem nevezheto at
+- `webserver/control_edudisplej_sk/api/rename_group.php:70` → Csoport sikeresen átnevezve
+- `webserver/control_edudisplej_sk/api/rename_group.php:72` → Átnevezés sikertelen
+- `webserver/control_edudisplej_sk/api/rename_group.php:80` → Adatbázis hiba
+- `webserver/control_edudisplej_sk/api/screenshot_file.php:22` → Bad request
+- `webserver/control_edudisplej_sk/api/screenshot_file.php:56` → Access denied
+- `webserver/control_edudisplej_sk/api/screenshot_file.php:104` → Not found
+- `webserver/control_edudisplej_sk/api/screenshot_file.php:111` → Screenshot storage unavailable
+- `webserver/control_edudisplej_sk/api/screenshot_file.php:126` → Not found
+- `webserver/control_edudisplej_sk/api/screenshot_file.php:168` → Server error
+- `webserver/control_edudisplej_sk/api/text_collection_meal_calendar.php:13` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/text_collection_meal_calendar.php:58` → Érvénytelen cég
+- `webserver/control_edudisplej_sk/api/text_collection_meal_calendar.php:114` → Dátum és intézmény kötelező
+- `webserver/control_edudisplej_sk/api/text_collection_meal_calendar.php:133` → Napi étrend mentve
+- `webserver/control_edudisplej_sk/api/text_collection_meal_calendar.php:144` → Érvénytelen azonosító
+- `webserver/control_edudisplej_sk/api/text_collection_meal_calendar.php:160` → Ismeretlen művelet
+- `webserver/control_edudisplej_sk/api/text_collection_meal_calendar.php:164` → Szerver hiba
+- `webserver/control_edudisplej_sk/api/text_collections.php:13` → Hozzáférés megtagadva
+- `webserver/control_edudisplej_sk/api/text_collections.php:235` → Érvénytelen cég azonosító
+- `webserver/control_edudisplej_sk/api/text_collections.php:292` → Név megadása kötelező
+- `webserver/control_edudisplej_sk/api/text_collections.php:363` → Érvénytelen azonosító
+- `webserver/control_edudisplej_sk/api/text_collections.php:378` → Elem nem található
+- `webserver/control_edudisplej_sk/api/text_collections.php:400` → Ismeretlen művelet
+- `webserver/control_edudisplej_sk/api/text_collections.php:404` → Szerver hiba
+- `webserver/control_edudisplej_sk/api/update_group_order.php:11` → Not authenticated
+- `webserver/control_edudisplej_sk/api/update_group_order.php:19` → No company assigned
+- `webserver/control_edudisplej_sk/api/update_group_order.php:24` → Invalid request method
+- `webserver/control_edudisplej_sk/api/update_group_order.php:32` → Invalid payload
+- `webserver/control_edudisplej_sk/api/update_group_order.php:65` → Hozzaferes megtagadva
+- `webserver/control_edudisplej_sk/api/update_group_order.php:80` → Hibas csoportsorrend
+- `webserver/control_edudisplej_sk/api/update_group_order.php:86` → Nincs csoport
+- `webserver/control_edudisplej_sk/api/update_group_order.php:118` → Csoportsorrend frissitve
+- `webserver/control_edudisplej_sk/api/update_group_order.php:125` → Adatbazis hiba
+- `webserver/control_edudisplej_sk/companies.php:350` → Create Company
+- `webserver/control_edudisplej_sk/companies.php:350` → Edit Company
+- `webserver/control_edudisplej_sk/companies.php:362` → Create Company
+- `webserver/control_edudisplej_sk/companies.php:391` → return confirm(
+- `webserver/control_edudisplej_sk/companies.php:410` → Kiosk #
+- `webserver/control_edudisplej_sk/companies.php:433` → e.g., Main Building, Room 101
+- `webserver/control_edudisplej_sk/companies.php:438` → Any notes about this kiosk...
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3555` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3579` → color: #4ec9b0;
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3581` → color: #f48771;
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:3586` → background: #0e6027;
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:195` → Találtam nem mentett helyi piszkozatot. Betöltsem?
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:223` → Biztosan elveted a helyi módosításokat?
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:416` → Nincs elérhető loop
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:436` → [Alap]
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:472` → Nincs időzíthető loop.
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:494` → Időzítés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:547` → Mentés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:581` → Frissítés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:733` → margin:0 0 10px 0;
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:743` → closeTimeBlockModal()
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1060` → Alap loop (időblokkon kívül)
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1307` → allowScheduleDrop(event)
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1708` → Nincs speciális dátumos idősáv.
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1708` → Nincs találat a keresésre.
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1717` → , true)
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1717` → setActiveScope(
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1741` → margin:0 0 8px 0;
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1749` → font-size:12px; color:#2b3f52;
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1750` → , true); closeTimeBlockModal();
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1750` → setActiveScope(
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1751` → btn btn-danger
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1764` → addSpecialDayBlockFromPlanner(
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:1767` → closeTimeBlockModal()
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2352` → Biztosan törölni szeretnéd az összes elemet?
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2588` → Időblokk szerkesztése
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2588` → margin:0 0 12px 0;
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2588` → Új időblokk
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2633` → closeTimeBlockModal()
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2924` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2955` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:2995` → margin: 0;
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3121` → Lejátszás...
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3131` → Lejátszás...
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3137` → Szüneteltetve
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3153` → Leállítva
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3156` → 0s / 0s
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3384` → A default csoport nem szerkeszthető
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3386` → Testreszabás
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3387` → Testreszabás
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3388` → Duplikálás
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3389` → Törlés
+- `webserver/control_edudisplej_sk/dashboard/assets/group_loop.js:3400` → font-size: 11px; opacity: 0.9;
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:208` → alert error
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:218` → panel easy-group-card
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:247` → 🔴 Offline
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:247` → 🟢 Online
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:276` → btn btn-primary
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:286` → btn btn-primary
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:294` → btn btn-primary
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:323` → btn btn-primary
+- `webserver/control_edudisplej_sk/dashboard/easy_user.php:570` → Nincs PDF kiválasztva.
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks.php:186` → alert error
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks.php:190` → alert success
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:273` → color: #1e40af; text-decoration: none;
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:288` → margin-bottom: 10px;
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:289` → color: #666; font-size: 13px;
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:290` → Nincs leírás
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:311` → btn btn-remove
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:311` → return confirm(
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:334` → btn btn-add
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:422` → btn pending-save-btn
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:423` → btn pending-discard-btn
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:452` → btn pending-save-btn
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:452` → publishLoopPlan()
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1051` → Nincs elérhető loop
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1126` → No schedulable loops.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1219` → Frissítés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1254` → Frissítés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1442` → Weekly schedule
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1442` → margin:0 0 10px 0;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1448` → Weekly start (hour-minute)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1449` → Weekly end (hour-minute)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1452` → closeTimeBlockModal()
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:1799` → DEFAULT loop (időblokkon kívül)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2049` → allowScheduleDrop(event)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2436` → Nincs speciális dátumos idősáv.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2436` → Nincs találat a keresésre.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2445` → , true)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2445` → setActiveScope(
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2469` → margin:0 0 8px 0;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2477` → font-size:12px; color:#2b3f52;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2478` → , true); closeTimeBlockModal();
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2478` → setActiveScope(
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2479` → btn btn-danger
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2492` → addSpecialDayBlockFromPlanner(
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:2495` → closeTimeBlockModal()
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3465` → Biztosan törölni szeretnéd az összes elemet?
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3722` → Időblokk szerkesztése
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3722` → margin:0 0 12px 0;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3722` → Új időblokk
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:3767` → closeTimeBlockModal()
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:4804` → ).trim() ?
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5312` → Nincs kiválasztott kép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5334` → Feldolgozás...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5347` → Kép feldolgozási hiba
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5355` → Nincs kiválasztott kép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5635` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5642` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5649` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5664` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5709` → padding:7px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5721` → padding:5px 9px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5722` → padding:5px 9px; font-style:italic;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5723` → padding:5px 9px; text-decoration:underline;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5724` → padding:5px 9px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5725` → padding:5px 9px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5726` → padding:5px 9px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5727` → padding:5px 9px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5753` → padding:5px 10px; border:1px solid #0d5f2e; background:#1f7a3f; color:#fff; border-radius:4px; cursor:pointer;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5754` → padding:5px 10px; border:1px solid #8a1f1f; background:#b02a2a; color:#fff; border-radius:4px; cursor:pointer;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5785` → padding: 5px 10px; border: none; border-radius: 4px; background: #dc3545; color: #fff; cursor: pointer;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5802` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5901` → width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5905` → width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5909` → width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5913` → width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5917` → width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5952` → pl. Dnešné menu
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5952` → width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5969` → Prajeme dobrú chuť!
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5969` → width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5976` → width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:5998` → padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6033` → color:#1e40af; font-weight:bold; text-decoration:underline;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6033` → font-size:14px; color:#425466;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6039` → padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6043` → margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6129` → color: #1e40af; font-weight: bold; text-decoration: underline;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6143` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6190` → color:#1e40af; font-weight:bold; text-decoration:underline;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6190` → font-size:14px; color:#425466;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6196` → padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6200` → margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6383` → margin: 0;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6827` → Lejátszás...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6837` → Lejátszás...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6843` → Szüneteltetve
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6857` → Leállítva
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:6860` → 0s / 0s
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:7412` → A default csoport nem szerkeszthető
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:7416` → Testreszabás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:7419` → Testreszabás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:7420` → Duplikálás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/app.js:7421` → Törlés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:125` → background: #2ecc71; color: white; padding: 2px 6px; border-radius: 3px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:126` → background: #e74c3c; color: white; padding: 2px 6px; border-radius: 3px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:126` → margin-top: 5px;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:197` → ● Aktív
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:201` → ● Kikapcsolt
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:240` → 📅 Kijelzo Ütemezés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:254` → Aktuális státusz:
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/display-scheduler.js:270` → Nincs ütemezés beállítva. Az ütemezés az admin felületen állítható be.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:244` → Nincs korábban feltöltött kép.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:263` → font-size:11px; color:#374151; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:264` → font-size:10px; color:#667085;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:273` → Betöltés...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:326` → ismeretlen hiba
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:591` → font-size:12px; color:#344054; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:592` → padding:4px 7px; border:1px solid #c43b2f; color:#c43b2f; background:#fff; border-radius:4px; cursor:pointer;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/gallery.js:697` → Nincs érvényes kép a kiválasztott fájlok között.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/text-editor.js:463` → Nincs kiválasztott kép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/text-editor.js:479` → Feldolgozás...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/text-editor.js:490` → Kép feldolgozási hiba
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/text-editor.js:497` → Nincs kiválasztott kép
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:271` → Loop időtartam: még nincs videó
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:338` → Kliens oldali optimalizálás indul...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:346` → Konvertált videó ellenőrzése...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:362` → Feltöltés...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:379` → ismeretlen hiba
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:395` → Nincs korábban feltöltött videó.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:421` → Betöltés...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:447` → ismeretlen hiba
+- `webserver/control_edudisplej_sk/dashboard/group_loop/assets/js/modules/video.js:468` → Videó metaadat lekérés...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1138` → alert alert-error
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1142` → alert alert-success
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1197` → ), ENT_QUOTES,
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1216` → ), ENT_QUOTES,
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1218` → ), ENT_QUOTES,
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1388` → font-size:12px; color:#425466; font-weight:700;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1766` → Még nincs loop létrehozva.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1808` → 📄 Duplikálás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1818` → 🗑️ Törlés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1852` → Nincs időzíthető loop.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1914` → + Idősáv hozzáadása
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:1948` → 💾 Idősáv frissítése
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2229` → Alap loop (időblokkon kívül)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2476` → allowScheduleDrop(event)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2873` → Nincs speciális dátumos idősáv.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2873` → Nincs találat a keresésre.
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2882` → , true)
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:2882` → setActiveScope(
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3392` → Biztosan törölni szeretnéd az összes elemet?
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3605` → Időblokk szerkesztése
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3605` → margin:0 0 12px 0;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3605` → Új időblokk
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3650` → closeTimeBlockModal()
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3940` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:3971` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4002` → color: #1e40af; font-weight: bold; text-decoration: underline;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4095` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4109` → font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4255` → margin: 0;
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4398` → Lejátszás...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4408` → Lejátszás...
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4414` → Szüneteltetve
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4430` → Leállítva
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4433` → 0s / 0s
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4662` → A default csoport nem szerkeszthető
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4664` → Testreszabás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4665` → Testreszabás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4666` → Duplikálás
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4667` → Törlés
+- `webserver/control_edudisplej_sk/dashboard/group_loop/index.php:4678` → font-size: 11px; opacity: 0.9;
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:321` → color: #1e40af; text-decoration: none;
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:337` → color: #666; font-size: 13px; margin-top: 5px;
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:370` → width: 50px;
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:398` → color: #666;
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:404` → font-size: 12px; color: #666;
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:408` → color: #dc3545;
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:418` → btn btn-secondary
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:321` → color: #1e40af; text-decoration: none;
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:337` → color: #666; font-size: 13px; margin-top: 5px;
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:370` → width: 50px;
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:398` → color: #666;
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:404` → font-size: 12px; color: #666;
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:408` → color: #dc3545;
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:418` → btn btn-secondary
+- `webserver/control_edudisplej_sk/dashboard/groups.php:580` → width: 32px; text-align: center;
+- `webserver/control_edudisplej_sk/dashboard/groups.php:604` → color: #666; font-size: 13px;
+- `webserver/control_edudisplej_sk/dashboard/groups.php:613` → font-size: 12px; color: #333; font-weight: 600;
+- `webserver/control_edudisplej_sk/dashboard/groups.php:619` → color:#9aa5b1; font-size:12px;
+- `webserver/control_edudisplej_sk/dashboard/index.php:227` → color:var(--danger);padding:12px 0;
+- `webserver/control_edudisplej_sk/dashboard/index.php:232` → filterByGroup(
+- `webserver/control_edudisplej_sk/dashboard/index.php:232` → summary-item active
+- `webserver/control_edudisplej_sk/dashboard/index.php:233` → summary-dot dot-total
+- `webserver/control_edudisplej_sk/dashboard/index.php:236` → filterByGroup(
+- `webserver/control_edudisplej_sk/dashboard/index.php:237` → summary-dot dot-online
+- `webserver/control_edudisplej_sk/dashboard/index.php:240` → filterByGroup(
+- `webserver/control_edudisplej_sk/dashboard/index.php:241` → summary-dot dot-offline
+- `webserver/control_edudisplej_sk/dashboard/index.php:245` → filterByGroup(
+- `webserver/control_edudisplej_sk/dashboard/index.php:246` → summary-dot dot-groups
+- `webserver/control_edudisplej_sk/dashboard/index.php:364` → muted nowrap kiosk-last-seen
+- `webserver/control_edudisplej_sk/dashboard/index.php:494` → Screenshot unavailable
+- `webserver/control_edudisplej_sk/dashboard/index.php:498` → No image
+- `webserver/control_edudisplej_sk/dashboard/index.php:502` → No timestamp
+- `webserver/control_edudisplej_sk/dashboard/index.php:511` → Load error.
+- `webserver/control_edudisplej_sk/dashboard/index.php:523` → OFFLINE SINCE:
+- `webserver/control_edudisplej_sk/dashboard/index.php:531` → No results.
+- `webserver/control_edudisplej_sk/dashboard/index.php:547` → Online error
+- `webserver/control_edudisplej_sk/dashboard/index.php:551` → Waiting for refresh
+- `webserver/control_edudisplej_sk/dashboard/index.php:571` → Last sync
+- `webserver/control_edudisplej_sk/dashboard/index.php:583` → Kiosk loop version
+- `webserver/control_edudisplej_sk/dashboard/index.php:587` → Server loop version
+- `webserver/control_edudisplej_sk/dashboard/index.php:591` → Loop status
+- `webserver/control_edudisplej_sk/dashboard/index.php:595` → — Offline (not evaluated)
+- `webserver/control_edudisplej_sk/dashboard/index.php:599` → ⚠️ Mismatch
+- `webserver/control_edudisplej_sk/dashboard/index.php:603` → ⏳ Waiting for refresh
+- `webserver/control_edudisplej_sk/dashboard/index.php:607` → ✓ Match
+- `webserver/control_edudisplej_sk/dashboard/index.php:615` → Unknown error
+- `webserver/control_edudisplej_sk/dashboard/index.php:792` → + escapeHtml(COMMON_LOADING_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:810` → + escapeHtml(COMMON_ERROR_PREFIX_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:810` → + escapeHtml(data.message || COMMON_LOAD_ERROR_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:837` → + escapeHtml(COMMON_LOAD_ERROR_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:849` → + escapeHtml(HISTORY_NO_RESULTS_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:866` → + escapeHtml(SCREENSHOT_NONE_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:870` → + escapeHtml(timestamp) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:937` → Legrégebbi: —
+- `webserver/control_edudisplej_sk/dashboard/index.php:938` → Legfrissebb: —
+- `webserver/control_edudisplej_sk/dashboard/index.php:939` → Aktuális: —
+- `webserver/control_edudisplej_sk/dashboard/index.php:994` → • 3 mp
+- `webserver/control_edudisplej_sk/dashboard/index.php:1064` → + _historyPage +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1158` → + escapeHtml(COMMON_LOADING_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1181` → + escapeHtml(screenshotTs) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1185` → + escapeHtml(SCREENSHOT_UNAVAILABLE_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1202` → + escapeHtml(data.friendly_name || data.hostname ||
+- `webserver/control_edudisplej_sk/dashboard/index.php:1203` → + escapeHtml(data.location ||
+- `webserver/control_edudisplej_sk/dashboard/index.php:1204` → + groupOptions +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1205` → + (data.screenshot_enabled ?
+- `webserver/control_edudisplej_sk/dashboard/index.php:1206` → + escapeHtml(DASHBOARD_ACTION_SAVE_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1206` → + escapeHtml(data.id || 0) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1234` → + escapeHtml(data.hostname ||
+- `webserver/control_edudisplej_sk/dashboard/index.php:1237` → + escapeHtml(data.mac ||
+- `webserver/control_edudisplej_sk/dashboard/index.php:1239` → + escapeHtml(data.kiosk_loop_version ||
+- `webserver/control_edudisplej_sk/dashboard/index.php:1240` → + escapeHtml(data.server_loop_version ||
+- `webserver/control_edudisplej_sk/dashboard/index.php:1298` → + JSON.stringify(SCREENSHOT_OFFLINE_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1298` → + JSON.stringify(screenshotUrl) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1298` → + kioskId +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1300` → + escapeHtml(SCREENSHOT_OFFLINE_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1306` → + JSON.stringify(screenshotTs) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1306` → + JSON.stringify(screenshotUrl) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1306` → + kioskId +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1308` → + escapeHtml(screenshotTs) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1314` → + escapeHtml(SCREENSHOT_NONE_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1425` → Kiosk #
+- `webserver/control_edudisplej_sk/dashboard/index.php:1426` → + escapeHtml(COMMON_LOADING_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1461` → + escapeHtml(COMMON_ERROR_PREFIX_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1461` → + escapeHtml(data.message || COMMON_UNKNOWN_ERROR_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/index.php:1465` → + escapeHtml(COMMON_LOAD_ERROR_TEXT) +
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:229` → Kiosk #
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:230` → color: #666; margin-top: 10px;
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:246` → margin: 0 0 5px 0;
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:247` → color: #999;
+- `webserver/control_edudisplej_sk/dashboard/modules.php:101` → font-weight:700; margin-bottom:6px;
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:277` → clearPdfFile()
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:282` → config-tab active
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:282` → switchPdfTab(
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:283` → switchPdfTab(
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:284` → switchPdfTab(
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:403` → showPdfPausePointEditor()
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:410` → background: #0066cc; color: white; border: none; padding: 8px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500;
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:410` → previewPdfModule()
+- `webserver/control_edudisplej_sk/dashboard/pdf_module_admin_ui.html:477` → ✓ Kódolva és kész mentésre
+- `webserver/control_edudisplej_sk/dashboard/profile.php:520` → padding: 12px;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:524` → padding: 12px;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:533` → padding: 12px;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:534` → background: #f5f5f5; padding: 4px 8px; border-radius: 3px; font-size: 12px;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:539` → curl -fsSL https://install.edudisplej.sk/install.sh | sudo bash -s -- --token=
+- `webserver/control_edudisplej_sk/dashboard/profile.php:605` → noopener noreferrer
+- `webserver/control_edudisplej_sk/dashboard/profile.php:608` → color: #999;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:610` → text-align: center;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:613` → text-align: center;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:640` → noopener noreferrer
+- `webserver/control_edudisplej_sk/dashboard/profile.php:682` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/dashboard/profile.php:735` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/dashboard/profile.php:739` → noopener noreferrer
+- `webserver/control_edudisplej_sk/dashboard/profile.php:982` → margin: 0;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:1001` → width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:1006` → width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:1011` → width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:1033` → background: #1e40af; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold;
+- `webserver/control_edudisplej_sk/dashboard/profile.php:1033` → createUser()
+- `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:217` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/room_occupancy_config.php:279` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/settings.php:43` → alert error
+- `webserver/control_edudisplej_sk/dashboard/settings.php:47` → alert success
+- `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:160` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collection_meal_calendar.php:160` → btn btn-small btn-danger
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:63` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:64` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:65` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:66` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:67` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:68` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:69` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:299` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard/text_collections.php:300` → btn btn-small btn-danger
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:364` → , event)
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:364` → switchTab(
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:365` → , event)
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:365` → switchTab(
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:394` → Kiosk #
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:395` → color: #666;
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:403` → font-size: 12px;
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:404` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:419` → color: #666; margin-bottom: 20px;
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:434` → Kiosk #
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:440` → btn btn-small
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:214` → Kiosk #
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:232` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:251` → margin-bottom: 15px;
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:252` → color: #666; margin-bottom: 15px; font-size: 13px;
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:257` → margin-top: 8px; color: #666;
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:258` → Nincsenek megjegyzések
+- `webserver/control_edudisplej_sk/kiosk_details.php:65` → Kiosk #
+- `webserver/control_edudisplej_sk/kiosk_details.php:215` → Kiosk #
+- `webserver/control_edudisplej_sk/kiosk_details.php:235` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/kiosk_details.php:238` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/kiosk_details.php:249` → background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto;
+- `webserver/control_edudisplej_sk/kiosk_details.php:257` → Kiosk Screenshot
+- `webserver/control_edudisplej_sk/kiosk_details.php:258` → margin-top: 10px; color: #666;
+- `webserver/control_edudisplej_sk/kiosk_details.php:259` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/kiosk_details.php:281` → Y-m-d H:i:s
+- `webserver/control_edudisplej_sk/login.php:646` → font-size: 12px; color: #856404; margin-top: 8px;
+- `webserver/control_edudisplej_sk/modules/default/m_default.html:110` → M12 21c-.28 0-.56-.09-.79-.28C9.12 19.03 3 14.09 3 8.94 3 6.21 5.2 4 7.9 4c1.66 0 3.22.82 4.1 2.17C12.88 4.82 14.44 4 16.1 4 18.8 4 21 6.21 21 8.94c0 5.15-6.12 10.09-8.21 11.78-.23.19-.51.28-.79.28z
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1509` → ).trim() ||
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1509` → ? label : (String(t.title ||
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1653` → ).trim() ||
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1674` → ).trim() ===
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1718` → Menu source
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1743` → ).trim() ===
+- `webserver/control_edudisplej_sk/modules/meal-menu/m_meal_menu.html:1809` → Menu source
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:123` → badge info
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:125` → badge info
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:127` → badge info
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:129` → badge info
+- `webserver/control_edudisplej_sk/modules/room-occupancy/m_room_occupancy.html:145` → Frissítési idő: ismeretlen
+- `webserver/control_edudisplej_sk/users.php:408` → Create New User
+- `webserver/control_edudisplej_sk/users.php:408` → Edit User
+- `webserver/control_edudisplej_sk/users.php:431` → (leave blank to keep current)
+- `webserver/control_edudisplej_sk/users.php:460` → Create User
+- `webserver/control_edudisplej_sk/users.php:464` → btn btn-warning
+- `webserver/control_edudisplej_sk/users.php:502` → Y-m-d H:i
+- `webserver/control_edudisplej_sk/users.php:504` → btn btn-sm
+- `webserver/control_edudisplej_sk/users.php:508` → return confirm(
+
+## missing_i18n_include
+- `webserver/control_edudisplej_sk/admin.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/api_logs.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/archived_users.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/companies.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/dashboard.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/db_autofix_bootstrap.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/display_scheduling.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/email_queue.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/email_settings.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/email_templates.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/index.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/kiosk_details.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/kiosk_health.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/kiosk_logs.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/kiosk_migrations.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/kiosk_modules_api.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/licenses.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/meal_menu_maintenance.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/module_licenses.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/modules.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/security_logs.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/services.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/admin/users.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/DEBUG_meal_check_8e5wb.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/admin_hard_delete_kiosk.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/assign_company.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/auth.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/display_schedule_api.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/display_scheduler.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/download_module.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/email_settings.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/email_templates.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/geolocation.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/get_group_kiosks.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/get_groups.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/get_module_file.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/group_loop/check_update.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/group_loop/config.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/group_loop/kiosk_loop.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_file.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_library.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/group_loop/module_asset_upload.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/health.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/health/list.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/health/report.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/health/status.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/hw_data_sync.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/install/list.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/install/progress.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/install/status.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk/command_result.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk/control_fast_loop.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk/execute_command.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk/get_command_result.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk/get_commands.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk/queue_full_update.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk/reboot.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk_details.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/kiosk_loop.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/licenses.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/log_sync.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/manage_company.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/manage_users.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/meal_plan.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/modules_sync.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/otp_setup.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/password_reset.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/registration.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/rename_group.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/room_occupancy.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/screenshot_file.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/screenshot_history.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/screenshot_sync.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/text_collection_meal_calendar.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/text_collections.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/toggle_screenshot.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/update_group_order.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/update_screenshot_settings.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/api/v1/device/sync.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/auth_roles.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/companies.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/cron/email/run_email_queue.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/cron/maintenance/maintenance_task.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/cron/maintenance/run_maintenance.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard/dashboard_helpers.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard/group_assignment.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard/group_kiosks_new.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard/group_loop.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard/group_modules.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard/group_modules_new.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard/kiosk_modules.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard_user/index.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dashboard_user/kiosk_edit.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dbjavito.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/dbkonfiguracia.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/email_helper.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/index.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/kiosk_details.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/kiosk_status.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/logging.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/modules/module_policy.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/modules/module_standard.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/password_reset.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/security_config.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/user_archive.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/userregistration.php:1` → Uses t()/t_def() but i18n.php include not found
+- `webserver/control_edudisplej_sk/users.php:1` → Uses t()/t_def() but i18n.php include not found

@@ -30,8 +30,9 @@
         .root.center-left .cards { width: min(94vw, 1600px); margin: 0 auto; justify-items: stretch; }
         .cards-wrap { width: 100%; height: 100%; overflow: hidden; position: relative; }
         .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-        .small-header-right { display: none; align-items: center; justify-content: flex-end; min-width: 0; }
-        .small-header-clock { font-size: clamp(52px, 6.4vw, 132px); font-weight: 800; line-height: 1; color: #f8fafc; letter-spacing: .02em; white-space: nowrap; }
+        .small-header-right { display: none; align-items: baseline; justify-content: flex-end; min-width: 0; gap: .45vw; }
+        .small-header-date { font-size: clamp(18px, 2.1vw, 44px); font-weight: 800; line-height: 1; color: #facc15; letter-spacing: .01em; white-space: nowrap; }
+        .small-header-clock { font-size: clamp(18px, 2.1vw, 44px); font-weight: 800; line-height: 1; color: #f8fafc; letter-spacing: .02em; white-space: nowrap; }
         .title { font-size: clamp(38px, 4.8vw, 88px); font-weight: 700; }
         .subtitle { font-size: clamp(22px, 2.2vw, 38px); color: #cbd5e1; margin-top: 6px; }
         .status { display: none; }
@@ -43,13 +44,14 @@
         .meal { font-size: clamp(34px, var(--meal-title-font-size, 3.2vw), 64px); font-weight: 800; color: #f1f5f9; margin-bottom: 8px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
         .meal-main { display:flex; align-items:center; gap:12px; min-width:0; }
         .meal-name { min-width:0; }
+        .meal-label-badge { display:inline-flex; align-items:center; border:1px solid rgba(250, 204, 21, 0.65); background: rgba(250, 204, 21, 0.16); color:#fde68a; border-radius:999px; padding: 4px 10px; font-size: .45em; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; }
         .root.center .meal { justify-content:center; }
         .meal-icon { width: clamp(32px, 2.1vw, 46px); height: clamp(32px, 2.1vw, 46px); display:inline-flex; color:#7dd3fc; flex: 0 0 auto; }
         .meal-table { display:grid; gap:8px; }
         .meal-row { display:grid; grid-template-columns: clamp(30px, 1.9vw, 42px) 1fr; align-items:flex-start; gap:12px; border:1px solid rgba(148,163,184,.24); border-radius:13px; background: rgba(30, 41, 59, 0.66); padding:10px 12px; }
         .meal-row-icon { width: clamp(24px, 1.5vw, 34px); height: clamp(24px, 1.5vw, 34px); display:inline-flex; color:#bfdbfe; margin-top: 4px; flex: 0 0 auto; }
-        .meal-row-text { font-size: clamp(28px, var(--meal-text-font-size, 2.3vw), 54px); line-height: var(--meal-line-height, 1.38); font-weight: var(--meal-text-weight, 650); color: #f8fafc; white-space: var(--meal-white-space, pre-wrap); word-break: var(--meal-word-break, break-word); }
-        .meal-row-line { display: inline; white-space: nowrap; }
+        .meal-row-text { font-size: clamp(28px, var(--meal-text-font-size, 2.3vw), 54px); line-height: var(--meal-line-height, 1.38); font-weight: var(--meal-text-weight, 650); color: #f8fafc; display:flex; align-items:center; gap: 8px; flex-wrap: nowrap; min-width: 0; white-space: nowrap; }
+        .meal-row-line { display: block; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
         .meal-inline-allergens { display:inline-flex; align-items:center; gap:6px; margin-left: 10px; vertical-align: middle; }
         .meal-inline-allergen-num { display:inline-flex; align-items:center; justify-content:center; min-width:1.8em; border-radius:999px; padding:3px 9px; font-size:.84em; line-height:1; font-weight:800; color:#111827; background:#fbbf24; border:1px solid rgba(251, 191, 36, .8); }
         .allergen-wrap { margin-top: 6px; padding: 10px 10px 0; border-top: 1px solid rgba(148, 163, 184, 0.2); background: rgba(15, 23, 42, 0.38); border-radius: 12px; }
@@ -91,32 +93,36 @@
         .root.scroll-mode .head { width: 100%; justify-content: center; }
         .root.scroll-mode .title-wrap { display:flex; flex-direction:column; align-items:center; }
         .root.scroll-mode .cards { grid-template-columns: 1fr; width: min(96vw, 1500px); margin: 0 auto; }
-        .root.small-mode .content-layer { padding: 1.2vh 1.2vw; gap: .9vh; grid-template-rows: auto 1fr auto; }
-        .root.small-mode .head { width: 100%; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 14px; background: rgba(15, 23, 42, 0.66); padding: .55vh 1.1vw; }
-        .root.small-mode .title-wrap { width: 100%; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; }
-        .root.small-mode .title { font-size: clamp(54px, 6.4vw, 132px); line-height: 1; margin: 0; }
+        .root.small-mode .content-layer { padding: .55vh .65vw; gap: .55vh; grid-template-rows: 20% 70% 10%; }
+        .root.small-mode .head { width: 100%; min-height: 0; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 14px; background: rgba(15, 23, 42, 0.66); padding: 0 .9vw; display:flex; align-items:center; }
+        .root.small-mode .title-wrap { flex: 1 1 auto; width: auto; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; min-width: 0; }
+        .root.small-mode .title { font-size: clamp(24px, 3.3vw, 64px); line-height: 1; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .root.small-mode .subtitle { display: none !important; }
-        .root.small-mode .small-header-right { display: flex; }
+        .root.small-mode .small-header-right { display: inline-flex !important; flex: 0 0 auto; }
         .root.small-mode .status { display: none !important; }
-        .root.small-mode .cards { grid-template-columns: 1fr; width: 100%; height: 100%; align-content: stretch; }
-        .root.small-mode .cards-wrap { overflow: hidden; }
-        .root.small-mode .card { min-height: 100%; height: 100%; padding: .8vh .8vw; }
-        .root.small-mode .meal { margin-bottom: 0; justify-content: center; font-size: clamp(58px, 6.9vw, 138px); line-height: 1; }
+        .root.small-mode .cards { grid-template-columns: 1fr; width: 100%; height: 100%; align-content: stretch; min-height: 0; }
+        .root.small-mode .cards-wrap { overflow: hidden; min-height: 0; }
+        .root.small-mode .card { min-height: 100%; height: 100%; padding: .3vh .3vw; }
+        .root.small-mode .meal { margin-bottom: 0; justify-content: center; font-size: clamp(24px, 3.6vw, 70px); line-height: 1; }
         .root.small-mode .meal-main { width: 100%; justify-content: center; }
         .root.small-mode .meal-icon { display: none; }
         .root.small-mode .meal-table { flex: 1 1 auto; display:grid; grid-auto-rows: minmax(0, 1fr); align-content: stretch; gap: .55vh; }
         .root.small-mode .meal-row { min-height: 0; height: 100%; grid-template-columns: 1fr; align-items: stretch; padding: 0 .9vw; }
         .root.small-mode .meal-row-icon { display: none; }
-        .root.small-mode .meal-row-text { width: 100%; height: 100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height: 1.03; font-size: clamp(52px, 6.9vw, 172px); font-weight: 800; }
+        .root.small-mode .meal-row-text { width: 100%; height: 100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height: 1.03; font-size: clamp(18px, 3.5vw, 70px); font-weight: 800; white-space: nowrap; }
         .root.small-mode .meal-inline-allergens { margin-left: 14px; gap: 8px; }
         .root.small-mode .meal-inline-allergen-num { font-size: .68em; padding: 4px 10px; }
-        .root.small-mode .small-page-card { padding: .45vh .45vw; }
-        .root.small-mode .small-page-table { height: 100%; display:grid; grid-template-rows: repeat(var(--small-page-rows, 6), minmax(0, 1fr)); gap: .4vh; }
-        .root.small-mode .small-page-row { border:1px solid rgba(148,163,184,.26); border-radius:12px; background: rgba(30, 41, 59, 0.68); min-height:0; display:flex; align-items:center; justify-content:center; text-align:center; padding: 0 .9vw; }
-        .root.small-mode .small-page-row-title { background: rgba(30, 58, 138, 0.86); border-color: rgba(147, 197, 253, 0.62); }
-        .root.small-mode .small-page-row-text { width:100%; line-height: .96; font-size: clamp(72px, 10vw, 320px); font-weight: 800; color:#f8fafc; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
-        .root.small-mode .small-page-row-title .small-page-row-text { font-weight: 900; color: #dbeafe; }
-        .root.small-mode .foot { text-align: center; font-size: clamp(14px, 1.8vw, 28px); color: #cbd5e1; }
+        .root.small-mode .small-page-card { padding: .35vh .35vw; }
+        .root.small-mode .small-page-table { height: 100%; min-height: 0; display:grid; grid-template-rows: repeat(var(--small-page-rows, 3), minmax(0, 1fr)); gap: .35vh; }
+        .root.small-mode .small-page-row { border:1px solid rgba(148,163,184,.26); border-radius:12px; background: rgba(30, 41, 59, 0.68); min-height:0; display:grid; grid-template-columns: clamp(46px, 4.2vw, 92px) minmax(0, 1fr); align-items:center; text-align:left; padding: 0 .8vw; column-gap: .7vw; }
+        .root.small-mode .small-page-row.no-icon { grid-template-columns: minmax(0, 1fr); }
+        .root.small-mode .small-page-row.no-icon .small-page-row-icon { display:none; }
+        .root.small-mode .small-page-row-icon { width: clamp(34px, 3vw, 68px); height: clamp(34px, 3vw, 68px); color:#bfdbfe; display:inline-flex; align-items:center; justify-content:center; }
+        .root.small-mode .small-page-row-icon svg { width: 100%; height: 100%; display:block; }
+        .root.small-mode .small-page-row-text { width:100%; line-height: 1; font-size: clamp(16px, 3.2vw, 68px); font-weight: 800; color:#f8fafc; white-space: nowrap; overflow: hidden; display:block; word-break: normal; text-overflow: clip; }
+        .root.small-mode .small-page-row-text .meal-row-line { white-space: nowrap; }
+        .root.small-mode .foot { min-height: 0; text-align: left; font-size: clamp(15px, 1.12vw, 24px); color: #cbd5e1; border: 1px solid rgba(148,163,184,.24); border-radius: 12px; background: rgba(15, 23, 42, 0.72); padding: 0 .9vw; display:flex; align-items:center; }
+        .root.small-mode .foot .foot-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
 
         .root.large-mode .cards {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -199,6 +205,7 @@
                 <div class="subtitle" id="subtitle">Betöltés...</div>
             </div>
             <div class="small-header-right" id="small-header-right">
+                <div class="small-header-date" id="small-header-date">--.--.----</div>
                 <div class="small-header-clock" id="small-header-clock">--:--</div>
             </div>
             <div class="status" id="status">🔄 Szerver lekérés</div>
@@ -208,12 +215,15 @@
         <div class="foot" id="foot"></div>
     </div>
 </div>
+<script src="./meal_menu_utils.js"></script>
 <script>
 (function () {
+    const MU = (typeof window.MealMenuUtils === 'object' && window.MealMenuUtils) ? window.MealMenuUtils : null;
     let scrollRaf = null;
     let mealPageSwitchTimer = null;
     let overlayClockInterval = null;
     let smallHeaderClockInterval = null;
+    let backgroundRefreshTimer = null;
     const overlayTextState = {
         top: { raf: null },
         bottom: { raf: null }
@@ -246,15 +256,23 @@
 
     function startSmallHeaderClock() {
         const clockEl = document.getElementById('small-header-clock');
-        if (!clockEl) {
+        const dateEl = document.getElementById('small-header-date');
+        if (!clockEl || !dateEl) {
             return;
         }
+
+        const skDayShort = ['Ne', 'Po', 'Ut', 'St', 'Št', 'Pia', 'So'];
 
         const renderClock = () => {
             const now = new Date();
             const hh = String(now.getHours()).padStart(2, '0');
             const mm = String(now.getMinutes()).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const yyyy = String(now.getFullYear());
+            const dayShort = skDayShort[now.getDay()] || 'Po';
             clockEl.textContent = `${hh}:${mm}`;
+            dateEl.textContent = `${dayShort} ${dd}.${month}.${yyyy}`;
         };
 
         stopSmallHeaderClock();
@@ -284,6 +302,7 @@
             sourceType: 'server',
             mealDisplayMode: 'small_screen',
             smallScreenPageSwitchSec: 12,
+            smallRowFontPx: 150,
             smallScreenUseCustomMealSelection: false,
             smallScreenVisibleMeals: 'breakfast,snack_am,lunch,snack_pm,dinner',
             showBreakfast: true,
@@ -299,6 +318,7 @@
             scheduleLunchUntil: '14:00',
             scheduleSnackPmUntil: '18:00',
             scheduleDinnerUntil: '23:59',
+            showTomorrowAfterMealPassed: true,
             language: 'sk',
             showHeaderTitle: false,
             customHeaderTitle: '',
@@ -341,7 +361,8 @@
             textOverlayColor: '#ffffff',
             textOverlaySpeedPxPerSec: 120,
             apiBaseUrl: '../../api/meal_plan.php',
-            runtimeApiFetchEnabled: false,
+            runtimeApiFetchEnabled: true,
+            runtimeRefreshIntervalSec: 300,
             apiTimeoutMs: 3500,
             maxFallbackDaysAhead: 2,
             offlinePrefetchedMenuData: null,
@@ -363,7 +384,8 @@
                 const legacyLayout = String(params.get('layoutMode') ?? injected.layoutMode ?? defaults.layoutMode).trim().toLowerCase();
                 return legacyLayout === 'square_dual_day' ? 'large_screen' : 'small_screen';
             })(),
-            smallScreenPageSwitchSec: Math.max(5, Math.min(60, parseNum(params.get('smallScreenPageSwitchSec') ?? injected.smallScreenPageSwitchSec, defaults.smallScreenPageSwitchSec))),
+            smallScreenPageSwitchSec: Math.max(1, Math.min(120, parseNum(params.get('smallScreenPageSwitchSec') ?? injected.smallScreenPageSwitchSec, defaults.smallScreenPageSwitchSec))),
+            smallRowFontPx: Math.max(60, Math.min(260, parseNum(params.get('smallRowFontPx') ?? injected.smallRowFontPx, defaults.smallRowFontPx))),
             smallScreenUseCustomMealSelection: parseBool(params.get('smallScreenUseCustomMealSelection') ?? injected.smallScreenUseCustomMealSelection, defaults.smallScreenUseCustomMealSelection),
             smallScreenVisibleMeals: String(params.get('smallScreenVisibleMeals') ?? injected.smallScreenVisibleMeals ?? defaults.smallScreenVisibleMeals),
             showBreakfast: parseBool(params.get('showBreakfast') ?? injected.showBreakfast, defaults.showBreakfast),
@@ -379,6 +401,7 @@
             scheduleLunchUntil: String(params.get('scheduleLunchUntil') ?? injected.scheduleLunchUntil ?? defaults.scheduleLunchUntil),
             scheduleSnackPmUntil: String(params.get('scheduleSnackPmUntil') ?? injected.scheduleSnackPmUntil ?? defaults.scheduleSnackPmUntil),
             scheduleDinnerUntil: String(params.get('scheduleDinnerUntil') ?? injected.scheduleDinnerUntil ?? defaults.scheduleDinnerUntil),
+            showTomorrowAfterMealPassed: parseBool(params.get('showTomorrowAfterMealPassed') ?? injected.showTomorrowAfterMealPassed, defaults.showTomorrowAfterMealPassed),
             showHeaderTitle: parseBool(params.get('showHeaderTitle') ?? injected.showHeaderTitle, defaults.showHeaderTitle),
             customHeaderTitle: String(params.get('customHeaderTitle') ?? injected.customHeaderTitle ?? defaults.customHeaderTitle),
             showInstitutionName: parseBool(params.get('showInstitutionName') ?? injected.showInstitutionName, defaults.showInstitutionName),
@@ -431,6 +454,7 @@
             textOverlaySpeedPxPerSec: parseNum(params.get('textOverlaySpeedPxPerSec') ?? injected.textOverlaySpeedPxPerSec, defaults.textOverlaySpeedPxPerSec),
             apiBaseUrl: String(params.get('apiBaseUrl') ?? injected.apiBaseUrl ?? defaults.apiBaseUrl),
             runtimeApiFetchEnabled: parseBool(params.get('runtimeApiFetchEnabled') ?? injected.runtimeApiFetchEnabled, defaults.runtimeApiFetchEnabled),
+            runtimeRefreshIntervalSec: Math.max(60, Math.min(3600, parseNum(params.get('runtimeRefreshIntervalSec') ?? injected.runtimeRefreshIntervalSec, defaults.runtimeRefreshIntervalSec))),
             apiTimeoutMs: Math.max(1500, Math.min(6000, parseNum(params.get('apiTimeoutMs') ?? injected.apiTimeoutMs, defaults.apiTimeoutMs))),
             maxFallbackDaysAhead: Math.max(0, Math.min(3, parseNum(params.get('maxFallbackDaysAhead') ?? injected.maxFallbackDaysAhead, defaults.maxFallbackDaysAhead))),
             offlinePrefetchedTodayFile: String(params.get('offlinePrefetchedTodayFile') ?? injected.offlinePrefetchedTodayFile ?? ''),
@@ -462,9 +486,11 @@
                 unknownUpdate: 'Frissítési idő: ismeretlen',
                 today: 'Mai menü',
                 tomorrow: 'Holnapi menü',
+                tomorrowTag: 'HOLNAP',
                 allergens: 'Allergének',
                 sourcePrefix: 'Étrend forrása',
-                mealLabels: { breakfast: 'Reggeli', snack_am: 'Tízórai', lunch: 'Ebéd', snack_pm: 'Uzsonna', dinner: 'Vacsora' }
+                mealLabels: { breakfast: 'Reggeli', snack_am: 'Tízórai', lunch: 'Ebéd', snack_pm: 'Uzsonna', dinner: 'Vacsora' },
+                tomorrowMealLabels: { breakfast: 'HOLNAPI REGGELI', snack_am: 'HOLNAPI TÍZÓRAI', lunch: 'HOLNAPI EBÉD', snack_pm: 'HOLNAPI UZSONNA', dinner: 'HOLNAPI VACSORA' }
             },
             sk: {
                 title: 'Dnešné menu',
@@ -475,9 +501,11 @@
                 unknownUpdate: 'Čas aktualizácie: neznámy',
                 today: 'Dnešné menu',
                 tomorrow: 'Zajtrajšie menu',
+                tomorrowTag: 'ZAJTRA',
                 allergens: 'Alergény',
                 sourcePrefix: 'Zdroj jedálneho lístka',
-                mealLabels: { breakfast: 'Raňajky', snack_am: 'Desiata', lunch: 'Obed', snack_pm: 'Olovrant', dinner: 'Večera' }
+                mealLabels: { breakfast: 'Raňajky', snack_am: 'Desiata', lunch: 'Obed', snack_pm: 'Olovrant', dinner: 'Večera' },
+                tomorrowMealLabels: { breakfast: 'ZAJTRAJŠIE RAŇAJKY', snack_am: 'ZAJTRAJŠIA DESIATA', lunch: 'ZAJTRAJŠÍ OBED', snack_pm: 'ZAJTRAJŠÍ OLOVRANT', dinner: 'ZAJTRAJŠIA VEČERA' }
             },
             en: {
                 title: "Today's menu",
@@ -488,9 +516,11 @@
                 unknownUpdate: 'Update time: unknown',
                 today: "Today's menu",
                 tomorrow: "Tomorrow's menu",
+                tomorrowTag: 'TOMORROW',
                 allergens: 'Allergens',
                 sourcePrefix: 'Menu source',
-                mealLabels: { breakfast: 'Breakfast', snack_am: 'Morning snack', lunch: 'Lunch', snack_pm: 'Afternoon snack', dinner: 'Dinner' }
+                mealLabels: { breakfast: 'Breakfast', snack_am: 'Morning snack', lunch: 'Lunch', snack_pm: 'Afternoon snack', dinner: 'Dinner' },
+                tomorrowMealLabels: { breakfast: 'TOMORROW BREAKFAST', snack_am: 'TOMORROW MORNING SNACK', lunch: 'TOMORROW LUNCH', snack_pm: 'TOMORROW AFTERNOON SNACK', dinner: 'TOMORROW DINNER' }
             }
         };
         return pack[key] || pack.sk;
@@ -506,8 +536,8 @@
             soup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16"/><path d="M6 12v3a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-3"/><path d="M9 8c0-1 1-1.5 1-2.5"/><path d="M13 8c0-1 1-1.5 1-2.5"/></svg>',
             cutlery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3v8"/><path d="M10 3v8"/><path d="M8.5 11v10"/><path d="M15 3c3 2 3 6 0 8v10"/></svg>',
             plate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
-            food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4v8"/><path d="M8 4v8"/><path d="M6.5 12v8"/><path d="M13 4c3 2 3 6 0 8v8"/><path d="M18 4v16"/></svg>'
-            ,
+            food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4v8"/><path d="M8 4v8"/><path d="M6.5 12v8"/><path d="M13 4c3 2 3 6 0 8v8"/><path d="M18 4v16"/></svg>',
+            drink: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12l-1.2 14a2 2 0 0 1-2 1.8h-5.6a2 2 0 0 1-2-1.8L6 4z"/><path d="M4 4h16"/></svg>',
             calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M3 10h18"/></svg>'
         };
         return map[name] || map.food;
@@ -544,13 +574,8 @@
         root.style.setProperty('--meal-text-weight', String(Math.round(textWeight)));
         root.style.setProperty('--meal-line-height', String(lineHeight));
 
-        if (settings.wrapText === false) {
-            root.style.setProperty('--meal-white-space', 'nowrap');
-            root.style.setProperty('--meal-word-break', 'normal');
-        } else {
-            root.style.setProperty('--meal-white-space', 'pre-wrap');
-            root.style.setProperty('--meal-word-break', 'break-word');
-        }
+        root.style.setProperty('--meal-white-space', 'nowrap');
+        root.style.setProperty('--meal-word-break', 'normal');
 
         const rootEl = document.querySelector('.root');
         if (rootEl) {
@@ -564,11 +589,94 @@
     }
 
     function normalizeMealLine(line) {
+        if (MU && typeof MU.normalizeMealLine === 'function') {
+            return MU.normalizeMealLine(line);
+        }
         let value = String(line || '').trim();
         value = value.replace(/^\d+\.\s*/u, '');
+        value = value.replace(/^\d{1,2}\.\d{3}(?:\s*[\)\].,;:-])?\s*/u, '');
+        value = value.replace(/\b\d{1,2}\.\d{3}\b(?:\s*[,;:.\)\(\-])?/gu, '');
+        value = value.replace(/,\s*(?:Kysličník|Obilniny|Vajcia|Mlieko|Ryby|Zeler|Horčica|Orech|Sezam|S[oó]j|Lupina|M[aä]kk[ýy]še).*$/iu, '');
         value = value.replace(/\s+\d{1,2}\.\d{3}\s*$/u, '');
+        value = value.replace(/,\s*,+/g, ', ');
+        value = value.replace(/\s+,/g, ',');
+        value = value.replace(/,\s*$/g, '');
+        value = value.replace(/\s+\)\s*$/u, '');
         value = value.replace(/[ \t]{2,}/g, ' ').trim();
         return value;
+    }
+
+    function isLikelyDrinkLine(rawLine, normalizedLine) {
+        const source = `${String(rawLine || '').toLowerCase()} ${String(normalizedLine || '').toLowerCase()}`;
+        if (source.includes('čaj') || source.includes('caj') || source.includes('tea')) return true;
+        if (source.includes('mlieko') || source.includes('kakao') || source.includes('káv') || source.includes('kava') || source.includes('coffee')) return true;
+        if (source.includes('nápoj') || source.includes('napoj') || source.includes('džús') || source.includes('dzus') || source.includes('juice')) return true;
+        if (source.includes('voda') || source.includes('water') || source.includes('sirup')) return true;
+        return false;
+    }
+
+    function normalizeDedupKey(line) {
+        return String(line || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+    }
+
+    function parseMealRowsForSmall(rawMealText) {
+        if (MU && typeof MU.parseMealRowsForSmall === 'function') {
+            return MU.parseMealRowsForSmall(rawMealText);
+        }
+        const rawText = stripAllergenAnnotations(stripSourceNoise(String(rawMealText || '').trim()));
+        const rawLines = String(rawText || '')
+            .split(/\r?\n/)
+            .map((line) => String(line || '').trim())
+            .filter(Boolean);
+
+        const seen = new Set();
+        const rows = [];
+        rawLines.forEach((rawLine) => {
+            const normalized = normalizeMealLine(rawLine);
+            if (!normalized) {
+                return;
+            }
+
+            const aliasKey = mealAliasToKey(normalized);
+            if (aliasKey && normalized.length <= 20) {
+                return;
+            }
+
+            const dedupKey = normalizeDedupKey(normalized);
+            if (!dedupKey || seen.has(dedupKey)) {
+                return;
+            }
+            seen.add(dedupKey);
+
+            rows.push({
+                text: normalized,
+                isDrink: isLikelyDrinkLine(rawLine, normalized),
+                icon: ''
+            });
+        });
+
+        if (!rows.length) {
+            return [{ text: '—', isDrink: false, icon: 'cutlery' }];
+        }
+
+        const drinkIndex = rows.findIndex((row) => row.isDrink === true);
+        if (drinkIndex >= 0) {
+            rows[drinkIndex].icon = 'drink';
+        }
+
+        const mainMealIndex = rows.findIndex((row) => row.isDrink !== true);
+        if (mainMealIndex >= 0) {
+            rows[mainMealIndex].icon = 'cutlery';
+        } else {
+            rows[0].icon = 'cutlery';
+        }
+
+        return rows;
     }
 
     function extractInlineAllergenCodesFromLine(lineText) {
@@ -674,6 +782,131 @@
             const key = String(meal?.key || '').trim();
             return key === 'breakfast' || key === 'lunch';
         });
+    }
+
+    function buildSmallScreenMeals(todayMealsRaw, tomorrowMealsRaw, settings, currentMinutes, t) {
+        const orderedKeys = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
+        const scheduleLimits = {
+            breakfast: parseHmToMinutes(settings.scheduleBreakfastUntil, 10 * 60),
+            snack_am: parseHmToMinutes(settings.scheduleSnackAmUntil, 11 * 60),
+            lunch: parseHmToMinutes(settings.scheduleLunchUntil, 14 * 60),
+            snack_pm: parseHmToMinutes(settings.scheduleSnackPmUntil, 18 * 60),
+            dinner: parseHmToMinutes(settings.scheduleDinnerUntil, 23 * 60 + 59)
+        };
+
+        let displayKeys = orderedKeys.slice();
+        if (settings.mealScheduleEnabled !== false) {
+            const startIndex = orderedKeys.findIndex((key) => currentMinutes <= (scheduleLimits[key] ?? (23 * 60 + 59)));
+            if (startIndex > 0) {
+                displayKeys = orderedKeys.slice(startIndex).concat(orderedKeys.slice(0, startIndex));
+            }
+        }
+
+        const todayMap = new Map();
+        const tomorrowMap = new Map();
+
+        (Array.isArray(todayMealsRaw) ? todayMealsRaw : []).forEach((meal) => {
+            const key = String(meal?.key || '').trim();
+            if (key) {
+                todayMap.set(key, meal);
+            }
+        });
+
+        (Array.isArray(tomorrowMealsRaw) ? tomorrowMealsRaw : []).forEach((meal) => {
+            const key = String(meal?.key || '').trim();
+            if (key) {
+                tomorrowMap.set(key, meal);
+            }
+        });
+
+        const useTomorrowAfterPassed = settings.showTomorrowAfterMealPassed !== false;
+        const result = [];
+
+        displayKeys.forEach((key) => {
+            const todayMeal = todayMap.get(key) || null;
+            const tomorrowMeal = tomorrowMap.get(key) || null;
+            const todayVisible = mealVisibleBySchedule(key, settings, currentMinutes);
+
+            if (todayMeal && todayVisible) {
+                result.push(todayMeal);
+                return;
+            }
+
+            if (useTomorrowAfterPassed && !todayVisible && tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
+                const titlePrefix = String(t.tomorrowMealLabels?.[key] || t.mealLabels?.[key] || tomorrowMeal.label || key).trim();
+                result.push({
+                    ...tomorrowMeal,
+                    label: titlePrefix,
+                    __displayLabel: titlePrefix,
+                    __tomorrowPreview: true
+                });
+                return;
+            }
+
+            if (todayMeal && todayVisible) {
+                result.push(todayMeal);
+            }
+        });
+
+        return result;
+    }
+
+    function buildLargeScreenMeals(todayMealsRaw, tomorrowMealsRaw, settings, currentMinutes, t) {
+        const orderedKeys = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
+        const todayMap = new Map();
+        const tomorrowMap = new Map();
+
+        (Array.isArray(todayMealsRaw) ? todayMealsRaw : []).forEach((meal) => {
+            const key = String(meal?.key || '').trim();
+            if (key) {
+                todayMap.set(key, meal);
+            }
+        });
+
+        (Array.isArray(tomorrowMealsRaw) ? tomorrowMealsRaw : []).forEach((meal) => {
+            const key = String(meal?.key || '').trim();
+            if (key) {
+                tomorrowMap.set(key, meal);
+            }
+        });
+
+        const scheduleEnabled = settings.mealScheduleEnabled !== false;
+        const useTomorrowAfterPassed = settings.showTomorrowAfterMealPassed !== false;
+        const result = [];
+        const consumedKeys = new Set();
+
+        orderedKeys.forEach((key) => {
+            const todayMeal = todayMap.get(key) || null;
+            const tomorrowMeal = tomorrowMap.get(key) || null;
+            const todayVisible = mealVisibleBySchedule(key, settings, currentMinutes);
+
+            if (todayMeal && (!scheduleEnabled || todayVisible)) {
+                result.push(todayMeal);
+                consumedKeys.add(key);
+                return;
+            }
+
+            if (scheduleEnabled && useTomorrowAfterPassed && !todayVisible && tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
+                const titlePrefix = String(t.tomorrowMealLabels?.[key] || t.mealLabels?.[key] || tomorrowMeal.label || key).trim();
+                result.push({
+                    ...tomorrowMeal,
+                    key,
+                    label: titlePrefix,
+                    __displayLabel: titlePrefix,
+                    __tomorrowPreview: true
+                });
+                consumedKeys.add(key);
+            }
+        });
+
+        (Array.isArray(todayMealsRaw) ? todayMealsRaw : []).forEach((meal) => {
+            const key = String(meal?.key || '').trim();
+            if (!consumedKeys.has(key) && mealHasRenderableRows(meal)) {
+                result.push(meal);
+            }
+        });
+
+        return result;
     }
 
     function emptyStateMessage(data, t) {
@@ -808,6 +1041,9 @@
     }
 
     function extractAllergenLabels(text) {
+        if (MU && typeof MU.extractAllergenLabels === 'function') {
+            return MU.extractAllergenLabels(text);
+        }
         const raw = String(text || '');
         const labels = [];
         const matches = raw.match(/ALERG[ÉE]NY:\s*([^\n\r)]+)/giu) || [];
@@ -844,6 +1080,9 @@
     }
 
     function extractAllergenCodes(text) {
+        if (MU && typeof MU.extractAllergenCodes === 'function') {
+            return MU.extractAllergenCodes(text);
+        }
         const raw = String(text || '');
         const codeSet = new Set();
         const patterns = [
@@ -869,6 +1108,9 @@
     }
 
     function stripAllergenAnnotations(text) {
+        if (MU && typeof MU.stripAllergenAnnotations === 'function') {
+            return MU.stripAllergenAnnotations(text);
+        }
         return String(text || '')
             .replace(/\((?:allerg[eé]n(?:ek)?|alerg[eé]ny(?:ek)?)\s*:\s*[^)]*\)/giu, '')
             .replace(/(?:allerg[eé]n(?:ek)?|alerg[eé]ny(?:ek)?)\s*:\s*[^\n\r;]+/giu, '')
@@ -881,6 +1123,9 @@
     }
 
     function stripSourceNoise(text) {
+        if (MU && typeof MU.stripSourceNoise === 'function') {
+            return MU.stripSourceNoise(text);
+        }
         return String(text || '')
             .replace(/\bbody=\[[\s\S]*$/giu, '')
             .replace(/\b(header|windowlock|cssbody|cssheader|doubleclickstop|singleclickstop|requireclick|hideselects|fade)=\[[^\]]*\]/giu, '')
@@ -893,10 +1138,12 @@
     function mergeStandardMealBands(meals, t, settings = {}) {
         const list = Array.isArray(meals) ? meals : [];
         const byKey = new Map();
+        const appearanceOrder = [];
         list.forEach((meal) => {
             const key = String(meal?.key || '').trim();
             if (key && !byKey.has(key)) {
                 byKey.set(key, meal);
+                appearanceOrder.push(key);
             }
         });
 
@@ -927,35 +1174,26 @@
             merged.push(left || right);
         };
 
-        if (mergeBreakfastSnack) {
-            mergePair('breakfast', 'snack_am', 'breakfast');
-        } else {
-            if (byKey.has('breakfast')) {
-                merged.push(byKey.get('breakfast'));
-                used.add('breakfast');
+        appearanceOrder.forEach((key) => {
+            if (used.has(key)) {
+                return;
             }
-            if (byKey.has('snack_am')) {
-                merged.push(byKey.get('snack_am'));
-                used.add('snack_am');
-            }
-        }
 
-        if (mergeLunchSnack) {
-            mergePair('lunch', 'snack_pm', 'lunch');
-        } else {
-            if (byKey.has('lunch')) {
-                merged.push(byKey.get('lunch'));
-                used.add('lunch');
+            if (mergeBreakfastSnack && (key === 'breakfast' || key === 'snack_am')) {
+                mergePair('breakfast', 'snack_am', 'breakfast');
+                return;
             }
-            if (byKey.has('snack_pm')) {
-                merged.push(byKey.get('snack_pm'));
-                used.add('snack_pm');
+
+            if (mergeLunchSnack && (key === 'lunch' || key === 'snack_pm')) {
+                mergePair('lunch', 'snack_pm', 'lunch');
+                return;
             }
-        }
-        if (byKey.has('dinner')) {
-            merged.push(byKey.get('dinner'));
-            used.add('dinner');
-        }
+
+            if (byKey.has(key)) {
+                merged.push(byKey.get(key));
+                used.add(key);
+            }
+        });
 
         list.forEach((meal) => {
             const key = String(meal?.key || '').trim();
@@ -975,23 +1213,79 @@
         return 'band-other';
     }
 
+    function sortStructuredRowsForMeal(rows, mealKey) {
+        const list = Array.isArray(rows) ? rows.slice() : [];
+        if (!list.length) {
+            return [];
+        }
+
+        const key = String(mealKey || '').trim().toLowerCase();
+        const textHas = (text, pattern) => pattern.test(String(text || '').toLowerCase());
+        const isBreadLine = (text) => textHas(text, /(chlieb|pečivo|pecivo|rožok|rozok|baget|toast|keny[eé]r)/i);
+        const isMainDishLine = (text) => textHas(text, /(brav[čc]|kurac|hov[aä]dz|morčac|morc|ryb|reze[nň]|gul[aá]š|gulas|na\s+tatransk|na\s+paprik|om[aá]čk|omack|ragu|perkelt|sot[eé]|fašír|fasir|zapekan|rizot)/i);
+        const isSideDishLine = (text) => textHas(text, /(cestovin|ryž|ryz|zemiak|knedl|tarho|bulgur|kuskus|halušk|halusk|pyr[eé]|pyre|kaša|kasa|hranol|zeleninov[aá]\s+obloha)/i);
+        const isDrinkLine = (text) => textHas(text, /(n[aá]poj|napoj|čaj|caj|kakao|k[aá]va|kava|mlieko|dž[uú]s|dzus|juice|voda|sirup)/i);
+        const isFruitLine = (text) => textHas(text, /(ovoc|jablk|ban[aá]n|banan|pomaran|hrušk|hrusk|brosky|komp[oó]t|kompot)/i);
+
+        const weightForRow = (row, index) => {
+            const rawText = normalizeMealLine(String(row?.text || ''));
+            const cat = parseInt(row?.recipe_category || 0, 10) || 0;
+            const soup = row?.is_soup === true || cat === 5;
+            const drink = row?.is_drink === true || cat === 1 || isDrinkLine(rawText);
+
+            if (key === 'lunch') {
+                if (soup) return 10 + index;
+                if (isBreadLine(rawText) || cat === 24) return 20 + index;
+                if (isMainDishLine(rawText) || [13, 14, 15, 17].includes(cat)) return 30 + index;
+                if (isSideDishLine(rawText) || [22].includes(cat)) return 40 + index;
+                if (drink) return 50 + index;
+                if (isFruitLine(rawText) || [23].includes(cat)) return 60 + index;
+                return 45 + index;
+            }
+
+            if (soup) return 10 + index;
+            if (drink) return 40 + index;
+            return 20 + index;
+        };
+
+        return list
+            .map((row, index) => ({ row, _weight: weightForRow(row, index) }))
+            .sort((a, b) => a._weight - b._weight)
+            .map((item) => item.row);
+    }
+
     function mealCardHtml(meal, settings, t, options = {}) {
         const showAllergens = options.showAllergens === true;
         const key = String(meal.key || '').trim();
+        const customDisplayLabel = String(meal?.__displayLabel || '').trim();
         const localized = String(t.mealLabels?.[key] || '').trim();
-        const rawName = localized || String(meal.label || key || '').trim();
+        const rawName = customDisplayLabel || localized || String(meal.label || key || '').trim();
         const mealIconHtml = settings.showMealTypeSvgIcons === true
             ? `<span class="meal-icon" aria-hidden="true">${mealTypeSvg(meal.key)}</span>`
+            : '';
+        const tomorrowBadge = meal?.__tomorrowPreview === true
+            ? `<span class="meal-label-badge">${escapeHtml(String(t.tomorrowTag || t.tomorrow || 'TOMORROW'))}</span>`
             : '';
         const name = escapeHtml(rawName);
         const originalText = stripSourceNoise(String(meal.text || '').trim());
         const allergenCodes = extractAllergenCodes(originalText);
         const allergenLabels = extractAllergenLabels(originalText);
 
-        const displayTextRaw = showAllergens
-            ? (stripAllergenAnnotations(originalText) || originalText)
-            : originalText;
-        const textLines = String(displayTextRaw || '—').split(/\r?\n/).map((line) => normalizeMealLine(line)).filter((line) => line !== '');
+        const structuredRows = sortStructuredRowsForMeal(Array.isArray(meal?.structured_rows) ? meal.structured_rows : [], key);
+        const textLines = structuredRows.length > 0
+            ? structuredRows
+                .map((row) => normalizeMealLine(String(row?.text || '')))
+                .filter((line) => line !== '')
+            : (() => {
+                const displayTextRaw = showAllergens
+                    ? (stripAllergenAnnotations(originalText) || originalText)
+                    : originalText;
+                return String(displayTextRaw || '—')
+                    .split(/\r?\n/)
+                    .map((line) => normalizeMealLine(line))
+                    .filter((line) => line !== '');
+            })();
+
         const rowHtml = textLines.length > 0
             ? textLines.map((line, idx) => {
                 const inlineParsed = extractInlineAllergenCodesFromLine(line);
@@ -1021,7 +1315,7 @@
             ? `<span class="meal-allergen-inline">${inlineCodeBadges.slice(0, 4).join('')}${inlineLabelBadges.join('')}${inlineCodeBadges.length > 4 ? `<span class="meal-allergen-count">+${inlineCodeBadges.length - 4}</span>` : ''}</span>`
             : '';
 
-        return `<div class="card ${mealBandClass(key)}"><div class="meal"><span class="meal-main">${mealIconHtml}<span class="meal-name">${name}</span></span>${inlineAllergenHtml}</div><div class="meal-table">${rowHtml}</div></div>`;
+        return `<div class="card ${mealBandClass(key)}"><div class="meal"><span class="meal-main">${mealIconHtml}<span class="meal-name">${name}</span>${tomorrowBadge}</span>${inlineAllergenHtml}</div><div class="meal-table">${rowHtml}</div></div>`;
     }
 
     function fitCardText(cardEl, minPx, maxPx) {
@@ -1061,20 +1355,17 @@
         return best;
     }
 
-    function fitVisibleMealCards(displayMode) {
+    function fitVisibleMealCards(displayMode, settings = null) {
         const cards = Array.from(document.querySelectorAll('#cards .card'));
         const isSmall = displayMode === 'small_screen';
-        cards.forEach((card) => fitCardText(card, isSmall ? 40 : 15, isSmall ? 160 : 34));
+        cards.forEach((card) => fitCardText(card, isSmall ? 10 : 12, isSmall ? 160 : 34));
 
         if (isSmall) {
             const smallRows = Array.from(document.querySelectorAll('#cards .small-page-row-text'));
-            const viewportMax = Math.max(220, Math.floor(window.innerHeight * 0.7));
-            const rowHeightMax = smallRows.length > 0
-                ? Math.max(...smallRows.map((row) => Math.floor(row.clientHeight * 1.25)))
-                : viewportMax;
-            const sharedSmall = fitSharedTextSize(smallRows, 64, Math.max(viewportMax, rowHeightMax));
+            const responsiveMax = Math.max(28, Math.min(84, Math.round(window.innerHeight * 0.085)));
+            const fittedSmallPx = fitSharedTextSize(smallRows, 10, responsiveMax);
             smallRows.forEach((row) => {
-                row.style.fontSize = `${sharedSmall}px`;
+                row.style.fontSize = `${fittedSmallPx}px`;
             });
         }
     }
@@ -1084,25 +1375,13 @@
         if (raw === '') {
             return '—';
         }
-
-        const lang = String(language || 'sk').toLowerCase();
-        try {
-            if (lang === 'hu') {
-                return raw.toLocaleUpperCase('hu-HU');
-            }
-            if (lang === 'sk') {
-                return raw.toLocaleUpperCase('sk-SK');
-            }
-            if (lang === 'en') {
-                return raw.toLocaleUpperCase('en-US');
-            }
-            return raw.toLocaleUpperCase();
-        } catch (_) {
-            return raw.toUpperCase();
-        }
+        return raw;
     }
 
     function normalizeMealAlias(value) {
+        if (MU && typeof MU.normalizeMealAlias === 'function') {
+            return MU.normalizeMealAlias(value);
+        }
         return String(value || '')
             .toLowerCase()
             .normalize('NFD')
@@ -1111,6 +1390,9 @@
     }
 
     function mealAliasToKey(value) {
+        if (MU && typeof MU.mealAliasToKey === 'function') {
+            return MU.mealAliasToKey(value);
+        }
         const n = normalizeMealAlias(value);
         if (n === 'breakfast' || n === 'ranajky' || n === 'reggeli') return 'breakfast';
         if (n === 'snackam' || n === 'desiata' || n === 'tizorai') return 'snack_am';
@@ -1157,34 +1439,55 @@
         list.forEach((meal) => {
             const key = String(meal?.key || '').trim();
             const localized = String(t.mealLabels?.[key] || '').trim();
-            const mealName = localized || String(meal?.label || key || '').trim() || '—';
+            const customDisplayLabel = String(meal?.__displayLabel || '').trim();
+            const explicitLabel = String(meal?.label || '').trim();
+            const mealName = customDisplayLabel || localized || explicitLabel || String(key || '').trim() || '—';
+            const structuredRows = sortStructuredRowsForMeal(Array.isArray(meal?.structured_rows) ? meal.structured_rows : [], key);
+            const pageRowsFromStructured = [];
+            if (structuredRows.length > 0) {
+                structuredRows.forEach((row, index) => {
+                    const category = parseInt(row?.recipe_category || 0, 10) || 0;
+                    let icon = '';
+                    if (row?.is_soup === true || category === 5) {
+                        icon = 'soup';
+                    } else if (row?.is_drink === true || category === 1) {
+                        icon = 'drink';
+                    } else if (index === 0) {
+                        icon = 'cutlery';
+                    }
 
-            const rawText = stripAllergenAnnotations(stripSourceNoise(String(meal?.text || '').trim()));
-            const lines = String(rawText || '—')
-                .split(/\r?\n/)
-                .map((line) => normalizeMealLine(line))
-                .filter((line) => line !== '');
+                    const lineText = normalizeMealLine(String(row?.text || '').trim());
+                    if (!lineText) {
+                        return;
+                    }
 
-            const pageRows = [];
-            (lines.length ? lines : ['—']).forEach((line) => {
-                const inlineParsed = extractInlineAllergenCodesFromLine(line);
-                pageRows.push({
-                    type: 'line',
-                    text: inlineParsed.text || line,
-                    codes: inlineParsed.codes
+                    pageRowsFromStructured.push({
+                        text: lineText,
+                        icon
+                    });
                 });
-            });
+            }
+
+            const pageRows = pageRowsFromStructured.length > 0
+                ? pageRowsFromStructured
+                : parseMealRowsForSmall(String(meal?.text || '').trim());
 
             pages.push({
                 label: mealName,
-                rows: pageRows
+                rows: pageRows,
+                tomorrowPreview: meal?.__tomorrowPreview === true
             });
         });
 
         const renderRow = (row) => {
             const rawText = String(row?.text || '—');
             const text = escapeHtml(toDisplaySingleLine(rawText, settings.language));
-            return `<div class="small-page-row"><div class="small-page-row-text"><span class="meal-row-line">${text}</span></div></div>`;
+            const iconKey = String(row?.icon || '').trim();
+            const iconHtml = iconKey !== ''
+                ? `<span class="small-page-row-icon" aria-hidden="true">${iconSvg(iconKey)}</span>`
+                : '<span class="small-page-row-icon" aria-hidden="true"></span>';
+            const rowClass = iconKey !== '' ? 'small-page-row' : 'small-page-row no-icon';
+            return `<div class="${rowClass}">${iconHtml}<div class="small-page-row-text"><span class="meal-row-line">${text}</span></div></div>`;
         };
 
         let pageIndex = 0;
@@ -1198,6 +1501,7 @@
             const page = pages[pageIndex] || pages[0] || { label: t.title, rows: [] };
             cards.setAttribute('data-page-index', String(pageIndex));
             cards.setAttribute('data-page-label', String(page.label || '').trim());
+            cards.setAttribute('data-page-tomorrow-preview', page && page.tomorrowPreview === true ? '1' : '0');
             cards.innerHTML = renderPageHtml(page);
             const titleEl = document.getElementById('title');
             if (titleEl) {
@@ -1205,13 +1509,13 @@
                 titleEl.textContent = label !== '' ? label : (String(t.title || '').trim() || 'Menu');
             }
             requestAnimationFrame(() => {
-                fitVisibleMealCards('small_screen');
+                fitVisibleMealCards('small_screen', settings);
             });
         };
 
         renderPage();
         if (pages.length > 1) {
-            const switchMs = Math.max(5000, Math.min(60000, Number(settings.smallScreenPageSwitchSec || 12) * 1000));
+            const switchMs = Math.max(1000, Math.min(120000, Number(settings.smallScreenPageSwitchSec || 12) * 1000));
             let switchInProgress = false;
             mealPageSwitchTimer = setInterval(() => {
                 if (switchInProgress) {
@@ -1243,7 +1547,7 @@
         }
 
         cards.innerHTML = list.map((meal) => mealCardHtml(meal, settings, t, { showAllergens: true })).join('');
-        fitVisibleMealCards('large_screen');
+        fitVisibleMealCards('large_screen', settings);
     }
 
     function renderFixedAllergenPanel(meals, settings, t) {
@@ -1289,18 +1593,25 @@
 
     function footerAllergenSummary(meals, t) {
         const list = Array.isArray(meals) ? meals : [];
-        const codes = new Set();
+        const labels = new Set();
+        const codeLabels = allergenMap();
         list.forEach((meal) => {
             const raw = stripSourceNoise(String(meal?.text || '').trim());
+            extractAllergenLabels(raw).forEach((label) => {
+                const clean = String(label || '').replace(/^ALERG[ÉE]NY:\s*/iu, '').replace(/[ \t]{2,}/g, ' ').trim();
+                if (clean) {
+                    labels.add(clean);
+                }
+            });
             extractAllergenCodes(raw).forEach((code) => {
                 const normalized = parseInt(code, 10);
-                if (normalized >= 1 && normalized <= 14) {
-                    codes.add(normalized);
+                if (normalized >= 1 && normalized <= 14 && codeLabels[normalized]?.label) {
+                    labels.add(String(codeLabels[normalized].label));
                 }
             });
         });
 
-        const sorted = Array.from(codes).sort((a, b) => a - b);
+        const sorted = Array.from(labels).sort((a, b) => String(a).localeCompare(String(b), 'sk'));
         if (!sorted.length) {
             return '';
         }
@@ -1308,7 +1619,7 @@
         return `${String(t.allergens || 'Allergens')}: ${sorted.join(', ')}`;
     }
 
-    function render(data, settings) {
+    function render(data, settings, context = {}) {
         const cards = document.getElementById('cards');
         const cardsWrap = document.getElementById('cards-wrap');
         const subtitle = document.getElementById('subtitle');
@@ -1323,11 +1634,13 @@
             ? 'large_screen'
             : 'small_screen';
 
-        const mealsRaw = Array.isArray(data?.meals) ? data.meals : [];
+        const tomorrowData = context && typeof context === 'object' ? (context.tomorrowData || null) : null;
+        const tomorrowMealsRaw = normalizeMealsForDisplay(Array.isArray(tomorrowData?.meals) ? tomorrowData.meals : []);
+        const mealsRaw = normalizeMealsForDisplay(Array.isArray(data?.meals) ? data.meals : []);
         const mealsUnmergedLarge = isFutureMenuDate(dayText)
             ? mealsRaw
-            : filterMealsForCurrentTime(mealsRaw, settings, nowMinutesLocal());
-        const mealsUnmergedSmall = mealsRaw;
+            : buildLargeScreenMeals(mealsRaw, tomorrowMealsRaw, settings, nowMinutesLocal(), t);
+        const mealsUnmergedSmall = buildSmallScreenMeals(mealsRaw, tomorrowMealsRaw, settings, nowMinutesLocal(), t);
         const mealsForSmall = mergeStandardMealBands(mealsUnmergedSmall, t, settings);
         const mealsForLarge = mergeStandardMealBands(mealsUnmergedLarge, t, settings);
         const smallAllowedKeys = resolveSmallScreenAllowedMealKeys(settings);
@@ -1365,7 +1678,9 @@
         stopSlowScroll();
         stopMealPageSwitch();
         const displayMealsRaw = displayMode === 'large_screen' ? mealsForLarge : mealsForSmallSelected;
-        const displayMeals = displayMealsRaw.filter((meal) => mealHasRenderableRows(meal));
+        const displayMeals = displayMode === 'small_screen'
+            ? displayMealsRaw
+            : displayMealsRaw.filter((meal) => mealHasRenderableRows(meal));
         if (!displayMeals.length) {
             cards.innerHTML = `<div class="empty">${escapeHtml(emptyStateMessage(data, t))}</div>`;
         } else {
@@ -1379,11 +1694,14 @@
 
         if (displayMode === 'small_screen') {
             const allergensLine = footerAllergenSummary(displayMeals, t);
-            const lines = [`<span class="foot-line">${escapeHtml(dayText || '')}</span>`];
-            if (allergensLine !== '') {
-                lines.push(`<span class="foot-allergens">${escapeHtml(allergensLine)}</span>`);
-            }
-            foot.innerHTML = lines.join('');
+            const hasTomorrowPreview = displayMeals.some((meal) => meal?.__tomorrowPreview === true);
+            const baseDateText = hasTomorrowPreview
+                ? String(t.tomorrowTag || t.tomorrow || 'ZAJTRA').trim()
+                : String(dayText || '').trim();
+            const combinedLine = [baseDateText, String(allergensLine || '').trim()]
+                .filter(Boolean)
+                .join(' • ');
+            foot.innerHTML = `<span class="foot-line">${escapeHtml(combinedLine || baseDateText || '')}</span>`;
         } else {
             const serverTs = String(data?.updated_at || '').trim();
             const appetiteText = String(settings.appetiteMessageText || '').trim();
@@ -1688,6 +2006,63 @@
         return normalizedLines.length > 0;
     }
 
+    function normalizeMealsForDisplay(meals) {
+        const list = Array.isArray(meals) ? meals.slice() : [];
+        if (!list.length) {
+            return list;
+        }
+
+        const byKey = new Map();
+        list.forEach((meal) => {
+            const key = String(meal?.key || '').trim();
+            if (key !== '') {
+                byKey.set(key, meal);
+            }
+        });
+
+        const breakfast = byKey.get('breakfast') || null;
+        const lunch = byKey.get('lunch') || null;
+        const breakfastHasRows = mealHasRenderableRows(breakfast);
+        if (!breakfastHasRows && lunch) {
+            const lunchRows = Array.isArray(lunch?.structured_rows) ? lunch.structured_rows : [];
+            const categories = lunchRows
+                .map((row) => parseInt(row?.recipe_category || 0, 10) || 0)
+                .filter((cat) => cat > 0);
+            if (categories.length > 0) {
+                const breakfastCats = new Set([1, 2, 3]);
+                const looksBreakfast = categories.every((cat) => breakfastCats.has(cat));
+                if (looksBreakfast) {
+                    byKey.set('breakfast', {
+                        ...lunch,
+                        key: 'breakfast',
+                        label: 'Raňajky'
+                    });
+                    byKey.delete('lunch');
+                }
+            }
+        }
+
+        const orderedKeys = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
+        const normalized = [];
+        const used = new Set();
+        orderedKeys.forEach((key) => {
+            const meal = byKey.get(key);
+            if (meal) {
+                normalized.push(meal);
+                used.add(key);
+            }
+        });
+
+        list.forEach((meal) => {
+            const key = String(meal?.key || '').trim();
+            if (!used.has(key)) {
+                normalized.push(meal);
+            }
+        });
+
+        return normalized;
+    }
+
     function createDebugState() {
         return { lines: [] };
     }
@@ -1816,6 +2191,262 @@
         }
     }
 
+    async function refreshSingleModeFromApi(settings, cacheKey, debugState) {
+        let data = await fetchMenuData(settings, isoDateOffset(0), false, debugState);
+        const shouldProbeFallback = (!data || data.__serverDataAvailable !== false) && settings.maxFallbackDaysAhead > 0;
+        if ((!data || !hasAnyMeals(data)) && shouldProbeFallback) {
+            const fallbackData = await findNextMenuWithMeals(settings, 1, settings.maxFallbackDaysAhead, debugState);
+            if (fallbackData) {
+                data = fallbackData;
+            }
+        }
+
+        if (!data) {
+            return false;
+        }
+
+        const effectiveTodayDate = String(data?.menu_date || isoDateOffset(0)).trim() || isoDateOffset(0);
+        const effectiveTomorrowDate = isoDateShift(effectiveTodayDate, 1);
+        const tomorrowData = await fetchMenuData(settings, effectiveTomorrowDate, true, debugState);
+
+        render(data, settings, { tomorrowData });
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: { today: data, tomorrow: tomorrowData } }));
+        } catch (_) {
+        }
+        return true;
+    }
+
+    async function refreshSquareModeFromApi(settings, cacheKey, debugState) {
+        const todayDate = isoDateOffset(0);
+        let todayData = await fetchMenuData(settings, todayDate, false, debugState);
+        const shouldProbeFallbackToday = (!todayData || todayData.__serverDataAvailable !== false) && settings.maxFallbackDaysAhead > 0;
+        if ((!todayData || !hasAnyMeals(todayData)) && shouldProbeFallbackToday) {
+            const fallbackToday = await findNextMenuWithMeals(settings, 1, settings.maxFallbackDaysAhead, debugState);
+            if (fallbackToday) {
+                todayData = fallbackToday;
+            }
+        }
+
+        const effectiveTodayDate = String(todayData?.menu_date || todayDate).trim() || todayDate;
+        const effectiveTomorrowDate = isoDateShift(effectiveTodayDate, 1);
+        const tomorrowData = settings.showTomorrowInSquare !== false
+            ? await fetchMenuData(settings, effectiveTomorrowDate, true, debugState)
+            : null;
+
+        if (!todayData && !tomorrowData) {
+            return false;
+        }
+
+        renderSquareDual(
+            todayData || { institution_name: '', menu_date: effectiveTodayDate, meals: [] },
+            tomorrowData || { institution_name: '', menu_date: effectiveTomorrowDate, meals: [] },
+            settings
+        );
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayData, tomorrow: tomorrowData } }));
+        } catch (_) {
+        }
+        return true;
+    }
+
+    function startBackgroundApiRefresh(settings, cacheKey, debugState) {
+        if (backgroundRefreshTimer !== null) {
+            clearInterval(backgroundRefreshTimer);
+            backgroundRefreshTimer = null;
+        }
+        if (settings.runtimeApiFetchEnabled !== true) {
+            return;
+        }
+
+        const intervalMs = Math.max(60000, Math.min(3600000, Number(settings.runtimeRefreshIntervalSec || 300) * 1000));
+        let inFlight = false;
+        backgroundRefreshTimer = setInterval(async () => {
+            if (inFlight) {
+                return;
+            }
+            inFlight = true;
+            try {
+                if (settings.layoutMode === 'square_dual_day') {
+                    await refreshSquareModeFromApi(settings, cacheKey, debugState);
+                } else {
+                    await refreshSingleModeFromApi(settings, cacheKey, debugState);
+                }
+            } catch (_) {
+            } finally {
+                inFlight = false;
+            }
+        }, intervalMs);
+    }
+
+    function saveMenuCache(cacheKey, mode, data) {
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode, data }));
+        } catch (_) {
+        }
+    }
+
+    function renderFromInlinePrefetched(settings, cacheKey, debugState, options = {}) {
+        const successMessage = String(options.successMessage || '').trim();
+        const emptyMessage = String(options.emptyMessage || '').trim();
+        const prefetched = settings.offlinePrefetchedMenuData;
+
+        if (settings.layoutMode === 'square_dual_day') {
+            const todayPref = prefetched && typeof prefetched === 'object' ? (prefetched.today || null) : null;
+            const tomorrowPref = prefetched && typeof prefetched === 'object' ? (prefetched.tomorrow || null) : null;
+            if (!(todayPref || tomorrowPref)) {
+                if (emptyMessage) {
+                    pushDebug(debugState, emptyMessage);
+                }
+                return false;
+            }
+            renderSquareDual(
+                todayPref || { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
+                tomorrowPref || { institution_name: '', menu_date: isoDateOffset(1), meals: [] },
+                settings
+            );
+            saveMenuCache(cacheKey, 'square_dual_day', { today: todayPref, tomorrow: tomorrowPref });
+            if (successMessage) {
+                pushDebug(debugState, successMessage);
+            }
+            return true;
+        }
+
+        if (!(prefetched && Array.isArray(prefetched.meals))) {
+            const prefTodayAlt = prefetched && typeof prefetched === 'object' ? prefetched.today : null;
+            if (!(prefTodayAlt && Array.isArray(prefTodayAlt.meals))) {
+                if (emptyMessage) {
+                    pushDebug(debugState, emptyMessage);
+                }
+                return false;
+            }
+            const prefTomorrowAlt = prefetched && typeof prefetched === 'object' ? (prefetched.tomorrow || null) : null;
+            render(prefTodayAlt, settings, { tomorrowData: prefTomorrowAlt });
+            saveMenuCache(cacheKey, 'single', { today: prefTodayAlt, tomorrow: prefTomorrowAlt });
+            if (successMessage) {
+                pushDebug(debugState, successMessage);
+            }
+            return true;
+        }
+
+        render(prefetched, settings, { tomorrowData: null });
+        saveMenuCache(cacheKey, 'single', { today: prefetched, tomorrow: null });
+        if (successMessage) {
+            pushDebug(debugState, successMessage);
+        }
+        return true;
+    }
+
+    function renderFromLocalCache(settings, cacheKey, debugState, options = {}) {
+        const successMessage = String(options.successMessage || '').trim();
+        const emptyMessage = String(options.emptyMessage || '').trim();
+        const unusableMessage = String(options.unusableMessage || '').trim();
+
+        try {
+            const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+            if (!(cached && cached.data)) {
+                if (emptyMessage) {
+                    pushDebug(debugState, emptyMessage);
+                }
+                return false;
+            }
+
+            if (settings.layoutMode === 'square_dual_day') {
+                const todayCached = cached.data.today || null;
+                const tomorrowCached = cached.data.tomorrow || null;
+                if (!(todayCached || tomorrowCached)) {
+                    if (unusableMessage) {
+                        pushDebug(debugState, unusableMessage);
+                    }
+                    return false;
+                }
+                renderSquareDual(
+                    todayCached || { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
+                    tomorrowCached || { institution_name: '', menu_date: isoDateOffset(1), meals: [] },
+                    settings
+                );
+                if (successMessage) {
+                    pushDebug(debugState, successMessage);
+                }
+                return true;
+            }
+
+            const todayCached = cached?.data && Array.isArray(cached.data?.today?.meals)
+                ? cached.data.today
+                : (cached?.data && Array.isArray(cached.data?.meals) ? cached.data : null);
+            const tomorrowCached = cached?.data && cached.data?.tomorrow && Array.isArray(cached.data.tomorrow?.meals)
+                ? cached.data.tomorrow
+                : null;
+
+            if (!todayCached) {
+                if (unusableMessage) {
+                    pushDebug(debugState, unusableMessage);
+                }
+                return false;
+            }
+
+            render(todayCached, settings, { tomorrowData: tomorrowCached });
+            if (successMessage) {
+                pushDebug(debugState, successMessage);
+            }
+            return true;
+        } catch (error) {
+            pushDebug(debugState, `Cache exception: ${String(error?.message || error || 'unknown')}`);
+            return false;
+        }
+    }
+
+    async function renderFromOfflineFiles(settings, cacheKey, debugState) {
+        const todayFile = String(settings.offlinePrefetchedTodayFile || '').trim();
+        const tomorrowFile = String(settings.offlinePrefetchedTomorrowFile || '').trim();
+
+        if (settings.layoutMode === 'square_dual_day') {
+            const todayFromFile = await loadOfflineMealFile(todayFile, debugState, 'today');
+            const tomorrowFromFile = settings.showTomorrowInSquare !== false
+                ? await loadOfflineMealFile(tomorrowFile, debugState, 'tomorrow')
+                : null;
+            if (!(todayFromFile || tomorrowFromFile)) {
+                pushDebug(debugState, 'Offline files empty (square mode)');
+                return false;
+            }
+            renderSquareDual(
+                todayFromFile || { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
+                tomorrowFromFile || { institution_name: '', menu_date: isoDateOffset(1), meals: [] },
+                settings
+            );
+            saveMenuCache(cacheKey, 'square_dual_day', { today: todayFromFile, tomorrow: tomorrowFromFile });
+            return true;
+        }
+
+        const todayFromFile = await loadOfflineMealFile(todayFile, debugState, 'today');
+        const tomorrowFromFile = await loadOfflineMealFile(tomorrowFile, debugState, 'tomorrow');
+        if (!todayFromFile) {
+            pushDebug(debugState, 'Offline file empty (single mode)');
+            return false;
+        }
+
+        render(todayFromFile, settings, { tomorrowData: tomorrowFromFile });
+        saveMenuCache(cacheKey, 'single', { today: todayFromFile, tomorrow: tomorrowFromFile });
+        return true;
+    }
+
+    function renderHardFallback(settings, debugState) {
+        if (settings.layoutMode === 'square_dual_day') {
+            renderSquareDual(
+                { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
+                { institution_name: '', menu_date: isoDateOffset(1), meals: [] },
+                settings
+            );
+        } else {
+            render(
+                { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
+                settings,
+                { tomorrowData: { institution_name: '', menu_date: isoDateOffset(1), meals: [] } }
+            );
+        }
+        pushDebug(debugState, 'Rendered hard fallback (empty meals)');
+    }
+
     async function init() {
         const settings = getSettings();
         settings.layoutMode = 'classic';
@@ -1827,98 +2458,29 @@
         let rendered = false;
 
         if (!rendered) {
-            const prefetched = settings.offlinePrefetchedMenuData;
-            if (settings.layoutMode === 'square_dual_day') {
-                const todayPref = prefetched && typeof prefetched === 'object' ? (prefetched.today || null) : null;
-                const tomorrowPref = prefetched && typeof prefetched === 'object' ? (prefetched.tomorrow || null) : null;
-                if (todayPref || tomorrowPref) {
-                    renderSquareDual(todayPref || { institution_name: '', menu_date: isoDateOffset(0), meals: [] }, tomorrowPref || { institution_name: '', menu_date: isoDateOffset(1), meals: [] }, settings);
-                    rendered = true;
-                    pushDebug(debugState, 'Rendered from inline prefetched data (startup fast path)');
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayPref, tomorrow: tomorrowPref } }));
-                    } catch (_) {
-                    }
-                }
-            } else if (prefetched && Array.isArray(prefetched.meals)) {
-                render(prefetched, settings);
-                rendered = true;
-                pushDebug(debugState, 'Rendered from inline prefetched data (startup fast path)');
-                try {
-                    localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: prefetched }));
-                } catch (_) {
-                }
-            }
+            rendered = renderFromInlinePrefetched(settings, cacheKey, debugState, {
+                successMessage: 'Rendered from inline prefetched data (startup fast path)'
+            });
         }
 
         if (!rendered) {
-            try {
-                const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
-                if (cached && cached.data) {
-                    if (settings.layoutMode === 'square_dual_day') {
-                        const todayCached = cached.data.today || null;
-                        const tomorrowCached = cached.data.tomorrow || null;
-                        if (todayCached || tomorrowCached) {
-                            renderSquareDual(todayCached || { institution_name: '', menu_date: isoDateOffset(0), meals: [] }, tomorrowCached || { institution_name: '', menu_date: isoDateOffset(1), meals: [] }, settings);
-                            rendered = true;
-                            pushDebug(debugState, 'Rendered from local cache (startup fast path)');
-                        }
-                    } else if (cached.data.meals || cached.mode === 'single') {
-                        render(cached.data, settings);
-                        rendered = true;
-                        pushDebug(debugState, 'Rendered from local cache (startup fast path)');
-                    }
-                }
-            } catch (_) {
-            }
+            rendered = renderFromLocalCache(settings, cacheKey, debugState, {
+                successMessage: 'Rendered from local cache (startup fast path)'
+            });
         }
 
         try {
-            if (!rendered && settings.runtimeApiFetchEnabled === true && settings.layoutMode === 'square_dual_day') {
-                const todayDate = isoDateOffset(0);
-                const tomorrowDate = isoDateOffset(1);
-                let todayData = await fetchMenuData(settings, todayDate, false, debugState);
-                const shouldProbeFallbackToday = (!todayData || todayData.__serverDataAvailable !== false) && settings.maxFallbackDaysAhead > 0;
-                if ((!todayData || !hasAnyMeals(todayData)) && shouldProbeFallbackToday) {
-                    const fallbackToday = await findNextMenuWithMeals(settings, 1, settings.maxFallbackDaysAhead, debugState);
-                    if (fallbackToday) {
-                        todayData = fallbackToday;
-                    }
-                }
-
-                const effectiveTodayDate = String(todayData?.menu_date || todayDate).trim() || todayDate;
-                const effectiveTomorrowDate = isoDateShift(effectiveTodayDate, 1);
-                const tomorrowData = settings.showTomorrowInSquare !== false
-                    ? await fetchMenuData(settings, effectiveTomorrowDate, true, debugState)
-                    : null;
-
-                if (todayData || tomorrowData) {
-                    renderSquareDual(todayData || { institution_name: '', menu_date: effectiveTodayDate, meals: [] }, tomorrowData || { institution_name: '', menu_date: effectiveTomorrowDate, meals: [] }, settings);
+            if (settings.runtimeApiFetchEnabled === true && settings.layoutMode === 'square_dual_day') {
+                const ok = await refreshSquareModeFromApi(settings, cacheKey, debugState);
+                if (ok) {
                     rendered = true;
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayData, tomorrow: tomorrowData } }));
-                    } catch (_) {
-                    }
                 } else {
                     pushDebug(debugState, 'API empty (square mode)');
                 }
-            } else if (!rendered && settings.runtimeApiFetchEnabled === true) {
-                let data = await fetchMenuData(settings, isoDateOffset(0), false, debugState);
-                const shouldProbeFallback = (!data || data.__serverDataAvailable !== false) && settings.maxFallbackDaysAhead > 0;
-                if ((!data || !hasAnyMeals(data)) && shouldProbeFallback) {
-                    const fallbackData = await findNextMenuWithMeals(settings, 1, settings.maxFallbackDaysAhead, debugState);
-                    if (fallbackData) {
-                        data = fallbackData;
-                    }
-                }
-
-                if (data) {
-                    render(data, settings);
+            } else if (settings.runtimeApiFetchEnabled === true) {
+                const ok = await refreshSingleModeFromApi(settings, cacheKey, debugState);
+                if (ok) {
                     rendered = true;
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data }));
-                    } catch (_) {
-                    }
                 } else {
                     pushDebug(debugState, 'API empty (single mode)');
                 }
@@ -1930,111 +2492,36 @@
         }
 
         if (!rendered) {
-            const todayFile = String(settings.offlinePrefetchedTodayFile || '').trim();
-            const tomorrowFile = String(settings.offlinePrefetchedTomorrowFile || '').trim();
-            if (settings.layoutMode === 'square_dual_day') {
-                const todayFromFile = await loadOfflineMealFile(todayFile, debugState, 'today');
-                const tomorrowFromFile = settings.showTomorrowInSquare !== false ? await loadOfflineMealFile(tomorrowFile, debugState, 'tomorrow') : null;
-                if (todayFromFile || tomorrowFromFile) {
-                    renderSquareDual(
-                        todayFromFile || { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
-                        tomorrowFromFile || { institution_name: '', menu_date: isoDateOffset(1), meals: [] },
-                        settings
-                    );
-                    rendered = true;
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayFromFile, tomorrow: tomorrowFromFile } }));
-                    } catch (_) {
-                    }
-                } else {
-                    pushDebug(debugState, 'Offline files empty (square mode)');
-                }
-            } else {
-                const todayFromFile = await loadOfflineMealFile(todayFile, debugState, 'today');
-                if (todayFromFile) {
-                    render(todayFromFile, settings);
-                    rendered = true;
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: todayFromFile }));
-                    } catch (_) {
-                    }
-                } else {
-                    pushDebug(debugState, 'Offline file empty (single mode)');
-                }
-            }
+            rendered = await renderFromOfflineFiles(settings, cacheKey, debugState);
         }
 
         if (!rendered) {
-            const prefetched = settings.offlinePrefetchedMenuData;
-            if (settings.layoutMode === 'square_dual_day') {
-                const todayPref = prefetched && typeof prefetched === 'object' ? (prefetched.today || null) : null;
-                const tomorrowPref = prefetched && typeof prefetched === 'object' ? (prefetched.tomorrow || null) : null;
-                if (todayPref || tomorrowPref) {
-                    renderSquareDual(todayPref || { institution_name: '', menu_date: isoDateOffset(0), meals: [] }, tomorrowPref || { institution_name: '', menu_date: isoDateOffset(1), meals: [] }, settings);
-                    rendered = true;
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'square_dual_day', data: { today: todayPref, tomorrow: tomorrowPref } }));
-                    } catch (_) {
-                    }
-                } else {
-                    pushDebug(debugState, 'Inline prefetched data empty (square mode)');
-                }
-            } else if (prefetched && Array.isArray(prefetched.meals)) {
-                render(prefetched, settings);
-                rendered = true;
-                try {
-                    localStorage.setItem(cacheKey, JSON.stringify({ saved_at: Date.now(), mode: 'single', data: prefetched }));
-                } catch (_) {
-                }
-            } else {
-                pushDebug(debugState, 'Inline prefetched data empty (single mode)');
-            }
+            rendered = renderFromInlinePrefetched(settings, cacheKey, debugState, {
+                emptyMessage: settings.layoutMode === 'square_dual_day'
+                    ? 'Inline prefetched data empty (square mode)'
+                    : 'Inline prefetched data empty (single mode)'
+            });
         }
 
         if (!rendered) {
-            try {
-                const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
-                if (cached && cached.data) {
-                    if (settings.layoutMode === 'square_dual_day') {
-                        const todayCached = cached.data.today || null;
-                        const tomorrowCached = cached.data.tomorrow || null;
-                        if (todayCached || tomorrowCached) {
-                            renderSquareDual(todayCached || { institution_name: '', menu_date: isoDateOffset(0), meals: [] }, tomorrowCached || { institution_name: '', menu_date: isoDateOffset(1), meals: [] }, settings);
-                            rendered = true;
-                        }
-                    } else if (cached.data.meals || cached.mode === 'single') {
-                        render(cached.data, settings);
-                        rendered = true;
-                    } else {
-                        pushDebug(debugState, 'Cache present but unusable');
-                    }
-                } else {
-                    pushDebug(debugState, 'No local cache');
-                }
-            } catch (error) {
-                pushDebug(debugState, `Cache exception: ${String(error?.message || error || 'unknown')}`);
-            }
+            rendered = renderFromLocalCache(settings, cacheKey, debugState, {
+                emptyMessage: 'No local cache',
+                unusableMessage: 'Cache present but unusable'
+            });
         }
 
         if (!rendered) {
-            if (settings.layoutMode === 'square_dual_day') {
-                renderSquareDual(
-                    { institution_name: '', menu_date: isoDateOffset(0), meals: [] },
-                    { institution_name: '', menu_date: isoDateOffset(1), meals: [] },
-                    settings
-                );
-            } else {
-                render({ institution_name: '', menu_date: isoDateOffset(0), meals: [] }, settings);
-            }
-            pushDebug(debugState, 'Rendered hard fallback (empty meals)');
+            renderHardFallback(settings, debugState);
         }
 
         window.addEventListener('resize', () => {
             const mode = String(settings.mealDisplayMode || 'small_screen').toLowerCase() === 'large_screen'
                 ? 'large_screen'
                 : 'small_screen';
-            fitVisibleMealCards(mode);
+            fitVisibleMealCards(mode, settings);
         });
+
+        startBackgroundApiRefresh(settings, cacheKey, debugState);
 
         renderDebugStatus(debugState, rendered);
     }

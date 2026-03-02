@@ -119,6 +119,44 @@
         return raw.includes(',') ? raw.split(',').pop() : raw;
     }
 
+    function normalizeSections(rawSections) {
+        let source = rawSections;
+        if (typeof source === 'string') {
+            try {
+                source = JSON.parse(source);
+            } catch (_) {
+                source = [];
+            }
+        }
+
+        if (!Array.isArray(source)) {
+            return [];
+        }
+
+        const normalized = source
+            .map((entry) => {
+                const startPercent = parseIntSafe(entry?.startPercent, 0);
+                const endPercent = parseIntSafe(entry?.endPercent, 100);
+                const pauseMs = parseIntSafe(entry?.pauseMs, 2000);
+                const horizontalPercent = parseIntSafe(entry?.horizontalPercent, 0);
+
+                const start = Math.max(0, Math.min(100, Math.min(startPercent, endPercent)));
+                const end = Math.max(0, Math.min(100, Math.max(startPercent, endPercent)));
+
+                return {
+                    startPercent: start,
+                    endPercent: end,
+                    pauseMs: Math.max(0, pauseMs),
+                    horizontalPercent: Math.max(0, Math.min(100, horizontalPercent))
+                };
+            })
+            .filter((entry) => entry.endPercent >= entry.startPercent)
+            .sort((left, right) => left.startPercent - right.startPercent)
+            .slice(0, 24);
+
+        return normalized;
+    }
+
     function getSettings() {
         function normalizeAssetApiUrl(inputUrl) {
             const raw = String(inputUrl || '').trim();
@@ -165,12 +203,14 @@
             pdfDataKey: '',
             pdfAssetUrl: '',
             zoomLevel: 100,
+            horizontalStartPercent: 0,
             autoScrollEnabled: false,
             autoScrollSpeedPxPerSec: 30,
             autoScrollStartPauseMs: 2000,
             autoScrollEndPauseMs: 2000,
             pauseAtPercent: -1,
-            pauseDurationMs: 2000
+            pauseDurationMs: 2000,
+            autoScrollSectionsJson: '[]'
         };
 
         const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS)
@@ -187,6 +227,7 @@
             pdfDataKey: params.get('pdfDataKey') ?? injected.pdfDataKey ?? defaults.pdfDataKey,
             pdfAssetUrl: params.get('pdfAssetUrl') ?? injected.pdfAssetUrl ?? defaults.pdfAssetUrl,
             zoomLevel: parseIntSafe(params.get('zoomLevel') ?? injected.zoomLevel, defaults.zoomLevel),
+            horizontalStartPercent: parseIntSafe(params.get('horizontalStartPercent') ?? injected.horizontalStartPercent, defaults.horizontalStartPercent),
             autoScrollEnabled: parseBool(
                 params.get('autoScrollEnabled') ?? injected.autoScrollEnabled,
                 legacyNavigationMode === 'auto'
@@ -195,15 +236,18 @@
             autoScrollStartPauseMs: parseIntSafe(params.get('autoScrollStartPauseMs') ?? injected.autoScrollStartPauseMs, defaults.autoScrollStartPauseMs),
             autoScrollEndPauseMs: parseIntSafe(params.get('autoScrollEndPauseMs') ?? injected.autoScrollEndPauseMs, defaults.autoScrollEndPauseMs),
             pauseAtPercent: parseIntSafe(params.get('pauseAtPercent') ?? injected.pauseAtPercent, defaults.pauseAtPercent),
-            pauseDurationMs: parseIntSafe(params.get('pauseDurationMs') ?? injected.pauseDurationMs, defaults.pauseDurationMs)
+            pauseDurationMs: parseIntSafe(params.get('pauseDurationMs') ?? injected.pauseDurationMs, defaults.pauseDurationMs),
+            autoScrollSectionsJson: params.get('autoScrollSectionsJson') ?? injected.autoScrollSectionsJson ?? defaults.autoScrollSectionsJson
         };
 
         merged.zoomLevel = Math.max(50, Math.min(250, merged.zoomLevel));
+        merged.horizontalStartPercent = Math.max(0, Math.min(100, merged.horizontalStartPercent));
         merged.autoScrollSpeedPxPerSec = Math.max(5, Math.min(300, merged.autoScrollSpeedPxPerSec));
         merged.autoScrollStartPauseMs = Math.max(0, merged.autoScrollStartPauseMs);
         merged.autoScrollEndPauseMs = Math.max(0, merged.autoScrollEndPauseMs);
         merged.pauseDurationMs = Math.max(0, merged.pauseDurationMs);
         merged.pauseAtPercent = Math.max(-1, Math.min(100, merged.pauseAtPercent));
+        merged.autoScrollSections = normalizeSections(merged.autoScrollSectionsJson);
 
         if (!merged.pdfDataBase64 && merged.pdfDataKey) {
             try {
@@ -248,6 +292,16 @@
             clearTimeout(restartTimer);
             restartTimer = null;
         }
+    }
+
+    function applyHorizontalPosition(horizontalPercent) {
+        const clampedPercent = Math.max(0, Math.min(100, parseIntSafe(horizontalPercent, settings.horizontalStartPercent)));
+        const maxScrollLeft = Math.max(0, viewportEl.scrollWidth - viewportEl.clientWidth);
+        if (maxScrollLeft <= 0) {
+            viewportEl.scrollLeft = 0;
+            return;
+        }
+        viewportEl.scrollLeft = (maxScrollLeft * clampedPercent) / 100;
     }
 
     async function renderPdf(base64Data) {
@@ -304,12 +358,63 @@
     function runAutoScroll() {
         stopAutoScroll();
 
+        applyHorizontalPosition(settings.horizontalStartPercent);
+
         if (!settings.autoScrollEnabled) {
             return;
         }
 
         const maxScroll = Math.max(0, viewportEl.scrollHeight - viewportEl.clientHeight);
         if (maxScroll <= 0) {
+            return;
+        }
+
+        const sectionPlan = Array.isArray(settings.autoScrollSections) ? settings.autoScrollSections : [];
+
+        if (sectionPlan.length > 0) {
+            const speedPerMs = settings.autoScrollSpeedPxPerSec / 1000;
+            let sectionIndex = 0;
+            let lastTs = null;
+
+            const playSection = () => {
+                const section = sectionPlan[sectionIndex];
+                if (!section) {
+                    sectionIndex = 0;
+                    restartTimer = setTimeout(playSection, settings.autoScrollEndPauseMs);
+                    return;
+                }
+
+                const startTop = (maxScroll * section.startPercent) / 100;
+                const endTop = (maxScroll * section.endPercent) / 100;
+                viewportEl.scrollTop = Math.max(0, Math.min(maxScroll, startTop));
+                applyHorizontalPosition(section.horizontalPercent);
+                lastTs = null;
+
+                const tickSection = (timestamp) => {
+                    if (lastTs === null) {
+                        lastTs = timestamp;
+                    }
+
+                    const delta = timestamp - lastTs;
+                    lastTs = timestamp;
+                    const nextTop = Math.min(endTop, viewportEl.scrollTop + (speedPerMs * delta));
+                    viewportEl.scrollTop = nextTop;
+
+                    if (nextTop >= endTop) {
+                        restartTimer = setTimeout(() => {
+                            sectionIndex = (sectionIndex + 1) % sectionPlan.length;
+                            playSection();
+                        }, section.pauseMs);
+                        return;
+                    }
+
+                    currentRafId = requestAnimationFrame(tickSection);
+                };
+
+                currentRafId = requestAnimationFrame(tickSection);
+            };
+
+            restartTimer = setTimeout(playSection, settings.autoScrollStartPauseMs);
             return;
         }
 
@@ -361,6 +466,7 @@
         if (!success) {
             return;
         }
+        applyHorizontalPosition(settings.horizontalStartPercent);
         runAutoScroll();
     }
 

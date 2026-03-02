@@ -3,10 +3,12 @@
   "pdfAssetUrl": "",
   "pdfAssetId": "",
   "zoomLevel": 100,
+  "horizontalStartPercent": 0,
   "autoScrollEnabled": false,
   "autoScrollSpeedPxPerSec": 30,
   "autoScrollStartPauseMs": 2000,
   "autoScrollEndPauseMs": 2000,
   "pauseAtPercent": -1,
-  "pauseDurationMs": 2000
+  "pauseDurationMs": 2000,
+  "autoScrollSectionsJson": "[]"
 }

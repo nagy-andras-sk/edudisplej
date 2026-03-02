@@ -39,6 +39,36 @@
             padding: 4vh 4vw;
         }
 
+        .clock-overlay-band {
+            position: absolute;
+            left: 0;
+            right: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35em;
+            background: rgba(0, 0, 0, 0.32);
+            line-height: 1;
+            z-index: 2;
+        }
+
+        .clock-overlay-time,
+        .clock-overlay-date {
+            width: 100%;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 1.2vw;
+            font-weight: 800;
+        }
+
+        .clock-overlay-date {
+            font-weight: 700;
+            opacity: 0.96;
+        }
+
         .text-content {
             width: 100%;
             white-space: normal;
@@ -99,6 +129,10 @@
 </head>
 <body>
     <div class="module-root" id="moduleRoot">
+        <div class="clock-overlay-band" id="clockOverlayBand">
+            <div class="clock-overlay-time" id="clockOverlayTime">--:--</div>
+            <div class="clock-overlay-date" id="clockOverlayDate">--.--.----</div>
+        </div>
         <div class="text-viewport" id="textViewport">
             <div class="text-content" id="textContent"></div>
         </div>
@@ -203,12 +237,30 @@
             return root.innerHTML;
         }
 
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function plainTextToHtml(value) {
+            const text = String(value || '').replace(/\r\n?/g, '\n').trim();
+            if (!text) {
+                return '';
+            }
+            return escapeHtml(text).replace(/\n/g, '<br>');
+        }
+
         function getSettings() {
             const defaults = {
                 textSourceType: 'manual',
                 textCollectionId: 0,
                 textCollectionLabel: '',
                 textCollectionVersionTs: 0,
+                textExternalUrl: '',
                 text: 'Sem vložte text...',
                 fontFamily: 'Arial, sans-serif',
                 fontSize: 72,
@@ -225,7 +277,12 @@
                 scrollMode: false,
                 scrollStartPauseMs: 3000,
                 scrollEndPauseMs: 3000,
-                scrollSpeedPxPerSec: 35
+                scrollSpeedPxPerSec: 35,
+                clockOverlayEnabled: false,
+                clockOverlayPosition: 'top',
+                clockOverlayHeightPercent: 30,
+                clockOverlayTimeColor: '#ffffff',
+                clockOverlayDateColor: '#ffffff'
             };
 
             const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS)
@@ -240,6 +297,7 @@
                 textCollectionId: parseNum(params.get('textCollectionId') ?? injected.textCollectionId, defaults.textCollectionId),
                 textCollectionLabel: String(params.get('textCollectionLabel') ?? injected.textCollectionLabel ?? defaults.textCollectionLabel),
                 textCollectionVersionTs: parseNum(params.get('textCollectionVersionTs') ?? injected.textCollectionVersionTs, defaults.textCollectionVersionTs),
+                textExternalUrl: String(params.get('textExternalUrl') ?? injected.textExternalUrl ?? defaults.textExternalUrl),
                 text: params.get('text') ?? injected.text ?? defaults.text,
                 fontFamily: params.get('fontFamily') ?? injected.fontFamily ?? defaults.fontFamily,
                 fontSize: parseNum(params.get('fontSize') ?? injected.fontSize, defaults.fontSize),
@@ -256,7 +314,12 @@
                 scrollMode: parseBool(params.get('scrollMode') ?? injected.scrollMode, defaults.scrollMode),
                 scrollStartPauseMs: parseNum(params.get('scrollStartPauseMs') ?? injected.scrollStartPauseMs, defaults.scrollStartPauseMs),
                 scrollEndPauseMs: parseNum(params.get('scrollEndPauseMs') ?? injected.scrollEndPauseMs, defaults.scrollEndPauseMs),
-                scrollSpeedPxPerSec: parseNum(params.get('scrollSpeedPxPerSec') ?? injected.scrollSpeedPxPerSec, defaults.scrollSpeedPxPerSec)
+                scrollSpeedPxPerSec: parseNum(params.get('scrollSpeedPxPerSec') ?? injected.scrollSpeedPxPerSec, defaults.scrollSpeedPxPerSec),
+                clockOverlayEnabled: parseBool(params.get('clockOverlayEnabled') ?? injected.clockOverlayEnabled, defaults.clockOverlayEnabled),
+                clockOverlayPosition: String(params.get('clockOverlayPosition') ?? injected.clockOverlayPosition ?? defaults.clockOverlayPosition),
+                clockOverlayHeightPercent: parseNum(params.get('clockOverlayHeightPercent') ?? injected.clockOverlayHeightPercent, defaults.clockOverlayHeightPercent),
+                clockOverlayTimeColor: params.get('clockOverlayTimeColor') ?? injected.clockOverlayTimeColor ?? defaults.clockOverlayTimeColor,
+                clockOverlayDateColor: params.get('clockOverlayDateColor') ?? injected.clockOverlayDateColor ?? defaults.clockOverlayDateColor
             };
 
             if (!merged.bgImageData && merged.bgImageStorageKey) {
@@ -272,12 +335,121 @@
             return merged;
         }
 
+        async function resolveTextHtml() {
+            const fallbackHtml = sanitizeRichHtml(settings.text || '') || 'Sem vložte text...';
+            const sourceType = String(settings.textSourceType || 'manual').toLowerCase();
+            const externalUrl = String(settings.textExternalUrl || '').trim();
+
+            if (sourceType === 'external' && externalUrl) {
+                try {
+                    const response = await fetch(externalUrl, {
+                        method: 'GET',
+                        cache: 'no-store'
+                    });
+                    if (response.ok) {
+                        const responseText = String(await response.text() || '').slice(0, 30000);
+                        const externalHtml = plainTextToHtml(responseText);
+                        if (externalHtml) {
+                            return externalHtml;
+                        }
+                    }
+                } catch (error) {
+                }
+            }
+
+            return fallbackHtml;
+        }
+
         const settings = getSettings();
         const root = document.getElementById('moduleRoot');
         const viewport = document.getElementById('textViewport');
         const content = document.getElementById('textContent');
+        const clockOverlayBand = document.getElementById('clockOverlayBand');
+        const clockOverlayTime = document.getElementById('clockOverlayTime');
+        const clockOverlayDate = document.getElementById('clockOverlayDate');
 
-        function applyStyles() {
+        let overlayClockInterval = null;
+
+        function clearOverlayClockRuntime() {
+            if (overlayClockInterval !== null) {
+                clearInterval(overlayClockInterval);
+                overlayClockInterval = null;
+            }
+        }
+
+        function getUiLocale() {
+            const raw = String(document?.documentElement?.lang || '').toLowerCase();
+            if (raw.startsWith('hu')) return 'hu-HU';
+            if (raw.startsWith('en')) return 'en-GB';
+            return 'sk-SK';
+        }
+
+        function formatOverlayDate(now) {
+            const locale = getUiLocale();
+            const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(now);
+            const datePart = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now);
+            return `${weekday} ${datePart}`.trim();
+        }
+
+        function renderOverlayClockTick() {
+            if (!clockOverlayTime || !clockOverlayDate) {
+                return;
+            }
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            clockOverlayTime.textContent = `${hh}:${mm}`;
+            clockOverlayDate.textContent = formatOverlayDate(now);
+        }
+
+        function applyClockOverlayLayout() {
+            if (!clockOverlayBand || !viewport) {
+                return;
+            }
+
+            clearOverlayClockRuntime();
+
+            const enabled = settings.clockOverlayEnabled === true;
+            if (!enabled) {
+                clockOverlayBand.style.display = 'none';
+                clockOverlayBand.style.top = '';
+                clockOverlayBand.style.bottom = '';
+                clockOverlayBand.style.height = '';
+                viewport.style.top = '0';
+                viewport.style.bottom = '0';
+                return;
+            }
+
+            const position = String(settings.clockOverlayPosition || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
+            const bandHeight = Math.max(30, Math.min(30, parseNum(settings.clockOverlayHeightPercent, 30)));
+
+            clockOverlayBand.style.display = 'flex';
+            clockOverlayBand.style.height = `${bandHeight}%`;
+            clockOverlayBand.style.top = position === 'top' ? '0' : '';
+            clockOverlayBand.style.bottom = position === 'bottom' ? '0' : '';
+
+            if (position === 'top') {
+                viewport.style.top = `${bandHeight}%`;
+                viewport.style.bottom = '0';
+            } else {
+                viewport.style.top = '0';
+                viewport.style.bottom = `${bandHeight}%`;
+            }
+
+            if (clockOverlayTime) {
+                clockOverlayTime.style.color = settings.clockOverlayTimeColor || '#ffffff';
+                clockOverlayTime.style.fontSize = `clamp(36px, ${Math.max(5, bandHeight * 0.32)}vh, 220px)`;
+            }
+            if (clockOverlayDate) {
+                clockOverlayDate.style.color = settings.clockOverlayDateColor || '#ffffff';
+                clockOverlayDate.style.fontSize = `clamp(20px, ${Math.max(2.6, bandHeight * 0.16)}vh, 120px)`;
+            }
+
+            renderOverlayClockTick();
+            overlayClockInterval = setInterval(renderOverlayClockTick, 1000);
+        }
+
+        function applyStyles(resolvedHtml) {
             root.style.backgroundColor = settings.bgColor || '#000000';
 
             if (settings.bgImageData) {
@@ -286,8 +458,7 @@
                 root.style.backgroundImage = 'none';
             }
 
-            const safeHtml = sanitizeRichHtml(settings.text || '');
-            content.innerHTML = safeHtml || 'Sem vložte text...';
+            content.innerHTML = resolvedHtml || 'Sem vložte text...';
             content.style.fontFamily = settings.fontFamily || 'Arial, sans-serif';
             content.style.fontSize = `${Math.max(10, parseNum(settings.fontSize, 72))}px`;
             content.style.fontWeight = settings.fontWeight || '700';
@@ -304,6 +475,8 @@
             } else if (animationEntry === 'zoomin') {
                 content.classList.add('text-animation-zoomIn');
             }
+
+            applyClockOverlayLayout();
         }
 
         let scrollAnimationFrame = null;
@@ -377,14 +550,18 @@
             }, effectiveStartPause);
         }
 
-        function render() {
-            applyStyles();
+        async function render() {
+            const resolvedHtml = await resolveTextHtml();
+            applyStyles(resolvedHtml);
             requestAnimationFrame(startScrollIfNeeded);
         }
 
         render();
         window.addEventListener('resize', () => {
             render();
+        });
+        window.addEventListener('beforeunload', () => {
+            clearOverlayClockRuntime();
         });
     </script>
 </body>

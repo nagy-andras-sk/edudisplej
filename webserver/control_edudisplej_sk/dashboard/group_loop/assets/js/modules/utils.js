@@ -160,7 +160,12 @@ const GroupLoopUtils = (() => {
                 scrollMode: false,
                 scrollStartPauseMs: 3000,
                 scrollEndPauseMs: 3000,
-                scrollSpeedPxPerSec: 35
+                scrollSpeedPxPerSec: 35,
+                clockOverlayEnabled: false,
+                clockOverlayPosition: 'top',
+                clockOverlayHeightPercent: 30,
+                clockOverlayTimeColor: '#ffffff',
+                clockOverlayDateColor: '#ffffff'
             }
         };
 

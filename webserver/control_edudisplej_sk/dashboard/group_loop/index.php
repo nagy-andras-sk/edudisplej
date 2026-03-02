@@ -8,6 +8,7 @@ session_start();
 require_once '../../dbkonfiguracia.php';
 require_once '../../i18n.php';
 require_once '../../auth_roles.php';
+require_once '../../modules/module_standard.php';
 
 $current_lang = edudisplej_apply_language_preferences();
 
@@ -93,6 +94,7 @@ $logout_url = '../../login.php?logout=1';
 $available_modules = [];
 $unconfigured_module = null;
 $turned_off_loop_action = null;
+$seen_module_keys = [];
 try {
     $conn = getDbConnection();
     
@@ -107,13 +109,25 @@ try {
     $result = $stmt->get_result();
     
     while ($row = $result->fetch_assoc()) {
-        if (($row['module_key'] ?? '') === 'unconfigured') {
+        $module_key_raw = strtolower(trim((string)($row['module_key'] ?? '')));
+        $module_key = edudisplej_canonical_module_key($module_key_raw);
+
+        if ($module_key === 'unconfigured') {
+            $row['module_key'] = 'unconfigured';
             $unconfigured_module = $row;
             continue;
         }
 
         // Include module only if enabled for this company
         if ($row['license_quantity'] > 0) {
+            if ($module_key === '') {
+                continue;
+            }
+            if (isset($seen_module_keys[$module_key])) {
+                continue;
+            }
+            $seen_module_keys[$module_key] = true;
+            $row['module_key'] = $module_key;
             $available_modules[] = $row;
         }
     }
@@ -159,7 +173,6 @@ function edudisplej_group_loop_module_emoji(string $moduleKey): string {
     $key = strtolower(trim($moduleKey));
     $map = [
         'clock' => '🕒',
-        'datetime' => '🕒',
         'default-logo' => '🏷️',
         'text' => '📝',
         'pdf' => '📄',

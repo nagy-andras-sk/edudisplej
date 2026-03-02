@@ -121,6 +121,17 @@ function profile_asset_is_in_use(int $asset_id, string $asset_path, array $used_
         || ($asset_path !== '' && isset($used_asset_paths[$asset_path]));
 }
 
+function profile_localized_module_name(string $module_key, string $fallback_name = ''): string {
+    $normalized = strtolower(trim($module_key));
+    if ($normalized === '') {
+        return trim($fallback_name) !== '' ? $fallback_name : t_def('group_loop.unspecified_module', 'Modul');
+    }
+
+    $translation_key = 'group_loop.module_name.' . str_replace('-', '_', $normalized);
+    $fallback = trim($fallback_name) !== '' ? $fallback_name : $module_key;
+    return t_def($translation_key, $fallback);
+}
+
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../login.php');
@@ -598,14 +609,16 @@ $logout_url = '../login.php?logout=1';
                                     <?php foreach ($enabled_licenses as $lic): 
                                         $total = (int)($lic['total_licenses'] ?? 0);
                                         $used = (int)($lic['used_licenses'] ?? 0);
-                                        $module_link = 'https://www.edudisplej.sk/modules/' . rawurlencode((string)($lic['module_key'] ?? ''));
+                                        $module_key = (string)($lic['module_key'] ?? '');
+                                        $module_link = 'https://www.edudisplej.sk/modules/' . rawurlencode($module_key);
+                                        $module_title = profile_localized_module_name($module_key, (string)($lic['name'] ?? ''));
                                     ?>
                                         <tr>
                                             <td>
                                                 <a href="<?php echo htmlspecialchars($module_link); ?>" target="_blank" rel="noopener noreferrer">
-                                                    <strong><?php echo htmlspecialchars($lic['name']); ?></strong>
+                                                    <strong><?php echo htmlspecialchars($module_title); ?></strong>
                                                 </a>
-                                                <br><small style="color: #999;"><?php echo htmlspecialchars($lic['module_key']); ?></small>
+                                                <br><small style="color: #999;"><?php echo htmlspecialchars($module_key); ?></small>
                                             </td>
                                             <td style="text-align: center;">
                                                 <strong><?php echo $total; ?></strong>
@@ -633,14 +646,16 @@ $logout_url = '../login.php?logout=1';
                                         <tr><td colspan="2" style="text-align:center; color:#999;"><?php echo htmlspecialchars(t_def('profile.licenses.disabled_empty', 'Nincs kikapcsolt modul.')); ?></td></tr>
                                     <?php endif; ?>
                                     <?php foreach ($disabled_licenses as $lic): 
-                                        $module_link = 'https://www.edudisplej.sk/modules/' . rawurlencode((string)($lic['module_key'] ?? ''));
+                                        $module_key = (string)($lic['module_key'] ?? '');
+                                        $module_link = 'https://www.edudisplej.sk/modules/' . rawurlencode($module_key);
+                                        $module_title = profile_localized_module_name($module_key, (string)($lic['name'] ?? ''));
                                     ?>
                                         <tr>
                                             <td>
                                                 <a href="<?php echo htmlspecialchars($module_link); ?>" target="_blank" rel="noopener noreferrer">
-                                                    <strong><?php echo htmlspecialchars($lic['name']); ?></strong>
+                                                    <strong><?php echo htmlspecialchars($module_title); ?></strong>
                                                 </a>
-                                                <br><small style="color:#999;"><?php echo htmlspecialchars($lic['module_key']); ?></small>
+                                                <br><small style="color:#999;"><?php echo htmlspecialchars($module_key); ?></small>
                                             </td>
                                             <td><span style="color:#999;"><?php echo htmlspecialchars(t_def('profile.licenses.state.disabled', 'Kikapcsolva')); ?></span></td>
                                         </tr>

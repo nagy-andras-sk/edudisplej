@@ -7,6 +7,16 @@
 session_start();
 require_once 'dbkonfiguracia.php';
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+function users_verify_csrf_token(): bool {
+    $submitted = (string)($_POST['csrf_token'] ?? '');
+    $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+    return $submitted !== '' && $sessionToken !== '' && hash_equals($sessionToken, $submitted);
+}
+
 // Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['isadmin']) {
     header('Location: admin.php');
@@ -18,6 +28,9 @@ $success = '';
 
 // Handle user creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
+    if (!users_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
     $username = trim($_POST['username'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -65,11 +78,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
             error_log($e->getMessage());
         }
     }
+    }
 }
 
 // Handle user deletion
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    $user_id = intval($_GET['delete']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+    if (!users_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
+    $user_id = intval($_POST['delete_user_id'] ?? 0);
     
     // Prevent deleting yourself
     if ($user_id == $_SESSION['user_id']) {
@@ -93,10 +110,14 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
             error_log($e->getMessage());
         }
     }
+    }
 }
 
 // Handle user modification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
+    if (!users_verify_csrf_token()) {
+        $error = 'Invalid security token';
+    } else {
     $user_id = intval($_POST['user_id'] ?? 0);
     $username = trim($_POST['username'] ?? '');
     $email = trim($_POST['email'] ?? '');
@@ -155,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
             $error = 'Database error occurred';
             error_log($e->getMessage());
         }
+    }
     }
 }
 
@@ -407,6 +429,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         <div class="card">
             <h2><?php echo $edit_user ? 'Edit User' : 'Create New User'; ?></h2>
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                 <?php if ($edit_user): ?>
                     <input type="hidden" name="user_id" value="<?php echo $edit_user['id']; ?>">
                 <?php endif; ?>
@@ -503,11 +526,11 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                                 <td>
                                     <a href="?edit=<?php echo $user['id']; ?>" class="btn btn-sm">✏️ Edit</a>
                                     <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                        <a href="?delete=<?php echo $user['id']; ?>" 
-                                           class="btn btn-sm btn-danger" 
-                                           onclick="return confirm('Are you sure you want to delete this user?')">
-                                            🗑️ Delete
-                                        </a>
+                                        <form method="POST" style="display:inline;">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                                            <input type="hidden" name="delete_user_id" value="<?php echo (int)$user['id']; ?>">
+                                            <button type="submit" name="delete_user" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this user?')">🗑️ Delete</button>
+                                        </form>
                                     <?php endif; ?>
                                 </td>
                             </tr>

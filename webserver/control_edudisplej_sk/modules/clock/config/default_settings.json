@@ -3,7 +3,7 @@
   "format": "24h",
   "dateFormat": "dmy",
   "timeColor": "#ffffff",
-  "dateColor": "#ffffff",
+  "dateColor": "#facc15",
   "bgColor": "#000000",
   "fontSize": 150,
   "timeFontSize": 150,

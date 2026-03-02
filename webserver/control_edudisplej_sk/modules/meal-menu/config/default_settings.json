@@ -14,6 +14,7 @@
   "mealScheduleEnabled": true,
   "scheduleBreakfastUntil": "10:00",
   "scheduleSnackAmUntil": "11:00",
+    "smallRowFontPx": 150,
   "scheduleLunchUntil": "14:00",
   "scheduleSnackPmUntil": "18:00",
   "scheduleDinnerUntil": "23:59",
@@ -55,5 +56,6 @@
   "textOverlayColor": "#ffffff",
   "textOverlaySpeedPxPerSec": 120,
   "apiBaseUrl": "../../api/meal_plan.php",
-  "runtimeApiFetchEnabled": false
+  "runtimeApiFetchEnabled": true,
+  "runtimeRefreshIntervalSec": 300
 }

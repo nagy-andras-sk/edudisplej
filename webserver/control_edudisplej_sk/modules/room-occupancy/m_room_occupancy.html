@@ -70,12 +70,89 @@
         return String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
     }
 
+    function normalizeLang(value) {
+        const normalized = String(value || '').toLowerCase();
+        if (normalized === 'hu' || normalized === 'en' || normalized === 'sk') {
+            return normalized;
+        }
+        return 'sk';
+    }
+
+    function rt(lang, id, vars = null) {
+        const dict = {
+            hu: {
+                title: 'Terem foglaltság',
+                subtitle_loading: 'Betöltés...',
+                subtitle_no_room: 'Nincs kiválasztott terem',
+                occupied: '🔴 Foglalt',
+                free: '🟢 Szabad',
+                now: 'Most',
+                source: 'Forrás',
+                daily_events: 'Napi események',
+                next_events: 'Következő',
+                source_server: 'Szerver',
+                source_cache: 'Offline cache',
+                source_no_data: 'Nincs adat',
+                source_no_room: 'Nincs kiválasztott terem',
+                no_rows: 'Nincs megjeleníthető foglaltság ehhez a nézethez.',
+                updated_at: 'Frissítve',
+                updated_unknown: 'Frissítési idő: ismeretlen'
+            },
+            sk: {
+                title: 'Obsadenosť miestností',
+                subtitle_loading: 'Načítavam...',
+                subtitle_no_room: 'Nie je vybraná miestnosť',
+                occupied: '🔴 Obsadené',
+                free: '🟢 Voľné',
+                now: 'Teraz',
+                source: 'Zdroj',
+                daily_events: 'Denné udalosti',
+                next_events: 'Nasledujúce',
+                source_server: 'Server',
+                source_cache: 'Offline cache',
+                source_no_data: 'Bez dát',
+                source_no_room: 'Nie je vybraná miestnosť',
+                no_rows: 'Pre tento pohľad nie sú dostupné žiadne udalosti.',
+                updated_at: 'Aktualizované',
+                updated_unknown: 'Čas aktualizácie: neznámy'
+            },
+            en: {
+                title: 'Room occupancy',
+                subtitle_loading: 'Loading...',
+                subtitle_no_room: 'No room selected',
+                occupied: '🔴 Occupied',
+                free: '🟢 Free',
+                now: 'Now',
+                source: 'Source',
+                daily_events: 'Daily events',
+                next_events: 'Upcoming',
+                source_server: 'Server',
+                source_cache: 'Offline cache',
+                source_no_data: 'No data',
+                source_no_room: 'No room selected',
+                no_rows: 'No events available for this view.',
+                updated_at: 'Updated',
+                updated_unknown: 'Update time: unknown'
+            }
+        };
+
+        let text = String((dict[lang] && dict[lang][id]) || dict.en[id] || id || '');
+        if (vars && typeof vars === 'object') {
+            Object.entries(vars).forEach(([key, value]) => {
+                text = text.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value ?? ''));
+            });
+        }
+        return text;
+    }
+
     function getSettings() {
         const defaults = {
             roomId: 0,
             companyId: 0,
             showOnlyCurrent: false,
             showNextCount: 4,
+            language: 'sk',
+            runtimeRefreshIntervalSec: 60,
             apiBaseUrl: '../../api/room_occupancy.php'
         };
 
@@ -87,6 +164,8 @@
             companyId: parseIntSafe(params.get('company_id') ?? params.get('companyId') ?? injected.companyId, defaults.companyId),
             showOnlyCurrent: parseBool(params.get('showOnlyCurrent') ?? injected.showOnlyCurrent, defaults.showOnlyCurrent),
             showNextCount: Math.max(1, Math.min(12, parseIntSafe(params.get('showNextCount') ?? injected.showNextCount, defaults.showNextCount))),
+            language: normalizeLang(params.get('language') ?? injected.language ?? defaults.language),
+            runtimeRefreshIntervalSec: Math.max(30, Math.min(3600, parseIntSafe(params.get('runtimeRefreshIntervalSec') ?? injected.runtimeRefreshIntervalSec, defaults.runtimeRefreshIntervalSec))),
             apiBaseUrl: String(params.get('apiBaseUrl') ?? injected.apiBaseUrl ?? defaults.apiBaseUrl)
         };
     }
@@ -101,39 +180,57 @@
         const status = document.getElementById('status');
         const eventsContainer = document.getElementById('events');
         const foot = document.getElementById('foot');
+        const lang = normalizeLang(settings.language);
+
+        document.documentElement.lang = lang;
+        document.title = rt(lang, 'title');
+        const titleEl = document.querySelector('.title');
+        if (titleEl) {
+            titleEl.textContent = rt(lang, 'title');
+        }
 
         const roomName = String(data?.room_name || '').trim();
         const eventDate = String(data?.event_date || '').trim();
-        subtitle.textContent = roomName ? `${roomName}${eventDate ? ` • ${eventDate}` : ''}` : 'Nincs kiválasztott terem';
+        subtitle.textContent = roomName ? `${roomName}${eventDate ? ` • ${eventDate}` : ''}` : rt(lang, 'subtitle_no_room');
 
         const current = data?.current_event || null;
         const isOccupied = Boolean(data?.is_occupied_now);
         const allEvents = Array.isArray(data?.events) ? data.events : [];
 
-        const nowTime = new Date().toTimeString().slice(0, 5);
-        const upcoming = allEvents.filter((event) => String(event?.start_time || '') >= nowTime).slice(0, settings.showNextCount);
+        const nowParts = new Date().toTimeString().slice(0, 5).split(':');
+        const nowMinutes = ((parseInt(nowParts[0] || '0', 10) || 0) * 60) + (parseInt(nowParts[1] || '0', 10) || 0);
+        const toMinutes = (hhmm) => {
+            const parts = String(hhmm || '').split(':');
+            const hh = parseInt(parts[0] || '0', 10) || 0;
+            const mm = parseInt(parts[1] || '0', 10) || 0;
+            return (hh * 60) + mm;
+        };
+        const upcoming = allEvents
+            .filter((event) => toMinutes(event?.start_time) >= nowMinutes)
+            .slice(0, settings.showNextCount);
 
         const rows = settings.showOnlyCurrent
             ? (current ? [current] : [])
             : allEvents;
+        const rowsToRender = rows.slice(0, 24);
 
         const badges = [];
-        badges.push(`<span class="badge ${isOccupied ? 'busy' : 'ok'}">${isOccupied ? '🔴 Foglalt' : '🟢 Szabad'}</span>`);
+        badges.push(`<span class="badge ${isOccupied ? 'busy' : 'ok'}">${isOccupied ? rt(lang, 'occupied') : rt(lang, 'free')}</span>`);
         if (current) {
-            badges.push(`<span class="badge info">Most: ${escapeHtml(current.start_time)}–${escapeHtml(current.end_time)} ${escapeHtml(current.event_title || '')}</span>`);
+            badges.push(`<span class="badge info">${rt(lang, 'now')}: ${escapeHtml(current.start_time)}–${escapeHtml(current.end_time)} ${escapeHtml(current.event_title || '')}</span>`);
         }
-        badges.push(`<span class="badge info">Forrás: ${escapeHtml(sourceText)}</span>`);
+        badges.push(`<span class="badge info">${rt(lang, 'source')}: ${escapeHtml(sourceText)}</span>`);
         if (!settings.showOnlyCurrent) {
-            badges.push(`<span class="badge info">Napi események: ${allEvents.length}</span>`);
+            badges.push(`<span class="badge info">${rt(lang, 'daily_events')}: ${allEvents.length}</span>`);
         } else {
-            badges.push(`<span class="badge info">Következő: ${upcoming.length}</span>`);
+            badges.push(`<span class="badge info">${rt(lang, 'next_events')}: ${upcoming.length}</span>`);
         }
         status.innerHTML = badges.join('');
 
-        if (!rows.length) {
-            eventsContainer.innerHTML = '<div class="empty">Nincs megjeleníthető foglaltság ehhez a nézethez.</div>';
+        if (!rowsToRender.length) {
+            eventsContainer.innerHTML = `<div class="empty">${escapeHtml(rt(lang, 'no_rows'))}</div>`;
         } else {
-            eventsContainer.innerHTML = `<div class="list">${rows.map((event) => {
+            eventsContainer.innerHTML = `<div class="list">${rowsToRender.map((event) => {
                 const time = `${escapeHtml(event.start_time || '')} - ${escapeHtml(event.end_time || '')}`;
                 const title = escapeHtml(event.event_title || '');
                 const note = escapeHtml(event.event_note || '');
@@ -142,7 +239,7 @@
         }
 
         const updateTs = allEvents.length > 0 ? String(allEvents[0]?.updated_at || '').trim() : '';
-        foot.textContent = updateTs ? `Frissítve: ${updateTs}` : 'Frissítési idő: ismeretlen';
+        foot.textContent = updateTs ? `${rt(lang, 'updated_at')}: ${updateTs}` : rt(lang, 'updated_unknown');
     }
 
     async function fetchWithTimeout(url, timeoutMs) {
@@ -158,9 +255,21 @@
     async function init() {
         const settings = getSettings();
         const cacheKey = `room_occ_cache_${settings.companyId}_${settings.roomId}`;
+        const lang = normalizeLang(settings.language);
+
+        document.documentElement.lang = lang;
+        document.title = rt(lang, 'title');
+        const titleEl = document.querySelector('.title');
+        if (titleEl) {
+            titleEl.textContent = rt(lang, 'title');
+        }
+        const subtitleEl = document.getElementById('subtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = rt(lang, 'subtitle_loading');
+        }
 
         if (settings.roomId <= 0) {
-            render({ room_name: '', event_date: new Date().toISOString().slice(0, 10), events: [], current_event: null, is_occupied_now: false }, settings, 'Nincs kiválasztott terem');
+            render({ room_name: '', event_date: new Date().toISOString().slice(0, 10), events: [], current_event: null, is_occupied_now: false }, settings, rt(lang, 'source_no_room'));
             return;
         }
 
@@ -180,7 +289,7 @@
             const payload = await response.json();
             if (response.ok && payload && payload.success) {
                 const data = payload.data || {};
-                render(data, settings, 'Szerver');
+                render(data, settings, rt(lang, 'source_server'));
                 rendered = true;
                 try {
                     localStorage.setItem(cacheKey, JSON.stringify({ data, saved_at: Date.now() }));
@@ -192,21 +301,21 @@
             try {
                 const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
                 if (cached?.data) {
-                    render(cached.data, settings, 'Offline cache');
+                    render(cached.data, settings, rt(lang, 'source_cache'));
                     rendered = true;
                 }
             } catch (_) {}
         }
 
         if (!rendered) {
-            render({ room_name: '', event_date: new Date().toISOString().slice(0, 10), events: [], current_event: null, is_occupied_now: false }, settings, 'Nincs adat');
+            render({ room_name: '', event_date: new Date().toISOString().slice(0, 10), events: [], current_event: null, is_occupied_now: false }, settings, rt(lang, 'source_no_data'));
         }
     }
 
     init();
     setInterval(() => {
         init();
-    }, 60 * 1000);
+    }, Math.max(30, Math.min(3600, parseIntSafe((getSettings() || {}).runtimeRefreshIntervalSec, 60))) * 1000);
 })();
 </script>
 </body>

@@ -43,6 +43,7 @@ $tmp_path = (string)($file['tmp_name'] ?? '');
 $original_name = (string)($file['name'] ?? 'asset.bin');
 $file_size = (int)($file['size'] ?? 0);
 $client_processing = strtolower(trim((string)($_POST['client_processing'] ?? '')));
+$video_duration_sec = 0;
 
 function edudisplej_ffprobe_available(): bool {
     if (!function_exists('shell_exec')) {
@@ -212,13 +213,18 @@ if ($module_key === 'pdf') {
         exit();
     }
 } elseif ($module_key === 'video') {
-    if ($client_processing !== 'ffmpeg_wasm_v1') {
-        echo json_encode(['success' => false, 'message' => 'A videó csak kliens oldali optimalizálás után tölthető fel']);
+    $is_client_optimized = ($client_processing === 'ffmpeg_wasm_v1');
+    $is_direct_upload = ($client_processing === 'direct_upload_v1' || $client_processing === '');
+
+    if (!$is_client_optimized && !$is_direct_upload) {
+        echo json_encode(['success' => false, 'message' => 'Érvénytelen videó feldolgozási mód']);
         exit();
     }
 
-    if ($file_size <= 0 || $file_size > 25 * 1024 * 1024) {
-        echo json_encode(['success' => false, 'message' => 'A videó mérete érvénytelen (max. 25 MB)']);
+    $max_video_size = $is_client_optimized ? (25 * 1024 * 1024) : (700 * 1024 * 1024);
+    if ($file_size <= 0 || $file_size > $max_video_size) {
+        $max_mb = (int)round($max_video_size / (1024 * 1024));
+        echo json_encode(['success' => false, 'message' => 'A videó mérete érvénytelen (max. ' . $max_mb . ' MB)']);
         exit();
     }
 
@@ -246,6 +252,7 @@ if ($module_key === 'pdf') {
         echo json_encode(['success' => false, 'message' => 'A videó hossza érvénytelen (max. 120 mp)']);
         exit();
     }
+    $video_duration_sec = max(1, (int)ceil($duration));
 
     $width = (int)($probe['width'] ?? 0);
     $height = (int)($probe['height'] ?? 0);
@@ -326,18 +333,23 @@ try {
 
     $hash = hash_file('sha256', $target_abs) ?: '';
     $mime_type = strtolower((string)mime_content_type($target_abs));
+    $stored_file_size = (int)@filesize($target_abs);
+    if ($stored_file_size <= 0) {
+        $stored_file_size = $file_size;
+    }
 
     $group_company_id = (int)$group['company_id'];
-    $insert = $conn->prepare("INSERT INTO module_asset_store (company_id, group_id, module_key, asset_kind, original_name, mime_type, file_size, storage_rel_path, sha256, created_by, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
+    $insert = $conn->prepare("INSERT INTO module_asset_store (company_id, group_id, module_key, asset_kind, original_name, mime_type, file_size, duration_sec, storage_rel_path, sha256, created_by, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
     $insert->bind_param(
-        "iissssissi",
+        "iissssiissi",
         $group_company_id,
         $group_id,
         $module_key,
         $asset_kind,
         $original_name,
         $mime_type,
-        $file_size,
+        $stored_file_size,
+        $video_duration_sec,
         $target_rel,
         $hash,
         $user_id
@@ -352,6 +364,7 @@ try {
         'asset_url' => edudisplej_module_asset_api_url_by_id($asset_id),
         'asset_kind' => $asset_kind,
         'module_key' => $module_key,
+        'duration_sec' => $video_duration_sec,
     ]);
 } catch (Throwable $e) {
     error_log('module_asset_upload error: ' . $e->getMessage());

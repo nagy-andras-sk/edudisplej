@@ -27,6 +27,7 @@ function edudisplej_module_asset_ensure_schema(mysqli $conn): void
         'group_id' => "ALTER TABLE module_asset_store ADD COLUMN group_id INT NOT NULL DEFAULT 0 AFTER company_id",
         'module_key' => "ALTER TABLE module_asset_store ADD COLUMN module_key VARCHAR(64) NOT NULL DEFAULT '' AFTER group_id",
         'asset_kind' => "ALTER TABLE module_asset_store ADD COLUMN asset_kind VARCHAR(64) NOT NULL DEFAULT 'file' AFTER module_key",
+        'duration_sec' => "ALTER TABLE module_asset_store ADD COLUMN duration_sec INT NOT NULL DEFAULT 0 AFTER file_size",
         'is_active' => "ALTER TABLE module_asset_store ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER created_by",
         'updated_at' => "ALTER TABLE module_asset_store ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at",
     ];

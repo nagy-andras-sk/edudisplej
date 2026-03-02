@@ -11,9 +11,9 @@
 $baseDir = dirname(__DIR__, 2);
 require_once $baseDir . '/dbkonfiguracia.php';
 
-// Enable error reporting for debugging
+// Keep full logging, but do not expose errors in web responses
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', PHP_SAPI === 'cli' ? '1' : '0');
 
 $results = [];
 $errors = [];
@@ -426,12 +426,35 @@ function edudisplej_maintenance_ensure_meal_schema(mysqli $conn): void {
         lunch TEXT NULL,
         snack_pm TEXT NULL,
         dinner TEXT NULL,
+        breakfast_rows_json LONGTEXT NULL,
+        snack_am_rows_json LONGTEXT NULL,
+        lunch_rows_json LONGTEXT NULL,
+        snack_pm_rows_json LONGTEXT NULL,
+        dinner_rows_json LONGTEXT NULL,
         source_type VARCHAR(20) NOT NULL DEFAULT 'manual',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_company_institution_date (company_id, institution_id, menu_date),
         INDEX idx_company_institution_date (company_id, institution_id, menu_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $jsonColumns = [
+        'breakfast_rows_json',
+        'snack_am_rows_json',
+        'lunch_rows_json',
+        'snack_pm_rows_json',
+        'dinner_rows_json',
+    ];
+    foreach ($jsonColumns as $columnName) {
+        $columnSafe = preg_replace('/[^a-z0-9_]/i', '', (string)$columnName);
+        if ($columnSafe === '') {
+            continue;
+        }
+        $check = $conn->query("SHOW COLUMNS FROM meal_plan_items LIKE '" . $conn->real_escape_string($columnSafe) . "'");
+        if ($check && $check->num_rows === 0) {
+            $conn->query("ALTER TABLE meal_plan_items ADD COLUMN $columnSafe LONGTEXT NULL");
+        }
+    }
 
     $seed_check = $conn->query("SELECT id FROM meal_plan_sites WHERE company_id = 0 AND site_key = 'jedalen.sk' LIMIT 1");
     if ($seed_check && $seed_check->num_rows === 0) {
@@ -940,6 +963,71 @@ function edudisplej_maintenance_classify_meal_slot(string $category): string {
     return 'lunch';
 }
 
+function edudisplej_maintenance_detect_meal_slot_header_line(string $line): string {
+    $clean = trim((string)$line);
+    if ($clean === '') {
+        return '';
+    }
+
+    $clean = preg_replace('/^\d+\.\s*/u', '', $clean);
+    $normalized = edudisplej_maintenance_normalize_name((string)$clean);
+    if ($normalized === '') {
+        return '';
+    }
+
+    $allowed = [
+        'ranajky', 'reggeli', 'breakfast',
+        'desiata', 'tizorai', 'snack am', 'snackam',
+        'obed', 'ebed', 'lunch',
+        'olovrant', 'uzsonna', 'snack pm', 'snackpm',
+        'vecera', 'vacsora', 'dinner',
+    ];
+
+    if (in_array($normalized, $allowed, true)) {
+        return edudisplej_maintenance_classify_meal_slot($normalized);
+    }
+
+    return '';
+}
+
+function edudisplej_maintenance_infer_slot_from_meal_line(string $mealName, string $currentSlot = 'lunch'): string {
+    $slot = trim((string)$currentSlot);
+    if ($slot === '') {
+        $slot = 'lunch';
+    }
+
+    $code = edudisplej_maintenance_extract_recipe_code($mealName);
+    $category = edudisplej_maintenance_recipe_category($code);
+    if ($category <= 0) {
+        return $slot;
+    }
+
+    if ($category === 5 || $category === 24) {
+        return 'lunch';
+    }
+
+    if ($category === 2 || $category === 3) {
+        return ($slot === 'snack_am') ? 'snack_am' : 'breakfast';
+    }
+
+    if ($category === 1) {
+        return $slot;
+    }
+
+    if (in_array($category, [13, 14, 15, 17], true)) {
+        return ($slot === 'dinner') ? 'dinner' : 'lunch';
+    }
+
+    if (in_array($category, [22, 23], true)) {
+        if ($slot === 'snack_am' || $slot === 'snack_pm' || $slot === 'dinner') {
+            return $slot;
+        }
+        return 'lunch';
+    }
+
+    return $slot;
+}
+
 function edudisplej_maintenance_clean_jedalen_meal_text(string $text): string {
     $value = trim(html_entity_decode($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
     if ($value === '') {
@@ -953,6 +1041,159 @@ function edudisplej_maintenance_clean_jedalen_meal_text(string $text): string {
     $value = preg_replace('/\n{3,}/u', "\n\n", (string)$value);
 
     return trim((string)$value);
+}
+
+function edudisplej_maintenance_extract_recipe_code(string $line): ?string {
+    if (preg_match_all('/\b([0-9]{1,2}\.[0-9]{3})\b/u', (string)$line, $matches) && !empty($matches[1])) {
+        $last = end($matches[1]);
+        return is_string($last) && $last !== '' ? $last : null;
+    }
+    return null;
+}
+
+function edudisplej_maintenance_recipe_category(?string $recipeCode): int {
+    $code = trim((string)$recipeCode);
+    if (!preg_match('/^([0-9]{1,2})\.[0-9]{3}$/', $code, $m)) {
+        return 0;
+    }
+    return (int)$m[1];
+}
+
+function edudisplej_maintenance_clean_display_meal_line(string $line): string {
+    $value = trim((string)$line);
+    if ($value === '') {
+        return '';
+    }
+
+    $value = preg_replace('/\((?:Allerg[ée]n(?:ek)?|Alerg[ée]ny(?:ek)?)\s*:[^)]*\)/iu', '', $value);
+    $value = preg_replace('/\bALERG[ÉE]NY\s*:\s*.*$/iu', '', (string)$value);
+    $value = preg_replace('/(?:Allerg[ée]n(?:ek)?|Alerg[ée]ny(?:ek)?)\s*:\s*[^\n\r;]+/iu', '', (string)$value);
+    $value = preg_replace('/\b[0-9]{1,2}\.[0-9]{3}\b(?:\s*[,;:.\)\(\-])?/u', '', (string)$value);
+    $value = preg_replace('/,\s*(?:Kysličník|Obilniny|Vajcia|Mlieko|Ryby|Zeler|Horčica|Orech|Sezam|S[oó]j|Lupina|M[aä]kk[ýy]še).*$/iu', '', (string)$value);
+    $value = preg_replace('/^\d+\.\s*/u', '', (string)$value);
+    $value = preg_replace('/,\s*,+/u', ', ', (string)$value);
+    $value = preg_replace('/\s+,/u', ',', (string)$value);
+    $value = preg_replace('/,\s*$/u', '', (string)$value);
+    $value = preg_replace('/[ \t]{2,}/u', ' ', (string)$value);
+    $value = preg_replace('/\s+\)\s*$/u', '', (string)$value);
+    return trim((string)$value);
+}
+
+function edudisplej_maintenance_parse_slot_rows(array $lines): array {
+    $rows = [];
+    $seen = [];
+    foreach ($lines as $rawLine) {
+        $line = trim((string)$rawLine);
+        if ($line === '') {
+            continue;
+        }
+
+        $parts = preg_split('/\r?\n/u', $line) ?: [$line];
+        foreach ($parts as $partRaw) {
+            $part = trim((string)$partRaw);
+            if ($part === '' || preg_match('/^\d+\.\s*$/u', $part)) {
+                continue;
+            }
+
+            $code = edudisplej_maintenance_extract_recipe_code($part);
+            $category = edudisplej_maintenance_recipe_category($code);
+            $text = edudisplej_maintenance_clean_display_meal_line($part);
+            if ($text === '') {
+                continue;
+            }
+
+            $dedupKey = edudisplej_maintenance_normalize_name($text);
+            if ($dedupKey === '' || isset($seen[$dedupKey])) {
+                continue;
+            }
+            $seen[$dedupKey] = true;
+
+            $rows[] = [
+                'text' => $text,
+                'recipe_code' => $code,
+                'recipe_category' => $category,
+                'is_drink' => ($category === 1),
+                'is_soup' => ($category === 5),
+            ];
+        }
+    }
+    return $rows;
+}
+
+function edudisplej_maintenance_sort_rows_by_categories(array $rows, array $categoryOrder): array {
+    if (empty($rows)) {
+        return [];
+    }
+
+    $weight = [];
+    $base = 0;
+    foreach ($categoryOrder as $cat) {
+        $weight[(int)$cat] = $base;
+        $base += 10;
+    }
+    $fallbackWeight = 10000;
+
+    foreach ($rows as $idx => &$row) {
+        $cat = (int)($row['recipe_category'] ?? 0);
+        $row['_sort'] = ($weight[$cat] ?? $fallbackWeight) + $idx;
+    }
+    unset($row);
+
+    usort($rows, static function (array $a, array $b): int {
+        return ((int)($a['_sort'] ?? 0)) <=> ((int)($b['_sort'] ?? 0));
+    });
+
+    foreach ($rows as &$row) {
+        unset($row['_sort']);
+    }
+    unset($row);
+
+    return $rows;
+}
+
+function edudisplej_maintenance_build_structured_slot_rows(string $slot, array $dayMeals): array {
+    $slotKey = trim((string)$slot);
+    $baseRows = edudisplej_maintenance_parse_slot_rows((array)($dayMeals[$slotKey] ?? []));
+
+    if ($slotKey === 'lunch') {
+        return edudisplej_maintenance_sort_rows_by_categories($baseRows, [5, 13, 14, 15, 17, 22, 23, 24, 1]);
+    }
+
+    if ($slotKey === 'breakfast') {
+        $rows = edudisplej_maintenance_sort_rows_by_categories($baseRows, [2, 3, 1]);
+        $snackRows = edudisplej_maintenance_parse_slot_rows((array)($dayMeals['snack_am'] ?? []));
+        if (!empty($snackRows)) {
+            $summaryParts = array_values(array_map(static function (array $row): string {
+                return (string)($row['text'] ?? '');
+            }, $snackRows));
+            $summaryParts = array_values(array_filter($summaryParts, static function (string $value): bool {
+                return trim($value) !== '';
+            }));
+
+            if (!empty($summaryParts)) {
+                $rows[] = [
+                    'text' => implode(', ', $summaryParts),
+                    'recipe_code' => null,
+                    'recipe_category' => 0,
+                    'is_drink' => false,
+                    'is_soup' => false,
+                    'source_slot' => 'snack_am',
+                    'is_joined_snack' => true,
+                ];
+            }
+        }
+        return $rows;
+    }
+
+    if ($slotKey === 'snack_am' || $slotKey === 'snack_pm') {
+        return edudisplej_maintenance_sort_rows_by_categories($baseRows, [3, 2, 1, 22, 23]);
+    }
+
+    if ($slotKey === 'dinner') {
+        return edudisplej_maintenance_sort_rows_by_categories($baseRows, [13, 14, 15, 17, 22, 23, 1]);
+    }
+
+    return $baseRows;
 }
 
 function edudisplej_maintenance_extract_jedalen_menu_from_html(string $html): array {
@@ -1015,7 +1256,14 @@ function edudisplej_maintenance_extract_jedalen_menu_from_html(string $html): ar
             continue;
         }
 
-        $currentSlot = 'lunch';
+        $currentSlot = 'breakfast';
+        $seenBySlot = [
+            'breakfast' => [],
+            'snack_am' => [],
+            'lunch' => [],
+            'snack_pm' => [],
+            'dinner' => [],
+        ];
         foreach ($rows as $tr) {
             $titleNode = $xpath->query(".//td[contains(concat(' ', normalize-space(@class), ' '), ' menu-tdmenu-title ')] | .//span[contains(concat(' ', normalize-space(@class), ' '), ' menu-tdmenu-title ')]", $tr);
             $categoryNode = $xpath->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' menu-kindname-td ') or contains(concat(' ', normalize-space(@class), ' '), ' menu-kindname ')]", $tr);
@@ -1058,13 +1306,40 @@ function edudisplej_maintenance_extract_jedalen_menu_from_html(string $html): ar
                 }
             }
 
-            $slot = $category !== '' ? edudisplej_maintenance_classify_meal_slot($category) : $currentSlot;
-            $line = $mealName;
-            if (!empty($allergens)) {
-                $line .= ' (Allergének: ' . implode(', ', array_unique($allergens)) . ')';
-            }
+            $mealParts = preg_split('/\r?\n/u', $mealName) ?: [$mealName];
+            foreach ($mealParts as $mealPartRaw) {
+                $mealPart = edudisplej_maintenance_clean_jedalen_meal_text((string)$mealPartRaw);
+                if ($mealPart === '' || preg_match('/^\d+\.\s*$/u', $mealPart)) {
+                    continue;
+                }
 
-            $result[$menuDate][$slot][] = $line;
+                $headerSlot = edudisplej_maintenance_detect_meal_slot_header_line($mealPart);
+                if ($headerSlot !== '') {
+                    $currentSlot = $headerSlot;
+                    continue;
+                }
+
+                $slot = $category !== ''
+                    ? edudisplej_maintenance_classify_meal_slot($category)
+                    : edudisplej_maintenance_infer_slot_from_meal_line($mealPart, $currentSlot);
+                $currentSlot = $slot;
+
+                if (!isset($seenBySlot[$slot])) {
+                    $seenBySlot[$slot] = [];
+                }
+                $dedupKey = edudisplej_maintenance_normalize_name(edudisplej_maintenance_clean_display_meal_line($mealPart));
+                if ($dedupKey === '' || isset($seenBySlot[$slot][$dedupKey])) {
+                    continue;
+                }
+                $seenBySlot[$slot][$dedupKey] = true;
+
+                $line = $mealPart;
+                if (!empty($allergens)) {
+                    $line .= ' (Allergének: ' . implode(', ', array_unique($allergens)) . ')';
+                }
+
+                $result[$menuDate][$slot][] = $line;
+            }
         }
     }
 
@@ -1821,23 +2096,38 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
             $jedalenByName[$norm][] = $item;
         }
 
-        $upsertStmt = $conn->prepare("INSERT INTO meal_plan_items (company_id, institution_id, menu_date, breakfast, snack_am, lunch, snack_pm, dinner, source_type)
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'server')
+        $upsertStmt = $conn->prepare("INSERT INTO meal_plan_items (company_id, institution_id, menu_date, breakfast, snack_am, lunch, snack_pm, dinner, breakfast_rows_json, snack_am_rows_json, lunch_rows_json, snack_pm_rows_json, dinner_rows_json, source_type)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'server')
                                      ON DUPLICATE KEY UPDATE
                                          breakfast = VALUES(breakfast),
                                          snack_am = VALUES(snack_am),
                                          lunch = VALUES(lunch),
                                          snack_pm = VALUES(snack_pm),
                                          dinner = VALUES(dinner),
+                                         breakfast_rows_json = VALUES(breakfast_rows_json),
+                                         snack_am_rows_json = VALUES(snack_am_rows_json),
+                                         lunch_rows_json = VALUES(lunch_rows_json),
+                                         snack_pm_rows_json = VALUES(snack_pm_rows_json),
+                                         dinner_rows_json = VALUES(dinner_rows_json),
                                          source_type = 'server',
                                          updated_at = CURRENT_TIMESTAMP");
         if (!$upsertStmt) {
             throw new RuntimeException('Jedalen sync: upsert prepare failed: ' . $conn->error);
         }
 
+        $cleanupPastStmt = $conn->prepare("DELETE FROM meal_plan_items WHERE company_id = ? AND institution_id = ? AND menu_date < CURDATE()");
+        if (!$cleanupPastStmt) {
+            throw new RuntimeException('Jedalen sync: past cleanup prepare failed: ' . $conn->error);
+        }
+
+        $todayDate = (new DateTimeImmutable('today'))->format('Y-m-d');
+        $maxMenuDate = (new DateTimeImmutable('today'))->modify('+14 days')->format('Y-m-d');
+
         $successTargetsForVersion = [];
         $targetsProcessed = 0;
         $menuDaysStored = 0;
+        $menuDaysSkippedByWindow = 0;
+        $pastRowsDeleted = 0;
 
         foreach ($targets as $target) {
             $institutionId = (int)$target['institution_id'];
@@ -1876,24 +2166,50 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
                 continue;
             }
 
+            $cleanupPastStmt->bind_param('ii', $targetCompany, $institutionId);
+            if ($cleanupPastStmt->execute()) {
+                $pastRowsDeleted += (int)$cleanupPastStmt->affected_rows;
+            }
+
             $institutionStoredCount = 0;
             foreach ($parsedDays as $menuDate => $dayMeals) {
+                $menuDateValue = (string)$menuDate;
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $menuDateValue)) {
+                    $menuDaysSkippedByWindow++;
+                    continue;
+                }
+                if ($menuDateValue < $todayDate || $menuDateValue > $maxMenuDate) {
+                    $menuDaysSkippedByWindow++;
+                    continue;
+                }
+
                 $breakfast = implode("\n", array_values(array_unique($dayMeals['breakfast'] ?? [])));
                 $snackAm = implode("\n", array_values(array_unique($dayMeals['snack_am'] ?? [])));
                 $lunch = implode("\n", array_values(array_unique($dayMeals['lunch'] ?? [])));
                 $snackPm = implode("\n", array_values(array_unique($dayMeals['snack_pm'] ?? [])));
                 $dinner = implode("\n", array_values(array_unique($dayMeals['dinner'] ?? [])));
 
+                $breakfastRowsJson = json_encode(edudisplej_maintenance_build_structured_slot_rows('breakfast', $dayMeals), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $snackAmRowsJson = json_encode(edudisplej_maintenance_build_structured_slot_rows('snack_am', $dayMeals), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $lunchRowsJson = json_encode(edudisplej_maintenance_build_structured_slot_rows('lunch', $dayMeals), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $snackPmRowsJson = json_encode(edudisplej_maintenance_build_structured_slot_rows('snack_pm', $dayMeals), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $dinnerRowsJson = json_encode(edudisplej_maintenance_build_structured_slot_rows('dinner', $dayMeals), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
                 $upsertStmt->bind_param(
-                    'iissssss',
+                    'iisssssssssss',
                     $targetCompany,
                     $institutionId,
-                    $menuDate,
+                    $menuDateValue,
                     $breakfast,
                     $snackAm,
                     $lunch,
                     $snackPm,
-                    $dinner
+                    $dinner,
+                    $breakfastRowsJson,
+                    $snackAmRowsJson,
+                    $lunchRowsJson,
+                    $snackPmRowsJson,
+                    $dinnerRowsJson
                 );
                 if ($upsertStmt->execute()) {
                     $menuDaysStored++;
@@ -1912,9 +2228,10 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
         }
 
         $upsertStmt->close();
+        $cleanupPastStmt->close();
 
         $refreshedGroups = edudisplej_maintenance_refresh_group_plan_versions($conn, $successTargetsForVersion);
-        $message = "Targets processed: $targetsProcessed, menu days stored: $menuDaysStored, refreshed groups: $refreshedGroups";
+        $message = "Targets processed: $targetsProcessed, menu days stored: $menuDaysStored, skipped by 14-day window: $menuDaysSkippedByWindow, past rows deleted: $pastRowsDeleted, refreshed groups: $refreshedGroups";
         edudisplej_maintenance_mark_job_run($conn, $jobKey, 'success', $message);
         logResult('Jedalen sync completed: ' . $message, 'success');
     } catch (Throwable $e) {

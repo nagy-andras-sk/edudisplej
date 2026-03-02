@@ -10,7 +10,7 @@ function edudisplej_module_policy_registry(): array
                 'format' => ['type' => 'enum', 'allowed' => ['24h', '12h'], 'default' => '24h'],
                 'dateFormat' => ['type' => 'enum', 'allowed' => ['full', 'short', 'dmy', 'numeric', 'none'], 'default' => 'dmy'],
                 'timeColor' => ['type' => 'color', 'default' => '#ffffff'],
-                'dateColor' => ['type' => 'color', 'default' => '#ffffff'],
+                'dateColor' => ['type' => 'color', 'default' => '#facc15'],
                 'bgColor' => ['type' => 'color', 'default' => '#000000'],
                 'fontSize' => ['type' => 'int', 'min' => 20, 'max' => 400, 'default' => 150],
                 'timeFontSize' => ['type' => 'int', 'min' => 20, 'max' => 400, 'default' => 150],
@@ -37,10 +37,11 @@ function edudisplej_module_policy_registry(): array
         'text' => [
             'duration' => ['min' => 1, 'max' => 3600, 'default' => 10],
             'settings' => [
-                'textSourceType' => ['type' => 'enum', 'allowed' => ['manual', 'collection'], 'default' => 'manual'],
+                'textSourceType' => ['type' => 'enum', 'allowed' => ['manual', 'collection', 'external'], 'default' => 'manual'],
                 'textCollectionId' => ['type' => 'int', 'min' => 0, 'max' => 2147483647, 'default' => 0],
                 'textCollectionLabel' => ['type' => 'string', 'maxLen' => 180, 'default' => ''],
                 'textCollectionVersionTs' => ['type' => 'int', 'min' => 0, 'max' => 9999999999999, 'default' => 0],
+                'textExternalUrl' => ['type' => 'string', 'maxLen' => 2000, 'default' => ''],
                 'text' => ['type' => 'string', 'maxLen' => 30000, 'default' => ''],
                 'fontFamily' => ['type' => 'enum', 'allowed' => [
                     'Arial, sans-serif',
@@ -63,6 +64,11 @@ function edudisplej_module_policy_registry(): array
                 'scrollStartPauseMs' => ['type' => 'int', 'min' => 0, 'max' => 15000, 'default' => 3000],
                 'scrollEndPauseMs' => ['type' => 'int', 'min' => 0, 'max' => 15000, 'default' => 3000],
                 'scrollSpeedPxPerSec' => ['type' => 'int', 'min' => 5, 'max' => 400, 'default' => 35],
+                'clockOverlayEnabled' => ['type' => 'bool', 'default' => false],
+                'clockOverlayPosition' => ['type' => 'enum', 'allowed' => ['top', 'bottom'], 'default' => 'top'],
+                'clockOverlayHeightPercent' => ['type' => 'int', 'min' => 30, 'max' => 30, 'default' => 30],
+                'clockOverlayTimeColor' => ['type' => 'color', 'default' => '#ffffff'],
+                'clockOverlayDateColor' => ['type' => 'color', 'default' => '#ffffff'],
             ],
         ],
         'unconfigured' => [
@@ -83,12 +89,14 @@ function edudisplej_module_policy_registry(): array
                 'pdfAssetUrl' => ['type' => 'string', 'maxLen' => 500, 'default' => ''],
                 'pdfAssetId' => ['type' => 'string', 'maxLen' => 64, 'default' => ''],
                 'zoomLevel' => ['type' => 'int', 'min' => 50, 'max' => 250, 'default' => 100],
+                'horizontalStartPercent' => ['type' => 'int', 'min' => 0, 'max' => 100, 'default' => 0],
                 'autoScrollEnabled' => ['type' => 'bool', 'default' => false],
                 'autoScrollSpeedPxPerSec' => ['type' => 'int', 'min' => 5, 'max' => 300, 'default' => 30],
                 'autoScrollStartPauseMs' => ['type' => 'int', 'min' => 0, 'max' => 15000, 'default' => 2000],
                 'autoScrollEndPauseMs' => ['type' => 'int', 'min' => 0, 'max' => 15000, 'default' => 2000],
                 'pauseAtPercent' => ['type' => 'int', 'min' => -1, 'max' => 100, 'default' => -1],
                 'pauseDurationMs' => ['type' => 'int', 'min' => 0, 'max' => 15000, 'default' => 2000],
+                'autoScrollSectionsJson' => ['type' => 'string', 'maxLen' => 12000, 'default' => '[]'],
             ],
         ],
         'image-gallery' => [

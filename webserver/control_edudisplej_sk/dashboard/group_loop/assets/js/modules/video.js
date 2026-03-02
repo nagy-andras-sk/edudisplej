@@ -301,7 +301,7 @@ const GroupLoopVideoModule = (() => {
         updateDurationBadge();
     };
 
-    const uploadVideoAsset = async (file) => {
+    const uploadVideoAsset = async (file, processingMode = 'ffmpeg_wasm_v1') => {
         const groupId = parseInt(window.GroupLoopBootstrap?.groupId || 0, 10);
         if (!groupId) {
             throw new Error('Hiányzó group_id');
@@ -311,7 +311,7 @@ const GroupLoopVideoModule = (() => {
         formData.append('group_id', String(groupId));
         formData.append('module_key', 'video');
         formData.append('asset_kind', 'video');
-        formData.append('client_processing', 'ffmpeg_wasm_v1');
+        formData.append('client_processing', String(processingMode || 'ffmpeg_wasm_v1'));
         formData.append('asset', file, file.name || 'video.mp4');
 
         const response = await fetch('../../api/group_loop/module_asset_upload.php', {
@@ -335,33 +335,63 @@ const GroupLoopVideoModule = (() => {
         }
 
         try {
-            if (status) status.textContent = 'Kliens oldali optimalizálás indul...';
+            if (status) {
+                status.textContent = 'Kliens oldali optimalizálás indul...';
+            }
 
-            const optimizedFile = await transcodeVideoForDisplay(file, (message) => {
+            let fileToUpload = file;
+            let processingMode = 'direct_upload_v1';
+            let uploadLabel = 'eredeti';
+            let metadata = null;
+            let transcodeErrorMessage = '';
+
+            try {
+                const optimizedFile = await transcodeVideoForDisplay(file, (message) => {
+                    if (status) {
+                        status.textContent = message;
+                    }
+                });
+
                 if (status) {
-                    status.textContent = message;
+                    status.textContent = 'Konvertált videó ellenőrzése...';
                 }
-            });
 
-            if (status) status.textContent = 'Konvertált videó ellenőrzése...';
-            const metadata = await getVideoMetadataFromFile(optimizedFile);
-            const durationSec = parseInt(metadata.duration || 0, 10);
+                metadata = await getVideoMetadataFromFile(optimizedFile);
+                const optimizedDurationSec = parseInt(metadata.duration || 0, 10);
+                if (!optimizedDurationSec || optimizedDurationSec > VIDEO_MAX_DURATION_SEC) {
+                    throw new Error(`A konvertált videó hossza legfeljebb ${VIDEO_MAX_DURATION_SEC} mp lehet.`);
+                }
+                if ((metadata.width || 0) > VIDEO_MAX_WIDTH || (metadata.height || 0) > VIDEO_MAX_HEIGHT) {
+                    throw new Error(`A konvertált videó felbontása legfeljebb ${VIDEO_MAX_WIDTH}×${VIDEO_MAX_HEIGHT} lehet.`);
+                }
+                if ((optimizedFile.size || 0) > VIDEO_MAX_OUTPUT_SIZE_BYTES) {
+                    throw new Error('A konvertált videó túl nagy (max 25 MB).');
+                }
 
-            if (!durationSec || durationSec > VIDEO_MAX_DURATION_SEC) {
-                throw new Error(`A konvertált videó hossza legfeljebb ${VIDEO_MAX_DURATION_SEC} mp lehet.`);
+                fileToUpload = optimizedFile;
+                processingMode = 'ffmpeg_wasm_v1';
+                uploadLabel = 'optimalizált';
+            } catch (transcodeError) {
+                transcodeErrorMessage = String(transcodeError?.message || 'ismeretlen konvertálási hiba');
+                if (status) {
+                    status.textContent = `Konvertálás sikertelen (${transcodeErrorMessage}). Eredeti fájl feltöltése...`;
+                }
+                try {
+                    metadata = await getVideoMetadataFromFile(file);
+                } catch (_) {
+                    metadata = null;
+                }
             }
 
-            if ((metadata.width || 0) > VIDEO_MAX_WIDTH || (metadata.height || 0) > VIDEO_MAX_HEIGHT) {
-                throw new Error(`A konvertált videó felbontása legfeljebb ${VIDEO_MAX_WIDTH}×${VIDEO_MAX_HEIGHT} lehet.`);
+            if (status) {
+                status.textContent = 'Feltöltés...';
             }
 
-            if ((optimizedFile.size || 0) > VIDEO_MAX_OUTPUT_SIZE_BYTES) {
-                throw new Error('A konvertált videó túl nagy (max 25 MB).');
-            }
+            const uploaded = await uploadVideoAsset(fileToUpload, processingMode);
+            const serverDurationSec = parseInt(uploaded.duration_sec || 0, 10);
+            const fallbackDurationSec = parseInt(metadata?.duration || 0, 10);
+            const durationSec = Math.max(1, serverDurationSec || fallbackDurationSec || parseIntSafe(window.videoModuleSettings?.videoDurationSec, 10));
 
-            if (status) status.textContent = 'Feltöltés...';
-
-            const uploaded = await uploadVideoAsset(optimizedFile);
             window.videoModuleSettings = {
                 ...(window.videoModuleSettings || {}),
                 videoAssetUrl: String(uploaded.asset_url || ''),
@@ -370,13 +400,19 @@ const GroupLoopVideoModule = (() => {
             };
 
             if (status) {
-                status.textContent = `Feltöltve (optimalizált): ${optimizedFile.name} (${formatBytes(optimizedFile.size || 0)}, ${durationSec}s, ${metadata.width}×${metadata.height})`;
+                const width = parseInt(metadata?.width || 0, 10);
+                const height = parseInt(metadata?.height || 0, 10);
+                const dimensions = width > 0 && height > 0 ? `, ${width}×${height}` : '';
+                const transcodeSuffix = (uploadLabel === 'eredeti' && transcodeErrorMessage)
+                    ? ` | konvertálás hiba: ${transcodeErrorMessage}`
+                    : '';
+                status.textContent = `Feltöltve (${uploadLabel}): ${fileToUpload.name} (${formatBytes(fileToUpload.size || 0)}, ${durationSec}s${dimensions})${transcodeSuffix}`;
             }
             updatePreview();
             renderLibrary();
         } catch (error) {
             if (status) {
-                status.textContent = `Hiba: ${error?.message || 'ismeretlen hiba'} (eredeti fájl nem került feltöltésre)`;
+                status.textContent = `Hiba: ${error?.message || 'ismeretlen hiba'}`;
             }
         }
     };
@@ -405,10 +441,10 @@ const GroupLoopVideoModule = (() => {
             const url = String(item.asset_url || '').replace(/"/g, '&quot;');
             return `
                 <label style="display:flex; align-items:center; gap:8px; border:1px solid #d9e0ea; border-radius:6px; padding:8px; background:#fff; cursor:pointer;">
-                    <input type="radio" name="video-library-choice" data-video-library-url="${url}" data-video-library-id="${id}" style="margin:0;">
+                    <input type="radio" name="video-library-choice" data-video-library-url="${url}" data-video-library-id="${id}" data-video-library-duration="${parseInt(item.duration_sec || 0, 10) || 0}" style="margin:0;">
                     <div style="min-width:0; flex:1;">
                         <div style="font-size:12px; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div>
-                        <div style="font-size:11px; color:#6b7280;">${formatBytes(item.file_size || 0)}</div>
+                        <div style="font-size:11px; color:#6b7280;">${formatBytes(item.file_size || 0)}${(parseInt(item.duration_sec || 0, 10) > 0) ? ` • ${parseInt(item.duration_sec || 0, 10)}s` : ''}</div>
                     </div>
                 </label>
             `;
@@ -435,7 +471,8 @@ const GroupLoopVideoModule = (() => {
                     asset_id: parseInt(item.asset_id || 0, 10),
                     asset_url: String(item.asset_url || '').trim(),
                     original_name: String(item.original_name || '').trim(),
-                    file_size: parseInt(item.file_size || 0, 10)
+                    file_size: parseInt(item.file_size || 0, 10),
+                    duration_sec: parseInt(item.duration_sec || 0, 10)
                 }))
                 .filter((item) => item.asset_id > 0 && item.asset_url !== '');
 
@@ -458,6 +495,7 @@ const GroupLoopVideoModule = (() => {
 
         const url = String(selected.getAttribute('data-video-library-url') || '').trim();
         const id = parseInt(selected.getAttribute('data-video-library-id') || '0', 10);
+        const knownDurationSec = parseInt(selected.getAttribute('data-video-library-duration') || '0', 10) || 0;
         if (!url) {
             alert('Érvénytelen videó URL.');
             return;
@@ -468,12 +506,13 @@ const GroupLoopVideoModule = (() => {
             status.textContent = 'Videó metaadat lekérés...';
         }
 
-        const durationSec = await getDurationFromUrl(url);
+        const durationSec = knownDurationSec > 0 ? knownDurationSec : await getDurationFromUrl(url);
+        const fallbackDurationSec = parseIntSafe(window.videoModuleSettings?.videoDurationSec, 10);
         window.videoModuleSettings = {
             ...(window.videoModuleSettings || {}),
             videoAssetUrl: url,
             videoAssetId: id > 0 ? id : '',
-            videoDurationSec: durationSec || parseIntSafe(window.videoModuleSettings?.videoDurationSec, 10)
+            videoDurationSec: durationSec || fallbackDurationSec
         };
 
         if (status) {

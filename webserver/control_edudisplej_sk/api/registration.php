@@ -17,7 +17,7 @@
 // - Running in production environment
 // - You want to avoid exposing system details
 //
-define('DEBUG_MODE', true);
+define('DEBUG_MODE', false);
 
 // Error reporting configuration
 if (DEBUG_MODE) {

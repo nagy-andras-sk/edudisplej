@@ -32,14 +32,19 @@
         }
 
         function resolveUiLang() {
-            const htmlLang = String(document?.documentElement?.lang || '').toLowerCase();
-            if (htmlLang.startsWith('hu')) return 'hu';
-            if (htmlLang.startsWith('sk')) return 'sk';
-            if (htmlLang.startsWith('en')) return 'en';
+            const customizationLabel = String(i18nCatalog['group_loop.customization'] || '').toLowerCase();
+            if (customizationLabel.includes('testresz')) return 'hu';
+            if (customizationLabel.includes('prispôsob') || customizationLabel.includes('prisposob')) return 'sk';
+            if (customizationLabel.includes('custom')) return 'en';
 
             const loopHeader = String(i18nCatalog['group_loop.header.title'] || '').toLowerCase();
             if (loopHeader.includes('testresz')) return 'hu';
             if (loopHeader.includes('prispôsob') || loopHeader.includes('prisposob')) return 'sk';
+
+            const htmlLang = String(document?.documentElement?.lang || '').toLowerCase();
+            if (htmlLang.startsWith('hu')) return 'hu';
+            if (htmlLang.startsWith('sk')) return 'sk';
+            if (htmlLang.startsWith('en')) return 'en';
             return 'en';
         }
 
@@ -132,7 +137,16 @@
                     display_profile: 'Kijelző profil',
                     mode_small: 'A) KIS KIJELZŐ — teljes képernyő, nagy sorok, lapozás (nem scroll)',
                     mode_large: 'B) NAGY KIJELZŐ — 4 egyenlő táblázatos blokk',
-                    mode_hint: 'A betűméret automatikusan igazodik, manuális méretállítás nincs.',
+                    mode_hint: 'Kis kijelzőn fix betűméret használatos (2 soros töréssel).',
+                    schedule_settings: 'Étkezés időzítés',
+                    schedule_enabled: 'Napi étkezések láthatósága idő alapján',
+                    schedule_breakfast_until: 'Reggeli vége (eddig látszik)',
+                    schedule_snack_am_until: 'Tízórai vége (eddig látszik)',
+                    schedule_lunch_until: 'Ebéd vége (eddig látszik)',
+                    schedule_snack_pm_until: 'Uzsonna vége (eddig látszik)',
+                    schedule_dinner_until: 'Vacsora vége (eddig látszik)',
+                    show_tomorrow_after_passed: 'Ha a mai étkezés lejárt, mutassa a holnapi megfelelő étkezést',
+                    small_row_font_size: 'Kis kijelző sor betűméret (px)',
                     page_switch: 'Kis kijelző lapozás (másodperc)',
                     page_switch_hint: 'Csak A) KIS KIJELZŐ módban érvényes.',
                     join_breakfast_snack: 'Raňajky + Desiata összevonás (kis kijelzőn)',
@@ -184,7 +198,15 @@
                     display_profile: 'Profil displeja',
                     mode_small: 'A) MALÝ DISPLEJ — celá obrazovka, veľké riadky, prepínanie strán (bez scrollu)',
                     mode_large: 'B) VEĽKÝ DISPLEJ — 4 rovnaké tabuľkové bloky',
-                    mode_hint: 'Veľkosť písma sa prispôsobuje automaticky, manuálne nastavenie sa nepoužíva.',
+                    mode_hint: 'Na malom displeji sa veľkosť písma nastavuje automaticky podľa dostupného priestoru.',
+                    schedule_settings: 'Časovanie jedál',
+                    schedule_enabled: 'Viditeľnosť denných jedál podľa času',
+                    schedule_breakfast_until: 'Raňajky do času',
+                    schedule_snack_am_until: 'Desiata do času',
+                    schedule_lunch_until: 'Obed do času',
+                    schedule_snack_pm_until: 'Olovrant do času',
+                    schedule_dinner_until: 'Večera do času',
+                    show_tomorrow_after_passed: 'Po prekročení dnešného času zobraz zajtrajšie zodpovedajúce jedlo',
                     page_switch: 'Prepínanie strán na malom displeji (sekundy)',
                     page_switch_hint: 'Platí len pre režim A) MALÝ DISPLEJ.',
                     join_breakfast_snack: 'Spojiť Raňajky + Desiata (na malom displeji)',
@@ -236,7 +258,16 @@
                     display_profile: 'Display profile',
                     mode_small: 'A) SMALL SCREEN — fullscreen, large rows, page switching (no scroll)',
                     mode_large: 'B) LARGE SCREEN — 4 equal table blocks',
-                    mode_hint: 'Font size is auto-adaptive; manual size control is disabled.',
+                    mode_hint: 'Small-screen rows use a fixed font size with 2-line wrapping.',
+                    schedule_settings: 'Meal timing',
+                    schedule_enabled: 'Daily meal visibility by time',
+                    schedule_breakfast_until: 'Breakfast until',
+                    schedule_snack_am_until: 'Morning snack until',
+                    schedule_lunch_until: 'Lunch until',
+                    schedule_snack_pm_until: 'Afternoon snack until',
+                    schedule_dinner_until: 'Dinner until',
+                    show_tomorrow_after_passed: 'After daily cutoff, show tomorrow equivalent meal',
+                    small_row_font_size: 'Small-screen row font size (px)',
                     page_switch: 'Small-screen page switch (seconds)',
                     page_switch_hint: 'Applies only to A) SMALL SCREEN mode.',
                     join_breakfast_snack: 'Join Breakfast + Morning snack (small screen)',
@@ -280,6 +311,505 @@
                 }
             };
             return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function roomOccUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    room: 'Terem',
+                    loading: 'Betöltés...',
+                    choose_room: '-- Válassz termet --',
+                    refresh: 'Frissít',
+                    loading_rooms: 'Termek betöltése...',
+                    rooms_count: 'Termek: {count} db',
+                    room_load_error: 'Terem betöltési hiba.',
+                    display_title: 'Megjelenítés',
+                    only_current: 'Csak aktuális foglaltság',
+                    next_count: 'Következő események száma',
+                    language: 'Nyelv',
+                    refresh_interval: 'Frissítés (mp)',
+                    summary_room: 'terem',
+                    summary_only_current: 'csak aktuális',
+                    summary_daily_list: 'napi lista',
+                    summary_next: 'következő',
+                    summary_lang: 'nyelv'
+                },
+                sk: {
+                    room: 'Miestnosť',
+                    loading: 'Načítavam...',
+                    choose_room: '-- Vyber miestnosť --',
+                    refresh: 'Obnoviť',
+                    loading_rooms: 'Načítavam miestnosti...',
+                    rooms_count: 'Miestnosti: {count}',
+                    room_load_error: 'Chyba načítania miestností.',
+                    display_title: 'Zobrazenie',
+                    only_current: 'Len aktuálna obsadenosť',
+                    next_count: 'Počet nasledujúcich udalostí',
+                    language: 'Jazyk',
+                    refresh_interval: 'Obnova (s)',
+                    summary_room: 'miestnosť',
+                    summary_only_current: 'len aktuálne',
+                    summary_daily_list: 'denný zoznam',
+                    summary_next: 'ďalšie',
+                    summary_lang: 'jazyk'
+                },
+                en: {
+                    room: 'Room',
+                    loading: 'Loading...',
+                    choose_room: '-- Select room --',
+                    refresh: 'Refresh',
+                    loading_rooms: 'Loading rooms...',
+                    rooms_count: 'Rooms: {count}',
+                    room_load_error: 'Room loading error.',
+                    display_title: 'Display',
+                    only_current: 'Only current occupancy',
+                    next_count: 'Number of upcoming events',
+                    language: 'Language',
+                    refresh_interval: 'Refresh (sec)',
+                    summary_room: 'room',
+                    summary_only_current: 'current only',
+                    summary_daily_list: 'daily list',
+                    summary_next: 'next',
+                    summary_lang: 'lang'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function loopUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    group_title: 'Csoport lejátszási listák',
+                    loop_list_label: 'Lejátszási listák',
+                    edited_loop: 'Szerkesztett lista',
+                    default_fallback_loop: 'Alap tartalék lista (üres idő)',
+                    preview_suffix: 'előnézete',
+                    total_prefix: 'Összesen',
+                    seconds_short: 'mp',
+                    confirm_clear_all: 'Biztosan törölni szeretnéd az összes elemet?',
+                    turned_off_name: 'Kikapcsolás',
+                    turned_off_desc: 'Ütemezett kijelző kikapcsolás (tartalom leáll + HDMI ki).',
+                    turned_off_period: 'Kijelző kikapcsolási idősáv',
+                    display_singular: 'kijelző',
+                    display_plural: 'kijelző'
+                },
+                sk: {
+                    group_title: 'Skupinové slučky',
+                    loop_list_label: 'Slučky',
+                    edited_loop: 'Upravovaná slučka',
+                    default_fallback_loop: 'Predvolená záložná slučka (prázdny čas)',
+                    preview_suffix: 'náhľad',
+                    total_prefix: 'Celkom',
+                    seconds_short: 's',
+                    confirm_clear_all: 'Naozaj chcete odstrániť všetky položky?',
+                    turned_off_name: 'Vypnutie',
+                    turned_off_desc: 'Plánované vypnutie displeja (zastavenie obsahu + HDMI off).',
+                    turned_off_period: 'Časový blok vypnutia displeja',
+                    display_singular: 'displej',
+                    display_plural: 'displeje'
+                },
+                en: {
+                    group_title: 'Group loops',
+                    loop_list_label: 'Loops',
+                    edited_loop: 'Edited loop',
+                    default_fallback_loop: 'Default fallback loop (empty time)',
+                    preview_suffix: 'preview',
+                    total_prefix: 'Total',
+                    seconds_short: 's',
+                    confirm_clear_all: 'Are you sure you want to remove all items?',
+                    turned_off_name: 'Turned Off',
+                    turned_off_desc: 'Scheduled display power off (content service stop + HDMI off).',
+                    turned_off_period: 'Display power-off time block',
+                    display_singular: 'display',
+                    display_plural: 'displays'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function localizedDisplayUnit(count) {
+            const value = Number.isFinite(parseInt(count, 10)) ? parseInt(count, 10) : 0;
+            const singular = loopUiText('display_singular');
+            const plural = loopUiText('display_plural');
+            if (resolveUiLang() === 'sk') {
+                return value === 1 ? singular : plural;
+            }
+            return value === 1 ? singular : plural;
+        }
+
+        function clockUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    type_label: 'Típus:',
+                    type_digital: 'Digitális',
+                    type_analog: 'Analóg',
+                    format_label: 'Formátum:',
+                    format_24h: '24 órás',
+                    date_format_label: 'Dátum formátum:',
+                    date_full: 'Teljes (év, hónap, nap, napnév)',
+                    date_short: 'Rövid (év, hónap, nap)',
+                    date_dmy: 'Nap.Hónap.Év (NN.HH.ÉÉÉÉ)',
+                    date_numeric: 'Numerikus (ÉÉÉÉ.HH.NN)',
+                    date_none: 'Nincs dátum',
+                    language_label: 'Nyelv:',
+                    lang_hu: 'Magyar',
+                    lang_sk: 'Szlovák',
+                    lang_en: 'Angol',
+                    time_color: 'Óra szín:',
+                    date_color: 'Dátum szín:',
+                    bg_color: 'Háttérszín:',
+                    time_font_size: 'Óra betűméret (px):',
+                    date_font_size: 'Dátum betűméret (px):',
+                    clock_size: 'Óra mérete (px):',
+                    show_seconds: 'Másodpercek mutatása',
+                    show_date: 'Dátum megjelenítése',
+                    date_inline: 'Nap + dátum egy sorban',
+                    weekday_position: 'Nap pozíció:',
+                    weekday_left: 'Nap bal oldalon',
+                    weekday_right: 'Nap jobb oldalon',
+                    digital_overlay: 'Digitális óra a középen (analógra)',
+                    digital_overlay_position: 'Digitális óra pozíció:',
+                    pos_auto: 'Automatikus (fent/lent mutatók alapján)',
+                    pos_top: 'Fent-közép',
+                    pos_center: 'Közép',
+                    pos_bottom: 'Lent-közép',
+                    summary_day_date: 'nap|dátum',
+                    summary_date_day: 'dátum|nap'
+                },
+                sk: {
+                    type_label: 'Typ:',
+                    type_digital: 'Digitálne',
+                    type_analog: 'Analógové',
+                    format_label: 'Formát:',
+                    format_24h: '24-hodinový',
+                    date_format_label: 'Formát dátumu:',
+                    date_full: 'Plný (rok, mesiac, deň, názov dňa)',
+                    date_short: 'Krátky (rok, mesiac, deň)',
+                    date_dmy: 'Deň.Mesiac.Rok (DD.MM.RRRR)',
+                    date_numeric: 'Numerický (RRRR.MM.DD)',
+                    date_none: 'Bez dátumu',
+                    language_label: 'Jazyk:',
+                    lang_hu: 'Maďarčina',
+                    lang_sk: 'Slovenčina',
+                    lang_en: 'Angličtina',
+                    time_color: 'Farba času:',
+                    date_color: 'Farba dátumu:',
+                    bg_color: 'Farba pozadia:',
+                    time_font_size: 'Veľkosť písma času (px):',
+                    date_font_size: 'Veľkosť písma dátumu (px):',
+                    clock_size: 'Veľkosť hodín (px):',
+                    show_seconds: 'Zobraziť sekundy',
+                    show_date: 'Zobraziť dátum',
+                    date_inline: 'Deň + dátum v jednom riadku',
+                    weekday_position: 'Pozícia dňa:',
+                    weekday_left: 'Deň vľavo',
+                    weekday_right: 'Deň vpravo',
+                    digital_overlay: 'Digitálne hodiny v strede (na analógových)',
+                    digital_overlay_position: 'Pozícia digitálnych hodín:',
+                    pos_auto: 'Automaticky (podľa ručičiek hore/dole)',
+                    pos_top: 'Hore-stred',
+                    pos_center: 'Stred',
+                    pos_bottom: 'Dole-stred',
+                    summary_day_date: 'deň|dátum',
+                    summary_date_day: 'dátum|deň'
+                },
+                en: {
+                    type_label: 'Type:',
+                    type_digital: 'Digital',
+                    type_analog: 'Analog',
+                    format_label: 'Format:',
+                    format_24h: '24-hour',
+                    date_format_label: 'Date format:',
+                    date_full: 'Full (year, month, day, weekday)',
+                    date_short: 'Short (year, month, day)',
+                    date_dmy: 'Day.Month.Year (DD.MM.YYYY)',
+                    date_numeric: 'Numeric (YYYY.MM.DD)',
+                    date_none: 'No date',
+                    language_label: 'Language:',
+                    lang_hu: 'Hungarian',
+                    lang_sk: 'Slovak',
+                    lang_en: 'English',
+                    time_color: 'Clock color:',
+                    date_color: 'Date color:',
+                    bg_color: 'Background color:',
+                    time_font_size: 'Clock font size (px):',
+                    date_font_size: 'Date font size (px):',
+                    clock_size: 'Clock size (px):',
+                    show_seconds: 'Show seconds',
+                    show_date: 'Show date',
+                    date_inline: 'Weekday + date on one line',
+                    weekday_position: 'Weekday position:',
+                    weekday_left: 'Weekday on left',
+                    weekday_right: 'Weekday on right',
+                    digital_overlay: 'Centered digital clock (on analog)',
+                    digital_overlay_position: 'Digital clock position:',
+                    pos_auto: 'Automatic (based on top/bottom hands)',
+                    pos_top: 'Top-center',
+                    pos_center: 'Center',
+                    pos_bottom: 'Bottom-center',
+                    summary_day_date: 'day|date',
+                    summary_date_day: 'date|day'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function pdfUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    upload_title: '📄 PDF feltöltés',
+                    drop_or_click: 'Húzd ide a PDF-et vagy',
+                    click_to_pick: 'kattints a kiválasztáshoz',
+                    max_size: 'Max. 50 MB',
+                    loaded: '✓ PDF betöltve',
+                    fixed_zoom: 'Fix zoom (%):',
+                    horizontal_focus: 'Vízszintes fókusz (%):',
+                    horizontal_hint: '0 = bal oldal, 50 = közép, 100 = jobb oldal',
+                    auto_scroll: 'Automatikus görgetés',
+                    scroll_speed: 'Görgetési sebesség (px/s):',
+                    start_pause: 'Indulás előtti várakozás (ms):',
+                    end_pause: 'Ciklus végi várakozás (ms):',
+                    pause_pos: 'Megállás pozíció (%):',
+                    pause_pos_hint: '-1 = nincs köztes megállás',
+                    pause_duration: 'Megállás hossza (ms):',
+                    section_planner: 'Szakasz tervező',
+                    add_section: 'Szakasz hozzáadása',
+                    section_start: 'Kezdet (%)',
+                    section_end: 'Vég (%)',
+                    section_pause: 'Pihenő (ms)',
+                    section_horizontal: 'X fókusz (%)',
+                    section_tip: 'A szakaszok sorrendben futnak, mindegyiknél külön beállítható a vízszintes nézet.',
+                    preview: 'Előnézet',
+                    preview_empty: 'Tölts fel PDF-et az előnézethez.'
+                },
+                sk: {
+                    upload_title: '📄 Nahratie PDF',
+                    drop_or_click: 'Sem presuň PDF alebo',
+                    click_to_pick: 'klikni na výber',
+                    max_size: 'Max. 50 MB',
+                    loaded: '✓ PDF načítané',
+                    fixed_zoom: 'Pevný zoom (%):',
+                    horizontal_focus: 'Horizontálne zameranie (%):',
+                    horizontal_hint: '0 = ľavá strana, 50 = stred, 100 = pravá strana',
+                    auto_scroll: 'Automatické posúvanie',
+                    scroll_speed: 'Rýchlosť posúvania (px/s):',
+                    start_pause: 'Oneskorenie pred štartom (ms):',
+                    end_pause: 'Pauza na konci cyklu (ms):',
+                    pause_pos: 'Pozícia zastavenia (%):',
+                    pause_pos_hint: '-1 = bez medzizastavenia',
+                    pause_duration: 'Dĺžka zastavenia (ms):',
+                    section_planner: 'Plánovanie úsekov',
+                    add_section: 'Pridať úsek',
+                    section_start: 'Začiatok (%)',
+                    section_end: 'Koniec (%)',
+                    section_pause: 'Pauza (ms)',
+                    section_horizontal: 'X fokus (%)',
+                    section_tip: 'Úseky sa prehrávajú postupne, každý môže mať vlastnú horizontálnu pozíciu.',
+                    preview: 'Náhľad',
+                    preview_empty: 'Nahraj PDF pre náhľad.'
+                },
+                en: {
+                    upload_title: '📄 PDF Upload',
+                    drop_or_click: 'Drop PDF here or',
+                    click_to_pick: 'click to choose',
+                    max_size: 'Max. 50 MB',
+                    loaded: '✓ PDF loaded',
+                    fixed_zoom: 'Fixed zoom (%):',
+                    horizontal_focus: 'Horizontal focus (%):',
+                    horizontal_hint: '0 = left side, 50 = center, 100 = right side',
+                    auto_scroll: 'Automatic scrolling',
+                    scroll_speed: 'Scroll speed (px/s):',
+                    start_pause: 'Start delay (ms):',
+                    end_pause: 'End-of-cycle pause (ms):',
+                    pause_pos: 'Pause position (%):',
+                    pause_pos_hint: '-1 = no intermediate pause',
+                    pause_duration: 'Pause duration (ms):',
+                    section_planner: 'Section planner',
+                    add_section: 'Add section',
+                    section_start: 'Start (%)',
+                    section_end: 'End (%)',
+                    section_pause: 'Pause (ms)',
+                    section_horizontal: 'X focus (%)',
+                    section_tip: 'Sections run in order; each section can keep a different horizontal focus.',
+                    preview: 'Preview',
+                    preview_empty: 'Upload a PDF for preview.'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function textUiText(id, vars = null) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    text_source: 'Szöveg forrása',
+                    manual_edit: 'Kézi szerkesztés',
+                    slide_collection: 'Slide gyűjtemény',
+                    source_external: 'Külső forrás (URL)',
+                    slide_item: 'Slide elem',
+                    external_url: 'Külső TXT forrás URL',
+                    external_url_hint: 'Pl.: https://pelda.hu/szoveg.txt',
+                    loading: 'Betöltés...',
+                    select_slide_item: '-- Válassz slide elemet --',
+                    refresh: 'Frissít',
+                    manage_collection: 'Slide gyűjtemény kezelése',
+                    editor: 'Szerkesztő:',
+                    bullet_list: '• Lista',
+                    align_left: 'Bal',
+                    align_center: 'Közép',
+                    align_right: 'Jobb',
+                    color: 'Szín',
+                    background: 'Háttér',
+                    size: 'Méret',
+                    line_height: 'Sorköz',
+                    play: '▶ Lejátszás',
+                    stop: '■ Stop',
+                    live_preview: 'Élő előnézet:',
+                    bg_color: 'Háttérszín:',
+                    bg_image_upload: 'Háttérkép feltöltés:',
+                    image_set: 'Kép beállítva',
+                    no_image_selected: 'Nincs kiválasztott kép',
+                    image_from_collection: 'Háttérkép gyűjteményből',
+                    remove_image: 'Kép törlése',
+                    text_animation: 'Megjelenítési animáció:',
+                    anim_none: 'Nincs animáció',
+                    anim_fade: 'Halványulás',
+                    anim_slide_up: 'Felfelé csúszás',
+                    anim_zoom: 'Nagyítás',
+                    scroll_mode: 'Görgetés mód (ha a szöveg nem fér ki)',
+                    scroll_start_pause: 'Indulás előtti várakozás (s):',
+                    scroll_end_pause: 'Végi várakozás (s):',
+                    scroll_speed: 'Görgetési sebesség (px/s):',
+                    clock_split_toggle: 'Split-screen óra + dátum (fix 30%)',
+                    clock_split_position: 'Óra sáv pozíciója',
+                    clock_split_top: 'Fent (30%)',
+                    clock_split_bottom: 'Lent (30%)',
+                    processing: 'Feldolgozás...',
+                    only_images: '⚠️ Csak képfájl tölthető fel',
+                    image_process_error: 'Kép feldolgozási hiba',
+                    image_load_failed: '⚠️ Nem sikerült betölteni a képet',
+                    collection_refreshed: '✓ Slide gyűjtemény frissítve',
+                    collection_refresh_failed: '⚠️ A slide gyűjtemény frissítése sikertelen',
+                    insert_text_here: 'Ide írd a szöveget...',
+                    item_prefix: 'Elem'
+                },
+                sk: {
+                    text_source: 'Zdroj textu',
+                    manual_edit: 'Ručná úprava',
+                    slide_collection: 'Kolekcia slidov',
+                    source_external: 'Externý zdroj (URL)',
+                    slide_item: 'Položka slidu',
+                    external_url: 'URL externého TXT zdroja',
+                    external_url_hint: 'Napr.: https://priklad.sk/text.txt',
+                    loading: 'Načítavam...',
+                    select_slide_item: '-- Vyber položku slidu --',
+                    refresh: 'Obnoviť',
+                    manage_collection: 'Správa kolekcie slidov',
+                    editor: 'Editor:',
+                    bullet_list: '• Zoznam',
+                    align_left: 'Vľavo',
+                    align_center: 'Na stred',
+                    align_right: 'Vpravo',
+                    color: 'Farba',
+                    background: 'Pozadie',
+                    size: 'Veľkosť',
+                    line_height: 'Riadkovanie',
+                    play: '▶ Spustiť',
+                    stop: '■ Stop',
+                    live_preview: 'Živý náhľad:',
+                    bg_color: 'Farba pozadia:',
+                    bg_image_upload: 'Nahratie obrázka pozadia:',
+                    image_set: 'Obrázok nastavený',
+                    no_image_selected: 'Nie je vybraný obrázok',
+                    image_from_collection: 'Obrázok pozadia z kolekcie',
+                    remove_image: 'Odstrániť obrázok',
+                    text_animation: 'Animácia zobrazenia:',
+                    anim_none: 'Bez animácie',
+                    anim_fade: 'Postupné zobrazenie',
+                    anim_slide_up: 'Posun nahor',
+                    anim_zoom: 'Priblíženie',
+                    scroll_mode: 'Režim posúvania (ak sa text nezmestí)',
+                    scroll_start_pause: 'Čakanie pred štartom (s):',
+                    scroll_end_pause: 'Čakanie na konci (s):',
+                    scroll_speed: 'Rýchlosť posúvania (px/s):',
+                    clock_split_toggle: 'Split-screen hodiny + dátum (fixne 30%)',
+                    clock_split_position: 'Pozícia pásu hodín',
+                    clock_split_top: 'Hore (30%)',
+                    clock_split_bottom: 'Dole (30%)',
+                    processing: 'Spracovanie...',
+                    only_images: '⚠️ Je možné nahrať iba obrázok',
+                    image_process_error: 'Chyba spracovania obrázka',
+                    image_load_failed: '⚠️ Obrázok sa nepodarilo načítať',
+                    collection_refreshed: '✓ Kolekcia slidov obnovená',
+                    collection_refresh_failed: '⚠️ Obnovenie kolekcie slidov zlyhalo',
+                    insert_text_here: 'Sem vložte text...',
+                    item_prefix: 'Položka'
+                },
+                en: {
+                    text_source: 'Text source',
+                    manual_edit: 'Manual editing',
+                    slide_collection: 'Slide collection',
+                    source_external: 'External source (URL)',
+                    slide_item: 'Slide item',
+                    external_url: 'External TXT source URL',
+                    external_url_hint: 'e.g. https://example.com/text.txt',
+                    loading: 'Loading...',
+                    select_slide_item: '-- Select slide item --',
+                    refresh: 'Refresh',
+                    manage_collection: 'Manage slide collection',
+                    editor: 'Editor:',
+                    bullet_list: '• List',
+                    align_left: 'Left',
+                    align_center: 'Center',
+                    align_right: 'Right',
+                    color: 'Color',
+                    background: 'Background',
+                    size: 'Size',
+                    line_height: 'Line height',
+                    play: '▶ Play',
+                    stop: '■ Stop',
+                    live_preview: 'Live preview:',
+                    bg_color: 'Background color:',
+                    bg_image_upload: 'Background image upload:',
+                    image_set: 'Image set',
+                    no_image_selected: 'No image selected',
+                    image_from_collection: 'Background image from collection',
+                    remove_image: 'Remove image',
+                    text_animation: 'Entry animation:',
+                    anim_none: 'No animation',
+                    anim_fade: 'Fade in',
+                    anim_slide_up: 'Slide up',
+                    anim_zoom: 'Zoom in',
+                    scroll_mode: 'Scroll mode (if text overflows)',
+                    scroll_start_pause: 'Start pause (s):',
+                    scroll_end_pause: 'End pause (s):',
+                    scroll_speed: 'Scroll speed (px/s):',
+                    clock_split_toggle: 'Split-screen clock + date (fixed 30%)',
+                    clock_split_position: 'Clock band position',
+                    clock_split_top: 'Top (30%)',
+                    clock_split_bottom: 'Bottom (30%)',
+                    processing: 'Processing...',
+                    only_images: '⚠️ Only image files can be uploaded',
+                    image_process_error: 'Image processing error',
+                    image_load_failed: '⚠️ Failed to load image',
+                    collection_refreshed: '✓ Slide collection refreshed',
+                    collection_refresh_failed: '⚠️ Failed to refresh slide collection',
+                    insert_text_here: 'Enter text here...',
+                    item_prefix: 'Item'
+                }
+            };
+
+            let text = (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+            if (vars && typeof vars === 'object') {
+                Object.entries(vars).forEach(([name, value]) => {
+                    text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value ?? ''));
+                });
+            }
+            return text;
         }
 
         function getLocalizedModuleName(moduleKey, fallbackName = '') {
@@ -764,7 +1294,7 @@
             const defaultStyle = getLoopStyleById(defaultLoopStyleId);
             const activeName = style ? style.name : '—';
             const defaultName = defaultStyle ? defaultStyle.name : '—';
-            meta.textContent = `Szerkesztett loop: ${activeName} • Alap fallback loop (üres idő): ${defaultName}`;
+            meta.textContent = `${loopUiText('edited_loop')}: ${activeName} • ${loopUiText('default_fallback_loop')}: ${defaultName}`;
         }
 
         function updateActiveLoopVisualState() {
@@ -773,12 +1303,12 @@
 
             const configTitle = document.getElementById('loop-config-title');
             if (configTitle) {
-                configTitle.textContent = `🔄 Csoport loopok — ${styleName}`;
+                configTitle.textContent = `🔄 ${tr('group_loop.title', loopUiText('group_title'))} — ${styleName}`;
             }
 
             const previewTitle = document.getElementById('preview-title');
             if (previewTitle) {
-                previewTitle.textContent = `📺 ${styleName} loop előnézete`;
+                previewTitle.textContent = `📺 ${styleName} ${loopUiText('preview_suffix')}`;
             }
 
             const inlineName = document.getElementById('active-loop-inline-name');
@@ -1091,7 +1621,7 @@
 
             if (dragList) {
                 const selectedSchedulableId = parseInt(fixedStyleInput?.value || activeLoopStyleId || 0, 10);
-                dragList.innerHTML = '<label style="font-size:12px; font-weight:600; color:#425466;">Loopok</label><div class="loop-schedule-list" id="loop-schedule-list-inner"></div>';
+                dragList.innerHTML = `<label style="font-size:12px; font-weight:600; color:#425466;">${loopUiText('loop_list_label')}</label><div class="loop-schedule-list" id="loop-schedule-list-inner"></div>`;
                 const listInner = document.getElementById('loop-schedule-list-inner');
                 if (schedulableStyles.length === 0) {
                     const info = document.createElement('div');
@@ -1297,13 +1827,6 @@
                     if (String(existing.specific_date || '') !== String(candidate.specific_date || '')) {
                         return false;
                     }
-                } else {
-                    const cDays = new Set(String(candidate.days_mask || '').split(',').map(v => parseInt(v, 10)).filter(v => v >= 1 && v <= 7));
-                    const eDays = new Set(String(existing.days_mask || '').split(',').map(v => parseInt(v, 10)).filter(v => v >= 1 && v <= 7));
-                    const commonDay = Array.from(cDays).some((d) => eDays.has(d));
-                    if (!commonDay) {
-                        return false;
-                    }
                 }
 
                 return hasPairOverlap(candidate, existing);
@@ -1311,28 +1834,16 @@
         }
 
         function hasPairOverlap(a, b) {
-            const toSegments = (startRaw, endRaw) => {
-                const startMinute = parseMinuteFromTime(startRaw, 0);
-                let endMinute = parseMinuteFromTime(endRaw, 0);
+            const typeA = String(a?.block_type || 'weekly');
+            const typeB = String(b?.block_type || 'weekly');
 
-                if (endMinute === startMinute) {
-                    return [[0, 1440]];
-                }
+            if (typeA === 'weekly' && typeB === 'weekly') {
+                return weeklyBlocksOverlapByDay(a, b);
+            }
 
-                if (endMinute > startMinute) {
-                    return [[startMinute, endMinute]];
-                }
-
-                if (endMinute === 0) {
-                    return [[startMinute, 1440]];
-                }
-
-                return [[startMinute, 1440], [0, endMinute]];
-            };
-
-            const segA = toSegments(String(a.start_time || '00:00:00'), String(a.end_time || '00:00:00'));
-            const segB = toSegments(String(b.start_time || '00:00:00'), String(b.end_time || '00:00:00'));
-            return segA.some(([a0, a1]) => segB.some(([b0, b1]) => a0 < b1 && b0 < a1));
+            const segA = toTimeSegments(String(a?.start_time || '00:00:00'), String(a?.end_time || '00:00:00'));
+            const segB = toTimeSegments(String(b?.start_time || '00:00:00'), String(b?.end_time || '00:00:00'));
+            return doSegmentsOverlap(segA, segB);
         }
 
         function resolveScheduleConflicts(candidate, ignoredId = null) {
@@ -1835,6 +2346,83 @@
             return Math.max(0, Math.min(1439, normalized));
         }
 
+        function parseDaysFromMask(daysMask) {
+            return String(daysMask || '')
+                .split(',')
+                .map((value) => parseInt(value, 10))
+                .filter((value) => value >= 1 && value <= 7);
+        }
+
+        function getPreviousWeekday(day) {
+            const normalized = parseInt(day, 10);
+            return normalized === 1 ? 7 : (normalized - 1);
+        }
+
+        function toTimeSegments(startRaw, endRaw) {
+            const startMinute = parseMinuteFromTime(startRaw, 0);
+            const endMinute = parseMinuteFromTime(endRaw, 0);
+
+            if (endMinute === startMinute) {
+                return [[0, 1440]];
+            }
+
+            if (endMinute > startMinute) {
+                return [[startMinute, endMinute]];
+            }
+
+            if (endMinute === 0) {
+                return [[startMinute, 1440]];
+            }
+
+            return [[startMinute, 1440], [0, endMinute]];
+        }
+
+        function getWeeklySegmentsForDay(block, day) {
+            const parsedDay = parseInt(day, 10);
+            if (!block || String(block.block_type || 'weekly') !== 'weekly' || parsedDay < 1 || parsedDay > 7) {
+                return [];
+            }
+
+            const days = new Set(parseDaysFromMask(block.days_mask));
+            const startMinute = parseMinuteFromTime(block.start_time, 0);
+            const endMinute = parseMinuteFromTime(block.end_time, 0);
+
+            if (endMinute === startMinute) {
+                return days.has(parsedDay) ? [[0, 1440]] : [];
+            }
+
+            if (endMinute > startMinute) {
+                return days.has(parsedDay) ? [[startMinute, endMinute]] : [];
+            }
+
+            const segments = [];
+            if (days.has(parsedDay)) {
+                segments.push([startMinute, 1440]);
+            }
+
+            const previousDay = getPreviousWeekday(parsedDay);
+            if (endMinute > 0 && days.has(previousDay)) {
+                segments.push([0, endMinute]);
+            }
+
+            return segments;
+        }
+
+        function doSegmentsOverlap(segmentsA, segmentsB) {
+            return segmentsA.some(([aStart, aEnd]) => segmentsB.some(([bStart, bEnd]) => aStart < bEnd && bStart < aEnd));
+        }
+
+        function weeklyBlocksOverlapByDay(blockA, blockB) {
+            for (let day = 1; day <= 7; day += 1) {
+                const segmentsA = getWeeklySegmentsForDay(blockA, day);
+                const segmentsB = getWeeklySegmentsForDay(blockB, day);
+                if (segmentsA.length > 0 && segmentsB.length > 0 && doSegmentsOverlap(segmentsA, segmentsB)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         function minutesToTimeLabel(totalMinutes) {
             const safe = Math.max(0, Math.min(1439, parseInt(totalMinutes, 10) || 0));
             const hour = Math.floor(safe / 60);
@@ -1944,17 +2532,8 @@
             if (!block || block.block_type !== 'weekly') {
                 return false;
             }
-            const days = String(block.days_mask || '').split(',').map((v) => parseInt(v, 10));
-            if (!days.includes(day)) {
-                return false;
-            }
-            const startMinute = parseMinuteFromTime(block.start_time, 0);
-            const endMinuteRaw = parseMinuteFromTime(block.end_time, 0);
-            const endMinute = endMinuteRaw === 0 && startMinute > 0 ? 1440 : endMinuteRaw;
-            if (startMinute < endMinute) {
-                return slotStartMinute < endMinute && startMinute < slotEndMinuteExclusive;
-            }
-            return slotStartMinute >= startMinute || slotEndMinuteExclusive <= endMinute;
+            const segments = getWeeklySegmentsForDay(block, day);
+            return segments.some(([segmentStart, segmentEnd]) => slotStartMinute < segmentEnd && segmentStart < slotEndMinuteExclusive);
         }
 
         function renderWeeklyScheduleGrid() {
@@ -2561,8 +3140,9 @@
             }
 
             const weekday = dt.getDay() === 0 ? 7 : dt.getDay();
-            const days = String(block.days_mask || '').split(',').map((v) => parseInt(v, 10));
-            return days.includes(weekday);
+            const minuteOfDay = (dt.getHours() * 60) + dt.getMinutes();
+            const segments = getWeeklySegmentsForDay(block, weekday);
+            return segments.some(([segmentStart, segmentEnd]) => minuteOfDay >= segmentStart && minuteOfDay < segmentEnd);
         }
 
         function resolveScopeByDateTime(dt) {
@@ -2926,8 +3506,8 @@
 
             return buildLoopItemForModule(
                 moduleId,
-                String(turnedOffLoopAction?.name || 'Turned Off'),
-                String(turnedOffLoopAction?.description || 'Kijelző kikapcsolása: tartalomszolgáltatás leáll, HDMI kimenet kikapcsol.'),
+                String(turnedOffLoopAction?.name || tr('group_loop.turned_off.name', loopUiText('turned_off_name'))),
+                String(turnedOffLoopAction?.description || tr('group_loop.turned_off.description', loopUiText('turned_off_desc'))),
                 'turned-off'
             );
         }
@@ -2953,7 +3533,7 @@
                 return null;
             }
 
-            const desiredName = String(turnedOffLoopAction.name || 'Turned Off').trim() || 'Turned Off';
+            const desiredName = String(turnedOffLoopAction.name || tr('group_loop.turned_off.name', loopUiText('turned_off_name'))).trim() || tr('group_loop.turned_off.name', loopUiText('turned_off_name'));
             const isLegacyTurnedOffName = (name) => /kikapcsol|turned\s*off/i.test(String(name || ''));
             const defaultStyleId = parseInt(defaultLoopStyleId || 0, 10);
             const technicalModuleId = parseInt(technicalModule?.id || 0, 10);
@@ -3428,7 +4008,7 @@
             const total = loopItems.reduce((sum, item) => sum + parseInt(item.duration_seconds), 0);
             const minutes = Math.floor(total / 60);
             const seconds = total % 60;
-            document.getElementById('total-duration').textContent = `Össz: ${total} mp (${minutes}:${seconds.toString().padStart(2, '0')})`;
+            document.getElementById('total-duration').textContent = `${loopUiText('total_prefix')}: ${total} ${loopUiText('seconds_short')} (${minutes}:${seconds.toString().padStart(2, '0')})`;
         }
         
         function clearLoop() {
@@ -3436,7 +4016,7 @@
                 return;
             }
 
-            if (confirm('Biztosan törölni szeretnéd az összes elemet?')) {
+            if (confirm(loopUiText('confirm_clear_all'))) {
                 loopItems = [];
                 normalizeRenderAndAutosaveLoop();
             }
@@ -3560,36 +4140,7 @@
             const cStart = String(candidate.start_time || '00:00:00');
             const cEnd = String(candidate.end_time || '00:00:00');
             const cType = String(candidate.block_type || 'weekly');
-            const cDays = new Set(String(candidate.days_mask || '').split(',').map(v => parseInt(v, 10)).filter(v => v >= 1 && v <= 7));
             const cDate = String(candidate.specific_date || '');
-
-            const toSegments = (startRaw, endRaw) => {
-                const startMinute = parseMinuteFromTime(startRaw, 0);
-                let endMinute = parseMinuteFromTime(endRaw, 0);
-
-                if (endMinute === startMinute) {
-                    return [[0, 1440]];
-                }
-
-                if (endMinute > startMinute) {
-                    return [[startMinute, endMinute]];
-                }
-
-                if (endMinute === 0) {
-                    return [[startMinute, 1440]];
-                }
-
-                return [
-                    [startMinute, 1440],
-                    [0, endMinute]
-                ];
-            };
-
-            const rangesOverlap = (aStart, aEnd, bStart, bEnd) => {
-                const segA = toSegments(aStart, aEnd);
-                const segB = toSegments(bStart, bEnd);
-                return segA.some(([a0, a1]) => segB.some(([b0, b1]) => a0 < b1 && b0 < a1));
-            };
 
             return timeBlocks.some((existing) => {
                 if (!existing || (ignoredId !== null && parseInt(existing.id, 10) === parseInt(ignoredId, 10))) {
@@ -3605,19 +4156,15 @@
                         return false;
                     }
                 } else {
-                    const eDays = new Set(String(existing.days_mask || '').split(',').map(v => parseInt(v, 10)).filter(v => v >= 1 && v <= 7));
-                    const commonDay = Array.from(cDays).some((d) => eDays.has(d));
-                    if (!commonDay) {
-                        return false;
-                    }
+                    return weeklyBlocksOverlapByDay(candidate, existing);
                 }
 
-                return rangesOverlap(
-                    cStart,
-                    cEnd,
+                const segCandidate = toTimeSegments(cStart, cEnd);
+                const segExisting = toTimeSegments(
                     String(existing.start_time || '00:00:00'),
                     String(existing.end_time || '00:00:00')
                 );
+                return doSegmentsOverlap(segCandidate, segExisting);
             });
         }
 
@@ -3951,7 +4498,7 @@
                 textOverlayPosition: 'bottom',
                 textOverlayHeightPercent: 20,
                 textOverlaySourceType: 'manual',
-                textOverlayText: 'Sem vložte text...',
+                textOverlayText: textUiText('insert_text_here'),
                 textOverlayCollectionJson: '[]',
                 textOverlayExternalUrl: '',
                 textOverlayFontSize: 52,
@@ -4019,7 +4566,7 @@
             merged.textOverlayHeightPercent = Math.max(12, Math.min(40, parseInt(document.getElementById('setting-textOverlayHeightPercent')?.value || '20', 10) || 20));
             const sourceType = String(document.getElementById('setting-textOverlaySourceType')?.value || 'manual');
             merged.textOverlaySourceType = ['manual', 'collection', 'external'].includes(sourceType) ? sourceType : 'manual';
-            merged.textOverlayText = document.getElementById('setting-textOverlayText')?.value || 'Sem vložte text...';
+            merged.textOverlayText = document.getElementById('setting-textOverlayText')?.value || textUiText('insert_text_here');
             const collectionRaw = String(document.getElementById('setting-textOverlayCollection')?.value || '');
             const collectionLines = collectionRaw
                 .split(/\r?\n/)
@@ -4064,7 +4611,7 @@
                     version: ''
                 },
                 'text': {
-                    text: 'Sem vložte text...',
+                    text: textUiText('insert_text_here'),
                     fontFamily: 'Arial, sans-serif',
                     fontSize: 72,
                     fontWeight: '700',
@@ -4077,7 +4624,12 @@
                     scrollMode: false,
                     scrollStartPauseMs: 3000,
                     scrollEndPauseMs: 3000,
-                    scrollSpeedPxPerSec: 35
+                    scrollSpeedPxPerSec: 35,
+                    clockOverlayEnabled: false,
+                    clockOverlayPosition: 'top',
+                    clockOverlayHeightPercent: 30,
+                    clockOverlayTimeColor: '#ffffff',
+                    clockOverlayDateColor: '#ffffff'
                 },
                 'video': {
                     videoAssetUrl: '',
@@ -4107,6 +4659,13 @@
                     sourceType: 'server',
                     mealDisplayMode: 'small_screen',
                     smallScreenPageSwitchSec: 12,
+                    mealScheduleEnabled: true,
+                    scheduleBreakfastUntil: '10:00',
+                    scheduleSnackAmUntil: '11:00',
+                    scheduleLunchUntil: '14:00',
+                    scheduleSnackPmUntil: '18:00',
+                    scheduleDinnerUntil: '23:59',
+                    showTomorrowAfterMealPassed: true,
                     language: 'sk',
                     showHeaderTitle: true,
                     customHeaderTitle: '',
@@ -4133,6 +4692,8 @@
                     lineHeight: 1.4,
                     wrapText: true,
                     apiBaseUrl: '../../api/meal_plan.php',
+                    runtimeApiFetchEnabled: true,
+                    runtimeRefreshIntervalSec: 300,
                     ...getClockOverlayDefaults(),
                     ...getTextOverlayDefaults()
                 },
@@ -4140,6 +4701,8 @@
                     roomId: 0,
                     showOnlyCurrent: false,
                     showNextCount: 4,
+                    language: resolveUiLang(),
+                    runtimeRefreshIntervalSec: 60,
                     apiBaseUrl: '../../api/room_occupancy.php'
                 }
             };
@@ -4157,6 +4720,44 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        function normalizeMealDisplayMode(value) {
+            return String(value || 'small_screen').toLowerCase() === 'large_screen'
+                ? 'large_screen'
+                : 'small_screen';
+        }
+
+        function isMealLargeScreenMode(value) {
+            return normalizeMealDisplayMode(value) === 'large_screen';
+        }
+
+        function normalizeMealLanguage(value) {
+            const normalized = String(value || 'sk').toLowerCase().trim();
+            return ['hu', 'sk', 'en'].includes(normalized) ? normalized : 'sk';
+        }
+
+        function normalizeMealScheduleTime(value, fallback = '10:00') {
+            const source = String(value || '').trim();
+            const match = source.match(/^(\d{1,2}):(\d{2})$/);
+            if (!match) {
+                return fallback;
+            }
+
+            const hh = parseInt(match[1], 10);
+            const mm = parseInt(match[2], 10);
+            if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+                return fallback;
+            }
+
+            return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+        }
+
+        function setElementDisplay(element, visible, visibleDisplay = 'block') {
+            if (!element) {
+                return;
+            }
+            element.style.display = visible ? visibleDisplay : 'none';
         }
 
         function sanitizeRichTextHtml(value) {
@@ -4455,20 +5056,31 @@
 
             const displayModeSelect = document.getElementById('setting-mealDisplayMode');
             const mealOverlayWrap = document.getElementById('meal-overlay-wrap');
+            const mealSmallSettings = document.getElementById('meal-small-settings');
+            const mealLargeHeaderSettings = document.getElementById('meal-large-header-settings');
+            const mealLargeAllergenSettings = document.getElementById('meal-large-allergen-settings');
+            const mealLargeMessageSettings = document.getElementById('meal-large-message-settings');
+            const mealLargeSourceSettings = document.getElementById('meal-large-source-settings');
+
+            const syncMealDisplaySpecificFields = () => {
+                const isLarge = isMealLargeScreenMode(displayModeSelect?.value);
+                setElementDisplay(mealSmallSettings, !isLarge, 'grid');
+                setElementDisplay(mealLargeHeaderSettings, isLarge, 'grid');
+                setElementDisplay(mealLargeAllergenSettings, isLarge, 'block');
+                setElementDisplay(mealLargeMessageSettings, isLarge, 'grid');
+                setElementDisplay(mealLargeSourceSettings, isLarge, 'grid');
+            };
+
             const syncMealOverlayVisibility = () => {
-                if (!mealOverlayWrap) {
-                    return;
-                }
-                const mode = String(displayModeSelect?.value || 'small_screen').toLowerCase() === 'large_screen'
-                    ? 'large_screen'
-                    : 'small_screen';
-                mealOverlayWrap.style.display = mode === 'large_screen' ? 'grid' : 'none';
+                setElementDisplay(mealOverlayWrap, isMealLargeScreenMode(displayModeSelect?.value), 'grid');
             };
 
             if (displayModeSelect) {
                 displayModeSelect.addEventListener('change', syncMealOverlayVisibility);
+                displayModeSelect.addEventListener('change', syncMealDisplaySpecificFields);
             }
             syncMealOverlayVisibility();
+            syncMealDisplaySpecificFields();
 
             const mealTextSizeInput = document.getElementById('setting-mealTextFontSize');
             const mealTitleSizeInput = document.getElementById('setting-mealTitleFontSize');
@@ -4629,7 +5241,7 @@
             });
             const payload = await response.json();
             if (!response.ok || !payload?.success) {
-                throw new Error(payload?.message || 'Nem sikerült betölteni a termek listáját.');
+                throw new Error(payload?.message || roomOccUiText('room_load_error'));
             }
             return Array.isArray(payload.items) ? payload.items : [];
         }
@@ -4653,7 +5265,7 @@
             };
 
             const renderRoomOptions = (rooms) => {
-                const options = ['<option value="0">-- Válassz termet --</option>'];
+                const options = [`<option value="0">${escapeHtml(roomOccUiText('choose_room'))}</option>`];
                 rooms.forEach((room) => {
                     const id = parseInt(room?.id || 0, 10) || 0;
                     if (id <= 0) {
@@ -4673,13 +5285,13 @@
             };
 
             const refreshRooms = async () => {
-                setStatus('Termek betöltése...');
+                setStatus(roomOccUiText('loading_rooms'));
                 try {
                     const rooms = await loadRoomOccupancyRoomsForModal();
                     renderRoomOptions(rooms);
-                    setStatus(`Termek: ${rooms.length} db`);
+                    setStatus(tr('group_loop.room_occ.rooms_count', roomOccUiText('rooms_count'), { count: rooms.length }));
                 } catch (error) {
-                    setStatus(error.message || 'Terem betöltési hiba.', true);
+                    setStatus(error.message || roomOccUiText('room_load_error'), true);
                 }
             };
 
@@ -4732,6 +5344,7 @@
             const hiddenHtml = document.getElementById('setting-text');
             const sourceType = String(document.getElementById('setting-textSourceType')?.value || 'manual');
             const selectedCollectionId = parseInt(document.getElementById('setting-textCollectionId')?.value || '0', 10) || 0;
+            const textExternalUrl = String(document.getElementById('setting-textExternalUrl')?.value || '').trim();
             const sanitizedHtml = sanitizeRichTextHtml(editor ? editor.innerHTML : (hiddenHtml?.value || ''));
             if (hiddenHtml) {
                 hiddenHtml.value = sanitizedHtml;
@@ -4779,6 +5392,7 @@
                     textSourceType: sourceType,
                     textCollectionId: sourceType === 'collection' ? selectedCollectionId : 0,
                     textCollectionLabel: sourceType === 'collection' ? (getTextCollectionById(selectedCollectionId)?.title || '') : '',
+                    textExternalUrl: sourceType === 'external' ? textExternalUrl : '',
                     text: previewTextHtml || 'Sem vložte text...',
                     fontFamily,
                     fontSize,
@@ -4793,7 +5407,12 @@
                     scrollMode: document.getElementById('setting-scrollMode')?.checked === true,
                     scrollStartPauseMs: Math.round((parseFloat(document.getElementById('setting-scrollStartPauseSec')?.value || '3') || 3) * 1000),
                     scrollEndPauseMs: Math.round((parseFloat(document.getElementById('setting-scrollEndPauseSec')?.value || '3') || 3) * 1000),
-                    scrollSpeedPxPerSec: parseInt(document.getElementById('setting-scrollSpeedPxPerSec')?.value || '35', 10) || 35
+                    scrollSpeedPxPerSec: parseInt(document.getElementById('setting-scrollSpeedPxPerSec')?.value || '35', 10) || 35,
+                    clockOverlayEnabled: document.getElementById('setting-clockOverlayEnabled')?.checked === true,
+                    clockOverlayPosition: document.getElementById('setting-clockOverlayPosition')?.value === 'bottom' ? 'bottom' : 'top',
+                    clockOverlayHeightPercent: 30,
+                    clockOverlayTimeColor: document.getElementById('setting-clockOverlayTimeColor')?.value || '#ffffff',
+                    clockOverlayDateColor: document.getElementById('setting-clockOverlayDateColor')?.value || '#ffffff'
                 }
             };
 
@@ -4878,11 +5497,14 @@
 
             const previewFields = [
                 'setting-bgColor',
-                'setting-previewResolution'
+                'setting-previewResolution',
+                'setting-textExternalUrl',
+                'setting-clockOverlayPosition'
             ];
 
             const textSourceSelect = document.getElementById('setting-textSourceType');
             const textCollectionWrap = document.getElementById('textCollectionSelectorWrap');
+            const textExternalWrap = document.getElementById('textExternalSourceWrap');
             const textManualWrap = document.getElementById('textManualEditorWrap');
             const textCollectionSelect = document.getElementById('setting-textCollectionId');
 
@@ -4890,6 +5512,9 @@
                 const source = String(textSourceSelect?.value || 'manual');
                 if (textCollectionWrap) {
                     textCollectionWrap.style.display = source === 'collection' ? 'block' : 'none';
+                }
+                if (textExternalWrap) {
+                    textExternalWrap.style.display = source === 'external' ? 'block' : 'none';
                 }
                 if (textManualWrap) {
                     textManualWrap.style.display = source === 'manual' ? 'block' : 'none';
@@ -4902,12 +5527,12 @@
                 }
 
                 const selectedBefore = parseInt(textCollectionSelect.value || String(parseInt(settings.textCollectionId, 10) || 0), 10) || 0;
-                textCollectionSelect.innerHTML = '<option value="0">-- Válassz slide elemet --</option>';
+                textCollectionSelect.innerHTML = `<option value="0">${textUiText('select_slide_item')}</option>`;
 
                 (Array.isArray(items) ? items : []).forEach((entry) => {
                     const option = document.createElement('option');
                     option.value = String(parseInt(entry.id, 10) || 0);
-                    option.textContent = String(entry.title || `Elem #${entry.id}`);
+                    option.textContent = String(entry.title || `${textUiText('item_prefix')} #${entry.id}`);
                     textCollectionSelect.appendChild(option);
                 });
 
@@ -4948,9 +5573,9 @@
                     try {
                         const items = await loadTextCollectionsDetailed(true);
                         renderTextCollectionOptions(items);
-                        showAutosaveToast('✓ Slide gyűjtemény frissítve');
+                        showAutosaveToast(textUiText('collection_refreshed'));
                     } catch (error) {
-                        showAutosaveToast('⚠️ A slide gyűjtemény frissítése sikertelen', true);
+                        showAutosaveToast(textUiText('collection_refresh_failed'), true);
                     }
                 });
             }
@@ -5216,16 +5841,36 @@
                 applyScrollVisibility();
             }
 
+            const clockSplitToggle = document.getElementById('setting-clockOverlayEnabled');
+            const clockSplitSettings = document.getElementById('clockOverlaySettings');
+            if (clockSplitToggle && clockSplitSettings) {
+                const applyClockSplitVisibility = () => {
+                    clockSplitSettings.style.display = clockSplitToggle.checked ? 'grid' : 'none';
+                };
+                clockSplitToggle.addEventListener('change', () => {
+                    applyClockSplitVisibility();
+                    updateTextModuleMiniPreview();
+                });
+                applyClockSplitVisibility();
+            }
+
             const removeBgButton = document.getElementById('setting-removeBgImage');
+            const pickBgButton = document.getElementById('setting-bgImagePick');
             const bgDataInput = document.getElementById('setting-bgImageData');
             const bgStatus = document.getElementById('setting-bgImageStatus');
             const bgFileInput = document.getElementById('setting-bgImageFile');
+
+            if (pickBgButton && bgFileInput) {
+                pickBgButton.addEventListener('click', () => {
+                    bgFileInput.click();
+                });
+            }
 
             if (removeBgButton && bgDataInput) {
                 removeBgButton.addEventListener('click', () => {
                     bgDataInput.value = '';
                     if (bgStatus) {
-                        bgStatus.textContent = 'Nincs kiválasztott kép';
+                        bgStatus.textContent = textUiText('no_image_selected');
                     }
                     if (bgFileInput) {
                         bgFileInput.value = '';
@@ -5242,12 +5887,12 @@
                         return;
                     }
                     if (!file.type.startsWith('image/')) {
-                        showAutosaveToast('⚠️ Csak képfájl tölthető fel', true);
+                        showAutosaveToast(textUiText('only_images'), true);
                         return;
                     }
 
                     if (bgStatus) {
-                        bgStatus.textContent = 'Feldolgozás...';
+                        bgStatus.textContent = textUiText('processing');
                     }
 
                     try {
@@ -5260,15 +5905,15 @@
                         updateTextModuleMiniPreview();
                     } catch (error) {
                         if (bgStatus) {
-                            bgStatus.textContent = 'Kép feldolgozási hiba';
+                            bgStatus.textContent = textUiText('image_process_error');
                         }
-                        showAutosaveToast('⚠️ Nem sikerült betölteni a képet', true);
+                        showAutosaveToast(textUiText('image_load_failed'), true);
                     }
                 });
             }
 
             if (bgStatus && !String(settings.bgImageData || '').trim()) {
-                bgStatus.textContent = 'Nincs kiválasztott kép';
+                bgStatus.textContent = textUiText('no_image_selected');
             }
 
             if (editor) {
@@ -5476,115 +6121,115 @@
             return `
                 <div style="display: grid; gap: 15px;">
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Típus:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('type_label')}</label>
                         <select id="setting-type" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                            <option value="digital" ${settings.type === 'digital' ? 'selected' : ''}>Digitális</option>
-                            <option value="analog" ${settings.type === 'analog' ? 'selected' : ''}>Analóg</option>
+                            <option value="digital" ${settings.type === 'digital' ? 'selected' : ''}>${clockUiText('type_digital')}</option>
+                            <option value="analog" ${settings.type === 'analog' ? 'selected' : ''}>${clockUiText('type_analog')}</option>
                         </select>
                     </div>
                     
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Formátum:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('format_label')}</label>
                         <select id="setting-format" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                            <option value="24h" selected>24 órás</option>
+                            <option value="24h" selected>${clockUiText('format_24h')}</option>
                         </select>
                     </div>
                     
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum formátum:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('date_format_label')}</label>
                         <select id="setting-dateFormat" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                            <option value="full" ${settings.dateFormat === 'full' ? 'selected' : ''}>Teljes (év, hónap, nap, napnév)</option>
-                            <option value="short" ${settings.dateFormat === 'short' ? 'selected' : ''}>Rövid (év, hónap, nap)</option>
-                            <option value="dmy" ${settings.dateFormat === 'dmy' ? 'selected' : ''}>Nap.Hónap.Év (NN.HH.ÉÉÉÉ)</option>
-                            <option value="numeric" ${settings.dateFormat === 'numeric' ? 'selected' : ''}>Numerikus (ÉÉÉÉ.HH.NN)</option>
-                            <option value="none" ${settings.dateFormat === 'none' ? 'selected' : ''}>Nincs dátum</option>
+                            <option value="full" ${settings.dateFormat === 'full' ? 'selected' : ''}>${clockUiText('date_full')}</option>
+                            <option value="short" ${settings.dateFormat === 'short' ? 'selected' : ''}>${clockUiText('date_short')}</option>
+                            <option value="dmy" ${settings.dateFormat === 'dmy' ? 'selected' : ''}>${clockUiText('date_dmy')}</option>
+                            <option value="numeric" ${settings.dateFormat === 'numeric' ? 'selected' : ''}>${clockUiText('date_numeric')}</option>
+                            <option value="none" ${settings.dateFormat === 'none' ? 'selected' : ''}>${clockUiText('date_none')}</option>
                         </select>
                     </div>
                     
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nyelv:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('language_label')}</label>
                         <select id="setting-language" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                            <option value="hu" ${settings.language === 'hu' ? 'selected' : ''}>Magyar</option>
-                            <option value="sk" ${settings.language === 'sk' ? 'selected' : ''}>Szlovák</option>
-                            <option value="en" ${settings.language === 'en' ? 'selected' : ''}>Angol</option>
+                            <option value="hu" ${settings.language === 'hu' ? 'selected' : ''}>${clockUiText('lang_hu')}</option>
+                            <option value="sk" ${settings.language === 'sk' ? 'selected' : ''}>${clockUiText('lang_sk')}</option>
+                            <option value="en" ${settings.language === 'en' ? 'selected' : ''}>${clockUiText('lang_en')}</option>
                         </select>
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra szín:</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('time_color')}</label>
                             <input type="color" id="setting-timeColor" value="${settings.timeColor || '#ffffff'}" style="width: 100%; height: 40px; border-radius: 5px;">
                         </div>
                         
                         <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum szín:</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('date_color')}</label>
                             <input type="color" id="setting-dateColor" value="${settings.dateColor || '#ffffff'}" style="width: 100%; height: 40px; border-radius: 5px;">
                         </div>
                     </div>
                     
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Háttérszín:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('bg_color')}</label>
                         <input type="color" id="setting-bgColor" value="${settings.bgColor || '#000000'}" style="width: 100%; height: 40px; border-radius: 5px;">
                     </div>
                     
                     <div id="digitalSettings" style="${settings.type === 'analog' ? 'display: none;' : ''}">
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra betűméret (px):</label>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('time_font_size')}</label>
                                 <input type="number" id="setting-timeFontSize" value="${settings.timeFontSize || settings.fontSize || 120}" min="40" max="320" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dátum betűméret (px):</label>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('date_font_size')}</label>
                                 <input type="number" id="setting-dateFontSize" value="${settings.dateFontSize || Math.max(16, Math.round((settings.timeFontSize || settings.fontSize || 120) * 0.3))}" min="14" max="180" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                             </div>
                         </div>
                     </div>
                     
                     <div id="analogSettings" style="${settings.type === 'digital' ? 'display: none;' : ''}">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Óra mérete (px):</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('clock_size')}</label>
                         <input type="number" id="setting-clockSize" value="${settings.clockSize || 300}" min="200" max="600" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                     </div>
                     
                     <div>
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                             <input type="checkbox" id="setting-showSeconds" ${settings.showSeconds !== false ? 'checked' : ''} style="width: 20px; height: 20px;">
-                            <span style="font-weight: bold;">Másodpercek mutatása</span>
+                            <span style="font-weight: bold;">${clockUiText('show_seconds')}</span>
                         </label>
                     </div>
 
                     <div>
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                             <input type="checkbox" id="setting-showDate" ${(settings.showDate !== false && settings.dateFormat !== 'none') ? 'checked' : ''} style="width: 20px; height: 20px;">
-                            <span style="font-weight: bold;">Dátum megjelenítése</span>
+                            <span style="font-weight: bold;">${clockUiText('show_date')}</span>
                         </label>
                     </div>
 
                     <div>
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                             <input type="checkbox" id="setting-dateInline" ${dateInlineEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
-                            <span style="font-weight: bold;">Nap + dátum egy sorban</span>
+                            <span style="font-weight: bold;">${clockUiText('date_inline')}</span>
                         </label>
                     </div>
 
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nap pozíció:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('weekday_position')}</label>
                         <select id="setting-weekdayPosition" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                            <option value="left" ${weekdayPosition === 'left' ? 'selected' : ''}>Nap bal oldalon</option>
-                            <option value="right" ${weekdayPosition === 'right' ? 'selected' : ''}>Nap jobb oldalon</option>
+                            <option value="left" ${weekdayPosition === 'left' ? 'selected' : ''}>${clockUiText('weekday_left')}</option>
+                            <option value="right" ${weekdayPosition === 'right' ? 'selected' : ''}>${clockUiText('weekday_right')}</option>
                         </select>
                     </div>
 
                     <div id="analogOverlaySettings" style="${settings.type === 'digital' ? 'display: none;' : ''}">
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom:8px;">
                             <input type="checkbox" id="setting-digitalOverlayEnabled" ${digitalOverlayEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
-                            <span style="font-weight: bold;">Digitális óra a középen (analógra)</span>
+                            <span style="font-weight: bold;">${clockUiText('digital_overlay')}</span>
                         </label>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Digitális óra pozíció:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('digital_overlay_position')}</label>
                         <select id="setting-digitalOverlayPosition" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                            <option value="auto" ${digitalOverlayPosition === 'auto' ? 'selected' : ''}>Automatikus (fent/lent mutatók alapján)</option>
-                            <option value="top" ${digitalOverlayPosition === 'top' ? 'selected' : ''}>Fent-közép</option>
-                            <option value="center" ${digitalOverlayPosition === 'center' ? 'selected' : ''}>Közép</option>
-                            <option value="bottom" ${digitalOverlayPosition === 'bottom' ? 'selected' : ''}>Lent-közép</option>
+                            <option value="auto" ${digitalOverlayPosition === 'auto' ? 'selected' : ''}>${clockUiText('pos_auto')}</option>
+                            <option value="top" ${digitalOverlayPosition === 'top' ? 'selected' : ''}>${clockUiText('pos_top')}</option>
+                            <option value="center" ${digitalOverlayPosition === 'center' ? 'selected' : ''}>${clockUiText('pos_center')}</option>
+                            <option value="bottom" ${digitalOverlayPosition === 'bottom' ? 'selected' : ''}>${clockUiText('pos_bottom')}</option>
                         </select>
                     </div>
                 </div>
@@ -5595,8 +6240,10 @@
             const safeTextHtml = sanitizeRichTextHtml(settings.text || '');
             const safeTextInput = escapeHtml(safeTextHtml);
             const safeBgImageData = escapeHtml(settings.bgImageData || '');
-            const textSourceType = String(settings.textSourceType || 'manual') === 'collection' ? 'collection' : 'manual';
+            const textSourceTypeRaw = String(settings.textSourceType || 'manual');
+            const textSourceType = ['manual', 'collection', 'external'].includes(textSourceTypeRaw) ? textSourceTypeRaw : 'manual';
             const textCollectionId = parseInt(settings.textCollectionId, 10) || 0;
+            const textExternalUrl = escapeHtml(String(settings.textExternalUrl || ''));
             const resolvedFontFamily = String(settings.fontFamily || 'Arial, sans-serif');
             const resolvedFontSize = Math.max(8, parseInt(settings.fontSize, 10) || 72);
             const resolvedLineHeight = Math.max(0.8, Math.min(2.5, parseFloat(settings.lineHeight) || 1.2));
@@ -5604,45 +6251,58 @@
             const scrollEndSec = Math.max(0, Math.min(5, (parseInt(settings.scrollEndPauseMs, 10) || 3000) / 1000));
             const scrollSpeed = Math.max(5, Math.min(200, parseInt(settings.scrollSpeedPxPerSec, 10) || 35));
             const textAnimationEntry = settings.textAnimationEntry || 'none';
+            const clockOverlayEnabled = settings.clockOverlayEnabled === true;
+            const clockOverlayPosition = String(settings.clockOverlayPosition || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
 
             return `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
                     <div style="display: grid; gap: 10px; min-width:0;">
                         <div style="display:grid; gap:8px; border:1px solid #d9e2ec; border-radius:8px; padding:10px; background:#f8fafc;">
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Szöveg forrása</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${textUiText('text_source')}</label>
                                 <select id="setting-textSourceType" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="manual" ${textSourceType === 'manual' ? 'selected' : ''}>Kézi szerkesztés</option>
-                                    <option value="collection" ${textSourceType === 'collection' ? 'selected' : ''}>Slide gyűjtemény</option>
+                                    <option value="manual" ${textSourceType === 'manual' ? 'selected' : ''}>${textUiText('manual_edit')}</option>
+                                    <option value="collection" ${textSourceType === 'collection' ? 'selected' : ''}>${textUiText('slide_collection')}</option>
+                                    <option value="external" ${textSourceType === 'external' ? 'selected' : ''}>${textUiText('source_external')}</option>
                                 </select>
                             </div>
                             <div id="textCollectionSelectorWrap" style="display:${textSourceType === 'collection' ? 'block' : 'none'};">
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Slide elem</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${textUiText('slide_item')}</label>
                                 <div style="display:flex; gap:6px; align-items:center;">
                                     <select id="setting-textCollectionId" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                        <option value="${textCollectionId}">${textCollectionId > 0 ? 'Betöltés...' : '-- Válassz slide elemet --'}</option>
+                                        <option value="${textCollectionId}">${textCollectionId > 0 ? textUiText('loading') : textUiText('select_slide_item')}</option>
                                     </select>
-                                    <button type="button" id="setting-textCollectionRefresh" style="padding:7px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">Frissít</button>
+                                    <button type="button" id="setting-textCollectionRefresh" style="padding:7px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">${textUiText('refresh')}</button>
                                 </div>
                                 <div style="margin-top:6px; font-size:12px;">
-                                    <a href="../text_collections.php" target="_blank" rel="noopener">Slide gyűjtemény kezelése</a>
+                                    <a href="../text_collections.php" target="_blank" rel="noopener">${textUiText('manage_collection')}</a>
                                 </div>
+                            </div>
+                            <div id="textExternalSourceWrap" style="display:${textSourceType === 'external' ? 'block' : 'none'};">
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${textUiText('external_url')}</label>
+                                <input
+                                    type="url"
+                                    id="setting-textExternalUrl"
+                                    value="${textExternalUrl}"
+                                    placeholder="${textUiText('external_url_hint')}"
+                                    style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;"
+                                >
                             </div>
                         </div>
 
                         <div id="textManualEditorWrap" style="display:${textSourceType === 'manual' ? 'block' : 'none'};">
                         <div style="display: grid; gap: 6px;">
-                            <label style="display: block; font-weight: bold; margin-bottom: 0;">Szerkesztő:</label>
+                            <label style="display: block; font-weight: bold; margin-bottom: 0;">${textUiText('editor')}</label>
                             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
                                 <button type="button" data-richcmd="bold" style="padding:5px 9px;">B</button>
                                 <button type="button" data-richcmd="italic" style="padding:5px 9px; font-style:italic;">I</button>
                                 <button type="button" data-richcmd="underline" style="padding:5px 9px; text-decoration:underline;">U</button>
-                                <button type="button" data-richcmd="insertUnorderedList" style="padding:5px 9px;">• Lista</button>
-                                <button type="button" data-richcmd="justifyLeft" style="padding:5px 9px;">Bal</button>
-                                <button type="button" data-richcmd="justifyCenter" style="padding:5px 9px;">Közép</button>
-                                <button type="button" data-richcmd="justifyRight" style="padding:5px 9px;">Jobb</button>
-                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Szín <input type="color" id="setting-richColor" value="#ffffff"></label>
-                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Háttér <input type="color" id="setting-richBgColor" value="#ffd54f"></label>
+                                <button type="button" data-richcmd="insertUnorderedList" style="padding:5px 9px;">${textUiText('bullet_list')}</button>
+                                <button type="button" data-richcmd="justifyLeft" style="padding:5px 9px;">${textUiText('align_left')}</button>
+                                <button type="button" data-richcmd="justifyCenter" style="padding:5px 9px;">${textUiText('align_center')}</button>
+                                <button type="button" data-richcmd="justifyRight" style="padding:5px 9px;">${textUiText('align_right')}</button>
+                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">${textUiText('color')} <input type="color" id="setting-richColor" value="#ffffff"></label>
+                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">${textUiText('background')} <input type="color" id="setting-richBgColor" value="#ffd54f"></label>
                                 <select id="setting-richFontFamily" style="padding:4px 6px; border:1px solid #ccc; border-radius:4px; max-width:180px;">
                                     <option value="Arial, sans-serif" ${resolvedFontFamily === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option>
                                     <option value="Verdana, sans-serif" ${resolvedFontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option>
@@ -5652,10 +6312,10 @@
                                     <option value="Times New Roman, serif" ${resolvedFontFamily === 'Times New Roman, serif' ? 'selected' : ''}>Times New Roman</option>
                                     <option value="Courier New, monospace" ${resolvedFontFamily === 'Courier New, monospace' ? 'selected' : ''}>Courier New</option>
                                 </select>
-                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Méret
+                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">${textUiText('size')}
                                     <input type="number" id="setting-richFontSize" value="${resolvedFontSize}" min="8" max="260" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
                                 </label>
-                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Sorköz
+                                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">${textUiText('line_height')}
                                     <input type="number" id="setting-richLineHeight" value="${resolvedLineHeight}" min="0.8" max="2.5" step="0.1" style="width:72px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
                                 </label>
                             </div>
@@ -5666,8 +6326,8 @@
                             <div id="text-editor-area" contenteditable="true" style="min-height:360px; border:1px solid #ccc; border-radius:6px; padding:10px; background:#000; color:#fff; overflow:auto; white-space:pre-wrap; word-wrap:break-word; word-break:break-word; outline:none;">${safeTextHtml}</div>
                             <input type="hidden" id="setting-text" value="${safeTextInput}">
                             <div style="display:flex; gap:6px; align-items:center; margin-top:8px;">
-                                <button type="button" id="text-preview-play" style="padding:5px 10px; border:1px solid #0d5f2e; background:#1f7a3f; color:#fff; border-radius:4px; cursor:pointer;">▶ Play</button>
-                                <button type="button" id="text-preview-stop" style="padding:5px 10px; border:1px solid #8a1f1f; background:#b02a2a; color:#fff; border-radius:4px; cursor:pointer;">■ Stop</button>
+                                <button type="button" id="text-preview-play" style="padding:5px 10px; border:1px solid #0d5f2e; background:#1f7a3f; color:#fff; border-radius:4px; cursor:pointer;">${textUiText('play')}</button>
+                                <button type="button" id="text-preview-stop" style="padding:5px 10px; border:1px solid #8a1f1f; background:#b02a2a; color:#fff; border-radius:4px; cursor:pointer;">${textUiText('stop')}</button>
                                 <small id="text-preview-time-label" style="color:#444; font-weight:600;">0.0s / ${(parseInt(item.duration_seconds || 10, 10) || 10).toFixed(1)}s</small>
                             </div>
                             <div style="height:10px; border:1px solid #cdd3da; border-radius:4px; overflow:hidden; background:#edf1f5;">
@@ -5679,7 +6339,7 @@
 
                     <div style="display: grid; gap: 14px; min-width:0;">
                         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                            <label style="display: block; margin-bottom: 0; font-weight: bold;">Élő előnézet:</label>
+                            <label style="display: block; margin-bottom: 0; font-weight: bold;">${textUiText('live_preview')}</label>
                             <select id="setting-previewResolution" style="padding:6px 8px; border-radius:5px; border:1px solid #ccc; max-width:220px;">
                             </select>
                         </div>
@@ -5688,49 +6348,71 @@
                         </div>
 
                         <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Háttérszín:</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">${textUiText('bg_color')}</label>
                             <input type="color" id="setting-bgColor" value="${settings.bgColor || '#000000'}" style="width: 100%; height: 40px; border-radius: 5px;">
                         </div>
 
                         <div style="padding: 10px; background: #f7f7f7; border-radius: 8px; border: 1px solid #e5e5e5;">
-                            <label style="display: block; margin-bottom: 6px; font-weight: bold;">Háttérkép feltöltés:</label>
-                            <input type="file" id="setting-bgImageFile" accept="image/*" style="width: 100%;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: bold;">${textUiText('bg_image_upload')}</label>
+                            <input type="file" id="setting-bgImageFile" accept="image/*" style="display:none;">
                             <input type="hidden" id="setting-bgImageData" value="${safeBgImageData}">
                             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px;">
-                                <small id="setting-bgImageStatus" style="color: #555;">${settings.bgImageData ? 'Kép beállítva' : 'Nincs kiválasztott kép'}</small>
-                                <button type="button" id="setting-removeBgImage" style="padding: 5px 10px; border: none; border-radius: 4px; background: #dc3545; color: #fff; cursor: pointer;">Kép törlése</button>
+                                <small id="setting-bgImageStatus" style="color: #555;">${settings.bgImageData ? textUiText('image_set') : textUiText('no_image_selected')}</small>
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <button type="button" id="setting-bgImagePick" style="padding: 5px 10px; border: 1px solid #1e40af; border-radius: 4px; background: #fff; color: #1e40af; cursor: pointer;">${textUiText('bg_image_upload')}</button>
+                                    <button type="button" id="setting-removeBgImage" style="padding: 5px 10px; border: none; border-radius: 4px; background: #dc3545; color: #fff; cursor: pointer;">${textUiText('remove_image')}</button>
+                                </div>
                             </div>
                         </div>
 
                         <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megjelenítési animáció:</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">${textUiText('text_animation')}</label>
                             <select id="setting-textAnimationEntry" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
-                                <option value="none" ${textAnimationEntry === 'none' ? 'selected' : ''}>Nincs animáció</option>
-                                <option value="fadeIn" ${textAnimationEntry === 'fadeIn' ? 'selected' : ''}>Fade In (Halványulás)</option>
-                                <option value="slideUp" ${textAnimationEntry === 'slideUp' ? 'selected' : ''}>Slide Up (Felsúslás)</option>
-                                <option value="zoomIn" ${textAnimationEntry === 'zoomIn' ? 'selected' : ''}>Zoom In (Nagyítás)</option>
+                                <option value="none" ${textAnimationEntry === 'none' ? 'selected' : ''}>${textUiText('anim_none')}</option>
+                                <option value="fadeIn" ${textAnimationEntry === 'fadeIn' ? 'selected' : ''}>Fade In (${textUiText('anim_fade')})</option>
+                                <option value="slideUp" ${textAnimationEntry === 'slideUp' ? 'selected' : ''}>Slide Up (${textUiText('anim_slide_up')})</option>
+                                <option value="zoomIn" ${textAnimationEntry === 'zoomIn' ? 'selected' : ''}>Zoom In (${textUiText('anim_zoom')})</option>
                             </select>
                         </div>
 
                         <div style="padding: 10px; border-radius: 8px; border: 1px solid #e5e5e5;">
                             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 10px;">
                                 <input type="checkbox" id="setting-scrollMode" ${(settings.scrollMode === true) ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                <span style="font-weight: bold;">Scroll mode (ha a szöveg nem fér ki)</span>
+                                <span style="font-weight: bold;">${textUiText('scroll_mode')}</span>
                             </label>
                             <div id="textScrollSettings" style="display: ${(settings.scrollMode === true) ? 'grid' : 'none'}; gap: 10px; grid-template-columns: 1fr;">
                                 <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Indulás előtti várakozás (s): <span id="setting-scrollStartPauseSecValue">${scrollStartSec.toFixed(1)}</span></label>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">${textUiText('scroll_start_pause')} <span id="setting-scrollStartPauseSecValue">${scrollStartSec.toFixed(1)}</span></label>
                                     <input type="range" id="setting-scrollStartPauseSec" value="${scrollStartSec}" min="0" max="5" step="0.1" style="width: 100%;">
                                 </div>
                                 <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Végi várakozás (s): <span id="setting-scrollEndPauseSecValue">${scrollEndSec.toFixed(1)}</span></label>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">${textUiText('scroll_end_pause')} <span id="setting-scrollEndPauseSecValue">${scrollEndSec.toFixed(1)}</span></label>
                                     <input type="range" id="setting-scrollEndPauseSec" value="${scrollEndSec}" min="0" max="5" step="0.1" style="width: 100%;">
                                 </div>
                                 <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Scroll sebesség (px/s): <span id="setting-scrollSpeedPxPerSecValue">${scrollSpeed}</span></label>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">${textUiText('scroll_speed')} <span id="setting-scrollSpeedPxPerSecValue">${scrollSpeed}</span></label>
                                     <input type="range" id="setting-scrollSpeedPxPerSec" value="${scrollSpeed}" min="5" max="200" step="1" style="width: 100%;">
                                 </div>
                             </div>
+                        </div>
+
+                        <div style="padding: 10px; border-radius: 8px; border: 1px solid #e5e5e5;">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 10px;">
+                                <input type="checkbox" id="setting-clockOverlayEnabled" ${clockOverlayEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
+                                <span style="font-weight: bold;">${textUiText('clock_split_toggle')}</span>
+                            </label>
+                            <div id="clockOverlaySettings" style="display:${clockOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr;">
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_position')}</label>
+                                    <select id="setting-clockOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                        <option value="top" ${clockOverlayPosition === 'top' ? 'selected' : ''}>${textUiText('clock_split_top')}</option>
+                                        <option value="bottom" ${clockOverlayPosition === 'bottom' ? 'selected' : ''}>${textUiText('clock_split_bottom')}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <input type="hidden" id="setting-clockOverlayHeightPercent" value="30">
+                            <input type="hidden" id="setting-clockOverlayTimeColor" value="${settings.clockOverlayTimeColor || '#ffffff'}">
+                            <input type="hidden" id="setting-clockOverlayDateColor" value="${settings.clockOverlayDateColor || '#ffffff'}">
                         </div>
                     </div>
 
@@ -5752,11 +6434,19 @@
             const siteKey = escapeHtml(String(settings.siteKey || 'jedalen.sk'));
             const institutionId = parseInt(settings.institutionId || 0, 10) || 0;
             const sourceType = String(settings.sourceType || 'manual').toLowerCase() === 'server' ? 'server' : 'manual';
-            const mealDisplayMode = String(settings.mealDisplayMode || 'small_screen').toLowerCase() === 'large_screen' ? 'large_screen' : 'small_screen';
-            const smallScreenPageSwitchSec = Math.max(5, Math.min(60, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const mealDisplayMode = normalizeMealDisplayMode(settings.mealDisplayMode);
+            const isSmallMode = mealDisplayMode === 'small_screen';
+            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
             const mergeBreakfastSnack = settings.mergeBreakfastSnack !== false;
             const mergeLunchSnack = settings.mergeLunchSnack !== false;
-            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'sk';
+            const mealScheduleEnabled = settings.mealScheduleEnabled !== false;
+            const showTomorrowAfterMealPassed = settings.showTomorrowAfterMealPassed !== false;
+            const scheduleBreakfastUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleBreakfastUntil, '10:00'));
+            const scheduleSnackAmUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleSnackAmUntil, '11:00'));
+            const scheduleLunchUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleLunchUntil, '14:00'));
+            const scheduleSnackPmUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleSnackPmUntil, '18:00'));
+            const scheduleDinnerUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleDinnerUntil, '23:59'));
+            const language = normalizeMealLanguage(settings.language);
             const customHeaderTitle = escapeHtml(String(settings.customHeaderTitle || ''));
             const appetiteMessageText = escapeHtml(String(settings.appetiteMessageText || 'Prajeme dobrú chuť!'));
             const sourceUrl = escapeHtml(String(settings.sourceUrl || ''));
@@ -5789,14 +6479,44 @@
                             <div style="font-size:12px; color:#64748b; margin-top:4px;">${mt('mode_hint')}</div>
                         </div>
 
-                        <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('page_switch')}</label>
-                            <input type="number" id="setting-smallScreenPageSwitchSec" min="5" max="60" step="1" value="${smallScreenPageSwitchSec}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                            <div style="font-size:12px; color:#64748b; margin-top:4px;">${mt('page_switch_hint')}</div>
+                        <div id="meal-small-settings" style="display:${isSmallMode ? 'grid' : 'none'}; gap:10px;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('page_switch')}</label>
+                                <input type="number" id="setting-smallScreenPageSwitchSec" min="1" max="120" step="1" value="${smallScreenPageSwitchSec}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                <div style="font-size:12px; color:#64748b; margin-top:4px;">${mt('page_switch_hint')}</div>
+                            </div>
+
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mergeBreakfastSnack" ${mergeBreakfastSnack ? 'checked' : ''}> ${mt('join_breakfast_snack')}</label>
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mergeLunchSnack" ${mergeLunchSnack ? 'checked' : ''}> ${mt('join_lunch_snack')}</label>
                         </div>
 
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mergeBreakfastSnack" ${mergeBreakfastSnack ? 'checked' : ''}> ${mt('join_breakfast_snack')}</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mergeLunchSnack" ${mergeLunchSnack ? 'checked' : ''}> ${mt('join_lunch_snack')}</label>
+                        <div style="padding:10px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; display:grid; gap:8px;">
+                            <div style="font-weight:700; color:#1f2937;">${mt('schedule_settings')}</div>
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mealScheduleEnabled" ${mealScheduleEnabled ? 'checked' : ''}> ${mt('schedule_enabled')}</label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_breakfast_until')}</label>
+                                    <input type="text" id="setting-scheduleBreakfastUntil" value="${scheduleBreakfastUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_snack_am_until')}</label>
+                                    <input type="text" id="setting-scheduleSnackAmUntil" value="${scheduleSnackAmUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_lunch_until')}</label>
+                                    <input type="text" id="setting-scheduleLunchUntil" value="${scheduleLunchUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_snack_pm_until')}</label>
+                                    <input type="text" id="setting-scheduleSnackPmUntil" value="${scheduleSnackPmUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_dinner_until')}</label>
+                                    <input type="text" id="setting-scheduleDinnerUntil" value="${scheduleDinnerUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                            </div>
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showTomorrowAfterMealPassed" ${showTomorrowAfterMealPassed ? 'checked' : ''}> ${mt('show_tomorrow_after_passed')}</label>
+                        </div>
 
                         <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
                             <div>
@@ -5823,28 +6543,36 @@
 
                     <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#fff; display:grid; gap:8px;">
                         <div style="font-weight:700; color:#1f2937;">${mt('visible_meals')}</div>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showHeaderTitle" ${settings.showHeaderTitle !== false ? 'checked' : ''}> ${mt('show_header')}</label>
-                        <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('custom_header')}</label>
-                            <input type="text" id="setting-customHeaderTitle" value="${customHeaderTitle}" placeholder="pl. Dnešné menu" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        <div id="meal-large-header-settings" style="display:${isSmallMode ? 'none' : 'grid'}; gap:8px;">
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showHeaderTitle" ${settings.showHeaderTitle !== false ? 'checked' : ''}> ${mt('show_header')}</label>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('custom_header')}</label>
+                                <input type="text" id="setting-customHeaderTitle" value="${customHeaderTitle}" placeholder="pl. Dnešné menu" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showInstitutionName" ${settings.showInstitutionName !== false ? 'checked' : ''}> ${mt('show_institution')}</label>
                         </div>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showInstitutionName" ${settings.showInstitutionName !== false ? 'checked' : ''}> ${mt('show_institution')}</label>
                         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showBreakfast" ${settings.showBreakfast !== false ? 'checked' : ''}> ${mt('breakfast')}</label>
                         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackAm" ${settings.showSnackAm !== false ? 'checked' : ''}> ${mt('snack_am')}</label>
                         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showLunch" ${settings.showLunch !== false ? 'checked' : ''}> ${mt('lunch')}</label>
                         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackPm" ${settings.showSnackPm === true ? 'checked' : ''}> ${mt('snack_pm')}</label>
                         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showDinner" ${settings.showDinner === true ? 'checked' : ''}> ${mt('dinner')}</label>
                         <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showMealTypeSvgIcons" ${settings.showMealTypeSvgIcons !== false ? 'checked' : ''}> ${mt('show_icons')}</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showAllergenEmojis" ${settings.showAllergenEmojis === true ? 'checked' : ''}> ${mt('allergens_large_only')}</label>
-                        <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showAppetiteMessage" ${settings.showAppetiteMessage === true ? 'checked' : ''}> ${mt('appetite_toggle')}</label>
-                        <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('appetite_text')}</label>
-                            <input type="text" id="setting-appetiteMessageText" value="${appetiteMessageText}" placeholder="Prajeme dobrú chuť!" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        <div id="meal-large-allergen-settings" style="display:${isSmallMode ? 'none' : 'block'};">
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showAllergenEmojis" ${settings.showAllergenEmojis === true ? 'checked' : ''}> ${mt('allergens_large_only')}</label>
                         </div>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSourceUrl" ${settings.showSourceUrl === true ? 'checked' : ''}> ${mt('source_url_toggle')}</label>
-                        <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('source_url')}</label>
-                            <input type="url" id="setting-sourceUrl" value="${sourceUrl}" placeholder="https://www.jedalen.sk/Pages/EatMenu?Ident=..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        <div id="meal-large-message-settings" style="display:${isSmallMode ? 'none' : 'grid'}; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;">
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showAppetiteMessage" ${settings.showAppetiteMessage === true ? 'checked' : ''}> ${mt('appetite_toggle')}</label>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('appetite_text')}</label>
+                                <input type="text" id="setting-appetiteMessageText" value="${appetiteMessageText}" placeholder="Prajeme dobrú chuť!" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+                        </div>
+                        <div id="meal-large-source-settings" style="display:${isSmallMode ? 'none' : 'grid'}; gap:8px;">
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSourceUrl" ${settings.showSourceUrl === true ? 'checked' : ''}> ${mt('source_url_toggle')}</label>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('source_url')}</label>
+                                <input type="url" id="setting-sourceUrl" value="${sourceUrl}" placeholder="https://www.jedalen.sk/Pages/EatMenu?Ident=..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -5854,28 +6582,44 @@
         function buildRoomOccupancyCustomizationHtml(settings) {
             const roomId = parseInt(settings.roomId || 0, 10) || 0;
             const showNextCount = parseInt(settings.showNextCount || 4, 10) || 4;
+            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : resolveUiLang();
+            const refreshIntervalSec = Math.max(30, Math.min(3600, parseInt(settings.runtimeRefreshIntervalSec || 60, 10) || 60));
 
             return `
                 <div style="display:grid; gap:14px;">
                     <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#f8fafc; display:grid; gap:10px;">
                         <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">Terem</label>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${roomOccUiText('room')}</label>
                                 <select id="setting-roomOccRoomId" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                    <option value="${roomId}">${roomId > 0 ? 'Betöltés...' : '-- Válassz termet --'}</option>
+                                    <option value="${roomId}">${roomId > 0 ? roomOccUiText('loading') : roomOccUiText('choose_room')}</option>
                                 </select>
                             </div>
-                            <button type="button" id="setting-roomOccReloadRooms" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">Frissít</button>
+                            <button type="button" id="setting-roomOccReloadRooms" style="padding:8px 10px; border:1px solid #1e40af; border-radius:5px; background:#fff; color:#1e40af; cursor:pointer;">${roomOccUiText('refresh')}</button>
                         </div>
-                        <div id="setting-roomOccStatus" style="font-size:12px; color:#475569;">Termek betöltése...</div>
+                        <div id="setting-roomOccStatus" style="font-size:12px; color:#475569;">${roomOccUiText('loading_rooms')}</div>
                     </div>
 
                     <div style="padding:12px; border:1px solid #dde3eb; border-radius:8px; background:#fff; display:grid; gap:8px;">
-                        <div style="font-weight:700; color:#1f2937;">Megjelenítés</div>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-roomOccShowOnlyCurrent" ${settings.showOnlyCurrent === true ? 'checked' : ''}> Csak aktuális foglaltság</label>
+                        <div style="font-weight:700; color:#1f2937;">${roomOccUiText('display_title')}</div>
+                        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-roomOccShowOnlyCurrent" ${settings.showOnlyCurrent === true ? 'checked' : ''}> ${roomOccUiText('only_current')}</label>
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Következő események száma</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${roomOccUiText('next_count')}</label>
                             <input type="number" id="setting-roomOccShowNextCount" min="1" max="12" value="${showNextCount}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${roomOccUiText('language')}</label>
+                                <select id="setting-roomOccLanguage" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="sk" ${language === 'sk' ? 'selected' : ''}>Slovenčina</option>
+                                    <option value="en" ${language === 'en' ? 'selected' : ''}>English</option>
+                                    <option value="hu" ${language === 'hu' ? 'selected' : ''}>Magyar</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${roomOccUiText('refresh_interval')}</label>
+                                <input type="number" id="setting-roomOccRefreshSec" min="30" max="3600" value="${refreshIntervalSec}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -5977,6 +6721,12 @@
             const fileSizeKB = pdfDataBase64 ? Math.round(pdfDataBase64.length / 1024) : 0;
             const hasPdfSource = !!pdfAssetUrl || !!pdfDataBase64;
             const autoScrollEnabled = settings.autoScrollEnabled === true || settings.navigationMode === 'auto';
+            const horizontalStartPercent = Number.isFinite(parseInt(settings.horizontalStartPercent, 10))
+                ? Math.max(0, Math.min(100, parseInt(settings.horizontalStartPercent, 10)))
+                : 0;
+            const autoScrollSectionsJson = typeof settings.autoScrollSectionsJson === 'string'
+                ? settings.autoScrollSectionsJson
+                : '[]';
             const pauseAtPercent = Number.isFinite(parseInt(settings.pauseAtPercent, 10))
                 ? parseInt(settings.pauseAtPercent, 10)
                 : -1;
@@ -5984,7 +6734,7 @@
             return `
                 <div style="display: grid; gap: 16px;">
                     <div>
-                        <label style="display: block; margin-bottom: 10px; font-weight: bold;">📄 PDF Feltöltés</label>
+                        <label style="display: block; margin-bottom: 10px; font-weight: bold;">${pdfUiText('upload_title')}</label>
                         <div id="pdf-upload-area" style="
                             border: 2px dashed #1e40af;
                             border-radius: 8px;
@@ -5996,53 +6746,89 @@
                         ">
                             <input type="file" id="pdf-file-input" accept=".pdf" style="display: none;">
                             <div style="font-size: 14px; color: #425466;">
-                                Húzd ide a PDF-et vagy <span style="color: #1e40af; font-weight: bold; text-decoration: underline;">kattints a kiválasztáshoz</span>
+                                ${pdfUiText('drop_or_click')} <span style="color: #1e40af; font-weight: bold; text-decoration: underline;">${pdfUiText('click_to_pick')}</span>
                             </div>
-                            <div style="font-size: 12px; color: #8a97a6; margin-top: 8px;">Max. 50 MB</div>
-                            ${hasPdfSource ? `<div style="color: #28a745; margin-top: 8px; font-size: 13px;">✓ PDF betöltve${fileSizeKB > 0 ? ` (${fileSizeKB} KB)` : ''}</div>` : ''}
+                            <div style="font-size: 12px; color: #8a97a6; margin-top: 8px;">${pdfUiText('max_size')}</div>
+                            ${hasPdfSource ? `<div style="color: #28a745; margin-top: 8px; font-size: 13px;">${pdfUiText('loaded')}${fileSizeKB > 0 ? ` (${fileSizeKB} KB)` : ''}</div>` : ''}
                         </div>
                     </div>
                     <div style="display:grid; gap:12px;">
                         <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fix zoom (%):</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">${pdfUiText('fixed_zoom')}</label>
                             <input type="number" id="pdf-zoomLevel" value="${settings.zoomLevel || 100}" min="50" max="250" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">${pdfUiText('horizontal_focus')}</label>
+                            <div style="display:grid; grid-template-columns:1fr 90px; gap:8px; align-items:center;">
+                                <input type="range" id="pdf-horizontalStartPercent" value="${horizontalStartPercent}" min="0" max="100" step="1">
+                                <input type="number" id="pdf-horizontalStartPercentNumber" value="${horizontalStartPercent}" min="0" max="100" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                            </div>
+                            <div style="font-size:12px; color:#8a97a6; margin-top:4px;">${pdfUiText('horizontal_hint')}</div>
                         </div>
                         <div>
                             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                                 <input type="checkbox" id="pdf-autoScrollEnabled" ${autoScrollEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
-                                <span style="font-weight: bold;">Automatikus görgetés</span>
+                                <span style="font-weight: bold;">${pdfUiText('auto_scroll')}</span>
                             </label>
                         </div>
                         <div class="pdf-scroll-settings" style="display:${autoScrollEnabled ? 'grid' : 'none'}; gap:12px;">
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Görgetési sebesség (px/s):</label>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${pdfUiText('scroll_speed')}</label>
                                 <input type="number" id="pdf-scrollSpeed" value="${settings.autoScrollSpeedPxPerSec || 30}" min="5" max="300" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Indulás előtti várakozás (ms):</label>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${pdfUiText('start_pause')}</label>
                                 <input type="number" id="pdf-startPause" value="${settings.autoScrollStartPauseMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ciklus végi várakozás (ms):</label>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${pdfUiText('end_pause')}</label>
                                 <input type="number" id="pdf-endPause" value="${settings.autoScrollEndPauseMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megállás pozíció (%):</label>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${pdfUiText('pause_pos')}</label>
                                 <input type="number" id="pdf-pauseAtPercent" value="${pauseAtPercent}" min="-1" max="100" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
-                                <div style="font-size:12px; color:#8a97a6; margin-top:4px;">-1 = nincs köztes megállás</div>
+                                <div style="font-size:12px; color:#8a97a6; margin-top:4px;">${pdfUiText('pause_pos_hint')}</div>
                             </div>
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megállás hossza (ms):</label>
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">${pdfUiText('pause_duration')}</label>
                                 <input type="number" id="pdf-pauseDurationMs" value="${settings.pauseDurationMs || 2000}" min="0" max="60000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                            </div>
+                            <div style="grid-column:1 / -1; border:1px solid #d8e2ee; border-radius:8px; padding:10px; background:#fff; display:grid; gap:8px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                                    <strong style="font-size:13px; color:#1f2a37;">${pdfUiText('section_planner')}</strong>
+                                    <button type="button" id="pdf-section-add" style="padding:6px 10px; border:1px solid #1e40af; background:#1e40af; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">${pdfUiText('add_section')}</button>
+                                </div>
+                                <div id="pdf-section-timeline" style="height:180px; border:1px solid #d6dde8; border-radius:6px; background:linear-gradient(to bottom,#f8fafc,#eef2f7); position:relative;"></div>
+                                <div style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px;">
+                                    <div>
+                                        <label style="display:block; margin-bottom:4px; font-size:12px; color:#425466;">${pdfUiText('section_start')}</label>
+                                        <input type="number" id="pdf-section-start" value="0" min="0" max="100" style="width:100%; padding:7px; border:1px solid #c9d4e3; border-radius:5px;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; margin-bottom:4px; font-size:12px; color:#425466;">${pdfUiText('section_end')}</label>
+                                        <input type="number" id="pdf-section-end" value="100" min="0" max="100" style="width:100%; padding:7px; border:1px solid #c9d4e3; border-radius:5px;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; margin-bottom:4px; font-size:12px; color:#425466;">${pdfUiText('section_pause')}</label>
+                                        <input type="number" id="pdf-section-pause" value="2000" min="0" max="60000" style="width:100%; padding:7px; border:1px solid #c9d4e3; border-radius:5px;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; margin-bottom:4px; font-size:12px; color:#425466;">${pdfUiText('section_horizontal')}</label>
+                                        <input type="number" id="pdf-section-horizontal" value="${horizontalStartPercent}" min="0" max="100" style="width:100%; padding:7px; border:1px solid #c9d4e3; border-radius:5px;">
+                                    </div>
+                                </div>
+                                <div id="pdf-sections-list" style="display:grid; gap:6px;"></div>
+                                <input type="hidden" id="pdf-sections-json" value="${escapeHtml(autoScrollSectionsJson)}">
+                                <div style="font-size:12px; color:#8a97a6;">${pdfUiText('section_tip')}</div>
                             </div>
                         </div>
                     </div>
                     <div id="pdf-preview-area" style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
-                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">${pdfUiText('preview')}</div>
                         <div style="height:360px; overflow:auto; border:1px solid #e0e6ed; border-radius:6px; background:#fff; padding:8px;">
                             <iframe id="pdf-live-preview-iframe" style="width:100%; height:100%; border:0; background:#fff;"></iframe>
                         </div>
-                        <div id="pdf-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${hasPdfSource ? 'none' : 'block'};">Tölts fel PDF-et az előnézethez.</div>
+                        <div id="pdf-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${hasPdfSource ? 'none' : 'block'};">${pdfUiText('preview_empty')}</div>
                     </div>
                 </div>
             `;
@@ -6390,13 +7176,15 @@
             const richEditor = document.getElementById('text-editor-area');
             const sourceType = String(document.getElementById('setting-textSourceType')?.value || 'manual');
             const selectedCollectionId = parseInt(document.getElementById('setting-textCollectionId')?.value || '0', 10) || 0;
+            const textExternalUrl = String(document.getElementById('setting-textExternalUrl')?.value || '').trim();
             const textHtml = sanitizeRichTextHtml(richEditor ? richEditor.innerHTML : (document.getElementById('setting-text')?.value || ''));
             const selectedCollection = sourceType === 'collection' ? getTextCollectionById(selectedCollectionId) : null;
 
-            settings.textSourceType = sourceType === 'collection' ? 'collection' : 'manual';
+            settings.textSourceType = ['manual', 'collection', 'external'].includes(sourceType) ? sourceType : 'manual';
             settings.textCollectionId = sourceType === 'collection' ? selectedCollectionId : 0;
             settings.textCollectionLabel = sourceType === 'collection' ? String(selectedCollection?.title || '') : '';
             settings.textCollectionVersionTs = sourceType === 'collection' ? Date.now() : 0;
+            settings.textExternalUrl = sourceType === 'external' ? textExternalUrl : '';
 
             if (sourceType === 'collection' && selectedCollection) {
                 settings.text = sanitizeRichTextHtml(selectedCollection.content_html || '') || 'Sem vložte text...';
@@ -6421,6 +7209,11 @@
             settings.scrollStartPauseMs = Math.round((parseFloat(document.getElementById('setting-scrollStartPauseSec')?.value || '3') || 3) * 1000);
             settings.scrollEndPauseMs = Math.round((parseFloat(document.getElementById('setting-scrollEndPauseSec')?.value || '3') || 3) * 1000);
             settings.scrollSpeedPxPerSec = parseInt(document.getElementById('setting-scrollSpeedPxPerSec')?.value, 10) || 35;
+            settings.clockOverlayEnabled = document.getElementById('setting-clockOverlayEnabled')?.checked === true;
+            settings.clockOverlayPosition = document.getElementById('setting-clockOverlayPosition')?.value === 'bottom' ? 'bottom' : 'top';
+            settings.clockOverlayHeightPercent = 30;
+            settings.clockOverlayTimeColor = document.getElementById('setting-clockOverlayTimeColor')?.value || '#ffffff';
+            settings.clockOverlayDateColor = document.getElementById('setting-clockOverlayDateColor')?.value || '#ffffff';
             return settings;
         }
 
@@ -6429,6 +7222,7 @@
             const pdfBase64 = window.pdfModuleSettings?.pdfDataBase64 || (item.settings?.pdfDataBase64 || '');
             const pdfAssetUrl = window.pdfModuleSettings?.pdfAssetUrl || (item.settings?.pdfAssetUrl || '');
             const pdfAssetId = window.pdfModuleSettings?.pdfAssetId || (item.settings?.pdfAssetId || '');
+            const sectionsJson = document.getElementById('pdf-sections-json')?.value || '[]';
 
             settings.pdfAssetUrl = pdfAssetUrl;
             if (pdfAssetId) {
@@ -6436,6 +7230,7 @@
             }
             settings.pdfDataBase64 = pdfAssetUrl ? '' : pdfBase64;
             settings.zoomLevel = parseInt(document.getElementById('pdf-zoomLevel')?.value, 10) || 100;
+            settings.horizontalStartPercent = Math.max(0, Math.min(100, parseInt(document.getElementById('pdf-horizontalStartPercentNumber')?.value, 10) || 0));
             settings.autoScrollEnabled = document.getElementById('pdf-autoScrollEnabled')?.checked === true;
             settings.autoScrollSpeedPxPerSec = parseInt(document.getElementById('pdf-scrollSpeed')?.value) || 30;
             settings.autoScrollStartPauseMs = parseInt(document.getElementById('pdf-startPause')?.value) || 2000;
@@ -6445,6 +7240,7 @@
                 settings.pauseAtPercent = -1;
             }
             settings.pauseDurationMs = parseInt(document.getElementById('pdf-pauseDurationMs')?.value, 10) || 2000;
+            settings.autoScrollSectionsJson = sectionsJson;
             return settings;
         }
 
@@ -6510,10 +7306,8 @@
         }
 
         function collectMealMenuSettingsFromForm() {
-            const mealDisplayMode = String(document.getElementById('setting-mealDisplayMode')?.value || 'small_screen').toLowerCase() === 'large_screen'
-                ? 'large_screen'
-                : 'small_screen';
-            const smallScreenPageSwitchSec = Math.max(5, Math.min(60, parseInt(document.getElementById('setting-smallScreenPageSwitchSec')?.value || '12', 10) || 12));
+            const mealDisplayMode = normalizeMealDisplayMode(document.getElementById('setting-mealDisplayMode')?.value || 'small_screen');
+            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(document.getElementById('setting-smallScreenPageSwitchSec')?.value || '12', 10) || 12));
             const mealTextFontSize = mealDisplayMode === 'large_screen' ? 1.9 : 3.0;
             const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
             return {
@@ -6521,14 +7315,20 @@
                 siteKey: String(document.getElementById('setting-mealSiteKey')?.value || 'jedalen.sk').trim() || 'jedalen.sk',
                 institutionId: parseInt(document.getElementById('setting-mealInstitutionId')?.value || '0', 10) || 0,
                 sourceType: (String(document.getElementById('setting-mealSourceType')?.value || 'manual').toLowerCase() === 'server') ? 'server' : 'manual',
+                runtimeApiFetchEnabled: true,
+                runtimeRefreshIntervalSec: 300,
                 mealDisplayMode,
                 smallScreenPageSwitchSec,
+                mealScheduleEnabled: document.getElementById('setting-mealScheduleEnabled')?.checked !== false,
+                scheduleBreakfastUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleBreakfastUntil')?.value, '10:00'),
+                scheduleSnackAmUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleSnackAmUntil')?.value, '11:00'),
+                scheduleLunchUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleLunchUntil')?.value, '14:00'),
+                scheduleSnackPmUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleSnackPmUntil')?.value, '18:00'),
+                scheduleDinnerUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleDinnerUntil')?.value, '23:59'),
+                showTomorrowAfterMealPassed: document.getElementById('setting-showTomorrowAfterMealPassed')?.checked !== false,
                 mergeBreakfastSnack: document.getElementById('setting-mergeBreakfastSnack')?.checked !== false,
                 mergeLunchSnack: document.getElementById('setting-mergeLunchSnack')?.checked !== false,
-                language: (() => {
-                    const raw = String(document.getElementById('setting-mealLanguage')?.value || 'sk').toLowerCase().trim();
-                    return ['hu', 'sk', 'en'].includes(raw) ? raw : 'sk';
-                })(),
+                language: normalizeMealLanguage(document.getElementById('setting-mealLanguage')?.value || 'sk'),
                 showHeaderTitle: document.getElementById('setting-showHeaderTitle')?.checked !== false,
                 customHeaderTitle: String(document.getElementById('setting-customHeaderTitle')?.value || '').trim(),
                 showInstitutionName: document.getElementById('setting-showInstitutionName')?.checked !== false,
@@ -6558,10 +7358,13 @@
         }
 
         function collectRoomOccupancySettingsFromForm() {
+            const language = String(document.getElementById('setting-roomOccLanguage')?.value || resolveUiLang()).toLowerCase();
             return {
                 roomId: parseInt(document.getElementById('setting-roomOccRoomId')?.value || '0', 10) || 0,
                 showOnlyCurrent: document.getElementById('setting-roomOccShowOnlyCurrent')?.checked === true,
                 showNextCount: Math.max(1, Math.min(12, parseInt(document.getElementById('setting-roomOccShowNextCount')?.value || '4', 10) || 4)),
+                language: ['hu', 'sk', 'en'].includes(language) ? language : resolveUiLang(),
+                runtimeRefreshIntervalSec: Math.max(30, Math.min(3600, parseInt(document.getElementById('setting-roomOccRefreshSec')?.value || '60', 10) || 60)),
                 apiBaseUrl: '../../api/room_occupancy.php'
             };
         }
@@ -6607,7 +7410,7 @@
                 Object.assign(newSettings, withOverlay);
             }
 
-            if (moduleKey === 'meal-menu' && String(newSettings.mealDisplayMode || 'small_screen').toLowerCase() !== 'large_screen') {
+            if (moduleKey === 'meal-menu' && !isMealLargeScreenMode(newSettings.mealDisplayMode)) {
                 newSettings.clockOverlayEnabled = false;
                 newSettings.textOverlayEnabled = false;
             }
@@ -6846,6 +7649,7 @@
             if (settings.textCollectionId !== undefined) params.append('textCollectionId', settings.textCollectionId);
             if (settings.textCollectionLabel) params.append('textCollectionLabel', settings.textCollectionLabel);
             if (settings.textCollectionVersionTs !== undefined) params.append('textCollectionVersionTs', settings.textCollectionVersionTs);
+            if (settings.textExternalUrl) params.append('textExternalUrl', settings.textExternalUrl);
             params.append('text', settings.text || '');
             params.append('durationSeconds', String(parseInt(module.duration_seconds || 10, 10) || 10));
             if (settings.fontFamily) params.append('fontFamily', settings.fontFamily);
@@ -6861,6 +7665,13 @@
             if (settings.scrollStartPauseMs !== undefined) params.append('scrollStartPauseMs', settings.scrollStartPauseMs);
             if (settings.scrollEndPauseMs !== undefined) params.append('scrollEndPauseMs', settings.scrollEndPauseMs);
             if (settings.scrollSpeedPxPerSec !== undefined) params.append('scrollSpeedPxPerSec', settings.scrollSpeedPxPerSec);
+            if (settings.clockOverlayEnabled === true) {
+                params.append('clockOverlayEnabled', 'true');
+                params.append('clockOverlayPosition', settings.clockOverlayPosition === 'bottom' ? 'bottom' : 'top');
+                params.append('clockOverlayHeightPercent', '30');
+                params.append('clockOverlayTimeColor', settings.clockOverlayTimeColor || '#ffffff');
+                params.append('clockOverlayDateColor', settings.clockOverlayDateColor || '#ffffff');
+            }
             if (settings.bgImageData) {
                 try {
                     const storageKey = `text_bg_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -6880,12 +7691,14 @@
                 params.append('pdfDataKey', dataKey);
             }
             if (settings.zoomLevel !== undefined) params.append('zoomLevel', settings.zoomLevel);
+            if (settings.horizontalStartPercent !== undefined) params.append('horizontalStartPercent', settings.horizontalStartPercent);
 
             const autoScrollEnabled = settings.autoScrollEnabled === true || settings.navigationMode === 'auto';
             params.append('autoScrollEnabled', autoScrollEnabled ? 'true' : 'false');
             if (settings.autoScrollSpeedPxPerSec !== undefined) params.append('autoScrollSpeedPxPerSec', settings.autoScrollSpeedPxPerSec);
             if (settings.autoScrollStartPauseMs !== undefined) params.append('autoScrollStartPauseMs', settings.autoScrollStartPauseMs);
             if (settings.autoScrollEndPauseMs !== undefined) params.append('autoScrollEndPauseMs', settings.autoScrollEndPauseMs);
+            if (settings.autoScrollSectionsJson !== undefined) params.append('autoScrollSectionsJson', settings.autoScrollSectionsJson);
 
             if (settings.pauseAtPercent !== undefined) {
                 params.append('pauseAtPercent', settings.pauseAtPercent);
@@ -6919,14 +7732,16 @@
         function appendMealMenuPreviewParams(params, settings) {
             const mealTextFontSize = Math.max(0.8, Math.min(4, parseFloat(settings.mealTextFontSize || 1.85) || 1.85));
             const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
-            const smallScreenPageSwitchSec = Math.max(5, Math.min(60, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const mealDisplayMode = normalizeMealDisplayMode(settings.mealDisplayMode);
+            const language = normalizeMealLanguage(settings.language);
             params.append('siteKey', String(settings.siteKey || 'jedalen.sk'));
             params.append('institutionId', String(parseInt(settings.institutionId || 0, 10) || 0));
-            params.append('mealDisplayMode', String(settings.mealDisplayMode || 'small_screen'));
+            params.append('mealDisplayMode', mealDisplayMode);
             params.append('smallScreenPageSwitchSec', String(smallScreenPageSwitchSec));
             params.append('mergeBreakfastSnack', settings.mergeBreakfastSnack === false ? 'false' : 'true');
             params.append('mergeLunchSnack', settings.mergeLunchSnack === false ? 'false' : 'true');
-            params.append('language', ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : 'sk');
+            params.append('language', language);
             params.append('showHeaderTitle', settings.showHeaderTitle === false ? 'false' : 'true');
             params.append('customHeaderTitle', String(settings.customHeaderTitle || ''));
             params.append('showInstitutionName', settings.showInstitutionName === false ? 'false' : 'true');
@@ -6951,6 +7766,7 @@
             params.append('sourceUrl', String(settings.sourceUrl || ''));
             params.append('apiBaseUrl', settings.apiBaseUrl || '../../api/meal_plan.php');
             params.append('runtimeApiFetchEnabled', 'true');
+            params.append('runtimeRefreshIntervalSec', String(Math.max(60, Math.min(3600, parseInt(settings.runtimeRefreshIntervalSec || 300, 10) || 300))));
             if (companyId > 0) {
                 params.append('company_id', String(companyId));
             }
@@ -6960,6 +7776,9 @@
             params.append('roomId', String(parseInt(settings.roomId || 0, 10) || 0));
             params.append('showOnlyCurrent', settings.showOnlyCurrent === true ? 'true' : 'false');
             params.append('showNextCount', String(Math.max(1, Math.min(12, parseInt(settings.showNextCount || 4, 10) || 4))));
+            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toLowerCase() : resolveUiLang();
+            params.append('language', language);
+            params.append('runtimeRefreshIntervalSec', String(Math.max(30, Math.min(3600, parseInt(settings.runtimeRefreshIntervalSec || 60, 10) || 60))));
             params.append('apiBaseUrl', settings.apiBaseUrl || '../../api/room_occupancy.php');
             if (companyId > 0) {
                 params.append('company_id', String(companyId));
@@ -7097,7 +7916,7 @@
         }
 
         function getClockLoopItemSummary(settings) {
-            const type = settings.type === 'analog' ? 'Analóg' : 'Digitális';
+            const type = settings.type === 'analog' ? clockUiText('type_analog') : clockUiText('type_digital');
             const details = [type];
             const dateInlineEnabled = settings.dateInline === true || String(settings.dateInline) === 'true';
 
@@ -7106,11 +7925,11 @@
             }
 
             if (dateInlineEnabled) {
-                details.push(settings.weekdayPosition === 'right' ? 'dátum|nap' : 'nap|dátum');
+                details.push(settings.weekdayPosition === 'right' ? clockUiText('summary_date_day') : clockUiText('summary_day_date'));
             }
 
             const language = formatLanguageCode(settings.language);
-            return `${details.join(' • ')}<br>Nyelv: ${language}`;
+            return `${details.join(' • ')}<br>${clockUiText('language_label')} ${language}`;
         }
 
         function getTextLoopItemSummary(settings) {
@@ -7191,9 +8010,10 @@
 
         function getRoomOccupancyLoopItemSummary(settings) {
             const roomId = parseInt(settings.roomId || 0, 10) || 0;
-            const onlyCurrent = settings.showOnlyCurrent === true ? 'csak aktuális' : 'napi lista';
+            const onlyCurrent = settings.showOnlyCurrent === true ? roomOccUiText('summary_only_current') : roomOccUiText('summary_daily_list');
             const nextCount = Math.max(1, Math.min(12, parseInt(settings.showNextCount || 4, 10) || 4));
-            return `terem #${roomId}<br>${onlyCurrent} • következő: ${nextCount}`;
+            const language = ['hu', 'sk', 'en'].includes(String(settings.language || '').toLowerCase()) ? String(settings.language).toUpperCase() : resolveUiLang().toUpperCase();
+            return `${roomOccUiText('summary_room')} #${roomId}<br>${onlyCurrent} • ${roomOccUiText('summary_next')}: ${nextCount} • ${roomOccUiText('summary_lang')}: ${language}`;
         }
 
         function getLoopItemSummary(item) {
@@ -7233,7 +8053,7 @@
             }
 
             if (moduleKey === 'turned-off') {
-                return 'Kijelző kikapcsolási idősáv';
+                return loopUiText('turned_off_period');
             }
 
             return '';
@@ -7555,7 +8375,7 @@
                 .map(([value, count]) => ({
                     value,
                     count,
-                    label: `${value} (${resolutionAspectLabel(value)}) • ${count} kijelző`
+                    label: `${value} (${resolutionAspectLabel(value)}) • ${count} ${localizedDisplayUnit(count)}`
                 }));
 
             return ranked;

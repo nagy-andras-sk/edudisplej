@@ -20,6 +20,11 @@ Ez a teljes audit a **EduDisplej Control Panel** biztonsági és teljesítmény 
 
 ## 📄 AUDIT DOKUMENTÁCIÓK
 
+### 🧭 ÜZEMELTETÉSI / SZINKRON DOKUMENTÁCIÓK
+
+- [MODUL_SYNC_KEPEK_ETREND_ADATFOLYAM.md](MODUL_SYNC_KEPEK_ETREND_ADATFOLYAM.md)  
+  Részletes, implementáció-közeli leírás a modul sync folyamatáról (képek, PDF/videó assetek, étrend prefetch/offline cache, loop frissítési trigger logika).
+
 ### 1. 📖 [README_AUDIT.md](README_AUDIT.md)
 **Olvasási idő:** 15-20 perc  
 **Hossz:** ~12 KB
@@ -232,6 +237,23 @@ Ez a teljes audit a **EduDisplej Control Panel** biztonsági és teljesítmény 
 - ✅ javasolt fejlesztői minta új modulokhoz
 
 🧩 **Ajánlott olvasmány minden modulfejlesztőnek és karbantartónak.**
+
+---
+
+### 10. 🍽️ [MEAL_MODULE_DETAILED_GUIDE.md](MEAL_MODULE_DETAILED_GUIDE.md)
+**Olvasási idő:** 12-18 perc  
+**Típus:** Részletes működési dokumentáció
+
+🎯 **Étrend modul end-to-end működése: backend lekérések, fallbackek, runtime döntési ágak**
+
+**Tartalma:**
+- ✅ mikor melyik backend kér adatot (`server` / `manual` / prefetch / runtime API)
+- ✅ `action=menu` API döntési logika (`exact_date`, jövő/múlt fallback, 14 napos korlát)
+- ✅ renderer indulási sorrend (inline/cache/API/offline/hard fallback)
+- ✅ időalapú meal láthatóság + holnapi preview működése
+- ✅ miért előnyös ez az architektúra üzemben (gyors indulás, hibatűrés, terheléskezelés)
+
+🛠️ **Ajánlott olvasmány meal modul hibakereséshez és fejlesztéshez.**
 
 ---
 

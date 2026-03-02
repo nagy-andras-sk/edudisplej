@@ -54,8 +54,8 @@ if ($company_id <= 0) {
 $groups = [];
 $kiosks_by_group = [];
 $module_catalog = [
-    'text' => ['id' => 0, 'name' => 'Text'],
-    'image-gallery' => ['id' => 0, 'name' => 'Képgaléria'],
+    'text' => ['id' => 0, 'name' => t_def('group_loop.module_name.text', 'Text')],
+    'image-gallery' => ['id' => 0, 'name' => t_def('group_loop.module_name.image_gallery', 'Image gallery')],
     'pdf' => ['id' => 0, 'name' => 'PDF'],
 ];
 $error = '';
@@ -126,7 +126,7 @@ try {
 
     closeDbConnection($conn);
 } catch (Throwable $e) {
-    $error = 'Nem sikerült betölteni az egyszerű dashboard adatokat.';
+    $error = t_def('easy_user.error.load_dashboard', 'Nepodarilo sa načítať údaje jednoduchého dashboardu.');
     error_log('easy_user.php: ' . $e->getMessage());
 }
 
@@ -190,17 +190,17 @@ include __DIR__ . '/../admin/header.php';
 
 <div class="easy-page-grid">
     <div class="panel">
-        <div class="panel-title">Gyors útmutató</div>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('easy_user.quick_guide.title', 'Rýchly návod')); ?></div>
         <ol class="easy-tutorial-list">
-            <li>Nézd át az aktív tervet és az időzített blokkokat.</li>
-            <li>Csak azokat a modulokat szerkeszd, amelyek szerepelnek a tervben.</li>
-            <li>Az azonnali szöveg kiírást 24 órás formátumban add meg, legfeljebb 3 órára.</li>
-            <li>Több azonnali kiírás is létrehozható egymás után.</li>
+            <li><?php echo htmlspecialchars(t_def('easy_user.quick_guide.item1', 'Skontrolujte aktívny plán a časované bloky.')); ?></li>
+            <li><?php echo htmlspecialchars(t_def('easy_user.quick_guide.item2', 'Upravujte len moduly, ktoré sú súčasťou plánu.')); ?></li>
+            <li><?php echo htmlspecialchars(t_def('easy_user.quick_guide.item3', 'Okamžitý text zadávajte v 24-hodinovom formáte, maximálne na 3 hodiny.')); ?></li>
+            <li><?php echo htmlspecialchars(t_def('easy_user.quick_guide.item4', 'Môžete vytvoriť viac okamžitých oznamov po sebe.')); ?></li>
         </ol>
     </div>
     <div class="panel">
-        <div class="panel-title">Munkamenet lépései</div>
-        <div class="muted"><strong>1.</strong> Aktív terv áttekintése • <strong>2.</strong> Terv tartalmainak módosítása • <strong>3.</strong> Azonnali szöveg kiírás ütemezése</div>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('easy_user.workflow.title', 'Kroky postupu')); ?></div>
+        <div class="muted"><strong>1.</strong> <?php echo htmlspecialchars(t_def('easy_user.step1.title', 'Prehľad aktívneho plánu')); ?> • <strong>2.</strong> <?php echo htmlspecialchars(t_def('easy_user.step2.title', 'Úprava obsahu plánu')); ?> • <strong>3.</strong> <?php echo htmlspecialchars(t_def('easy_user.step3.title', 'Naplánovanie okamžitého textu')); ?></div>
     </div>
 </div>
 
@@ -210,7 +210,7 @@ include __DIR__ . '/../admin/header.php';
 
 <?php if (empty($groups)): ?>
     <div class="panel">
-        <div class="muted">Nincs csoport ehhez az intézményhez.</div>
+        <div class="muted"><?php echo htmlspecialchars(t_def('easy_user.no_groups', 'Pre túto inštitúciu nie je vytvorená žiadna skupina.')); ?></div>
     </div>
 <?php else: ?>
     <?php foreach ($groups as $group): ?>
@@ -219,23 +219,23 @@ include __DIR__ . '/../admin/header.php';
             <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                 <div>
                     <div class="panel-title" style="margin:0;"><?php echo htmlspecialchars($group['name']); ?></div>
-                    <div class="muted" id="easy-plan-summary-<?php echo $gid; ?>">Terv betöltése…</div>
+                    <div class="muted" id="easy-plan-summary-<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('easy_user.plan_loading', 'Načítavam plán…')); ?></div>
                 </div>
                 <div class="muted" id="easy-save-state-<?php echo $gid; ?>"></div>
             </div>
 
             <div class="easy-step" style="margin-top:10px;">
-                <h4>Kijelzők a csoportban</h4>
+                <h4><?php echo htmlspecialchars(t_def('easy_user.group_displays', 'Displeje v skupine')); ?></h4>
                 <div style="margin-top:6px;">
                     <?php if (empty($kiosks_by_group[$gid])): ?>
-                        <span class="muted">Nincs hozzárendelt kijelző.</span>
+                        <span class="muted"><?php echo htmlspecialchars(t_def('easy_user.no_assigned_displays', 'Nie je priradený žiadny displej.')); ?></span>
                     <?php else: ?>
                         <table class="easy-kiosk-table">
                             <thead>
                                 <tr>
-                                    <th>Kijelző</th>
-                                    <th>Hely</th>
-                                    <th>Állapot</th>
+                                    <th><?php echo htmlspecialchars(t_def('easy_user.col.display', 'Displej')); ?></th>
+                                    <th><?php echo htmlspecialchars(t_def('easy_user.col.location', 'Miesto')); ?></th>
+                                    <th><?php echo htmlspecialchars(t_def('easy_user.col.status', 'Stav')); ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -244,7 +244,7 @@ include __DIR__ . '/../admin/header.php';
                                     <tr>
                                         <td><?php echo htmlspecialchars($kiosk['name']); ?></td>
                                         <td><?php echo htmlspecialchars($kiosk['location'] !== '' ? $kiosk['location'] : '—'); ?></td>
-                                        <td><?php echo $online ? '🟢 Online' : '🔴 Offline'; ?></td>
+                                        <td><?php echo $online ? htmlspecialchars(t_def('easy_user.status.online', '🟢 Online')) : htmlspecialchars(t_def('easy_user.status.offline', '🔴 Offline')); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -254,73 +254,73 @@ include __DIR__ . '/../admin/header.php';
             </div>
 
             <div class="easy-step">
-                <h4>1. Aktív terv áttekintése</h4>
-                <div class="muted">A DEFAULT terv akkor fut, amikor nincs aktív időzített blokk.</div>
-                <div id="easy-schedule-<?php echo $gid; ?>" class="muted" style="margin-top:6px;">Betöltés…</div>
+                <h4>1. <?php echo htmlspecialchars(t_def('easy_user.step1.title', 'Prehľad aktívneho plánu')); ?></h4>
+                <div class="muted"><?php echo htmlspecialchars(t_def('easy_user.step1.subtitle', 'DEFAULT plán beží, keď nie je aktívny žiadny časovaný blok.')); ?></div>
+                <div id="easy-schedule-<?php echo $gid; ?>" class="muted" style="margin-top:6px;"><?php echo htmlspecialchars(t_def('easy_user.loading', 'Načítavam…')); ?></div>
             </div>
 
             <div class="easy-step">
-                <h4>2. Terv tartalmainak módosítása</h4>
-                <div class="muted" style="margin-top:2px;">Csak azok a modulok szerkeszthetők, amelyek szerepelnek a tervben.</div>
+                <h4>2. <?php echo htmlspecialchars(t_def('easy_user.step2.title', 'Úprava obsahu plánu')); ?></h4>
+                <div class="muted" style="margin-top:2px;"><?php echo htmlspecialchars(t_def('easy_user.step2.subtitle', 'Upravovať sa dajú len moduly, ktoré sú súčasťou plánu.')); ?></div>
 
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-                    <button type="button" class="btn" data-action="open-text" data-group-id="<?php echo $gid; ?>" style="display:none;">Szöveg szerkesztése</button>
-                    <button type="button" class="btn" data-action="open-gallery" data-group-id="<?php echo $gid; ?>" style="display:none;">Képgaléria szerkesztése</button>
-                    <button type="button" class="btn" data-action="open-pdf" data-group-id="<?php echo $gid; ?>" style="display:none;">PDF szerkesztése</button>
+                    <button type="button" class="btn" data-action="open-text" data-group-id="<?php echo $gid; ?>" style="display:none;"><?php echo htmlspecialchars(t_def('easy_user.button.edit_text', 'Upraviť text')); ?></button>
+                    <button type="button" class="btn" data-action="open-gallery" data-group-id="<?php echo $gid; ?>" style="display:none;"><?php echo htmlspecialchars(t_def('easy_user.button.edit_gallery', 'Upraviť galériu obrázkov')); ?></button>
+                    <button type="button" class="btn" data-action="open-pdf" data-group-id="<?php echo $gid; ?>" style="display:none;"><?php echo htmlspecialchars(t_def('easy_user.button.edit_pdf', 'Upraviť PDF')); ?></button>
                 </div>
 
                 <div id="easy-text-editor-<?php echo $gid; ?>" style="display:none; margin-top:10px;">
-                    <label for="easy-text-<?php echo $gid; ?>" style="display:block; font-weight:600; margin-bottom:4px;">Szöveg tartalom</label>
+                    <label for="easy-text-<?php echo $gid; ?>" style="display:block; font-weight:600; margin-bottom:4px;"><?php echo htmlspecialchars(t_def('easy_user.text_content', 'Obsah textu')); ?></label>
                     <textarea id="easy-text-<?php echo $gid; ?>" rows="6" style="width:100%;"></textarea>
                     <div style="margin-top:8px;">
-                        <button type="button" class="btn btn-primary" data-action="save-text" data-group-id="<?php echo $gid; ?>">Mentés</button>
+                        <button type="button" class="btn btn-primary" data-action="save-text" data-group-id="<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('common.save', 'Uložiť')); ?></button>
                     </div>
                 </div>
 
                 <div id="easy-gallery-editor-<?php echo $gid; ?>" style="display:none; margin-top:10px;">
-                    <label for="easy-gallery-urls-<?php echo $gid; ?>" style="display:block; font-weight:600; margin-bottom:4px;">Kép URL-ek (soronként 1)</label>
+                    <label for="easy-gallery-urls-<?php echo $gid; ?>" style="display:block; font-weight:600; margin-bottom:4px;"><?php echo htmlspecialchars(t_def('easy_user.gallery_urls', 'URL obrázkov (1 na riadok)')); ?></label>
                     <textarea id="easy-gallery-urls-<?php echo $gid; ?>" rows="6" style="width:100%;"></textarea>
                     <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                         <input type="file" id="easy-gallery-upload-<?php echo $gid; ?>" accept="image/*" multiple>
-                        <button type="button" class="btn" data-action="upload-gallery" data-group-id="<?php echo $gid; ?>">Feltöltés és hozzáadás</button>
-                        <button type="button" class="btn btn-primary" data-action="save-gallery" data-group-id="<?php echo $gid; ?>">Mentés</button>
+                        <button type="button" class="btn" data-action="upload-gallery" data-group-id="<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('easy_user.button.upload_add', 'Nahrať a pridať')); ?></button>
+                        <button type="button" class="btn btn-primary" data-action="save-gallery" data-group-id="<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('common.save', 'Uložiť')); ?></button>
                     </div>
                 </div>
 
                 <div id="easy-pdf-editor-<?php echo $gid; ?>" style="display:none; margin-top:10px;">
-                    <div class="muted" id="easy-pdf-current-<?php echo $gid; ?>">Nincs PDF kiválasztva.</div>
+                    <div class="muted" id="easy-pdf-current-<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('easy_user.pdf_none_selected', 'Nie je vybrané žiadne PDF.')); ?></div>
                     <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                         <input type="file" id="easy-pdf-upload-<?php echo $gid; ?>" accept="application/pdf">
-                        <button type="button" class="btn btn-primary" data-action="save-pdf" data-group-id="<?php echo $gid; ?>">PDF feltöltés és mentés</button>
+                        <button type="button" class="btn btn-primary" data-action="save-pdf" data-group-id="<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('easy_user.button.upload_save_pdf', 'Nahrať PDF a uložiť')); ?></button>
                     </div>
                 </div>
             </div>
 
             <div class="easy-step">
-                <h4>3. Azonnali szöveg kiírás</h4>
-                <div class="muted" style="margin-top:2px;">24 órás időformátum, maximum 3 órás időtartam. Több kiírás is menthető.</div>
+                <h4>3. <?php echo htmlspecialchars(t_def('easy_user.step3.title', 'Naplánovanie okamžitého textu')); ?></h4>
+                <div class="muted" style="margin-top:2px;"><?php echo htmlspecialchars(t_def('easy_user.step3.subtitle', '24-hodinový formát, maximálne 3 hodiny. Môžete uložiť viac oznamov.')); ?></div>
 
-                <label for="easy-sos-text-<?php echo $gid; ?>" style="display:block; margin-top:8px;">Szöveg</label>
+                <label for="easy-sos-text-<?php echo $gid; ?>" style="display:block; margin-top:8px;"><?php echo htmlspecialchars(t_def('group_loop.module_name.text', 'Text')); ?></label>
                 <textarea id="easy-sos-text-<?php echo $gid; ?>" rows="4" style="width:100%;"></textarea>
 
                 <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin-top:8px;">
                     <div>
-                        <label for="easy-sos-start-<?php echo $gid; ?>">Kezdés</label>
+                        <label for="easy-sos-start-<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('easy_user.start', 'Začiatok')); ?></label>
                         <input type="datetime-local" id="easy-sos-start-<?php echo $gid; ?>" style="width:100%;" step="60">
                     </div>
                     <div>
-                        <label for="easy-sos-end-<?php echo $gid; ?>">Vége</label>
+                        <label for="easy-sos-end-<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('easy_user.end', 'Koniec')); ?></label>
                         <input type="datetime-local" id="easy-sos-end-<?php echo $gid; ?>" style="width:100%;" step="60">
                     </div>
                 </div>
 
                 <label style="display:flex; align-items:center; gap:8px; margin-top:8px;">
                     <input type="checkbox" id="easy-sos-show-datetime-<?php echo $gid; ?>" checked>
-                    <span>Dátum/óra megjelenítése a szövegben</span>
+                    <span><?php echo htmlspecialchars(t_def('easy_user.show_datetime', 'Zobraziť dátum/čas v texte')); ?></span>
                 </label>
 
                 <div style="margin-top:8px;">
-                    <button type="button" class="btn btn-primary" data-action="save-sos" data-group-id="<?php echo $gid; ?>">Azonnali kiírás mentése</button>
+                    <button type="button" class="btn btn-primary" data-action="save-sos" data-group-id="<?php echo $gid; ?>"><?php echo htmlspecialchars(t_def('easy_user.button.save_sos', 'Uložiť okamžitý oznam')); ?></button>
                 </div>
             </div>
         </div>
@@ -335,6 +335,57 @@ include __DIR__ . '/../admin/header.php';
         moduleCatalog: <?php echo json_encode($module_catalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
         groups: <?php echo json_encode(array_map(static fn($g) => ['id' => (int)$g['id'], 'name' => (string)$g['name']], $groups), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
         apiPrefix: <?php echo json_encode($api_prefix, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+    };
+
+    const EASY_I18N = {
+        planHashPrefix: <?php echo json_encode(t_def('easy_user.plan_hash_prefix', 'Plán #'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        defaultPlanNoSchedule: <?php echo json_encode(t_def('easy_user.default_plan_no_schedule', 'DEFAULT (bez plánu)'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        noScheduledBlocks: <?php echo json_encode(t_def('easy_user.no_scheduled_blocks', 'Nie je naplánovaný žiadny blok. DEFAULT plán beží celý deň.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        colWhen: <?php echo json_encode(t_def('easy_user.col.when', 'Kedy'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        colTime: <?php echo json_encode(t_def('common.time', 'Čas'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        colPlan: <?php echo json_encode(t_def('easy_user.col.plan', 'Plán'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        loading: <?php echo json_encode(t_def('easy_user.loading', 'Načítavam…'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        saving: <?php echo json_encode(t_def('easy_user.saving', 'Ukladám…'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        modulesEditablePrefix: <?php echo json_encode(t_def('easy_user.modules_editable_prefix', 'Moduly upraviteľné v pláne:'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        noScheduledSupportedModules: <?php echo json_encode(t_def('easy_user.no_scheduled_supported_modules', 'Nie je naplánovaný text/galéria/PDF modul.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        moduleText: <?php echo json_encode(t_def('group_loop.module_name.text', 'Text'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        moduleGallery: <?php echo json_encode(t_def('group_loop.module_name.image_gallery', 'Galéria obrázkov'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        modulePdf: <?php echo json_encode(t_def('group_loop.module_name.pdf', 'PDF'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        currentPdfPrefix: <?php echo json_encode(t_def('easy_user.current_pdf_prefix', 'Aktuálne PDF:'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        pdfNoneSelected: <?php echo json_encode(t_def('easy_user.pdf_none_selected', 'Nie je vybrané žiadne PDF.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errPrefix: <?php echo json_encode(t_def('common.error_prefix', 'Chyba:'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errNoLoadedPlan: <?php echo json_encode(t_def('easy_user.error.no_loaded_plan', 'Pre túto skupinu nie je načítaný plán.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errNoScheduledText: <?php echo json_encode(t_def('easy_user.error.no_scheduled_text', 'V tejto skupine nie je naplánovaný textový modul.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errNoScheduledGallery: <?php echo json_encode(t_def('easy_user.error.no_scheduled_gallery', 'V tejto skupine nie je naplánovaný modul galérie obrázkov.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errNoScheduledPdf: <?php echo json_encode(t_def('easy_user.error.no_scheduled_pdf', 'V tejto skupine nie je naplánovaný PDF modul.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errSelectAtLeastOneImage: <?php echo json_encode(t_def('easy_user.error.select_image', 'Vyberte aspoň 1 obrázok.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errSelectPdf: <?php echo json_encode(t_def('easy_user.error.select_pdf', 'Vyberte PDF súbor.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errPdfUpload: <?php echo json_encode(t_def('easy_user.error.pdf_upload', 'Chyba nahrávania PDF'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errImageUpload: <?php echo json_encode(t_def('easy_user.error.image_upload', 'Chyba nahrávania obrázka'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errSetStartEnd: <?php echo json_encode(t_def('easy_user.error.set_start_end', 'Zadajte čas začiatku a konca.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errEndAfterStart: <?php echo json_encode(t_def('easy_user.error.end_after_start', 'Koniec musí byť neskôr ako začiatok.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errMaxWeekAhead: <?php echo json_encode(t_def('easy_user.error.max_week_ahead', 'Plánovať možno najviac 1 týždeň dopredu.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errMax3Hours: <?php echo json_encode(t_def('easy_user.error.max_3_hours', 'Okamžitý oznam môže trvať najviac 3 hodiny.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errSosTextRequired: <?php echo json_encode(t_def('easy_user.error.sos_text_required', 'Text okamžitého oznamu je povinný.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        errTextModuleDisabled: <?php echo json_encode(t_def('easy_user.error.text_module_disabled', 'Textový modul nie je pre túto inštitúciu povolený.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        sosNamePrefix: <?php echo json_encode(t_def('easy_user.sos_name_prefix', 'Okamžitý'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        sosDescription: <?php echo json_encode(t_def('easy_user.sos_description', 'Okamžité textové oznámenie'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        sosBlockName: <?php echo json_encode(t_def('easy_user.sos_block_name', 'Okamžitý text'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        savedText: <?php echo json_encode(t_def('easy_user.saved.text', 'Text uložený.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        savedGallery: <?php echo json_encode(t_def('easy_user.saved.gallery', 'Galéria obrázkov uložená.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        savedPdf: <?php echo json_encode(t_def('easy_user.saved.pdf', 'PDF uložené.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        savedSos: <?php echo json_encode(t_def('easy_user.saved.sos', 'Okamžitý oznam uložený.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        uploadedGalleryPendingSave: <?php echo json_encode(t_def('easy_user.saved.gallery_uploaded_pending', 'Obrázky nahraté, ešte uložte modul.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        unknownError: <?php echo json_encode(t_def('easy_user.error.unknown', 'Neznáma chyba.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        dayShort: {
+            1: <?php echo json_encode(t_def('day.short.1', 'Po'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            2: <?php echo json_encode(t_def('day.short.2', 'Ut'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            3: <?php echo json_encode(t_def('day.short.3', 'St'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            4: <?php echo json_encode(t_def('day.short.4', 'Št'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            5: <?php echo json_encode(t_def('day.short.5', 'Pi'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            6: <?php echo json_encode(t_def('day.short.6', 'So'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+            7: <?php echo json_encode(t_def('day.short.7', 'Ne'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+        }
     };
 
     const planState = new Map();
@@ -419,20 +470,18 @@ include __DIR__ . '/../admin/header.php';
         (Array.isArray(plan.loop_styles) ? plan.loop_styles : []).forEach((style) => {
             const id = parseInt(style.id || 0, 10);
             if (id > 0) {
-                map.set(id, String(style.name || `Terv #${id}`));
+                map.set(id, String(style.name || `${EASY_I18N.planHashPrefix}${id}`));
             }
         });
         return map;
     };
 
-    const dayShort = {
-        1: 'H', 2: 'K', 3: 'Sze', 4: 'Cs', 5: 'P', 6: 'Szo', 7: 'V'
-    };
+    const dayShort = EASY_I18N.dayShort;
 
     const formatScheduleHtml = (plan) => {
         const blocks = Array.isArray(plan.schedule_blocks) ? plan.schedule_blocks : [];
         if (blocks.length === 0) {
-            return '<span class="muted">Nincs időzített blokk. A DEFAULT terv fut egész nap.</span>';
+            return `<span class="muted">${escapeHtml(EASY_I18N.noScheduledBlocks)}</span>`;
         }
 
         const styleMap = styleNameMap(plan);
@@ -446,7 +495,7 @@ include __DIR__ . '/../admin/header.php';
             const start = String(block.start_time || '00:00:00').slice(0, 5);
             const end = String(block.end_time || '00:00:00').slice(0, 5);
             const styleId = parseInt(block.loop_style_id || 0, 10);
-            const styleLabel = escapeHtml(styleMap.get(styleId) || (styleId > 0 ? `Terv #${styleId}` : 'DEFAULT (nincs terv)'));
+            const styleLabel = escapeHtml(styleMap.get(styleId) || (styleId > 0 ? `${EASY_I18N.planHashPrefix}${styleId}` : EASY_I18N.defaultPlanNoSchedule));
             let when = '';
             if (type === 'date') {
                 when = escapeHtml(String(block.specific_date || '—'));
@@ -464,7 +513,7 @@ include __DIR__ . '/../admin/header.php';
 
         return `
             <table class="easy-schedule-table">
-                <thead><tr><th>Mikor</th><th>Idő</th><th>Terv</th></tr></thead>
+                <thead><tr><th>${escapeHtml(EASY_I18N.colWhen)}</th><th>${escapeHtml(EASY_I18N.colTime)}</th><th>${escapeHtml(EASY_I18N.colPlan)}</th></tr></thead>
                 <tbody>${rows.join('')}</tbody>
             </table>
         `;
@@ -567,12 +616,12 @@ include __DIR__ . '/../admin/header.php';
 
         if (textArea) textArea.value = firstText;
         if (galleryArea) galleryArea.value = firstGalleryUrls.join('\n');
-        if (pdfCurrent) pdfCurrent.textContent = firstPdfUrl ? `Aktuális PDF: ${firstPdfUrl}` : 'Nincs PDF kiválasztva.';
+        if (pdfCurrent) pdfCurrent.textContent = firstPdfUrl ? `${EASY_I18N.currentPdfPrefix} ${firstPdfUrl}` : EASY_I18N.pdfNoneSelected;
     };
 
     const loadGroup = async (groupId) => {
         try {
-            setSaveState(groupId, 'Betöltés…');
+            setSaveState(groupId, EASY_I18N.loading);
             const plan = await apiGetPlan(groupId);
             planState.set(groupId, plan);
 
@@ -585,12 +634,12 @@ include __DIR__ . '/../admin/header.php';
             if (summaryEl) {
                 const mods = detectScheduledModules(plan);
                 const labels = [];
-                if (mods.text) labels.push('szöveg');
-                if (mods.gallery) labels.push('képgaléria');
-                if (mods.pdf) labels.push('pdf');
+                if (mods.text) labels.push(EASY_I18N.moduleText.toLowerCase());
+                if (mods.gallery) labels.push(EASY_I18N.moduleGallery.toLowerCase());
+                if (mods.pdf) labels.push(EASY_I18N.modulePdf.toLowerCase());
                 summaryEl.textContent = labels.length > 0
-                    ? `A tervben szerkeszthető modulok: ${labels.join(', ')}`
-                    : 'Nincs ütemezett text/képgaléria/pdf modul.';
+                    ? `${EASY_I18N.modulesEditablePrefix} ${labels.join(', ')}`
+                    : EASY_I18N.noScheduledSupportedModules;
             }
 
             refreshEditorButtons(groupId, plan);
@@ -606,14 +655,14 @@ include __DIR__ . '/../admin/header.php';
                 endInput.value = toLocalDateTimeInputValue(end);
             }
         } catch (error) {
-            setSaveState(groupId, `Hiba: ${error?.message || 'ismeretlen hiba'}`, true);
+            setSaveState(groupId, `${EASY_I18N.errPrefix} ${error?.message || EASY_I18N.unknownError}`, true);
         }
     };
 
     const saveText = async (groupId) => {
         const plan = planState.get(groupId);
         if (!plan) {
-            throw new Error('Nincs betöltött terv ehhez a csoporthoz.');
+            throw new Error(EASY_I18N.errNoLoadedPlan);
         }
 
         const source = document.getElementById(`easy-text-${groupId}`)?.value || '';
@@ -624,7 +673,7 @@ include __DIR__ . '/../admin/header.php';
         });
 
         if (touched === 0) {
-            throw new Error('Nincs ütemezett szöveg modul ebben a csoportban.');
+            throw new Error(EASY_I18N.errNoScheduledText);
         }
 
         await apiSavePlan(groupId, plan);
@@ -634,7 +683,7 @@ include __DIR__ . '/../admin/header.php';
     const saveGallery = async (groupId) => {
         const plan = planState.get(groupId);
         if (!plan) {
-            throw new Error('Nincs betöltött terv ehhez a csoporthoz.');
+            throw new Error(EASY_I18N.errNoLoadedPlan);
         }
 
         const lines = String(document.getElementById(`easy-gallery-urls-${groupId}`)?.value || '')
@@ -648,7 +697,7 @@ include __DIR__ . '/../admin/header.php';
         });
 
         if (touched === 0) {
-            throw new Error('Nincs ütemezett képgaléria modul ebben a csoportban.');
+            throw new Error(EASY_I18N.errNoScheduledGallery);
         }
 
         await apiSavePlan(groupId, plan);
@@ -659,7 +708,7 @@ include __DIR__ . '/../admin/header.php';
         const fileInput = document.getElementById(`easy-gallery-upload-${groupId}`);
         const textArea = document.getElementById(`easy-gallery-urls-${groupId}`);
         if (!fileInput || !textArea || !fileInput.files || fileInput.files.length === 0) {
-            throw new Error('Válassz legalább 1 képet.');
+            throw new Error(EASY_I18N.errSelectAtLeastOneImage);
         }
 
         const urls = String(textArea.value || '')
@@ -681,7 +730,7 @@ include __DIR__ . '/../admin/header.php';
             });
             const data = await response.json();
             if (!response.ok || !data?.success || !data?.asset_url) {
-                throw new Error(data?.message || `Kép feltöltési hiba (${response.status})`);
+                throw new Error(data?.message || `${EASY_I18N.errImageUpload} (${response.status})`);
             }
 
             urls.push(String(data.asset_url));
@@ -697,13 +746,13 @@ include __DIR__ . '/../admin/header.php';
     const savePdf = async (groupId) => {
         const plan = planState.get(groupId);
         if (!plan) {
-            throw new Error('Nincs betöltött terv ehhez a csoporthoz.');
+            throw new Error(EASY_I18N.errNoLoadedPlan);
         }
 
         const fileInput = document.getElementById(`easy-pdf-upload-${groupId}`);
         const file = fileInput?.files?.[0];
         if (!file) {
-            throw new Error('Válassz egy PDF fájlt.');
+            throw new Error(EASY_I18N.errSelectPdf);
         }
 
         const formData = new FormData();
@@ -719,7 +768,7 @@ include __DIR__ . '/../admin/header.php';
         });
         const data = await response.json();
         if (!response.ok || !data?.success || !data?.asset_url) {
-            throw new Error(data?.message || `PDF feltöltési hiba (${response.status})`);
+            throw new Error(data?.message || `${EASY_I18N.errPdfUpload} (${response.status})`);
         }
 
         const touched = forEachModuleItem(plan, 'pdf', (item) => {
@@ -729,7 +778,7 @@ include __DIR__ . '/../admin/header.php';
         });
 
         if (touched === 0) {
-            throw new Error('Nincs ütemezett PDF modul ebben a csoportban.');
+            throw new Error(EASY_I18N.errNoScheduledPdf);
         }
 
         await apiSavePlan(groupId, plan);
@@ -740,7 +789,7 @@ include __DIR__ . '/../admin/header.php';
     const saveSos = async (groupId) => {
         const plan = planState.get(groupId);
         if (!plan) {
-            throw new Error('Nincs betöltött terv ehhez a csoporthoz.');
+            throw new Error(EASY_I18N.errNoLoadedPlan);
         }
 
         const startInput = document.getElementById(`easy-sos-start-${groupId}`);
@@ -751,31 +800,31 @@ include __DIR__ . '/../admin/header.php';
         const start = parseLocalDateTime(startInput?.value || '');
         const end = parseLocalDateTime(endInput?.value || '');
         if (!start || !end) {
-            throw new Error('Add meg a kezdés és vége időpontját.');
+            throw new Error(EASY_I18N.errSetStartEnd);
         }
         if (end <= start) {
-            throw new Error('A vége időpont legyen később, mint a kezdés.');
+            throw new Error(EASY_I18N.errEndAfterStart);
         }
 
         const now = new Date();
         const maxStart = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
         if (start > maxStart) {
-            throw new Error('Legfeljebb 1 hétre lehet előre ütemezni.');
+            throw new Error(EASY_I18N.errMaxWeekAhead);
         }
 
         const maxDurationMs = 3 * 60 * 60 * 1000;
         if ((end.getTime() - start.getTime()) > maxDurationMs) {
-            throw new Error('Legfeljebb 3 órás azonnali kiírás adható meg.');
+            throw new Error(EASY_I18N.errMax3Hours);
         }
 
         const rawText = String(textInput?.value || '').trim();
         if (rawText === '') {
-            throw new Error('Azonnali kiírás szövegének megadása kötelező.');
+            throw new Error(EASY_I18N.errSosTextRequired);
         }
 
         const textModuleMeta = bootstrap.moduleCatalog.text || { id: 0, name: 'Text' };
         if (!textModuleMeta.id) {
-            throw new Error('A text modul nincs engedélyezve ehhez az intézményhez.');
+            throw new Error(EASY_I18N.errTextModuleDisabled);
         }
 
         const pad = (n) => String(n).padStart(2, '0');
@@ -792,12 +841,12 @@ include __DIR__ . '/../admin/header.php';
 
         const sosStyle = {
             id: nextStyleId,
-            name: `Azonnali ${dateLabel}`,
+            name: `${EASY_I18N.sosNamePrefix} ${dateLabel}`,
             items: [{
                 module_id: parseInt(textModuleMeta.id || 0, 10),
                 module_name: String(textModuleMeta.name || 'Text'),
                 module_key: 'text',
-                description: 'Azonnali szöveg kiírás',
+                description: EASY_I18N.sosDescription,
                 duration_seconds: Math.max(10, Math.min(60, Math.floor((end.getTime() - start.getTime()) / 1000))),
                 settings: {
                     text: finalText,
@@ -812,7 +861,7 @@ include __DIR__ . '/../admin/header.php';
         const nextBlockId = Math.min(-1, ...plan.schedule_blocks.map((b) => parseInt(b.id || 0, 10)).filter((n) => Number.isFinite(n) && n < 0)) - 1;
         const sosBlock = {
             id: nextBlockId,
-            block_name: 'Azonnali szöveg',
+            block_name: EASY_I18N.sosBlockName,
             block_type: 'date',
             specific_date: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
             start_time: `${pad(start.getHours())}:${pad(start.getMinutes())}:00`,
@@ -848,7 +897,7 @@ include __DIR__ . '/../admin/header.php';
         if (!groupId) return;
 
         try {
-            setSaveState(groupId, 'Mentés…');
+            setSaveState(groupId, EASY_I18N.saving);
 
             if (action === 'open-text') {
                 toggleEditor(groupId, 'text');
@@ -868,37 +917,37 @@ include __DIR__ . '/../admin/header.php';
 
             if (action === 'save-text') {
                 await saveText(groupId);
-                setSaveState(groupId, 'Szöveg mentve.');
+                setSaveState(groupId, EASY_I18N.savedText);
                 return;
             }
 
             if (action === 'upload-gallery') {
                 await uploadGalleryImages(groupId);
-                setSaveState(groupId, 'Képek feltöltve, még mentsd a modult.');
+                setSaveState(groupId, EASY_I18N.uploadedGalleryPendingSave);
                 return;
             }
 
             if (action === 'save-gallery') {
                 await saveGallery(groupId);
-                setSaveState(groupId, 'Képgaléria mentve.');
+                setSaveState(groupId, EASY_I18N.savedGallery);
                 return;
             }
 
             if (action === 'save-pdf') {
                 await savePdf(groupId);
-                setSaveState(groupId, 'PDF mentve.');
+                setSaveState(groupId, EASY_I18N.savedPdf);
                 return;
             }
 
             if (action === 'save-sos') {
                 await saveSos(groupId);
-                setSaveState(groupId, 'Azonnali kiírás mentve.');
+                setSaveState(groupId, EASY_I18N.savedSos);
                 return;
             }
 
             setSaveState(groupId, '');
         } catch (error) {
-            setSaveState(groupId, error?.message || 'Ismeretlen hiba.', true);
+            setSaveState(groupId, error?.message || EASY_I18N.unknownError, true);
         }
     });
 

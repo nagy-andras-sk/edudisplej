@@ -57,6 +57,29 @@
             text-align: center;
             white-space: nowrap;
         }
+        #digital-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.2vh;
+        }
+        .clock-date-row {
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: 0.01em;
+            text-align: center;
+            white-space: nowrap;
+            pointer-events: none;
+            user-select: none;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+        }
+        #analog-date {
+            position: absolute;
+            left: 50%;
+            top: 79%;
+            transform: translateX(-50%);
+        }
     </style>
 </head>
 <body>
@@ -67,11 +90,15 @@
         const settings = {
             type: (params.get('type') || 'analog').toLowerCase() === 'digital' ? 'digital' : 'analog',
             format: (params.get('format') || '24h').toLowerCase() === '12h' ? '12h' : '24h',
+            dateFormat: (params.get('dateFormat') || 'dmy').toLowerCase(),
             timeColor: params.get('timeColor') || '#ffffff',
-            dateColor: params.get('dateColor') || '#ffffff',
+            dateColor: params.get('dateColor') || '#facc15',
             bgColor: params.get('bgColor') || '#000000',
             showSeconds: params.get('showSeconds') !== 'false',
+            showDate: params.get('showDate') !== 'false',
+            language: (params.get('language') || 'sk').toLowerCase(),
             timeFontSize: parseInt(params.get('timeFontSize'), 10) || parseInt(params.get('fontSize'), 10) || 150,
+            dateFontSize: parseInt(params.get('dateFontSize'), 10) || 48,
             digitalOverlayEnabled: params.get('digitalOverlayEnabled') === 'true',
             digitalOverlayPosition: (() => {
                 const value = String(params.get('digitalOverlayPosition') || 'auto').toLowerCase();
@@ -97,6 +124,43 @@
             return `${pad2(hours)}:${minutes}${settings.showSeconds ? ':' + seconds : ''}`;
         }
 
+        function getDayShort(dateObj) {
+            const days = {
+                sk: ['Ne', 'Po', 'Ut', 'St', 'Št', 'Pia', 'So'],
+                hu: ['V', 'H', 'K', 'Sze', 'Cs', 'P', 'Szo'],
+                en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+            };
+            const lang = ['sk', 'hu', 'en'].includes(settings.language) ? settings.language : 'sk';
+            return (days[lang] || days.sk)[dateObj.getDay()] || 'Po';
+        }
+
+        function formatDatePart(dateObj) {
+            const locale = settings.language === 'hu' ? 'hu-HU' : (settings.language === 'en' ? 'en-GB' : 'sk-SK');
+            const dd = pad2(dateObj.getDate());
+            const mm = pad2(dateObj.getMonth() + 1);
+            const yyyy = String(dateObj.getFullYear());
+
+            switch (settings.dateFormat) {
+                case 'none':
+                    return '';
+                case 'numeric':
+                    return `${dd}.${mm}`;
+                case 'short':
+                    return new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'short' }).format(dateObj);
+                case 'full':
+                    return new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(dateObj);
+                case 'dmy':
+                default:
+                    return `${dd}.${mm}.${yyyy}`;
+            }
+        }
+
+        function formatClockDate(dateObj) {
+            const dayShort = getDayShort(dateObj);
+            const datePart = formatDatePart(dateObj);
+            return `${dayShort} ${datePart}`.trim();
+        }
+
         function topZoneBusy(angles) {
             return angles.some((angle) => {
                 const radians = (angle - 90) * Math.PI / 180;
@@ -107,15 +171,33 @@
         }
 
         function renderDigitalOnly(root) {
+            const stack = document.createElement('div');
+            stack.id = 'digital-stack';
+
             const el = document.createElement('div');
             el.id = 'digital-full';
             el.style.fontSize = `clamp(56px, ${Math.max(6, Math.min(14, settings.timeFontSize / 16))}vw, 220px)`;
             el.style.color = settings.timeColor;
-            root.appendChild(el);
+            stack.appendChild(el);
+
+            let dateEl = null;
+            if (settings.showDate) {
+                dateEl = document.createElement('div');
+                dateEl.id = 'digital-date';
+                dateEl.className = 'clock-date-row';
+                dateEl.style.color = settings.dateColor;
+                dateEl.style.fontSize = `clamp(20px, ${Math.max(2, Math.min(5.5, settings.dateFontSize / 16))}vw, 110px)`;
+                stack.appendChild(dateEl);
+            }
+
+            root.appendChild(stack);
 
             const tick = () => {
-                el.textContent = formatDigitalTime(new Date());
                 const now = new Date();
+                el.textContent = formatDigitalTime(now);
+                if (dateEl) {
+                    dateEl.textContent = formatClockDate(now);
+                }
                 setTimeout(tick, 1000 - (now.getTime() % 1000) + 20);
             };
             tick();
@@ -163,6 +245,16 @@
                 root.appendChild(overlayEl);
             }
 
+            let analogDateEl = null;
+            if (settings.showDate) {
+                analogDateEl = document.createElement('div');
+                analogDateEl.id = 'analog-date';
+                analogDateEl.className = 'clock-date-row';
+                analogDateEl.style.color = settings.dateColor;
+                analogDateEl.style.fontSize = `clamp(18px, ${Math.max(1.8, Math.min(4.8, settings.dateFontSize / 16))}vw, 96px)`;
+                root.appendChild(analogDateEl);
+            }
+
             hands.removeAttribute('style');
 
             const tick = () => {
@@ -190,6 +282,10 @@
                     }
                     overlayEl.className = '';
                     overlayEl.classList.add(`pos-${position}`);
+                }
+
+                if (analogDateEl) {
+                    analogDateEl.textContent = formatClockDate(now);
                 }
 
                 setTimeout(tick, 1000 - (now.getTime() % 1000) + 20);
