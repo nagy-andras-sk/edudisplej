@@ -1,0 +1,5 @@
+network-manager
+whiptail
+curl
+ca-certificates
+systemd-sysv

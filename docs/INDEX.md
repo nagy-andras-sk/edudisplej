@@ -22,6 +22,9 @@ Ez a teljes audit a **EduDisplej Control Panel** biztonsági és teljesítmény 
 
 ### 🧭 ÜZEMELTETÉSI / SZINKRON DOKUMENTÁCIÓK
 
+- [DEBIAN_LIVE_OFFLINE_INSTALLER_WINDOWS_WSL_GUIDE.md](DEBIAN_LIVE_OFFLINE_INSTALLER_WINDOWS_WSL_GUIDE.md)  
+  Részletes, végponttól végpontig leírás arról, hogyan épüljön be az EduDisplej offline wizard egy Debian Live ISO-ba, külön Windows + PowerShell + WSL2 workflow-val, build lépésekkel, first-boot működéssel és hibakereséssel.
+
 - [JEDALEN_TECH_DISCOVERY.md](JEDALEN_TECH_DISCOVERY.md)  
   Technikai feltárási dokumentáció arról, hogyan azonosítottuk a Jedalen oldal működését (web scraping + WebForms jellegű postback), és miért erre a gyűjtési stratégiára épül a szinkron.
 

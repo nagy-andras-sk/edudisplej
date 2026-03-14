@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+install -d /etc/systemd/system/multi-user.target.wants
+ln -sf /etc/systemd/system/edudisplej-offline-installer.service \
+  /etc/systemd/system/multi-user.target.wants/edudisplej-offline-installer.service
+
+rm -f /opt/edudisplej/.offline_installer_done
