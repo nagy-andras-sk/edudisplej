@@ -181,6 +181,60 @@ render_service_for_console_user() {
         "$source_path" > "$dest_path"
 }
 
+detect_console_user() {
+    local detected_user=""
+
+    # 1) Prefer invoking sudo user when installer is started via sudo
+    if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ] && id -u "${SUDO_USER}" >/dev/null 2>&1; then
+        detected_user="${SUDO_USER}"
+    fi
+
+    # 2) Active graphical/console session user (if available)
+    if [ -z "$detected_user" ] && command -v loginctl >/dev/null 2>&1; then
+        detected_user="$(loginctl list-sessions --no-legend 2>/dev/null | awk '$3 != "" && $3 != "root" {print $3; exit}' || true)"
+    fi
+
+    # 3) Traditional first desktop user (UID 1000)
+    if [ -z "$detected_user" ]; then
+        detected_user="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
+    fi
+
+    # 4) Fallback to first human user (UID >=1000, excludes nologin)
+    if [ -z "$detected_user" ]; then
+        detected_user="$(awk -F: '($3>=1000 && $1!="nobody" && $7 !~ /(nologin|false)$/){print $1; exit}' /etc/passwd || true)"
+    fi
+
+    if [ -z "$detected_user" ] || ! id -u "$detected_user" >/dev/null 2>&1; then
+        return 1
+    fi
+
+    echo "$detected_user"
+    return 0
+}
+
+detect_hardware_profile() {
+    local model=""
+
+    if [ -f "/proc/device-tree/model" ]; then
+        model="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)"
+    elif [ -f "/sys/firmware/devicetree/base/model" ]; then
+        model="$(tr -d '\0' < /sys/firmware/devicetree/base/model 2>/dev/null || true)"
+    fi
+
+    if echo "$model" | grep -qi "raspberry"; then
+        echo "raspberry"
+        return 0
+    fi
+
+    if command -v vcgencmd >/dev/null 2>&1; then
+        echo "raspberry"
+        return 0
+    fi
+
+    echo "generic-debian"
+    return 0
+}
+
 # Kompletny cleanup starej instalacie - Full cleanup of previous installation
 cleanup_existing_installation() {
     echo "[*] Kontrola starej instalacie - Checking previous installation..."
@@ -303,12 +357,17 @@ fi
 # Detekcia architektury - Architecture detection
 ARCH="$(uname -m)"
 echo "[*] Architektura - Architecture: $ARCH"
+
+HARDWARE_PROFILE="$(detect_hardware_profile)"
+echo "[*] Hardver profil - Hardware profile: $HARDWARE_PROFILE"
 # Always use surf browser
 KIOSK_MODE="surf"
 
 # Apply ARMv6 boot config fix if needed
-if [ "$ARCH" = "armv6l" ]; then
+if [ "$HARDWARE_PROFILE" = "raspberry" ] && [ "$ARCH" = "armv6l" ]; then
   fix_armv6_boot_config
+elif [ "$HARDWARE_PROFILE" != "raspberry" ]; then
+    echo "[*] Neraspberry system detected - skipping Raspberry-specific boot config"
 fi
 
 # Always perform cleanup of previous installation before fresh install
@@ -471,8 +530,12 @@ if [ ! -f "${INIT_DIR}/edudisplej-init.sh" ]; then
 fi
 
 # Urcenie pouzivatela - Determine user
-CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
-[ -z "${CONSOLE_USER}" ] && CONSOLE_USER="pi"
+CONSOLE_USER="$(detect_console_user || true)"
+if [ -z "$CONSOLE_USER" ]; then
+    echo "[!] CHYBA - ERROR: Nepodarilo sa detekovat konzoloveho pouzivatela - Failed to detect console user"
+    echo "[!] Vytvorte standardneho pouzivatela (UID >= 1000) a spustite instalaciu znovu"
+    exit 1
+fi
 
 USER_HOME="$(getent passwd "$CONSOLE_USER" | cut -d: -f6)"
 if [ -z "$USER_HOME" ]; then
@@ -522,6 +585,7 @@ echo "[✓] Oprávnenia nastavené - Permissions configured"
 echo "surf" > "${TARGET_DIR}/.kiosk_mode"
 echo "$CONSOLE_USER" > "${TARGET_DIR}/.console_user"
 echo "$USER_HOME" > "${TARGET_DIR}/.user_home"
+echo "$HARDWARE_PROFILE" > "${TARGET_DIR}/.hardware_profile"
 
 # Configure hostname immediately during install (running as root)
 if [ -x "${INIT_DIR}/edudisplej-hostname.sh" ]; then
@@ -780,7 +844,12 @@ else
 fi
 
 # Deaktivacia getty@tty1 - Disable getty
-systemctl disable getty@tty1.service 2>/dev/null || true
+if [ "$HARDWARE_PROFILE" = "raspberry" ]; then
+    systemctl disable getty@tty1.service 2>/dev/null || true
+    echo "[*] Raspberry profile: getty@tty1 disabled"
+else
+    echo "[*] Generic Debian profile: keeping getty@tty1 enabled for compatibility"
+fi
 
 # ============================================================================
 # INITIALIZE CENTRALIZED DATA DIRECTORY / CENTRALIZOVANY DATOVY ADRESAR
@@ -853,7 +922,9 @@ case "$response" in
         ;;
     *)
         echo "[*] Zastavujem sluzby - Stopping services..."
-        systemctl stop getty@tty1.service 2>/dev/null || true
+        if [ "$HARDWARE_PROFILE" = "raspberry" ]; then
+            systemctl stop getty@tty1.service 2>/dev/null || true
+        fi
         echo "[*] Synchronizujem disky - Syncing disks..."
         sync
         echo "[*] Restartujem - Restarting..."

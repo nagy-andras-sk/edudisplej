@@ -1,0 +1,22 @@
+[Unit]
+Description=EduDisplej Offline Installer Wizard (First Boot)
+After=network.target systemd-user-sessions.service
+Wants=network.target
+ConditionPathExists=!/opt/edudisplej/.offline_installer_done
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/edudisplej-offline-installer.sh --first-boot
+Restart=on-failure
+RestartSec=5
+
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+
+[Install]
+WantedBy=multi-user.target

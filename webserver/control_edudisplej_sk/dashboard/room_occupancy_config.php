@@ -79,77 +79,77 @@ if ($companyId > 0) {
 }
 
 $breadcrumb_items = [
-    ['label' => '🏫 ' . t_def('room_occ.title', 'Terem foglaltság'), 'current' => true],
+    ['label' => '🏫 ' . t_def('room_occ.title', 'Room occupancy'), 'current' => true],
 ];
 $logout_url = '../login.php?logout=1';
 
 $room_occ_i18n = [
-    'invalidServerResponse' => t_def('room_occ.error.invalid_response', 'Érvénytelen szerver válasz'),
-    'errorGeneral' => t_def('room_occ.error.general', 'Hiba'),
-    'emptyRooms' => t_def('room_occ.empty.rooms', 'Nincs terem'),
-    'emptyEvents' => t_def('room_occ.empty.events', 'Nincs esemény'),
-    'chooseRoom' => t_def('room_occ.choose.room', 'Válassz termet'),
-    'readonlyExternal' => t_def('room_occ.external.readonly', 'Külső (readonly)'),
-    'editShort' => t_def('common.edit_short', 'Szerk.'),
-    'statusRoomSaved' => t_def('room_occ.status.room_saved', 'Terem mentve'),
-    'statusEventSaved' => t_def('room_occ.status.event_saved', 'Esemény mentve'),
-    'statusEventDeleted' => t_def('room_occ.status.event_deleted', 'Esemény törölve'),
-    'confirmDelete' => t_def('room_occ.confirm.delete', 'Biztosan törlöd az eseményt?'),
-    'errChooseRoom' => t_def('room_occ.error.choose_room', 'Válassz termet.'),
-    'errChooseDate' => t_def('room_occ.error.choose_date', 'Válassz dátumot.'),
-    'errInvalidTime' => t_def('room_occ.error.invalid_time', 'Adj meg érvényes időpontot 24 órás formátumban (HH:MM).'),
-    'errTimeOrder' => t_def('room_occ.error.time_order', 'A kezdési időnek korábbinak kell lennie mint a befejezési idő.'),
-    'errTitleRequired' => t_def('room_occ.error.title_required', 'Az esemény cím megadása kötelező.'),
+    'invalidServerResponse' => t_def('room_occ.error.invalid_response', 'Invalid server response'),
+    'errorGeneral' => t_def('room_occ.error.general', 'Error'),
+    'emptyRooms' => t_def('room_occ.empty.rooms', 'No rooms'),
+    'emptyEvents' => t_def('room_occ.empty.events', 'No events'),
+    'chooseRoom' => t_def('room_occ.choose.room', 'Choose room'),
+    'readonlyExternal' => t_def('room_occ.external.readonly', 'External (readonly)'),
+    'editShort' => t_def('common.edit_short', 'Edit'),
+    'statusRoomSaved' => t_def('room_occ.status.room_saved', 'Room saved'),
+    'statusEventSaved' => t_def('room_occ.status.event_saved', 'Event saved'),
+    'statusEventDeleted' => t_def('room_occ.status.event_deleted', 'Event deleted'),
+    'confirmDelete' => t_def('room_occ.confirm.delete', 'Delete this event?'),
+    'errChooseRoom' => t_def('room_occ.error.choose_room', 'Choose a room.'),
+    'errChooseDate' => t_def('room_occ.error.choose_date', 'Choose a date.'),
+    'errInvalidTime' => t_def('room_occ.error.invalid_time', 'Enter a valid 24-hour time (HH:MM).'),
+    'errTimeOrder' => t_def('room_occ.error.time_order', 'Start time must be earlier than end time.'),
+    'errTitleRequired' => t_def('room_occ.error.title_required', 'Event title is required.'),
     'manual' => t_def('common.manual', 'manual'),
 ];
 include '../admin/header.php';
 ?>
 
 <div class="panel" style="margin-bottom:12px;">
-    <div class="panel-title"><?php echo htmlspecialchars(t_def('room_occ.panel.title', 'Terem foglaltság modul')); ?></div>
-    <div class="muted"><?php echo htmlspecialchars(t_def('room_occ.panel.desc', 'Termek és napi idősávok kezelése (kézi). A külső szerver-integráció admin portálon konfigurálható.')); ?></div>
+    <div class="panel-title"><?php echo htmlspecialchars(t_def('room_occ.panel.title', 'Room occupancy module')); ?></div>
+    <div class="muted"><?php echo htmlspecialchars(t_def('room_occ.panel.desc', 'Manage rooms and daily time slots (manual). External server integration can be configured in admin portal.')); ?></div>
 </div>
 
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start;">
     <div class="panel">
-        <div class="panel-title"><?php echo htmlspecialchars(t_def('room_occ.rooms.title', 'Termek')); ?></div>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('room_occ.rooms.title', 'Rooms')); ?></div>
         <div style="display:grid; gap:8px; margin-bottom:10px;">
             <input type="hidden" id="room-id" value="0">
-            <input type="text" id="room-key" placeholder="<?php echo htmlspecialchars(t_def('room_occ.room.key', 'terem_kulcs (pl. a101)')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
-            <input type="text" id="room-name" placeholder="<?php echo htmlspecialchars(t_def('room_occ.room.name', 'Terem neve (pl. A101 Informatika)')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
-            <input type="number" id="room-capacity" min="0" max="100000" placeholder="<?php echo htmlspecialchars(t_def('room_occ.room.capacity', 'Kapacitás')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
-            <label><input type="checkbox" id="room-active" checked> <?php echo htmlspecialchars(t_def('common.active', 'Aktív')); ?></label>
+            <input type="text" id="room-key" placeholder="<?php echo htmlspecialchars(t_def('room_occ.room.key', 'room_key (e.g. a101)')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
+            <input type="text" id="room-name" placeholder="<?php echo htmlspecialchars(t_def('room_occ.room.name', 'Room name (e.g. A101 Informatics)')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
+            <input type="number" id="room-capacity" min="0" max="100000" placeholder="<?php echo htmlspecialchars(t_def('room_occ.room.capacity', 'Capacity')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
+            <label><input type="checkbox" id="room-active" checked> <?php echo htmlspecialchars(t_def('common.active', 'Active')); ?></label>
             <div style="display:flex; gap:8px;">
-                <button class="btn btn-primary" id="room-save"><?php echo htmlspecialchars(t_def('common.save', 'Mentés')); ?></button>
-                <button class="btn" id="room-new"><?php echo htmlspecialchars(t_def('common.new', 'Új')); ?></button>
+                <button class="btn btn-primary" id="room-save"><?php echo htmlspecialchars(t_def('common.save', 'Save')); ?></button>
+                <button class="btn" id="room-new"><?php echo htmlspecialchars(t_def('common.new', 'New')); ?></button>
             </div>
         </div>
-        <div class="table-wrap"><table><thead><tr><th><?php echo htmlspecialchars(t_def('common.key', 'Kulcs')); ?></th><th><?php echo htmlspecialchars(t_def('common.name', 'Név')); ?></th><th><?php echo htmlspecialchars(t_def('common.action', 'Művelet')); ?></th></tr></thead><tbody id="rooms-body"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th><?php echo htmlspecialchars(t_def('common.key', 'Key')); ?></th><th><?php echo htmlspecialchars(t_def('common.name', 'Name')); ?></th><th><?php echo htmlspecialchars(t_def('common.action', 'Action')); ?></th></tr></thead><tbody id="rooms-body"></tbody></table></div>
     </div>
 
     <div class="panel">
-        <div class="panel-title"><?php echo htmlspecialchars(t_def('room_occ.daily.title', 'Napi foglaltság')); ?></div>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('room_occ.daily.title', 'Daily occupancy')); ?></div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
             <select id="event-room" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;"></select>
-            <input type="date" id="event-date" lang="hu-HU" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
+            <input type="date" id="event-date" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
         </div>
 
         <div style="display:grid; gap:8px; margin-bottom:10px;">
             <input type="hidden" id="event-id" value="0">
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <input type="time" id="event-start" lang="hu-HU" step="60" placeholder="HH:MM" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
-                <input type="time" id="event-end" lang="hu-HU" step="60" placeholder="HH:MM" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
+                <input type="time" id="event-start" step="60" placeholder="HH:MM" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
+                <input type="time" id="event-end" step="60" placeholder="HH:MM" style="padding:8px; border:1px solid #d1d5db; border-radius:6px;">
             </div>
-            <input type="text" id="event-title" placeholder="<?php echo htmlspecialchars(t_def('room_occ.event.title', 'Esemény címe')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
-            <textarea id="event-note" rows="3" placeholder="<?php echo htmlspecialchars(t_def('common.note_optional', 'Megjegyzés (opcionális)')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;"></textarea>
+            <input type="text" id="event-title" placeholder="<?php echo htmlspecialchars(t_def('room_occ.event.title', 'Event title')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
+            <textarea id="event-note" rows="3" placeholder="<?php echo htmlspecialchars(t_def('common.note_optional', 'Note (optional)')); ?>" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;"></textarea>
             <div style="display:flex; gap:8px;">
-                <button class="btn btn-primary" id="event-save"><?php echo htmlspecialchars(t_def('room_occ.event.save', 'Esemény mentése')); ?></button>
-                <button class="btn" id="event-new"><?php echo htmlspecialchars(t_def('common.new', 'Új')); ?></button>
-                <button class="btn btn-danger" id="event-delete" style="display:none;"><?php echo htmlspecialchars(t_def('common.delete', 'Törlés')); ?></button>
+                <button class="btn btn-primary" id="event-save"><?php echo htmlspecialchars(t_def('room_occ.event.save', 'Save event')); ?></button>
+                <button class="btn" id="event-new"><?php echo htmlspecialchars(t_def('common.new', 'New')); ?></button>
+                <button class="btn btn-danger" id="event-delete" style="display:none;"><?php echo htmlspecialchars(t_def('common.delete', 'Delete')); ?></button>
             </div>
         </div>
 
-        <div class="table-wrap"><table><thead><tr><th><?php echo htmlspecialchars(t_def('common.time', 'Idő')); ?></th><th><?php echo htmlspecialchars(t_def('common.event', 'Esemény')); ?></th><th><?php echo htmlspecialchars(t_def('common.source', 'Forrás')); ?></th><th><?php echo htmlspecialchars(t_def('common.action', 'Művelet')); ?></th></tr></thead><tbody id="events-body"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th><?php echo htmlspecialchars(t_def('common.time', 'Time')); ?></th><th><?php echo htmlspecialchars(t_def('common.event', 'Event')); ?></th><th><?php echo htmlspecialchars(t_def('common.source', 'Source')); ?></th><th><?php echo htmlspecialchars(t_def('common.action', 'Action')); ?></th></tr></thead><tbody id="events-body"></tbody></table></div>
     </div>
 </div>
 

@@ -41,6 +41,128 @@ function pick_value($data, $keys) {
     return null;
 }
 
+function normalize_version_text($value) {
+    $text = trim((string)$value);
+    if ($text === '') {
+        return '';
+    }
+
+    $normalized = strtolower($text);
+    $invalid_values = ['unknown', 'ismeretlen', 'neznáme', 'nezname', 'n/a', 'na', '-', '--', 'null', 'undefined'];
+    if (in_array($normalized, $invalid_values, true)) {
+        return '';
+    }
+
+    return $text;
+}
+
+function extract_version_recursive($data) {
+    if (!is_array($data)) {
+        return '';
+    }
+
+    $keys = [
+        'version',
+        'app_version',
+        'software_version',
+        'appVersion',
+        'softwareVersion',
+        'client_version',
+        'kiosk_version',
+        'build_version',
+        'buildVersion',
+        'app_build',
+        'release',
+        'edudisplej_version',
+    ];
+
+    foreach ($keys as $key) {
+        if (!array_key_exists($key, $data)) {
+            continue;
+        }
+        $candidate = normalize_version_text($data[$key]);
+        if ($candidate !== '') {
+            return $candidate;
+        }
+    }
+
+    foreach ($data as $value) {
+        if (!is_array($value)) {
+            continue;
+        }
+        $nested = extract_version_recursive($value);
+        if ($nested !== '') {
+            return $nested;
+        }
+    }
+
+    return '';
+}
+
+function format_eta_seconds($seconds) {
+    $seconds = max(0, (int)$seconds);
+    if ($seconds < 60) {
+        return $seconds . 's';
+    }
+
+    $minutes = intdiv($seconds, 60);
+    $remaining = $seconds % 60;
+    if ($minutes < 60) {
+        return $remaining > 0 ? ($minutes . 'm ' . $remaining . 's') : ($minutes . 'm');
+    }
+
+    $hours = intdiv($minutes, 60);
+    $minutes = $minutes % 60;
+    return $minutes > 0 ? ($hours . 'h ' . $minutes . 'm') : ($hours . 'h');
+}
+
+function estimate_next_sync_eta($last_sync, $sync_interval, $sync_data_json) {
+    $last_sync_ts = $last_sync ? strtotime((string)$last_sync) : false;
+    $sync_interval = (int)$sync_interval;
+    $sync_data = json_decode((string)$sync_data_json, true);
+    if (!is_array($sync_data)) {
+        $sync_data = [];
+    }
+
+    $next_sync_ts = null;
+
+    if (!empty($sync_data['next_sync_at'])) {
+        $candidate = strtotime((string)$sync_data['next_sync_at']);
+        if ($candidate !== false) {
+            $next_sync_ts = $candidate;
+        }
+    }
+
+    if ($next_sync_ts === null && isset($sync_data['next_sync_in']) && is_numeric($sync_data['next_sync_in'])) {
+        $next_sync_ts = time() + (int)$sync_data['next_sync_in'];
+    }
+
+    if ($next_sync_ts === null && $last_sync_ts !== false && $sync_interval > 0) {
+        $next_sync_ts = $last_sync_ts + $sync_interval;
+    }
+
+    if ($next_sync_ts === null && $last_sync_ts !== false) {
+        $avg_keys = ['avg_interval', 'avg_interval_sec', 'avg_interval_seconds'];
+        foreach ($avg_keys as $avg_key) {
+            if (!isset($sync_data[$avg_key]) || !is_numeric($sync_data[$avg_key])) {
+                continue;
+            }
+            $avg_interval = (int)$sync_data[$avg_key];
+            if ($avg_interval > 0) {
+                $next_sync_ts = $last_sync_ts + $avg_interval;
+                break;
+            }
+        }
+    }
+
+    if ($next_sync_ts === null) {
+        return null;
+    }
+
+    $eta_seconds = max(0, $next_sync_ts - time());
+    return 'ETA: ~' . format_eta_seconds($eta_seconds) . ' (' . date('Y-m-d H:i:s', $next_sync_ts) . ')';
+}
+
 function format_last_reboot($uptime_seconds) {
     if ($uptime_seconds === null || $uptime_seconds === '') {
         return '-';
@@ -407,6 +529,7 @@ include 'header.php';
                             $system = json_decode($kiosk['system_data'] ?? '{}', true) ?: [];
                             $network = json_decode($kiosk['network_data'] ?? '{}', true) ?: [];
                             $hw_info = json_decode($kiosk['hw_info'] ?? '{}', true) ?: [];
+                            $sync = json_decode($kiosk['sync_data'] ?? '{}', true) ?: [];
                             $status = $kiosk['status'] ?? 'unknown';
                             $badge_class = 'info';
                             if ($status === 'online') {
@@ -450,12 +573,21 @@ include 'header.php';
                                 $disk_usage_value = pick_value($hw_info, ['disk_usage']);
                             }
 
-                            $rpi_version = pick_value($system, ['rpi_model', 'os_version']);
-                            if (!$rpi_version) {
-                                $rpi_version = pick_value($hw_info, ['rpi_model', 'os_version', 'os']);
+                            $rpi_version = normalize_version_text($kiosk['version'] ?? '');
+                            if ($rpi_version === '') {
+                                $rpi_version = normalize_version_text(extract_version_recursive($system));
+                            }
+                            if ($rpi_version === '') {
+                                $rpi_version = normalize_version_text(extract_version_recursive($hw_info));
+                            }
+                            if ($rpi_version === '') {
+                                $rpi_version = normalize_version_text(extract_version_recursive($sync));
+                            }
+                            if ($rpi_version === '') {
+                                $rpi_version = pick_value($system, ['rpi_model', 'os_version']);
                             }
                             if (!$rpi_version) {
-                                $rpi_version = $kiosk['version'] ?? null;
+                                $rpi_version = pick_value($hw_info, ['rpi_model', 'os_version', 'os']);
                             }
 
                             $uptime_seconds = pick_value($system, ['uptime', 'uptime_seconds']);
@@ -476,6 +608,12 @@ include 'header.php';
                             if ($rpi_version === null || $rpi_version === '') {
                                 $rpi_version = '-';
                             }
+
+                            $next_sync_eta = estimate_next_sync_eta(
+                                $kiosk['last_sync'] ?? null,
+                                $kiosk['sync_interval'] ?? 0,
+                                $kiosk['sync_data'] ?? null
+                            );
                         ?>
                         <tr>
                             <td class="nowrap"><?php echo (int)$kiosk['id']; ?></td>
@@ -489,7 +627,12 @@ include 'header.php';
                             <td><span class="badge <?php echo $badge_class; ?>"><?php echo htmlspecialchars($status); ?></span></td>
                             <td class="nowrap"><a class="btn btn-small" href="kiosk_details.php?id=<?php echo (int)$kiosk['id']; ?>">View</a></td>
                             <td class="nowrap"><?php echo format_datetime($kiosk['loop_last_update'] ?? null); ?></td>
-                            <td class="nowrap"><?php echo format_datetime($kiosk['last_sync'] ?? null); ?></td>
+                            <td class="nowrap">
+                                <?php echo format_datetime($kiosk['last_sync'] ?? null); ?>
+                                <?php if ($next_sync_eta !== null): ?>
+                                    <div class="muted" style="font-size:11px;"><?php echo htmlspecialchars($next_sync_eta); ?></div>
+                                <?php endif; ?>
+                            </td>
                             <td class="nowrap"><?php echo format_datetime($kiosk['last_seen'] ?? null); ?></td>
                             <td><?php echo htmlspecialchars((string)$network_name); ?></td>
                             <td><?php echo htmlspecialchars((string)$network_signal); ?></td>

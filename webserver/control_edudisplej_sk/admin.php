@@ -202,6 +202,15 @@ if ($is_logged_in) {
         
         .navbar h1 {
             font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .navbar h1 img {
+            width: 24px;
+            height: 24px;
+            display: inline-block;
         }
         
         .navbar .user-info {
@@ -423,7 +432,7 @@ if ($is_logged_in) {
         </div>
     <?php else: ?>
         <div class="navbar">
-            <h1>🖥️ EduDisplej Control Panel</h1>
+            <h1><img src="favicon.svg" alt="EduDisplej logo"> EduDisplej Control Panel</h1>
             <div class="user-info">
                 <a href="users.php">👥 Users</a>
                 <a href="companies.php">🏢 Companies</a>

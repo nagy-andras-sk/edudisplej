@@ -454,8 +454,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         }
         
         .login-header .logo {
-            font-size: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             margin-bottom: 15px;
+        }
+
+        .login-header .logo img {
+            width: 56px;
+            height: 56px;
+            display: block;
         }
         
         .form-group {
@@ -585,7 +593,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             </select>
         </div>
         <div class="login-header">
-            <div class="logo">🖥️</div>
+            <div class="logo"><img src="favicon.svg" alt="EduDisplej logo"></div>
             <h1><?php echo htmlspecialchars(t('app.title')); ?></h1>
             <p><?php echo htmlspecialchars(t('login.subheading')); ?></p>
         </div>

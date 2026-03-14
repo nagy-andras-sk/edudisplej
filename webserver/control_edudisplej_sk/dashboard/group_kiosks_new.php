@@ -294,7 +294,7 @@ try {
             <div class="two-column">
                 <!-- Kiosks in Group -->
                 <div class="card">
-                    <h3>🖥️ A csoportban lévő kijelzők (<?php echo count($kiosks_in_group); ?>)</h3>
+                    <h3><img src="../favicon.svg" alt="EduDisplej logo" style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;">A csoportban lévő kijelzők (<?php echo count($kiosks_in_group); ?>)</h3>
                     
                     <?php if (empty($kiosks_in_group)): ?>
                         <div class="no-data">Nincsenek kijelzők ebben a csoportban</div>

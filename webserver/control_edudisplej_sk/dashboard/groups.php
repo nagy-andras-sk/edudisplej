@@ -580,9 +580,10 @@ closeDbConnection($conn);
                 <a href="group_kiosks.php" class="btn btn-primary"><?php echo htmlspecialchars(t_def('groups.assignment_button', 'Kijelzők hozzárendelése csoportokhoz')); ?></a>
             </div>
             
-            <form method="POST" action="">
+            <form id="create-group-form" method="POST" action="" style="display:none;">
                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['csrf_token']); ?>">
-                <table>
+            </form>
+            <table>
                     <thead>
                         <tr>
                             <th></th>
@@ -656,15 +657,14 @@ closeDbConnection($conn);
                         </tr>
                         <tr class="new-group-row">
                             <td></td>
-                            <td><input type="text" id="group_name" name="group_name" required placeholder="<?php echo htmlspecialchars(t_def('groups.placeholder.name', 'Csoport neve')); ?>"></td>
-                            <td><input type="text" id="description" name="description" placeholder="<?php echo htmlspecialchars(t_def('groups.placeholder.description', 'pl. Emelet 1, Épület A')); ?>"></td>
+                            <td><input type="text" id="group_name" name="group_name" form="create-group-form" required placeholder="<?php echo htmlspecialchars(t_def('groups.placeholder.name', 'Csoport neve')); ?>"></td>
+                            <td><input type="text" id="description" name="description" form="create-group-form" placeholder="<?php echo htmlspecialchars(t_def('groups.placeholder.description', 'pl. Emelet 1, Épület A')); ?>"></td>
                             <td style="color:#75879a; font-size:12px;">0 <?php echo htmlspecialchars(t_def('groups.kiosk_unit', 'kijelző')); ?></td>
                             <td style="color:#75879a; font-size:12px;"><?php echo htmlspecialchars(t_def('groups.auto', 'Automatikus')); ?></td>
-                            <td><button type="submit" name="create_group" class="btn btn-primary" style="width: 100%;">+ <?php echo htmlspecialchars(t_def('groups.create', 'Létrehozás')); ?></button></td>
+                            <td><button type="submit" name="create_group" form="create-group-form" class="btn btn-primary" style="width: 100%;">+ <?php echo htmlspecialchars(t_def('groups.create', 'Létrehozás')); ?></button></td>
                         </tr>
                     </tbody>
                 </table>
-            </form>
         </div>
     </div>
     

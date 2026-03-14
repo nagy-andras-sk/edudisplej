@@ -195,7 +195,7 @@ try {
 <body>
     <div class="header">
         <div class="header-content">
-            <h1>🖥️ Kijelző Szerkesztése</h1>
+            <h1><img src="../favicon.svg" alt="EduDisplej logo" style="width:20px;height:20px;vertical-align:-4px;margin-right:6px;">Kijelző Szerkesztése</h1>
             <a href="index.php">← Vissza</a>
         </div>
     </div>

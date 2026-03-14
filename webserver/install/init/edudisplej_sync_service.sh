@@ -444,8 +444,6 @@ force_full_loop_refresh() {
 
     log "📥 Forced full refresh started: ${reason}"
 
-    # Always clear local modules/loop before re-download
-    rm -rf "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
     mkdir -p "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
 
     if [ ! -x "$DOWNLOAD_SCRIPT" ]; then

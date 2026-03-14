@@ -278,6 +278,7 @@ cleanup_stale_local_content() {
 import json
 import shutil
 import sys
+import urllib.parse
 from pathlib import Path
 
 modules_dir = Path(sys.argv[1])
@@ -327,7 +328,28 @@ def iter_loop_items(payload):
                 if isinstance(item, dict):
                     yield item
 
-keep_meal_rel_files = set()
+def extract_local_asset_rel(raw_value):
+    raw = str(raw_value or '').strip()
+    if not raw:
+        return ''
+
+    parsed = urllib.parse.urlparse(raw)
+    candidate = raw
+    if parsed.scheme:
+        candidate = parsed.path or ''
+
+    candidate = candidate.replace('\\', '/')
+    if '../../assets/' in raw:
+        return raw.split('../../assets/', 1)[1].split('?', 1)[0].strip().replace('\\', '/')
+    if '/assets/' in candidate:
+        return candidate.split('/assets/', 1)[1].split('?', 1)[0].strip().replace('\\', '/')
+
+    candidate = candidate.split('?', 1)[0].lstrip('./')
+    if candidate.startswith('assets/'):
+        candidate = candidate[len('assets/'):]
+    return candidate
+
+keep_asset_rel_files = set()
 if loop_file.exists() and loop_file.is_file():
     try:
         payload = json.loads(loop_file.read_text(encoding='utf-8', errors='ignore'))
@@ -339,26 +361,37 @@ if loop_file.exists() and loop_file.is_file():
         if not isinstance(settings, dict):
             continue
         for field in ('offlinePrefetchedTodayFile', 'offlinePrefetchedTomorrowFile'):
-            raw = str(settings.get(field) or '').strip()
-            if not raw:
-                continue
-            marker = '../../assets/'
-            if marker in raw:
-                rel = raw.split(marker, 1)[1].strip().replace('\\', '/')
-            else:
-                rel = raw.replace('\\', '/').lstrip('./')
-                if rel.startswith('assets/'):
-                    rel = rel[len('assets/'):]
+            rel = extract_local_asset_rel(settings.get(field))
             if rel.startswith('meal-menu/'):
-                keep_meal_rel_files.add(rel)
+                keep_asset_rel_files.add(rel)
 
-meal_assets_root = assets_dir / 'meal-menu'
-if meal_assets_root.exists() and meal_assets_root.is_dir():
-    for file_path in meal_assets_root.rglob('*'):
+        for field in ('pdfAssetUrl', 'videoAssetUrl'):
+            rel = extract_local_asset_rel(settings.get(field))
+            if rel.startswith('module-cache/'):
+                keep_asset_rel_files.add(rel)
+
+        raw_images = settings.get('imageUrlsJson')
+        if raw_images:
+            try:
+                parsed_images = json.loads(str(raw_images))
+            except Exception:
+                parsed_images = []
+            if isinstance(parsed_images, list):
+                for image_value in parsed_images:
+                    rel = extract_local_asset_rel(image_value)
+                    if rel.startswith('module-cache/'):
+                        keep_asset_rel_files.add(rel)
+
+managed_roots = [assets_dir / 'meal-menu', assets_dir / 'module-cache']
+for managed_root in managed_roots:
+    if not managed_root.exists() or not managed_root.is_dir():
+        continue
+
+    for file_path in managed_root.rglob('*'):
         if not file_path.is_file():
             continue
         rel = file_path.relative_to(assets_dir).as_posix()
-        if rel in keep_meal_rel_files:
+        if rel in keep_asset_rel_files:
             continue
         try:
             file_path.unlink()
@@ -366,7 +399,7 @@ if meal_assets_root.exists() and meal_assets_root.is_dir():
         except Exception:
             pass
 
-    for dir_path in sorted(meal_assets_root.rglob('*'), key=lambda p: len(p.parts), reverse=True):
+    for dir_path in sorted(managed_root.rglob('*'), key=lambda p: len(p.parts), reverse=True):
         if not dir_path.is_dir():
             continue
         try:
@@ -380,10 +413,10 @@ if meal_assets_root.exists() and meal_assets_root.is_dir():
                 pass
 
     try:
-        next(meal_assets_root.iterdir())
+        next(managed_root.iterdir())
     except StopIteration:
         try:
-            meal_assets_root.rmdir()
+            managed_root.rmdir()
             removed_asset_dirs += 1
         except Exception:
             pass
@@ -530,13 +563,13 @@ prefetch_loop_assets_and_meal_json() {
     fi
 
     if ! command -v python3 >/dev/null 2>&1; then
-        log_error "python3 not available - meal JSON prefetch skipped"
+        log_error "python3 not available - asset prefetch skipped"
         return 1
     fi
 
     local token
     token=$(get_api_token) || {
-        log_error "Meal prefetch skipped: missing API token"
+        log_error "Asset prefetch skipped: missing API token"
         return 1
     }
 
@@ -547,6 +580,8 @@ prefetch_loop_assets_and_meal_json() {
 import datetime
 import hashlib
 import json
+import mimetypes
+import os
 import sys
 import urllib.error
 import urllib.parse
@@ -610,6 +645,199 @@ def iter_loop_items(root_data):
             for item in loops:
                 if isinstance(item, dict):
                     yield item
+
+def parse_json_list(raw_value):
+    try:
+        parsed = json.loads(str(raw_value or '[]'))
+    except Exception:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+def canonical_asset_source(raw_url):
+    absolute = absolutize_asset_url(raw_url)
+    if not absolute:
+        return ''
+
+    parsed = urllib.parse.urlparse(absolute)
+    query_pairs = []
+    for key, value in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True):
+        if key.lower() == 'token':
+            continue
+        query_pairs.append((key, value))
+    query = urllib.parse.urlencode(sorted(query_pairs))
+    return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', query, ''))
+
+def absolutize_asset_url(raw_url):
+    raw = str(raw_url or '').strip()
+    if not raw:
+        return ''
+    if raw.startswith('http://') or raw.startswith('https://'):
+        return raw
+    return urllib.parse.urljoin(api_base + '/', raw)
+
+def build_request(url, method='GET'):
+    return urllib.request.Request(url, headers={
+        'Authorization': f'Bearer {token}',
+        'User-Agent': 'EduDisplejSync/1.0 (+asset-prefetch)',
+        'Accept': '*/*'
+    }, method=method)
+
+def extract_header(headers, name, default=''):
+    value = headers.get(name, default)
+    return str(value or '').strip()
+
+def head_asset(remote_url):
+    request = build_request(remote_url, method='HEAD')
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            headers = response.headers
+            size_text = extract_header(headers, 'Content-Length') or extract_header(headers, 'X-Asset-Size')
+            sha256 = extract_header(headers, 'X-Asset-Sha256').lower()
+            content_type = extract_header(headers, 'Content-Type').split(';', 1)[0].strip().lower()
+            size = int(size_text) if size_text.isdigit() else 0
+            return {
+                'size': size,
+                'sha256': sha256,
+                'content_type': content_type,
+            }
+    except Exception:
+        return None
+
+def compute_sha256(file_path):
+    digest = hashlib.sha256()
+    with file_path.open('rb') as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest().lower()
+
+def guess_extension(source_url, content_type=''):
+    parsed = urllib.parse.urlparse(source_url)
+    suffix = Path(parsed.path).suffix.strip()
+    if suffix:
+        return suffix.lower()
+
+    mapped = mimetypes.guess_extension(content_type or '', strict=False)
+    if mapped:
+        return mapped.lower()
+
+    return '.bin'
+
+asset_cache_root = assets_dir / 'module-cache'
+asset_cache_root.mkdir(parents=True, exist_ok=True)
+asset_cache = {}
+media_assets_found = 0
+media_assets_downloaded = 0
+media_assets_reused = 0
+media_assets_failed = 0
+
+def localize_asset(raw_url):
+    global media_assets_downloaded, media_assets_reused, media_assets_failed
+
+    canonical_source = canonical_asset_source(raw_url)
+    if not canonical_source:
+        return str(raw_url or '').strip(), False
+
+    if canonical_source in asset_cache:
+        cached_rel = asset_cache[canonical_source]
+        if cached_rel:
+            return f'../../assets/{cached_rel}', True
+        return str(raw_url or '').strip(), False
+
+    remote_url = absolutize_asset_url(raw_url)
+    metadata = head_asset(remote_url)
+    extension = guess_extension(canonical_source, (metadata or {}).get('content_type', ''))
+    rel_path = f"module-cache/{hashlib.sha1(canonical_source.encode('utf-8')).hexdigest()[:24]}{extension}"
+    local_path = assets_dir / rel_path
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if local_path.exists() and local_path.is_file() and metadata:
+        local_size = local_path.stat().st_size
+        remote_size = int(metadata.get('size') or 0)
+        remote_sha = str(metadata.get('sha256') or '').lower()
+        size_matches = remote_size > 0 and local_size == remote_size
+        if size_matches:
+            if remote_sha:
+                try:
+                    if compute_sha256(local_path) == remote_sha:
+                        asset_cache[canonical_source] = rel_path
+                        media_assets_reused += 1
+                        return f'../../assets/{rel_path}', True
+                except Exception:
+                    pass
+            else:
+                asset_cache[canonical_source] = rel_path
+                media_assets_reused += 1
+                return f'../../assets/{rel_path}', True
+
+    request = build_request(remote_url, method='GET')
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            content_type = extract_header(response.headers, 'Content-Type').split(';', 1)[0].strip().lower()
+            if extension == '.bin':
+                extension = guess_extension(canonical_source, content_type)
+                rel_path = f"module-cache/{hashlib.sha1(canonical_source.encode('utf-8')).hexdigest()[:24]}{extension}"
+                local_path = assets_dir / rel_path
+                local_path.parent.mkdir(parents=True, exist_ok=True)
+
+            temp_path = local_path.with_suffix(local_path.suffix + '.tmp')
+            with temp_path.open('wb') as handle:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    handle.write(chunk)
+            os.replace(temp_path, local_path)
+            asset_cache[canonical_source] = rel_path
+            media_assets_downloaded += 1
+            return f'../../assets/{rel_path}', True
+    except Exception:
+        media_assets_failed += 1
+        if local_path.exists() and local_path.is_file():
+            asset_cache[canonical_source] = rel_path
+            media_assets_reused += 1
+            return f'../../assets/{rel_path}', True
+        asset_cache[canonical_source] = ''
+        return str(raw_url or '').strip(), False
+
+def localize_media_settings(settings, module_key):
+    global media_assets_found
+
+    normalized_key = str(module_key or '').strip().lower()
+    if normalized_key == 'pdf':
+        raw = str(settings.get('pdfAssetUrl') or '').strip()
+        if raw:
+            media_assets_found += 1
+            localized, success = localize_asset(raw)
+            if success:
+                settings['pdfAssetUrl'] = localized
+        return
+
+    if normalized_key == 'video':
+        raw = str(settings.get('videoAssetUrl') or '').strip()
+        if raw:
+            media_assets_found += 1
+            localized, success = localize_asset(raw)
+            if success:
+                settings['videoAssetUrl'] = localized
+        return
+
+    if normalized_key in {'gallery', 'image-gallery', 'image_gallery'}:
+        localized_images = []
+        for raw in parse_json_list(settings.get('imageUrlsJson')):
+            value = str(raw or '').strip()
+            if not value:
+                continue
+            media_assets_found += 1
+            localized, success = localize_asset(value)
+            localized_images.append(localized if success else value)
+        settings['imageUrlsJson'] = json.dumps(localized_images, ensure_ascii=False)
+        return
+
+for item in iter_loop_items(data):
+    settings = item.get('settings')
+    if not isinstance(settings, dict):
+        continue
+    localize_media_settings(settings, item.get('module_key'))
 
 def fetch_meal_payload(config, target_date, exact_date=False):
     query = {
@@ -737,14 +965,17 @@ for key, group in meal_groups.items():
         patched_settings += 1
 
 loop_file.write_text(json.dumps(data, ensure_ascii=False, indent=4), encoding='utf-8')
-print(f"meal_items={meal_items_found} groups={len(meal_groups)} prefetched_groups={prefetched_groups} files={prefetched_files} patched={patched_settings}")
+print(
+    f"media_refs={media_assets_found} media_downloaded={media_assets_downloaded} media_reused={media_assets_reused} media_failed={media_assets_failed} "
+    f"meal_items={meal_items_found} groups={len(meal_groups)} prefetched_groups={prefetched_groups} files={prefetched_files} patched={patched_settings}"
+)
 PY
     ); then
-        log_error "Meal JSON prefetch failed"
+        log_error "Asset prefetch failed"
         return 1
     fi
 
-    log "Meal prefetch summary: $prefetch_output"
+    log "Asset prefetch summary: $prefetch_output"
     log_success "Loop asset prefetch + meal JSON cache completed"
     return 0
 }

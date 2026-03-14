@@ -89,7 +89,7 @@ if ($focus_group_name !== '') {
     $breadcrumb_items[] = ['label' => '👥 ' . $focus_group_name, 'href' => 'group_kiosks.php?id=' . $focus_group_id];
 }
 
-$breadcrumb_items[] = ['label' => '🖥️ ' . t_def('group_kiosks.kiosks', 'Kijelzők'), 'current' => true];
+$breadcrumb_items[] = ['label' => t_def('group_kiosks.kiosks', 'Kijelzők'), 'current' => true];
 
 $logout_url = '../login.php?logout=1';
 

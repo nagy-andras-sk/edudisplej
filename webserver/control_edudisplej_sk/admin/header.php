@@ -156,9 +156,9 @@ $admin_nav_pages = [
 
 // Dashboard nav page map
 $dashboard_nav_pages = [
-    'index.php'          => ['href' => 'index.php',          'label' => '🖥️ ' . t('nav.kiosks'),  'key' => 'kiosks'],
+    'index.php'          => ['href' => 'index.php',          'label' => t('nav.kiosks'),  'key' => 'kiosks'],
     'groups.php'         => ['href' => 'groups.php',         'label' => '📁 ' . t('nav.groups'),  'key' => 'groups'],
-    'modules.php'        => ['href' => 'modules.php',        'label' => '🧩 Modulok', 'key' => 'modules_page'],
+    'modules.php'        => ['href' => 'modules.php',        'label' => '🧩 ' . t('nav.modules'), 'key' => 'modules_page'],
     'profile.php'        => ['href' => 'profile.php',        'label' => '🏢 ' . t('nav.profile'), 'key' => 'profile'],
     'settings.php'       => ['href' => 'settings.php',       'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
 ];

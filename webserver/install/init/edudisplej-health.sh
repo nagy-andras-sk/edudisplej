@@ -82,6 +82,8 @@ get_system_health() {
     local disk_usage="0"
     local uptime="0"
     local rpi_model="unknown"
+    local hardware_model="unknown"
+    local hardware_profile="generic-debian"
     local os_version="unknown"
     
     # CPU temperature (Raspberry Pi specific)
@@ -101,9 +103,19 @@ get_system_health() {
     # Uptime in seconds
     uptime=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo "0")
 
-    if [ -f "/proc/device-tree/model" ]; then
-        rpi_model=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "unknown")
+    if [ -f "/opt/edudisplej/.hardware_profile" ]; then
+        hardware_profile=$(tr -d '\n\r' < /opt/edudisplej/.hardware_profile 2>/dev/null || echo "generic-debian")
     fi
+
+    if [ -f "/proc/device-tree/model" ]; then
+        hardware_model=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "unknown")
+    elif [ -f "/sys/firmware/devicetree/base/model" ]; then
+        hardware_model=$(tr -d '\0' < /sys/firmware/devicetree/base/model 2>/dev/null || echo "unknown")
+    elif [ -f "/sys/devices/virtual/dmi/id/product_name" ]; then
+        hardware_model=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null || echo "unknown")
+    fi
+
+    rpi_model="$hardware_model"
 
     if command -v lsb_release >/dev/null 2>&1; then
         os_version=$(lsb_release -ds 2>/dev/null | sed 's/^\"//;s/\"$//' || echo "unknown")
@@ -130,6 +142,8 @@ get_system_health() {
     "memory_usage": $memory_usage,
     "disk_usage": $disk_usage,
     "uptime": $uptime,
+    "hardware_profile": "${hardware_profile}",
+    "hardware_model": "${hardware_model}",
     "rpi_model": "${rpi_model}",
     "os_version": "${os_version}",
     "status": "$health_status"

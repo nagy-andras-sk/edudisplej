@@ -361,7 +361,7 @@ $online_count = count(array_filter($kiosks, fn($k) => $k['status'] == 'online'))
         
         <!-- Navigation & Content -->
         <div class="nav-tabs">
-            <a href="#kiosks" class="active" onclick="switchTab('kiosks', event)">🖥️ Kijelzők</a>
+            <a href="#kiosks" class="active" onclick="switchTab('kiosks', event)"><img src="../favicon.svg" alt="EduDisplej logo" style="width:16px;height:16px;vertical-align:-2px;margin-right:4px;">Kijelzők</a>
             <a href="#edit" onclick="switchTab('edit', event)">⚙️ Szerkesztés</a>
         </div>
         
@@ -435,7 +435,7 @@ $online_count = count(array_filter($kiosks, fn($k) => $k['status'] == 'online'))
                                 </div>
                                 <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
                                     📍 <?php echo htmlspecialchars($kiosk['location'] ?? '—'); ?><br>
-                                    💻 <?php echo htmlspecialchars($kiosk['device_id'] ?? '—'); ?>
+                                    <img src="../favicon.svg" alt="EduDisplej logo" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"> <?php echo htmlspecialchars($kiosk['device_id'] ?? '—'); ?>
                                 </div>
                                 <a href="kiosk_edit.php?id=<?php echo $kiosk['id']; ?>" class="btn btn-small">Szerkesztés →</a>
                             </div>

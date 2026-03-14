@@ -10,6 +10,83 @@ const GroupLoopVideoModule = (() => {
     const FFMPEG_SCRIPT_URL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
     const FFMPEG_CORE_JS_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js';
     const FFMPEG_CORE_WASM_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm';
+    const i18nCatalog = (window.GroupLoopBootstrap?.i18n && typeof window.GroupLoopBootstrap.i18n === 'object')
+        ? window.GroupLoopBootstrap.i18n
+        : {};
+
+    const resolveUiLang = () => {
+        const customizationLabel = String(i18nCatalog['group_loop.customization'] || '').toLowerCase();
+        if (customizationLabel.includes('testresz')) return 'hu';
+        if (customizationLabel.includes('prispôsob') || customizationLabel.includes('prisposob')) return 'sk';
+        if (customizationLabel.includes('custom')) return 'en';
+
+        const htmlLang = String(document?.documentElement?.lang || '').toLowerCase();
+        if (htmlLang.startsWith('hu')) return 'hu';
+        if (htmlLang.startsWith('sk')) return 'sk';
+        return 'en';
+    };
+
+    const videoText = (id, vars = null) => {
+        const lang = resolveUiLang();
+        const dict = {
+            hu: {
+                loop_duration_fixed: 'Loop időtartam: {seconds} s (fix, videó hossza)',
+                loop_duration_none: 'Loop időtartam: még nincs videó',
+                only_video_upload: 'Csak videófájl tölthető fel.',
+                checking_converted: 'Konvertált videó ellenőrzése...',
+                previous_videos_empty: 'Nincs korábban feltöltött videó.',
+                found_items: 'Talált elemek: {count}',
+                loading: 'Betöltés...',
+                library_error: 'Library betöltési hiba: {error}',
+                unknown_error: 'ismeretlen hiba',
+                select_video: 'Válassz ki egy videót a listából.',
+                invalid_video_url: 'Érvénytelen videó URL.',
+                fetch_metadata: 'Videó metaadat lekérés...',
+                selected_with_duration: 'Library videó kiválasztva ({seconds}s)',
+                selected: 'Library videó kiválasztva'
+            },
+            sk: {
+                loop_duration_fixed: 'Trvanie loopu: {seconds} s (fixné podľa dĺžky videa)',
+                loop_duration_none: 'Trvanie loopu: zatiaľ bez videa',
+                only_video_upload: 'Nahrať je možné iba video súbor.',
+                checking_converted: 'Kontrola skonvertovaného videa...',
+                previous_videos_empty: 'Nie sú žiadne predtým nahraté videá.',
+                found_items: 'Nájdené položky: {count}',
+                loading: 'Načítavam...',
+                library_error: 'Chyba načítania knižnice: {error}',
+                unknown_error: 'neznáma chyba',
+                select_video: 'Vyberte jedno video zo zoznamu.',
+                invalid_video_url: 'Neplatná URL videa.',
+                fetch_metadata: 'Načítavam metaúdaje videa...',
+                selected_with_duration: 'Vybrané video z knižnice ({seconds}s)',
+                selected: 'Vybrané video z knižnice'
+            },
+            en: {
+                loop_duration_fixed: 'Loop duration: {seconds} s (fixed to video length)',
+                loop_duration_none: 'Loop duration: no video yet',
+                only_video_upload: 'Only video files can be uploaded.',
+                checking_converted: 'Checking converted video...',
+                previous_videos_empty: 'No previously uploaded videos.',
+                found_items: 'Found items: {count}',
+                loading: 'Loading...',
+                library_error: 'Library load error: {error}',
+                unknown_error: 'unknown error',
+                select_video: 'Select one video from the list.',
+                invalid_video_url: 'Invalid video URL.',
+                fetch_metadata: 'Fetching video metadata...',
+                selected_with_duration: 'Library video selected ({seconds}s)',
+                selected: 'Library video selected'
+            }
+        };
+
+        let text = (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        if (vars && typeof vars === 'object') {
+            Object.entries(vars).forEach(([name, value]) => {
+                text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value ?? ''));
+            });
+        }
+        return text;
+    };
 
     let globalDropGuardsCleanup = null;
     let ffmpegInstancePromise = null;
@@ -265,10 +342,10 @@ const GroupLoopVideoModule = (() => {
         }
 
         if (durationSec > 0) {
-            badge.textContent = `Loop időtartam: ${durationSec} s (fix, videó hossza)`;
+            badge.textContent = videoText('loop_duration_fixed', { seconds: durationSec });
             badge.style.color = '#0f5132';
         } else {
-            badge.textContent = 'Loop időtartam: még nincs videó';
+            badge.textContent = videoText('loop_duration_none');
             badge.style.color = '#6b7280';
         }
     };
@@ -330,7 +407,7 @@ const GroupLoopVideoModule = (() => {
     const handleVideoFile = async (file) => {
         const status = document.getElementById('video-upload-status');
         if (!isLikelyVideoFile(file)) {
-            alert('Csak videófájl tölthető fel.');
+            alert(videoText('only_video_upload'));
             return;
         }
 
@@ -353,7 +430,7 @@ const GroupLoopVideoModule = (() => {
                 });
 
                 if (status) {
-                    status.textContent = 'Konvertált videó ellenőrzése...';
+                    status.textContent = videoText('checking_converted');
                 }
 
                 metadata = await getVideoMetadataFromFile(optimizedFile);
@@ -428,11 +505,11 @@ const GroupLoopVideoModule = (() => {
 
         if (!libraryItems.length) {
             list.innerHTML = '';
-            status.textContent = 'Nincs korábban feltöltött videó.';
+            status.textContent = videoText('previous_videos_empty');
             return;
         }
 
-        status.textContent = `Talált elemek: ${libraryItems.length}`;
+        status.textContent = videoText('found_items', { count: libraryItems.length });
         list.innerHTML = libraryItems.map((item) => {
             const id = parseInt(item.asset_id || 0, 10);
             const name = String(item.original_name || `video-${id}`)
@@ -454,7 +531,7 @@ const GroupLoopVideoModule = (() => {
     const loadLibrary = async () => {
         const status = document.getElementById('video-library-status');
         if (status) {
-            status.textContent = 'Betöltés...';
+            status.textContent = videoText('loading');
         }
 
         try {
@@ -481,7 +558,7 @@ const GroupLoopVideoModule = (() => {
             libraryItems = [];
             renderLibrary();
             if (status) {
-                status.textContent = `Library betöltési hiba: ${error?.message || 'ismeretlen hiba'}`;
+                status.textContent = videoText('library_error', { error: error?.message || videoText('unknown_error') });
             }
         }
     };
@@ -489,7 +566,7 @@ const GroupLoopVideoModule = (() => {
     const importFromLibrary = async () => {
         const selected = document.querySelector('input[name="video-library-choice"]:checked');
         if (!selected) {
-            alert('Válassz ki egy videót a listából.');
+            alert(videoText('select_video'));
             return;
         }
 
@@ -497,13 +574,13 @@ const GroupLoopVideoModule = (() => {
         const id = parseInt(selected.getAttribute('data-video-library-id') || '0', 10);
         const knownDurationSec = parseInt(selected.getAttribute('data-video-library-duration') || '0', 10) || 0;
         if (!url) {
-            alert('Érvénytelen videó URL.');
+            alert(videoText('invalid_video_url'));
             return;
         }
 
         const status = document.getElementById('video-upload-status');
         if (status) {
-            status.textContent = 'Videó metaadat lekérés...';
+            status.textContent = videoText('fetch_metadata');
         }
 
         const durationSec = knownDurationSec > 0 ? knownDurationSec : await getDurationFromUrl(url);
@@ -517,8 +594,8 @@ const GroupLoopVideoModule = (() => {
 
         if (status) {
             status.textContent = durationSec
-                ? `Library videó kiválasztva (${durationSec}s)`
-                : 'Library videó kiválasztva';
+                ? videoText('selected_with_duration', { seconds: durationSec })
+                : videoText('selected');
         }
 
         updatePreview();

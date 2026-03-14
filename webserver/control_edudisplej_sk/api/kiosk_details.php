@@ -8,6 +8,7 @@ session_start();
 require_once '../dbkonfiguracia.php';
 require_once '../kiosk_status.php';
 require_once '../auth_roles.php';
+require_once '../i18n.php';
 
 header('Content-Type: application/json');
 
@@ -70,6 +71,113 @@ function extract_version_from_hw_info($hw_info) {
     }
 
     return '';
+}
+
+function extract_version_from_payload($payload) {
+    if (!is_array($payload)) {
+        return '';
+    }
+
+    $candidate = extract_version_from_hw_info($payload);
+    if ($candidate !== '') {
+        return $candidate;
+    }
+
+    foreach ($payload as $value) {
+        if (!is_array($value)) {
+            continue;
+        }
+        $nested = extract_version_from_payload($value);
+        if ($nested !== '') {
+            return $nested;
+        }
+    }
+
+    return '';
+}
+
+function resolve_kiosk_version(array $row): ?string {
+    $version = normalize_version_text($row['version'] ?? '');
+    if ($version !== '') {
+        return $version;
+    }
+
+    $hw_info = json_decode((string)($row['hw_info'] ?? '{}'), true);
+    if (is_array($hw_info)) {
+        $version = extract_version_from_payload($hw_info);
+        if ($version !== '') {
+            return $version;
+        }
+    }
+
+    $system_data = json_decode((string)($row['system_data'] ?? '{}'), true);
+    if (is_array($system_data)) {
+        $version = extract_version_from_payload($system_data);
+        if ($version !== '') {
+            return $version;
+        }
+    }
+
+    $sync_data = json_decode((string)($row['sync_data'] ?? '{}'), true);
+    if (is_array($sync_data)) {
+        $version = extract_version_from_payload($sync_data);
+        if ($version !== '') {
+            return $version;
+        }
+    }
+
+    return null;
+}
+
+function format_eta_seconds(int $seconds): string {
+    $seconds = max(0, $seconds);
+    if ($seconds < 60) {
+        return $seconds . 's';
+    }
+
+    $minutes = intdiv($seconds, 60);
+    $remaining_seconds = $seconds % 60;
+    if ($minutes < 60) {
+        return $remaining_seconds > 0 ? ($minutes . 'm ' . $remaining_seconds . 's') : ($minutes . 'm');
+    }
+
+    $hours = intdiv($minutes, 60);
+    $remaining_minutes = $minutes % 60;
+    return $remaining_minutes > 0 ? ($hours . 'h ' . $remaining_minutes . 'm') : ($hours . 'h');
+}
+
+function estimate_next_sync_eta_text(array $row): ?string {
+    $last_sync_ts = !empty($row['last_sync']) ? strtotime((string)$row['last_sync']) : false;
+    $sync_interval = (int)($row['sync_interval'] ?? 0);
+
+    $sync_data = json_decode((string)($row['sync_data'] ?? '{}'), true);
+    if (!is_array($sync_data)) {
+        $sync_data = [];
+    }
+
+    $next_sync_ts = null;
+
+    if (!empty($sync_data['next_sync_at'])) {
+        $candidate = strtotime((string)$sync_data['next_sync_at']);
+        if ($candidate !== false) {
+            $next_sync_ts = $candidate;
+        }
+    }
+
+    if ($next_sync_ts === null && isset($sync_data['next_sync_in']) && is_numeric($sync_data['next_sync_in'])) {
+        $next_sync_ts = time() + (int)$sync_data['next_sync_in'];
+    }
+
+    if ($next_sync_ts === null && $last_sync_ts !== false && $sync_interval > 0) {
+        $next_sync_ts = $last_sync_ts + $sync_interval;
+    }
+
+    if ($next_sync_ts === null) {
+        return null;
+    }
+
+    $eta_seconds = max(0, $next_sync_ts - time());
+    return 'ETA: ~' . format_eta_seconds($eta_seconds) . ' (' . date('Y-m-d H:i:s', $next_sync_ts) . ')';
 }
 
 function normalize_loop_version_value($value) {
@@ -146,6 +254,27 @@ function normalize_screenshot_url($raw_url) {
     return '../' . ltrim($path, '/');
 }
 
+function edudisplej_translate_module_name(string $module_key, string $fallback_name): string {
+    $map = [
+        'default-logo' => 'group_loop.module_name.default_logo',
+        'meal-menu' => 'group_loop.module_name.meal_menu',
+        'clock' => 'group_loop.module_name.clock',
+        'text' => 'group_loop.module_name.text',
+        'pdf' => 'group_loop.module_name.pdf',
+        'image-gallery' => 'group_loop.module_name.image_gallery',
+        'video' => 'group_loop.module_name.video',
+        'room-occupancy' => 'group_loop.module_name.room_occupancy',
+        'unconfigured' => 'group_loop.module_name.unconfigured',
+    ];
+
+    $normalized = strtolower(trim($module_key));
+    if ($normalized !== '' && isset($map[$normalized])) {
+        return t_def($map[$normalized], $fallback_name);
+    }
+
+    return $fallback_name;
+}
+
 // Check authentication
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -164,9 +293,10 @@ if (isset($_GET['refresh_list'])) {
         $placeholders = implode(',', array_fill(0, count($kiosk_ids), '?'));
         
         $query = "
-             SELECT k.id, k.hostname, k.last_seen, k.status, k.screenshot_url, k.screenshot_timestamp,
+                         SELECT k.id, k.hostname, k.last_seen, k.status, k.screenshot_url, k.screenshot_timestamp,
                    GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as group_names,
                    k.version, k.screen_resolution, k.screen_status,
+                                 k.hw_info, h.system_data, h.sync_data,
                  k.last_sync, k.loop_last_update,
                  (SELECT DATE_FORMAT(MAX(COALESCE(kgm.updated_at, kgm.created_at)), '%Y%m%d%H%i%s')
                  FROM kiosk_group_assignments kga2
@@ -178,6 +308,9 @@ if (isset($_GET['refresh_list'])) {
             FROM kiosks k 
             LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
             LEFT JOIN kiosk_groups g ON kga.group_id = g.id
+            LEFT JOIN kiosk_health h ON k.id = h.kiosk_id AND h.timestamp = (
+                SELECT MAX(timestamp) FROM kiosk_health WHERE kiosk_id = k.id
+            )
             WHERE k.id IN ($placeholders) AND k.company_id = ?
             GROUP BY k.id
         ";
@@ -236,6 +369,8 @@ if (isset($_GET['refresh_list'])) {
             $row['screenshot_url'] = !empty($row['screenshot_url'])
                 ? ('../api/screenshot_file.php?kiosk_id=' . (int)$row['id'])
                 : null;
+            $row['version'] = resolve_kiosk_version($row);
+            $row['next_sync_eta'] = estimate_next_sync_eta_text($row);
             $kiosks[] = $row;
         }
         $stmt->close();
@@ -363,6 +498,7 @@ try {
         SELECT k.*, 
                GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as group_names,
                     GROUP_CONCAT(DISTINCT g.id SEPARATOR ',') as group_ids,
+                    h.system_data, h.sync_data,
                     (SELECT DATE_FORMAT(MAX(COALESCE(kgm.updated_at, kgm.created_at)), '%Y%m%d%H%i%s')
                         FROM kiosk_group_assignments kga2
                         JOIN kiosk_group_modules kgm ON kgm.group_id = kga2.group_id
@@ -373,6 +509,9 @@ try {
         FROM kiosks k 
         LEFT JOIN kiosk_group_assignments kga ON k.id = kga.kiosk_id
         LEFT JOIN kiosk_groups g ON kga.group_id = g.id
+        LEFT JOIN kiosk_health h ON k.id = h.kiosk_id AND h.timestamp = (
+            SELECT MAX(timestamp) FROM kiosk_health WHERE kiosk_id = k.id
+        )
         WHERE k.id = ? AND k.company_id = ?
         GROUP BY k.id
     ");
@@ -447,19 +586,13 @@ try {
     $response['group_ids'] = $kiosk['group_ids'] ?? null;
     
     // Add technical information
-    $resolved_version = normalize_version_text($kiosk['version'] ?? '');
-    if ($resolved_version === '' && !empty($kiosk['hw_info'])) {
-        $hw_info = json_decode($kiosk['hw_info'], true);
-        if (is_array($hw_info)) {
-            $resolved_version = extract_version_from_hw_info($hw_info);
-        }
-    }
-    $response['version'] = $resolved_version !== '' ? $resolved_version : null;
+    $response['version'] = resolve_kiosk_version($kiosk);
     $response['screen_resolution'] = $kiosk['screen_resolution'] ?? null;
     $response['screen_status'] = $kiosk['screen_status'] ?? null;
     
     // Add sync timing information
     $response['last_sync'] = $kiosk['last_sync'] ? date('Y-m-d H:i:s', strtotime($kiosk['last_sync'])) : null;
+    $response['next_sync_eta'] = estimate_next_sync_eta_text($kiosk);
     $response['loop_last_update'] = $kiosk['loop_last_update'] ? date('Y-m-d H:i:s', strtotime($kiosk['loop_last_update'])) : null;
     $response['kiosk_loop_version'] = $kiosk_loop_version ?? null;
     $response['server_loop_version'] = $server_loop_version ?? null;
@@ -479,7 +612,7 @@ try {
     // Get assigned modules
     $modules = [];
 
-    $group_mod_query = "SELECT m.name
+    $group_mod_query = "SELECT m.module_key, m.name
                         FROM kiosk_group_assignments kga
                         INNER JOIN kiosk_group_modules kgm ON kga.group_id = kgm.group_id
                         INNER JOIN modules m ON kgm.module_id = m.id
@@ -489,13 +622,24 @@ try {
     $group_mod_stmt->bind_param("i", $kiosk_id);
     $group_mod_stmt->execute();
     $group_mod_result = $group_mod_stmt->get_result();
+    $module_seen = [];
     while ($mod = $group_mod_result->fetch_assoc()) {
-        $modules[] = $mod['name'];
+        $module_key = (string)($mod['module_key'] ?? '');
+        $module_name = (string)($mod['name'] ?? '');
+        $translated_name = edudisplej_translate_module_name($module_key, $module_name);
+        $dedupe_key = strtolower(trim($module_key !== '' ? $module_key : $translated_name));
+        if ($dedupe_key !== '' && isset($module_seen[$dedupe_key])) {
+            continue;
+        }
+        if ($dedupe_key !== '') {
+            $module_seen[$dedupe_key] = true;
+        }
+        $modules[] = $translated_name;
     }
     $group_mod_stmt->close();
 
     if (empty($modules)) {
-        $mod_query = "SELECT m.name
+        $mod_query = "SELECT m.module_key, m.name
                       FROM modules m
                       INNER JOIN kiosk_modules km ON m.id = km.module_id
                       WHERE km.kiosk_id = ? AND km.is_active = 1
@@ -506,7 +650,17 @@ try {
         $mod_result = $mod_stmt->get_result();
 
         while ($mod = $mod_result->fetch_assoc()) {
-            $modules[] = $mod['name'];
+            $module_key = (string)($mod['module_key'] ?? '');
+            $module_name = (string)($mod['name'] ?? '');
+            $translated_name = edudisplej_translate_module_name($module_key, $module_name);
+            $dedupe_key = strtolower(trim($module_key !== '' ? $module_key : $translated_name));
+            if ($dedupe_key !== '' && isset($module_seen[$dedupe_key])) {
+                continue;
+            }
+            if ($dedupe_key !== '') {
+                $module_seen[$dedupe_key] = true;
+            }
+            $modules[] = $translated_name;
         }
         $mod_stmt->close();
     }

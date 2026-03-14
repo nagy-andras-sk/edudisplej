@@ -25,9 +25,9 @@ if (!isset($_SESSION['user_id'])) {
 $company_id = $_SESSION['company_id'] ?? null;
 $kiosk_id = intval($_GET['kiosk_id'] ?? 0);
 $page = max(1, intval($_GET['page'] ?? 1));
-$per_page = intval($_GET['per_page'] ?? 20);
-if ($per_page <= 0 || $per_page > 50) {
-    $per_page = 20;
+$per_page = intval($_GET['per_page'] ?? 50);
+if ($per_page <= 0 || $per_page > 100) {
+    $per_page = 50;
 }
 
 $date_from_raw = trim((string)($_GET['date_from'] ?? ''));

@@ -237,7 +237,14 @@ function edudisplej_resolve_group_current_content($plan, $now) {
         return edudisplej_format_schedule_info($matches[0], $style_map, $now, $default_style_id);
     }
 
-    $default_name = trim((string)($style_map[$default_style_id] ?? '')) ?: 'DEFAULT';
+    $default_name = trim((string)($style_map[$default_style_id] ?? ''));
+    $normalized_default = strtolower($default_name);
+    if (
+        $default_name === ''
+        || in_array($normalized_default, ['default', 'alap loop', 'default loop', 'predvolený loop', 'predvoleny loop'], true)
+    ) {
+        $default_name = edudisplej_dashboard_t('dashboard.loop.default_name', 'Default loop');
+    }
     return [
         'loop_name' => $default_name,
         'schedule_text' => edudisplej_dashboard_t('dashboard.schedule.no_active', 'No active time block'),

@@ -177,6 +177,31 @@ wait_for_enter() {
 }
 
 # Pomocne funkcie / Segito funkciok
+get_hardware_profile() {
+    local profile_file="/opt/edudisplej/.hardware_profile"
+    if [[ -f "$profile_file" ]]; then
+        local profile
+        profile="$(tr -d '\r\n' < "$profile_file")"
+        if [[ -n "$profile" ]]; then
+            echo "$profile"
+            return 0
+        fi
+    fi
+
+    local model=""
+    if [[ -f /proc/device-tree/model ]]; then
+        model=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)
+    elif [[ -f /sys/firmware/devicetree/base/model ]]; then
+        model=$(tr -d '\0' < /sys/firmware/devicetree/base/model 2>/dev/null || true)
+    fi
+
+    if echo "$model" | grep -qi "raspberry"; then
+        echo "raspberry"
+    else
+        echo "generic-debian"
+    fi
+}
+
 check_internet() {
     local net_check_urls=(
         "${EDUDISPLEJ_NET_CHECK_URL:-https://control.edudisplej.sk/api/health.php}"
@@ -319,9 +344,11 @@ show_boot_screen() {
 
 countdown_with_f2() {
     local countdown_seconds=5
+    local hardware_profile
+    hardware_profile="$(get_hardware_profile)"
     
     echo "╔═══════════════════════════════════════════════════════════════════════════╗"
-    echo "║  Stlacte F2 pre nastavenia (raspi-config) / Press F2 for settings        ║"
+    echo "║  Stlacte F2 pre systemove nastavenia / Press F2 for system settings      ║"
     echo "╚═══════════════════════════════════════════════════════════════════════════╝"
     echo ""
     
@@ -351,9 +378,15 @@ countdown_with_f2() {
                             [[ -n "$old_tty_settings" ]] && stty "$old_tty_settings" 2>/dev/null || true
                             echo ""
                             echo ""
-                            print_info "F2 stlacene! Spustam raspi-config..."
+                            print_info "F2 stlacene! Otvaram systemove nastavenia..."
                             sleep 1
-                            sudo raspi-config
+                            if [[ "$hardware_profile" = "raspberry" ]] && command -v raspi-config >/dev/null 2>&1; then
+                                sudo raspi-config || true
+                            elif [[ "$hardware_profile" = "raspberry" ]]; then
+                                print_warning "raspi-config nie je dostupny na tomto systeme, pokracujem bez neho"
+                            else
+                                print_info "F2 shortcut is Raspberry-specific, continuing on generic Debian"
+                            fi
                             echo ""
                             print_info "Navrat z nastaveni..."
                             sleep 2

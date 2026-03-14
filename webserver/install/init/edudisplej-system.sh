@@ -346,8 +346,9 @@ install_packages() {
 # =============================================================================
 
 check_kiosk_configuration() {
-    local console_user="${1:-pi}"
-    local user_home="${2:-/home/pi}"
+    local console_user="${1:-${SUDO_USER:-$(id -un 2>/dev/null || echo root)}}"
+    local user_home="${2:-$(getent passwd "${console_user}" | cut -d: -f6)}"
+    [[ -z "$user_home" ]] && user_home="/home/${console_user}"
     local kiosk_configured_file="${EDUDISPLEJ_HOME}/.kiosk_system_configured"
     
     local missing_configs=()
@@ -376,8 +377,9 @@ check_kiosk_configuration() {
 
 check_system_ready() {
     local kiosk_mode="${1:-surf}"
-    local console_user="${2:-pi}"
-    local user_home="${3:-/home/pi}"
+    local console_user="${2:-${SUDO_USER:-$(id -un 2>/dev/null || echo root)}}"
+    local user_home="${3:-$(getent passwd "${console_user}" | cut -d: -f6)}"
+    [[ -z "$user_home" ]] && user_home="/home/${console_user}"
     
     print_info "System check..."
     echo ""

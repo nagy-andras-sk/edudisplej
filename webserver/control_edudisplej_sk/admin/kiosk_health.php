@@ -19,6 +19,106 @@ $success = '';
 $kiosks = [];
 $statistics = [];
 
+function pick_value($data, $keys) {
+    if (!is_array($data)) {
+        return null;
+    }
+    foreach ($keys as $key) {
+        if (isset($data[$key]) && $data[$key] !== '' && $data[$key] !== null) {
+            return $data[$key];
+        }
+    }
+    return null;
+}
+
+function format_percent($value) {
+    if ($value === null || $value === '') {
+        return '-';
+    }
+    if (is_numeric($value)) {
+        return number_format((float)$value, 1) . '%';
+    }
+    $text = trim((string)$value);
+    return $text === '' ? '-' : $text;
+}
+
+function format_temperature($value) {
+    if ($value === null || $value === '') {
+        return '-';
+    }
+    if (is_numeric($value)) {
+        return number_format((float)$value, 1) . '°C';
+    }
+    $text = trim((string)$value);
+    return $text === '' ? '-' : $text;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['queue_full_update_all'])) {
+    try {
+        $conn = getDbConnection();
+
+        $result = $conn->query("SELECT id FROM kiosks ORDER BY id ASC");
+        if (!$result) {
+            throw new Exception('Kiosks lekérdezése sikertelen.');
+        }
+
+        $pending_stmt = $conn->prepare("SELECT id FROM kiosk_command_queue WHERE kiosk_id = ? AND command_type = 'full_update' AND status = 'pending' LIMIT 1");
+        $insert_stmt = $conn->prepare("INSERT INTO kiosk_command_queue (kiosk_id, command_type, command, status, created_at) VALUES (?, 'full_update', '', 'pending', NOW())");
+        $log_stmt = $conn->prepare("INSERT INTO kiosk_command_logs (kiosk_id, command_id, action, details) VALUES (?, ?, 'full_update_queued_bulk', ?)");
+
+        if (!$pending_stmt || !$insert_stmt || !$log_stmt) {
+            throw new Exception('Parancs-előkészítés sikertelen.');
+        }
+
+        $total = 0;
+        $queued = 0;
+        $skipped_pending = 0;
+
+        while ($row = $result->fetch_assoc()) {
+            $kiosk_id = (int)($row['id'] ?? 0);
+            if ($kiosk_id <= 0) {
+                continue;
+            }
+
+            $total++;
+
+            $pending_stmt->bind_param('i', $kiosk_id);
+            $pending_stmt->execute();
+            $pending_result = $pending_stmt->get_result();
+            if ($pending_result && $pending_result->num_rows > 0) {
+                $skipped_pending++;
+                continue;
+            }
+
+            $insert_stmt->bind_param('i', $kiosk_id);
+            if (!$insert_stmt->execute()) {
+                continue;
+            }
+
+            $command_id = (int)$insert_stmt->insert_id;
+            $details = json_encode([
+                'requested_by_user_id' => $_SESSION['user_id'] ?? null,
+                'queued_at' => date('Y-m-d H:i:s'),
+                'mode' => 'bulk'
+            ]);
+            $log_stmt->bind_param('iis', $kiosk_id, $command_id, $details);
+            $log_stmt->execute();
+            $queued++;
+        }
+
+        $pending_stmt->close();
+        $insert_stmt->close();
+        $log_stmt->close();
+        closeDbConnection($conn);
+
+        $success = 'Teljes frissítési parancsok sorba állítva. Összes kioszk: ' . $total
+            . ', új parancs: ' . $queued
+            . ', már függőben volt: ' . $skipped_pending . '.';
+    } catch (Exception $e) {
+        $error = 'Bulk full update hiba: ' . $e->getMessage();
+    }
+}
+
 try {
     $conn = getDbConnection();
 
@@ -27,6 +127,7 @@ try {
             k.id, k.device_id, k.hostname, k.status,
             k.last_sync, k.last_seen, k.last_heartbeat, k.upgrade_started_at,
             k.company_id, c.name as company_name,
+            k.hw_info,
             h.status as health_status,
             h.system_data,
             h.services_data,
@@ -90,6 +191,9 @@ include 'header.php';
 <?php if ($error): ?>
     <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
+<?php if ($success): ?>
+    <div class="alert success"><?php echo htmlspecialchars($success); ?></div>
+<?php endif; ?>
 
 <div class="panel">
     <div class="panel-title">Statisztika</div>
@@ -113,6 +217,14 @@ include 'header.php';
             </tbody>
         </table>
     </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Rendszer frissítés</div>
+    <form method="post" onsubmit="return confirm('Biztosan teljes frissítési parancsot küld minden kioszkra?');" style="display:flex; gap:10px; align-items:center;">
+        <button type="submit" name="queue_full_update_all" class="btn btn-warning">Teljes frissítés küldése minden kioszkra</button>
+        <span class="muted">A már függőben lévő full update parancsokat a rendszer kihagyja.</span>
+    </form>
 </div>
 
 <div class="panel">
@@ -145,6 +257,33 @@ include 'header.php';
                     <?php foreach ($kiosks as $kiosk): ?>
                         <?php
                             $system = json_decode($kiosk['system_data'] ?? '{}', true) ?: [];
+                            $hw_info = json_decode($kiosk['hw_info'] ?? '{}', true) ?: [];
+
+                            $cpu_temp_value = pick_value($system, ['cpu_temp', 'temperature', 'temp']);
+                            if ($cpu_temp_value === null) {
+                                $cpu_temp_value = pick_value($hw_info, ['cpu_temp', 'temperature', 'temp']);
+                            }
+
+                            $cpu_usage_value = pick_value($system, ['cpu_usage']);
+                            if ($cpu_usage_value === null) {
+                                $cpu_usage_value = pick_value($hw_info, ['cpu_usage']);
+                            }
+
+                            $memory_usage_value = pick_value($system, ['memory_usage']);
+                            if ($memory_usage_value === null) {
+                                $memory_usage_value = pick_value($hw_info, ['memory_usage']);
+                            }
+
+                            $disk_usage_value = pick_value($system, ['disk_usage']);
+                            if ($disk_usage_value === null) {
+                                $disk_usage_value = pick_value($hw_info, ['disk_usage']);
+                            }
+
+                            $uptime_value = pick_value($system, ['uptime', 'uptime_seconds']);
+                            if ($uptime_value === null) {
+                                $uptime_value = pick_value($hw_info, ['uptime_seconds']);
+                            }
+
                             $status = $kiosk['status'] ?? 'unknown';
                             $badge_class = 'info';
                             if ($status === 'online') {
@@ -163,11 +302,11 @@ include 'header.php';
                             <td><span class="badge <?php echo $badge_class; ?>"><?php echo htmlspecialchars($status); ?></span></td>
                             <td><?php echo htmlspecialchars($kiosk['health_status'] ?? '-'); ?></td>
                             <td class="nowrap"><?php echo $kiosk['timestamp'] ? date('Y-m-d H:i:s', strtotime($kiosk['timestamp'])) : '-'; ?></td>
-                            <td><?php echo htmlspecialchars($system['cpu_temp'] ?? '-'); ?></td>
-                            <td><?php echo isset($system['cpu_usage']) ? number_format((float)$system['cpu_usage'], 1) . '%' : '-'; ?></td>
-                            <td><?php echo isset($system['memory_usage']) ? number_format((float)$system['memory_usage'], 1) . '%' : '-'; ?></td>
-                            <td><?php echo isset($system['disk_usage']) ? htmlspecialchars((string)$system['disk_usage']) . '%' : '-'; ?></td>
-                            <td class="nowrap"><?php echo format_last_reboot($system['uptime'] ?? null); ?></td>
+                            <td><?php echo htmlspecialchars(format_temperature($cpu_temp_value)); ?></td>
+                            <td><?php echo htmlspecialchars(format_percent($cpu_usage_value)); ?></td>
+                            <td><?php echo htmlspecialchars(format_percent($memory_usage_value)); ?></td>
+                            <td><?php echo htmlspecialchars(format_percent($disk_usage_value)); ?></td>
+                            <td class="nowrap"><?php echo htmlspecialchars(format_last_reboot($uptime_value)); ?></td>
                             <td class="nowrap">
                                 <button class="btn btn-small" onclick="openTerminal(<?php echo (int)$kiosk['id']; ?>, '<?php echo htmlspecialchars($kiosk['hostname'] ?? 'kiosk'); ?>')">Terminal</button>
                                 <button class="btn btn-small btn-warning" onclick="toggleFastLoop(<?php echo (int)$kiosk['id']; ?>, this)">Fast Loop</button>
@@ -256,10 +395,10 @@ include 'header.php';
 
                     const output = document.getElementById('terminalOutput');
                     const cmd = data.command;
-                    if (cmd.status === 'completed' || cmd.status === 'failed') {
+                    if (cmd.status === 'completed' || cmd.status === 'executed' || cmd.status === 'failed' || cmd.status === 'timeout') {
                         terminalCommands.delete(commandId);
                         const result = cmd.output || cmd.error || '(no output)';
-                        output.innerHTML += `<div>${escapeHtml(result)}</div>`;
+                        output.innerHTML += `<div>[${escapeHtml(String(cmd.status || 'unknown'))}] ${escapeHtml(result)}</div>`;
                         output.scrollTop = output.scrollHeight;
                     } else if (terminalCommands.has(commandId)) {
                         pollCommandResult(commandId);

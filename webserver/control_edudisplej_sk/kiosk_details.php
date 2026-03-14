@@ -206,7 +206,7 @@ if (!$kiosk) {
 </head>
 <body>
     <div class="navbar">
-        <h1>🖥️ Kiosk Details</h1>
+        <h1><img src="favicon.svg" alt="EduDisplej logo" style="width:22px;height:22px;vertical-align:-4px;margin-right:6px;">Kiosk Details</h1>
         <a href="admin.php">← Back to Dashboard</a>
     </div>
     

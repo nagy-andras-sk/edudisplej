@@ -77,7 +77,7 @@ try {
 
     // Load kiosks with group assignments
     $stmt = $conn->prepare("
-          SELECT k.id, k.hostname, k.friendly_name, k.status, k.location, k.last_seen,
+          SELECT k.id, k.hostname, k.friendly_name, k.status, k.location, k.last_seen, k.last_sync,
                     k.screenshot_url, k.screenshot_timestamp, k.loop_last_update,
                     (SELECT DATE_FORMAT(MAX(COALESCE(kgm.updated_at, kgm.created_at)), '%Y%m%d%H%i%s')
                         FROM kiosk_group_assignments kga2
@@ -279,7 +279,7 @@ include '../admin/header.php';
                     $data_groups = implode(' ', array_map(fn($id) => 'g' . $id, $gids));
                     $location_value = trim((string)($k['location'] ?? ''));
                     $location_value_lc = strtolower($location_value);
-                    $last_seen_str = $k['last_seen'] ? date('Y-m-d H:i', strtotime($k['last_seen'])) : 'Soha';
+                    $last_seen_str = $k['last_sync'] ? date('Y-m-d H:i', strtotime($k['last_sync'])) : ($k['last_seen'] ? date('Y-m-d H:i', strtotime($k['last_seen'])) : 'Soha');
                     $display_name = trim((string)($k['friendly_name'] ?? ''));
                     if ($display_name === '') {
                         $display_name = $k['hostname'] ?? 'N/A';
@@ -333,7 +333,7 @@ include '../admin/header.php';
                         </td>
                         <td>
                             <?php if ($location_value !== ''): ?>
-                                <a href="#" onclick="filterByLocationValue(<?php echo json_encode($location_value, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>); return false;" title="<?php echo htmlspecialchars(t_def('dashboard.filter.location_title', 'Szűrés erre a helyre')); ?>">
+                                <a href="#" onclick="filterByLocationValue(<?php echo htmlspecialchars((json_encode($location_value, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '""'), ENT_QUOTES, 'UTF-8'); ?>); return false;" title="<?php echo htmlspecialchars(t_def('dashboard.filter.location_title', 'Szűrés erre a helyre')); ?>">
                                     <?php echo htmlspecialchars($location_value); ?>
                                 </a>
                             <?php else: ?>
@@ -461,6 +461,8 @@ include '../admin/header.php';
                     </tbody>
                 </table>
 
+                <div id="history-gallery" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;"></div>
+
                 <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
                     <button type="button" class="btn" id="history-prev-btn" onclick="changeHistoryPage(-1)"><?php echo htmlspecialchars(t_def('dashboard.history.prev', '◀ Előző')); ?></button>
                     <span class="muted" id="history-page-info"><?php echo htmlspecialchars(t_def('dashboard.history.page', 'Oldal')); ?> 1/1</span>
@@ -533,6 +535,18 @@ var HISTORY_NO_RESULTS_TEXT = <?php
 var HISTORY_TIME_TEXT = <?php
     $history_time_text_json = json_encode(t_def('dashboard.history.time', 'Időpont'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $history_time_text_json !== false ? $history_time_text_json : '"Time"';
+?>;
+var HISTORY_OLDEST_TEXT = <?php
+    $history_oldest_text_json = json_encode(t_def('dashboard.history.oldest', 'Legrégebbi'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $history_oldest_text_json !== false ? $history_oldest_text_json : '"Oldest"';
+?>;
+var HISTORY_LATEST_TEXT = <?php
+    $history_latest_text_json = json_encode(t_def('dashboard.history.latest', 'Legfrissebb'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $history_latest_text_json !== false ? $history_latest_text_json : '"Latest"';
+?>;
+var HISTORY_CURRENT_TEXT = <?php
+    $history_current_text_json = json_encode(t_def('dashboard.history.current', 'Aktuális'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $history_current_text_json !== false ? $history_current_text_json : '"Current"';
 ?>;
 var STATUS_ONLINE_TEXT = <?php
     $status_online_text_json = json_encode(t('dashboard.status.online'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
@@ -609,6 +623,34 @@ var DASHBOARD_LOOP_STATUS_MATCH_TEXT = <?php
 var DASHBOARD_COL_MODULES_TEXT = <?php
     $dashboard_col_modules_text_json = json_encode(t_def('dashboard.col.modules', 'Modulok'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_col_modules_text_json !== false ? $dashboard_col_modules_text_json : '"Modules"';
+?>;
+var DASHBOARD_COL_SCREENSHOT_TEXT = <?php
+    $dashboard_col_screenshot_text_json = json_encode(t_def('dashboard.col.screenshot', 'Screenshot'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $dashboard_col_screenshot_text_json !== false ? $dashboard_col_screenshot_text_json : '"Screenshot"';
+?>;
+var COMMON_ENABLED_TEXT = <?php
+    $common_enabled_text_json = json_encode(t_def('common.enabled', 'Engedélyezve'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $common_enabled_text_json !== false ? $common_enabled_text_json : '"Enabled"';
+?>;
+var COMMON_HOSTNAME_TEXT = <?php
+    $common_hostname_text_json = json_encode(t_def('common.hostname', 'Hostname'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $common_hostname_text_json !== false ? $common_hostname_text_json : '"Hostname"';
+?>;
+var DASHBOARD_SAVE_ERROR_TEXT = <?php
+    $dashboard_save_error_text_json = json_encode(t_def('dashboard.error.save', 'Mentési hiba'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $dashboard_save_error_text_json !== false ? $dashboard_save_error_text_json : '"Save error"';
+?>;
+var DASHBOARD_OPEN_HISTORY_TITLE_TEXT = <?php
+    $dashboard_open_history_title_text_json = json_encode(t_def('dashboard.screenshot.open_history', 'Előzmények megnyitása'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $dashboard_open_history_title_text_json !== false ? $dashboard_open_history_title_text_json : '"Open history"';
+?>;
+var DASHBOARD_ZOOM_LIVE_TITLE_TEXT = <?php
+    $dashboard_zoom_live_title_text_json = json_encode(t_def('dashboard.screenshot.zoom_live', 'Nagyítás és élő frissítés'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $dashboard_zoom_live_title_text_json !== false ? $dashboard_zoom_live_title_text_json : '"Zoom and live refresh"';
+?>;
+var DASHBOARD_KIOSK_PREFIX_TEXT = <?php
+    $dashboard_kiosk_prefix_text_json = json_encode(t_def('dashboard.kiosk.prefix', 'Kioszk #'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $dashboard_kiosk_prefix_text_json !== false ? $dashboard_kiosk_prefix_text_json : '"Kiosk #"';
 ?>;
 var COMMON_UNKNOWN_ERROR_TEXT = <?php
     $common_unknown_error_text_json = json_encode(t_def('common.unknown_error', 'Ismeretlen hiba'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
@@ -794,7 +836,7 @@ function loadScreenshotHistory(page) {
 
     var url = '../api/screenshot_history.php?kiosk_id=' + encodeURIComponent(_viewerKioskId)
         + '&page=' + encodeURIComponent(_historyPage)
-        + '&per_page=20';
+        + '&per_page=50';
     if (dateFrom) {
         url += '&date_from=' + encodeURIComponent(dateFrom);
     }
@@ -821,6 +863,7 @@ function loadScreenshotHistory(page) {
             _historyCurrentIndex = 0;
 
             renderScreenshotHistoryRows(items);
+            renderScreenshotGallery(items);
             updateHistoryPager();
 
             if (_historyItems.length > 0) {
@@ -897,6 +940,49 @@ function renderScreenshotHistoryRows(items) {
     });
 }
 
+function renderScreenshotGallery(items) {
+    var gallery = document.getElementById('history-gallery');
+    if (!gallery) {
+        return;
+    }
+
+    if (!items.length) {
+        gallery.innerHTML = '';
+        return;
+    }
+
+    var html = '';
+    items.forEach(function (item, index) {
+        var isOfflineMarker = !!item.is_offline_marker;
+        var timestamp = item.timestamp || '—';
+        if (isOfflineMarker) {
+            html += '<button type="button" data-index="' + index + '" class="history-gallery-offline" style="border:1px solid #e5b4b4;border-radius:6px;background:#fdecec;color:#9f1d1d;padding:8px;cursor:pointer;text-align:left;">'
+                + '<div style="font-size:11px;font-weight:700;">' + escapeHtml(HISTORY_OFFLINE_SINCE_TEXT) + '</div>'
+                + '<div style="font-size:11px;">' + escapeHtml(item.offline_since || COMMON_UNKNOWN_TEXT) + '</div>'
+                + '</button>';
+            return;
+        }
+
+        var screenshotUrl = String(item.screenshot_url || '');
+        html += '<button type="button" data-index="' + index + '" class="history-gallery-item" style="border:1px solid #d0d6dc;border-radius:6px;background:#fff;padding:4px;cursor:pointer;text-align:left;">'
+            + '<img src="' + escapeHtml(appendCacheBuster(screenshotUrl)) + '" alt="Screenshot" style="display:block;width:100%;height:70px;object-fit:cover;border-radius:4px;">'
+            + '<div style="margin-top:4px;font-size:11px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(timestamp) + '</div>'
+            + '</button>';
+    });
+
+    gallery.innerHTML = html;
+    gallery.querySelectorAll('[data-index]').forEach(function (buttonEl) {
+        buttonEl.addEventListener('click', function () {
+            var idx = parseInt(buttonEl.getAttribute('data-index'), 10);
+            if (isNaN(idx)) {
+                return;
+            }
+            stopHistoryPlayer();
+            showHistoryItemByIndex(idx);
+        });
+    });
+}
+
 function showHistoryItemByIndex(index) {
     if (index < 0 || index >= _historyItems.length) {
         return;
@@ -934,9 +1020,9 @@ function updateHistoryTimeline() {
         timeline.min = '0';
         timeline.max = '0';
         timeline.value = '0';
-        oldestLabel.textContent = 'Legrégebbi: —';
-        latestLabel.textContent = 'Legfrissebb: —';
-        currentLabel.textContent = 'Aktuális: —';
+        oldestLabel.textContent = HISTORY_OLDEST_TEXT + ': —';
+        latestLabel.textContent = HISTORY_LATEST_TEXT + ': —';
+        currentLabel.textContent = HISTORY_CURRENT_TEXT + ': —';
         labelsWrap.innerHTML = '';
         return;
     }
@@ -949,9 +1035,9 @@ function updateHistoryTimeline() {
     var latestItem = _historyItems[0] || null;
     var currentItem = _historyItems[_historyCurrentIndex] || null;
 
-    oldestLabel.textContent = 'Legrégebbi: ' + (oldestItem && oldestItem.timestamp ? oldestItem.timestamp : '—');
-    latestLabel.textContent = 'Legfrissebb: ' + (latestItem && latestItem.timestamp ? latestItem.timestamp : '—');
-    currentLabel.textContent = 'Aktuális: ' + (currentItem && currentItem.timestamp ? currentItem.timestamp : '—');
+    oldestLabel.textContent = HISTORY_OLDEST_TEXT + ': ' + (oldestItem && oldestItem.timestamp ? oldestItem.timestamp : '—');
+    latestLabel.textContent = HISTORY_LATEST_TEXT + ': ' + (latestItem && latestItem.timestamp ? latestItem.timestamp : '—');
+    currentLabel.textContent = HISTORY_CURRENT_TEXT + ': ' + (currentItem && currentItem.timestamp ? currentItem.timestamp : '—');
 
     var labelsHtml = '';
     _historyItems.forEach(function (item) {
@@ -1202,7 +1288,7 @@ function buildKioskModalHTML(data) {
             + '<tr><th>' + escapeHtml(DASHBOARD_COL_NAME_TEXT) + '</th><td><input type="text" id="kiosk-edit-friendly-name" value="' + escapeHtml(data.friendly_name || data.hostname || '') + '" style="width:100%;"></td></tr>'
             + '<tr><th>' + escapeHtml(DASHBOARD_COL_LOCATION_TEXT) + '</th><td><input type="text" id="kiosk-edit-location" value="' + escapeHtml(data.location || '') + '" style="width:100%;"></td></tr>'
             + '<tr><th>' + escapeHtml(DASHBOARD_COL_GROUP_TEXT) + '</th><td><select id="kiosk-edit-group" style="width:100%;">' + groupOptions + '</select></td></tr>'
-            + '<tr><th>Screenshot</th><td><label><input type="checkbox" id="kiosk-edit-screenshot-enabled" ' + (data.screenshot_enabled ? 'checked' : '') + '> Engedélyezve</label></td></tr>'
+            + '<tr><th>' + escapeHtml(DASHBOARD_COL_SCREENSHOT_TEXT) + '</th><td><label><input type="checkbox" id="kiosk-edit-screenshot-enabled" ' + (data.screenshot_enabled ? 'checked' : '') + '> ' + escapeHtml(COMMON_ENABLED_TEXT) + '</label></td></tr>'
             + '<tr><td colspan="2" style="text-align:right;"><button class="btn btn-primary" onclick="saveKioskDetails(' + escapeHtml(data.id || 0) + ')">' + escapeHtml(DASHBOARD_ACTION_SAVE_TEXT) + '</button></td></tr>'
             + '</tbody></table>';
     } else {
@@ -1231,9 +1317,11 @@ function buildKioskModalHTML(data) {
             )
         )
         + '</td></tr>'
-        + '<tr><th>Hostname</th><td class="mono">' + escapeHtml(data.hostname || '—') + '</td></tr>'
+        + '<tr><th>' + escapeHtml(COMMON_HOSTNAME_TEXT) + '</th><td class="mono">' + escapeHtml(data.hostname || '—') + '</td></tr>'
         + '<tr><th>' + escapeHtml(DASHBOARD_COL_GROUP_TEXT) + '</th><td>' + escapeHtml(data.group_names || '—') + '</td></tr>'
-        + '<tr><th>' + escapeHtml(DASHBOARD_COL_LAST_SYNC_TEXT) + '</th><td>' + escapeHtml(data.last_seen || '—') + '</td></tr>'
+        + '<tr><th>' + escapeHtml(DASHBOARD_COL_LAST_SYNC_TEXT) + '</th><td>' + escapeHtml(data.last_sync || data.last_seen || '—')
+        + (data.next_sync_eta ? ('<div class="muted" style="font-size:11px;">' + escapeHtml(data.next_sync_eta) + '</div>') : '')
+        + '</td></tr>'
         + '<tr><th>MAC</th><td class="mono">' + escapeHtml(data.mac || '—') + '</td></tr>'
         + '<tr><th>' + escapeHtml(DASHBOARD_COL_VERSION_TEXT) + '</th><td>' + escapeHtml(data.version || COMMON_UNKNOWN_TEXT) + '</td></tr>'
         + '<tr><th>' + escapeHtml(DASHBOARD_LOOP_KIOSK_VERSION_TEXT) + '</th><td class="mono">' + escapeHtml(data.kiosk_loop_version || 'n/a') + '</td></tr>'
@@ -1280,13 +1368,13 @@ function saveKioskDetails(kioskId) {
     .then(function (r) { return r.json(); })
     .then(function (data) {
         if (!data.success) {
-            alert('⚠️ ' + (data.message || 'Mentési hiba'));
+            alert('⚠️ ' + (data.message || DASHBOARD_SAVE_ERROR_TEXT));
             return;
         }
         window.location.reload();
     })
     .catch(function () {
-        alert('⚠️ Mentési hiba.');
+        alert('⚠️ ' + DASHBOARD_SAVE_ERROR_TEXT + '.');
     });
 }
 
@@ -1295,7 +1383,7 @@ function renderKioskScreenshotCell(kiosk) {
     var kioskId = parseInt(kiosk.id, 10) || 0;
     var screenshotUrl = String(kiosk.screenshot_url || '');
     if (status === 'offline') {
-        return '<div class="preview-card placeholder" style="cursor:pointer;" onclick="openScreenshotViewer(' + kioskId + ', ' + JSON.stringify(screenshotUrl) + ', ' + JSON.stringify(SCREENSHOT_OFFLINE_TEXT) + ');" title="Előzmények megnyitása">'
+        return '<div class="preview-card placeholder" style="cursor:pointer;" onclick="openScreenshotViewer(' + kioskId + ', ' + JSON.stringify(screenshotUrl) + ', ' + JSON.stringify(SCREENSHOT_OFFLINE_TEXT) + ');" title="' + escapeHtml(DASHBOARD_OPEN_HISTORY_TITLE_TEXT) + '">'
             + '<div class="screenshot-loader">' + escapeHtml(SCREENSHOT_OFFLINE_TEXT) + '</div>'
             + '<span class="screenshot-timestamp">' + escapeHtml(SCREENSHOT_OFFLINE_TEXT) + '</span>'
             + '</div>';
@@ -1303,7 +1391,7 @@ function renderKioskScreenshotCell(kiosk) {
 
     if (kiosk.screenshot_url) {
         var screenshotTs = String(kiosk.screenshot_timestamp || NO_TIMESTAMP_TEXT);
-        return '<div class="preview-card" style="cursor:pointer;" onclick="openScreenshotViewer(' + kioskId + ', ' + JSON.stringify(screenshotUrl) + ', ' + JSON.stringify(screenshotTs) + ');" title="Nagyítás és élő frissítés">'
+        return '<div class="preview-card" style="cursor:pointer;" onclick="openScreenshotViewer(' + kioskId + ', ' + JSON.stringify(screenshotUrl) + ', ' + JSON.stringify(screenshotTs) + ');" title="' + escapeHtml(DASHBOARD_ZOOM_LIVE_TITLE_TEXT) + '">'
             + '<img class="screenshot-img" src="' + escapeHtml(screenshotUrl) + '" alt="Screenshot" loading="lazy">'
             + '<span class="screenshot-timestamp">' + escapeHtml(screenshotTs) + '</span>'
             + '</div>';
@@ -1422,7 +1510,7 @@ function openKioskDetail(kioskId, hostname) {
     _currentModalKioskId = kioskId;
     var modal = document.getElementById('kiosk-modal');
     var body  = document.getElementById('kiosk-modal-body');
-    document.getElementById('kiosk-modal-title').textContent = hostname || ('Kiosk #' + kioskId);
+    document.getElementById('kiosk-modal-title').textContent = hostname || (DASHBOARD_KIOSK_PREFIX_TEXT + kioskId);
     body.innerHTML = '<p class="muted">' + escapeHtml(COMMON_LOADING_TEXT) + '</p>';
     modal.style.display = 'flex';
 

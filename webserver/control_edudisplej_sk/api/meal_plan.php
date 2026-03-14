@@ -77,10 +77,108 @@ function edudisplej_meal_plan_ensure_schema(mysqli $conn): void {
         }
     }
 
-    $seed_check = $conn->query("SELECT id FROM meal_plan_sites WHERE company_id = 0 AND site_key = 'jedalen.sk' LIMIT 1");
-    if ($seed_check && $seed_check->num_rows === 0) {
-        $conn->query("INSERT INTO meal_plan_sites (company_id, site_key, site_name, base_url, is_active) VALUES (0, 'jedalen.sk', 'Jedalen.sk', 'https://www.jedalen.sk', 1)");
+    edudisplej_meal_plan_seed_global_sources($conn);
+}
+
+function edudisplej_meal_plan_default_sites(): array {
+    return [
+        [
+            'site_key' => 'jedalen.sk',
+            'site_name' => 'Jedalen.sk',
+            'base_url' => 'https://www.jedalen.sk',
+        ],
+        [
+            'site_key' => 'webkredit',
+            'site_name' => 'WebKredit',
+            'base_url' => '',
+        ],
+    ];
+}
+
+function edudisplej_meal_plan_default_webkredit_institutions(): array {
+    return [
+        [
+            'institution_name' => 'W. JFMed UNIBA',
+            'city' => 'Martin',
+            'external_key' => 'https://strava.jfmed.uniba.sk/WebKredit/Api/Ordering/Rss?canteenId=1&locale=sk',
+        ],
+        [
+            'institution_name' => 'W. STU STUBA SvF',
+            'city' => 'Bratislava',
+            'external_key' => 'https://www.jedalen.stuba.sk/webkredit/Api/Ordering/Rss?canteenId=3&locale=sk',
+        ],
+        [
+            'institution_name' => 'W. UJS Konferencia-központ',
+            'city' => 'Komárno',
+            'external_key' => 'https://food.ujs.sk/webkredit/Api/Ordering/Rss?canteenId=1&locale=sk',
+        ],
+    ];
+}
+
+function edudisplej_meal_plan_seed_global_sources(mysqli $conn): void {
+    $siteIds = [];
+    $siteStmt = $conn->prepare("INSERT INTO meal_plan_sites (company_id, site_key, site_name, base_url, is_active)
+                                VALUES (0, ?, ?, ?, 1)
+                                ON DUPLICATE KEY UPDATE
+                                    site_name = VALUES(site_name),
+                                    base_url = VALUES(base_url),
+                                    is_active = 1,
+                                    updated_at = CURRENT_TIMESTAMP,
+                                    id = LAST_INSERT_ID(id)");
+    if ($siteStmt) {
+        foreach (edudisplej_meal_plan_default_sites() as $site) {
+            $siteKey = (string)($site['site_key'] ?? '');
+            $siteName = (string)($site['site_name'] ?? '');
+            $baseUrl = (string)($site['base_url'] ?? '');
+            if ($siteKey === '' || $siteName === '') {
+                continue;
+            }
+            $siteStmt->bind_param('sss', $siteKey, $siteName, $baseUrl);
+            if ($siteStmt->execute()) {
+                $siteIds[$siteKey] = (int)$conn->insert_id;
+            }
+        }
+        $siteStmt->close();
     }
+
+    $webkreditSiteId = (int)($siteIds['webkredit'] ?? 0);
+    if ($webkreditSiteId <= 0) {
+        $siteLookup = $conn->prepare("SELECT id FROM meal_plan_sites WHERE company_id = 0 AND site_key = 'webkredit' LIMIT 1");
+        if ($siteLookup) {
+            $siteLookup->execute();
+            $siteRow = $siteLookup->get_result()->fetch_assoc();
+            $siteLookup->close();
+            $webkreditSiteId = (int)($siteRow['id'] ?? 0);
+        }
+    }
+
+    if ($webkreditSiteId <= 0) {
+        return;
+    }
+
+    $institutionStmt = $conn->prepare("INSERT INTO meal_plan_institutions (company_id, site_id, external_key, institution_name, city, is_active)
+                                       VALUES (0, ?, ?, ?, ?, 1)
+                                       ON DUPLICATE KEY UPDATE
+                                           institution_name = VALUES(institution_name),
+                                           city = VALUES(city),
+                                           is_active = 1,
+                                           updated_at = CURRENT_TIMESTAMP,
+                                           id = LAST_INSERT_ID(id)");
+    if (!$institutionStmt) {
+        return;
+    }
+
+    foreach (edudisplej_meal_plan_default_webkredit_institutions() as $institution) {
+        $externalKey = trim((string)($institution['external_key'] ?? ''));
+        $institutionName = trim((string)($institution['institution_name'] ?? ''));
+        $city = trim((string)($institution['city'] ?? ''));
+        if ($externalKey === '' || $institutionName === '') {
+            continue;
+        }
+        $institutionStmt->bind_param('isss', $webkreditSiteId, $externalKey, $institutionName, $city);
+        $institutionStmt->execute();
+    }
+    $institutionStmt->close();
 }
 
 function edudisplej_meal_plan_can_admin(): bool {
@@ -124,7 +222,10 @@ function edudisplej_meal_plan_normalize_site_key($value): string {
 }
 
 function edudisplej_meal_plan_allowed_site_keys(): array {
-    return ['jedalen.sk' => true];
+    return [
+        'jedalen.sk' => true,
+        'webkredit' => true,
+    ];
 }
 
 function edudisplej_meal_plan_is_allowed_site_key(string $siteKey): bool {
@@ -792,7 +893,7 @@ try {
 
         if (!edudisplej_meal_plan_is_allowed_site_key($site_key)) {
             closeDbConnection($conn);
-            edudisplej_meal_plan_response_error('Jelenleg csak a jedalen.sk forrás támogatott.');
+            edudisplej_meal_plan_response_error('Csak a támogatott források menthetők: jedalen.sk, webkredit.');
         }
 
         if ($id > 0) {
@@ -843,7 +944,7 @@ try {
         $site_key = edudisplej_meal_plan_normalize_site_key($site_row['site_key'] ?? '');
         if (!edudisplej_meal_plan_is_allowed_site_key($site_key)) {
             closeDbConnection($conn);
-            edudisplej_meal_plan_response_error('Jelenleg csak a jedalen.sk forrás támogatott.');
+            edudisplej_meal_plan_response_error('Csak a támogatott források menthetők: jedalen.sk, webkredit.');
         }
 
         if ($external_key === '') {

@@ -52,6 +52,314 @@ function appendCronLog(?string $cronLog, string $line): void {
     error_log(trim($line));
 }
 
+function rmEmitLog(bool $isCli, ?string $cronLog, string $message, bool $isError = false): void {
+    $line = '[' . date('Y-m-d H:i:s') . '] ' . $message . "\n";
+    appendCronLog($cronLog, $line);
+    emitMaintenanceOutput($line, $isCli, $isError);
+}
+
+function rmTableExists(mysqli $conn, string $tableName): bool {
+    $safe = $conn->real_escape_string($tableName);
+    $res = $conn->query("SHOW TABLES LIKE '{$safe}'");
+    return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function rmColumnExists(mysqli $conn, string $tableName, string $columnName): bool {
+    $tableSafe = $conn->real_escape_string($tableName);
+    $columnSafe = $conn->real_escape_string($columnName);
+    $res = $conn->query("SHOW COLUMNS FROM `{$tableSafe}` LIKE '{$columnSafe}'");
+    return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function rmRandomHex(int $bytes = 32): string {
+    if ($bytes < 16) {
+        $bytes = 16;
+    }
+
+    try {
+        return bin2hex(random_bytes($bytes));
+    } catch (Throwable $e) {
+        return bin2hex(hash('sha256', uniqid('', true) . microtime(true) . mt_rand(), true));
+    }
+}
+
+function rmEnsureAdminAccount(mysqli $conn, bool $isCli, ?string $cronLog): int {
+    if (!rmTableExists($conn, 'users')) {
+        rmEmitLog($isCli, $cronLog, '[WARNING] DB repair: users table not found, admin account step skipped');
+        return 0;
+    }
+
+    $targetUsername = 'admin@edudisplej.sk';
+    $targetEmail = 'admin@edudisplej.sk';
+    $targetPasswordHash = password_hash('Windowsss9', PASSWORD_DEFAULT);
+
+    $lookupSql = "SELECT id FROM users
+                  WHERE username = ? OR email = ? OR username = 'admin'
+                  ORDER BY (username = ?) DESC, (email = ?) DESC, isadmin DESC, id ASC
+                  LIMIT 1";
+    $lookup = $conn->prepare($lookupSql);
+    if (!$lookup) {
+        rmEmitLog($isCli, $cronLog, '[ERROR] DB repair: admin lookup prepare failed: ' . $conn->error, true);
+        return 0;
+    }
+
+    $lookup->bind_param('ssss', $targetUsername, $targetEmail, $targetUsername, $targetEmail);
+    $lookup->execute();
+    $row = $lookup->get_result()->fetch_assoc();
+    $lookup->close();
+
+    $adminId = (int)($row['id'] ?? 0);
+
+    if ($adminId > 0) {
+        $update = $conn->prepare("UPDATE users
+                     SET username = ?, email = ?, isadmin = 1, is_super_admin = 1, role = 'super_admin'
+                                 WHERE id = ?");
+        if (!$update) {
+            rmEmitLog($isCli, $cronLog, '[ERROR] DB repair: admin update prepare failed: ' . $conn->error, true);
+            return 0;
+        }
+
+        $update->bind_param('ssi', $targetUsername, $targetEmail, $adminId);
+        if ($update->execute()) {
+            rmEmitLog($isCli, $cronLog, "[SUCCESS] DB repair: admin account normalized (id={$adminId}, username={$targetUsername})");
+        } else {
+            rmEmitLog($isCli, $cronLog, '[ERROR] DB repair: admin update failed: ' . $conn->error, true);
+            $adminId = 0;
+        }
+        $update->close();
+
+        return $adminId;
+    }
+
+    $insert = $conn->prepare("INSERT INTO users (username, password, email, isadmin, is_super_admin, role, otp_enabled, otp_verified, lang)
+                             VALUES (?, ?, ?, 1, 1, 'super_admin', 0, 0, 'sk')");
+    if (!$insert) {
+        rmEmitLog($isCli, $cronLog, '[ERROR] DB repair: admin insert prepare failed: ' . $conn->error, true);
+        return 0;
+    }
+
+    $insert->bind_param('sss', $targetUsername, $targetPasswordHash, $targetEmail);
+    if ($insert->execute()) {
+        $adminId = (int)$conn->insert_id;
+        rmEmitLog($isCli, $cronLog, "[SUCCESS] DB repair: admin account created (id={$adminId}, username={$targetUsername})");
+    } else {
+        rmEmitLog($isCli, $cronLog, '[ERROR] DB repair: admin insert failed: ' . $conn->error, true);
+    }
+    $insert->close();
+
+    return $adminId;
+}
+
+function rmRunDatabaseStateRepair(string $baseDir, bool $isCli, ?string $cronLog): void {
+    require_once $baseDir . '/dbkonfiguracia.php';
+
+    $conn = null;
+    try {
+        $conn = getDbConnection();
+        $conn->set_charset('utf8mb4');
+
+        $tableCount = 0;
+        $tableScan = $conn->query('SHOW TABLES');
+        if ($tableScan instanceof mysqli_result) {
+            $tableCount = $tableScan->num_rows;
+        }
+        rmEmitLog($isCli, $cronLog, "[INFO] DB repair: scanning {$tableCount} table(s)");
+
+        $adminUserId = rmEnsureAdminAccount($conn, $isCli, $cronLog);
+
+        if (rmTableExists($conn, 'companies') && rmColumnExists($conn, 'companies', 'signing_secret')) {
+            $companiesToFix = [];
+            $res = $conn->query("SELECT id FROM companies WHERE signing_secret IS NULL OR TRIM(signing_secret) = ''");
+            if ($res instanceof mysqli_result) {
+                while ($row = $res->fetch_assoc()) {
+                    $companiesToFix[] = (int)$row['id'];
+                }
+            }
+
+            if (!empty($companiesToFix)) {
+                $upd = $conn->prepare('UPDATE companies SET signing_secret = ? WHERE id = ?');
+                if ($upd) {
+                    $updated = 0;
+                    foreach ($companiesToFix as $companyId) {
+                        $secret = rmRandomHex(32);
+                        $upd->bind_param('si', $secret, $companyId);
+                        if ($upd->execute()) {
+                            $updated++;
+                        }
+                    }
+                    $upd->close();
+                    rmEmitLog($isCli, $cronLog, "[SUCCESS] DB repair: companies.signing_secret backfilled for {$updated} company record(s)");
+                }
+            } else {
+                rmEmitLog($isCli, $cronLog, '[INFO] DB repair: companies.signing_secret already populated');
+            }
+        }
+
+        if (rmTableExists($conn, 'company_licenses') && rmTableExists($conn, 'companies')) {
+            $insertLicenseSql = "INSERT INTO company_licenses (company_id, valid_from, valid_until, device_limit, status, notes)
+                                 SELECT c.id, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 10 YEAR), 10, 'active', 'Auto-created by maintenance repair'
+                                 FROM companies c
+                                 LEFT JOIN company_licenses cl ON cl.company_id = c.id
+                                 WHERE c.is_active = 1 AND cl.id IS NULL";
+            if ($conn->query($insertLicenseSql)) {
+                rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: missing company_licenses rows created: ' . (int)$conn->affected_rows);
+            } else {
+                rmEmitLog($isCli, $cronLog, '[ERROR] DB repair: company_licenses upsert failed: ' . $conn->error, true);
+            }
+        }
+
+        if (rmTableExists($conn, 'display_schedules') && rmTableExists($conn, 'kiosk_group_assignments')) {
+            $sql = "UPDATE display_schedules ds
+                    JOIN (
+                        SELECT kiosk_id, MIN(group_id) AS group_id
+                        FROM kiosk_group_assignments
+                        GROUP BY kiosk_id
+                    ) ga ON ga.kiosk_id = ds.kijelzo_id
+                    SET ds.group_id = ga.group_id
+                    WHERE ds.group_id IS NULL";
+            if ($conn->query($sql)) {
+                rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: display_schedules.group_id backfilled rows: ' . (int)$conn->affected_rows);
+            }
+        }
+
+        if (rmTableExists($conn, 'display_status_log') && rmTableExists($conn, 'kiosks')) {
+            $countRes = $conn->query('SELECT COUNT(*) AS cnt FROM display_status_log');
+            $countRow = $countRes ? $countRes->fetch_assoc() : ['cnt' => 0];
+            $count = (int)($countRow['cnt'] ?? 0);
+
+            if ($count === 0) {
+                $seed = "INSERT INTO display_status_log (kijelzo_id, previous_status, new_status, reason, triggered_by)
+                         SELECT k.id, NULL, COALESCE(NULLIF(k.status, ''), 'unconfigured'), 'Initial state seeded by maintenance', 'maintenance'
+                         FROM kiosks k";
+                if ($conn->query($seed)) {
+                    rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: seeded display_status_log rows: ' . (int)$conn->affected_rows);
+                }
+            }
+        }
+
+        if (rmTableExists($conn, 'group_modules') && rmTableExists($conn, 'kiosk_group_modules')) {
+            $countRes = $conn->query('SELECT COUNT(*) AS cnt FROM group_modules');
+            $countRow = $countRes ? $countRes->fetch_assoc() : ['cnt' => 0];
+            $count = (int)($countRow['cnt'] ?? 0);
+            if ($count === 0) {
+                $seedGroupModules = "INSERT INTO group_modules (group_id, module_sequence, module_id, duration_seconds, settings, is_active)
+                                     SELECT x.group_id,
+                                            ROW_NUMBER() OVER (PARTITION BY x.group_id ORDER BY x.display_order ASC, x.id ASC) AS module_sequence,
+                                            x.module_id,
+                                            x.duration_seconds,
+                                            x.settings,
+                                            x.is_active
+                                     FROM kiosk_group_modules x";
+                if ($conn->query($seedGroupModules)) {
+                    rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: group_modules seeded from kiosk_group_modules rows: ' . (int)$conn->affected_rows);
+                }
+            }
+        }
+
+        if (rmTableExists($conn, 'kiosk_command_queue')) {
+            if ($conn->query("DELETE FROM kiosk_command_queue WHERE status = 'pending'")) {
+                rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: removed pending kiosk command rows: ' . (int)$conn->affected_rows);
+            }
+        }
+
+        if (rmTableExists($conn, 'kiosk_group_time_blocks') && rmTableExists($conn, 'kiosk_groups')) {
+            $seedTimeBlocks = "INSERT INTO kiosk_group_time_blocks
+                                (group_id, block_name, block_type, specific_date, start_time, end_time, days_mask, is_active, priority, display_order)
+                               SELECT kg.id,
+                                      'Default full-day',
+                                      'weekly',
+                                      NULL,
+                                      '00:00:00',
+                                      '23:59:59',
+                                      '1,2,3,4,5,6,7',
+                                      1,
+                                      100,
+                                      0
+                               FROM kiosk_groups kg
+                               LEFT JOIN kiosk_group_time_blocks kgtb ON kgtb.group_id = kg.id
+                               WHERE kgtb.id IS NULL";
+            if ($conn->query($seedTimeBlocks)) {
+                rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: default kiosk_group_time_blocks created: ' . (int)$conn->affected_rows);
+            }
+        }
+
+        if (
+            rmTableExists($conn, 'kiosk_group_modules') &&
+            rmTableExists($conn, 'kiosk_group_time_blocks') &&
+            rmColumnExists($conn, 'kiosk_group_modules', 'time_block_id')
+        ) {
+            $bindDefaultBlock = "UPDATE kiosk_group_modules kgm
+                                 JOIN (
+                                    SELECT group_id, MIN(id) AS default_block_id
+                                    FROM kiosk_group_time_blocks
+                                    GROUP BY group_id
+                                 ) t ON t.group_id = kgm.group_id
+                                 SET kgm.time_block_id = t.default_block_id
+                                 WHERE kgm.time_block_id IS NULL";
+            if ($conn->query($bindDefaultBlock)) {
+                rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: kiosk_group_modules.time_block_id backfilled rows: ' . (int)$conn->affected_rows);
+            }
+        }
+
+        if (rmTableExists($conn, 'api_logs')) {
+            $purgeApiLogs = "DELETE FROM api_logs
+                             WHERE company_id IS NULL
+                               AND kiosk_id IS NULL
+                               AND (request_data IS NULL OR TRIM(request_data) = '')
+                               AND (response_data IS NULL OR TRIM(response_data) = '')";
+            if ($conn->query($purgeApiLogs)) {
+                rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: purged unusable api_logs rows: ' . (int)$conn->affected_rows);
+            }
+        }
+
+        if (rmTableExists($conn, 'api_nonces')) {
+            if ($conn->query('DELETE FROM api_nonces WHERE expires_at < NOW()')) {
+                rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: expired api_nonces removed: ' . (int)$conn->affected_rows);
+            }
+        }
+
+        if (rmTableExists($conn, 'security_logs')) {
+            if (!rmColumnExists($conn, 'security_logs', 'severity')) {
+                if ($conn->query("ALTER TABLE security_logs ADD COLUMN severity ENUM('info','warning','critical') NOT NULL DEFAULT 'info' AFTER event_type")) {
+                    rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: security_logs.severity column created');
+                }
+            }
+
+            if (rmColumnExists($conn, 'security_logs', 'severity')) {
+                $severitySql = "UPDATE security_logs
+                                SET severity = CASE
+                                    WHEN LOWER(event_type) REGEXP 'brute|attack|critical|lock|blocked|intrusion' THEN 'critical'
+                                    WHEN LOWER(event_type) REGEXP 'fail|denied|invalid|forbidden|warning|expired' THEN 'warning'
+                                    ELSE 'info'
+                                END
+                                WHERE severity IS NULL OR severity = '' OR severity = 'info'";
+                if ($conn->query($severitySql)) {
+                    rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: security_logs.severity classified rows: ' . (int)$conn->affected_rows);
+                }
+            }
+        }
+
+        if (rmTableExists($conn, 'service_versions') && $adminUserId > 0) {
+            $setUpdater = $conn->prepare('UPDATE service_versions SET updated_by_user_id = ? WHERE updated_by_user_id IS NULL');
+            if ($setUpdater) {
+                $setUpdater->bind_param('i', $adminUserId);
+                if ($setUpdater->execute()) {
+                    rmEmitLog($isCli, $cronLog, '[SUCCESS] DB repair: service_versions.updated_by_user_id backfilled rows: ' . (int)$setUpdater->affected_rows);
+                }
+                $setUpdater->close();
+            }
+        }
+
+        rmEmitLog($isCli, $cronLog, '[INFO] DB repair: operational state normalization completed');
+    } catch (Throwable $e) {
+        rmEmitLog($isCli, $cronLog, '[ERROR] DB repair failed: ' . $e->getMessage(), true);
+    } finally {
+        if ($conn instanceof mysqli) {
+            closeDbConnection($conn);
+        }
+    }
+}
+
 $runtimeDir = pickRuntimeDir($runtimeDirPrimary, $logDirPrimary);
 $lockFile = rtrim($runtimeDir, '/\\') . '/maintenance.lock';
 $cronLog = pickCronLogPath($logDirPrimary);
@@ -86,6 +394,8 @@ $jedalenFetchMenusOnly = false;
 $jedalenInstitutionIdsCsv = '';
 $forceMaintenanceRun = false;
 $forceEmailQueueRun = false;
+$respectIntervalGuard = true;
+$runNow = false;
 $maintenanceMinIntervalMinutes = 15;
 $emailMinIntervalMinutes = 5;
 $emailBatchLimit = 50;
@@ -116,11 +426,18 @@ if ($isCli) {
     $jedalenFetchInstitutionsOnly = maintenance_truthy($_GET['jedalen_fetch_institutions_only'] ?? $_POST['jedalen_fetch_institutions_only'] ?? false);
     $jedalenFetchMenusOnly = maintenance_truthy($_GET['jedalen_fetch_menus_only'] ?? $_POST['jedalen_fetch_menus_only'] ?? false);
     $jedalenInstitutionIdsCsv = trim((string)($_GET['jedalen_institution_ids'] ?? $_POST['jedalen_institution_ids'] ?? ''));
+    $runNow = maintenance_truthy($_GET['run_now'] ?? $_POST['run_now'] ?? false);
     $forceMaintenanceRun = maintenance_truthy($_GET['force_maintenance'] ?? $_POST['force_maintenance'] ?? false);
     $forceEmailQueueRun = maintenance_truthy($_GET['force_email_queue'] ?? $_POST['force_email_queue'] ?? false);
+    $respectIntervalGuard = maintenance_truthy($_GET['respect_interval_guard'] ?? $_POST['respect_interval_guard'] ?? false);
     $maintenanceMinIntervalMinutes = (int)($_GET['maintenance_min_interval_minutes'] ?? $_POST['maintenance_min_interval_minutes'] ?? 15);
     $emailMinIntervalMinutes = (int)($_GET['email_min_interval_minutes'] ?? $_POST['email_min_interval_minutes'] ?? 5);
     $emailBatchLimit = (int)($_GET['email_limit'] ?? $_POST['email_limit'] ?? 50);
+
+    if ($runNow || !$respectIntervalGuard) {
+        $forceMaintenanceRun = true;
+        $forceEmailQueueRun = true;
+    }
 }
 
 if ($maintenanceMinIntervalMinutes < 1) {
@@ -263,6 +580,12 @@ $startLine = "[$timestamp] [INFO] Unified cron scheduler start\n";
 appendCronLog($cronLog, $startLine);
 emitMaintenanceOutput($startLine, $isCli);
 
+if (!$isCli && ($runNow || !$respectIntervalGuard)) {
+    $manualLine = '[' . date('Y-m-d H:i:s') . "] [INFO] Manual HTTP run requested, interval guards bypassed\n";
+    appendCronLog($cronLog, $manualLine);
+    emitMaintenanceOutput($manualLine, $isCli);
+}
+
 $emailLastRunMarker = rtrim($runtimeDir, '/\\') . '/email-queue-last-run.txt';
 $maintenanceLastRunMarker = rtrim($runtimeDir, '/\\') . '/maintenance-last-run.txt';
 
@@ -374,6 +697,13 @@ if ($shouldRunMaintenance) {
         foreach ($storageHealth['errors'] as $storageError) {
             emitMaintenanceIssue($storageError, $storageHealth['recommendations'], $isCli, $cronLog);
         }
+    }
+
+    if (!$onlyJedalenSync) {
+        $repairStartLine = '[' . date('Y-m-d H:i:s') . "] [STEP] DB repair step started\n";
+        appendCronLog($cronLog, $repairStartLine);
+        emitMaintenanceOutput($repairStartLine, $isCli);
+        rmRunDatabaseStateRepair($baseDir, $isCli, $cronLog);
     }
 }
 

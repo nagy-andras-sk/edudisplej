@@ -6,8 +6,12 @@
  * Provides encryption and security utilities
  */
 
-// Session security settings - only set if session hasn't started yet
-if (session_status() === PHP_SESSION_NONE) {
+function security_config_can_send_headers(): bool {
+    return php_sapi_name() !== 'cli' && !headers_sent();
+}
+
+// Session security settings - only set if session hasn't started yet and headers are still mutable
+if (session_status() === PHP_SESSION_NONE && security_config_can_send_headers()) {
     $is_https_request = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
         || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
@@ -189,7 +193,7 @@ if (!function_exists('log_security_event')) {
  */
 function is_https() {
     return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || $_SERVER['SERVER_PORT'] == 443
+    || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443)
         || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
 }
 
@@ -197,7 +201,7 @@ function is_https() {
  * Force HTTPS redirect (optional, can be enabled in production)
  */
 function force_https() {
-    if (!is_https() && php_sapi_name() !== 'cli') {
+    if (!is_https() && security_config_can_send_headers()) {
         header('Location: https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], true, 301);
         exit;
     }
@@ -207,6 +211,10 @@ function force_https() {
  * Add security headers
  */
 function add_security_headers() {
+    if (!security_config_can_send_headers()) {
+        return;
+    }
+
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: SAMEORIGIN');
     header('X-XSS-Protection: 1; mode=block');

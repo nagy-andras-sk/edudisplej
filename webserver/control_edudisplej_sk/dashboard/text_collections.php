@@ -14,60 +14,70 @@ if (!edudisplej_can_edit_module_content()) {
 }
 
 $breadcrumb_items = [
-    ['label' => '📝 ' . t_def('slides.title', 'Slide-ok'), 'current' => true],
+    ['label' => '📝 ' . t_def('slides.title', 'Slides'), 'current' => true],
 ];
 $logout_url = '../login.php?logout=1';
 
 $slides_i18n = [
-    'statusNewItem' => t_def('slides.status.new_item', 'Új elem létrehozása'),
-    'statusLoaded' => t_def('slides.status.loaded_for_edit', 'Elem betöltve szerkesztésre'),
-    'statusDeleted' => t_def('slides.status.deleted', 'Elem törölve. Kapcsolt loopok verziója frissítve.'),
-    'statusSaved' => t_def('slides.status.saved', 'Mentve. A kapcsolt Text modulok és loop verziók frissítve.'),
-    'errorLoad' => t_def('slides.error.load', 'Betöltési hiba'),
-    'errorDelete' => t_def('slides.error.delete', 'Törlési hiba'),
-    'errorSave' => t_def('slides.error.save', 'Mentési hiba'),
-    'errorImageType' => t_def('slides.error.image_type', 'Csak képfájl tölthető fel.'),
-    'errorImageRead' => t_def('slides.error.image_read', 'Kép beolvasási hiba.'),
-    'errorNameRequired' => t_def('slides.error.name_required', 'A név kötelező.'),
-    'confirmDelete' => t_def('slides.confirm.delete', 'Biztosan törlöd ezt az elemet?'),
-    'emptyItems' => t_def('slides.empty', 'Nincs még elem'),
+    'statusNewItem' => t_def('slides.status.new_item', 'Creating new item'),
+    'statusLoaded' => t_def('slides.status.loaded_for_edit', 'Item loaded for edit'),
+    'statusDeleted' => t_def('slides.status.deleted', 'Item deleted. Linked loop versions were updated.'),
+    'statusSaved' => t_def('slides.status.saved', 'Saved. Linked Text modules and loop versions were updated.'),
+    'errorLoad' => t_def('slides.error.load', 'Load error'),
+    'errorDelete' => t_def('slides.error.delete', 'Delete error'),
+    'errorSave' => t_def('slides.error.save', 'Save error'),
+    'errorImageType' => t_def('slides.error.image_type', 'Only image files can be uploaded.'),
+    'errorImageRead' => t_def('slides.error.image_read', 'Image read error.'),
+    'errorNameRequired' => t_def('slides.error.name_required', 'Name is required.'),
+    'confirmDelete' => t_def('slides.confirm.delete', 'Are you sure you want to delete this item?'),
+    'emptyItems' => t_def('slides.empty', 'No items yet'),
     'loading' => t_def('common.loading', 'Betöltés...'),
     'edit' => t_def('common.edit', 'Szerkesztés'),
     'delete' => t_def('common.delete', 'Törlés'),
-    'externalSourceLabel' => t_def('slides.external.label', 'Külső forrás (JSON v1)'),
-    'externalSourceHint' => t_def('slides.external.hint', 'Előre megszabott formátum: format_version, source_name, headline, body, note, published_at'),
-    'externalSourceTemplate' => t_def('slides.external.template', 'Sablon betöltése'),
-    'externalSourcePreview' => t_def('slides.external.preview', 'Külső forrás előnézet'),
-    'errorExternalSourceJson' => t_def('slides.external.error_json', 'A külső forrás mezőben érvénytelen JSON van.'),
-    'emptyExternalSource' => t_def('slides.external.empty', 'Nincs külső forrás adat.'),
+    'externalSourceLabel' => t_def('slides.external.label', 'External source (JSON v1)'),
+    'externalSourceHint' => t_def('slides.external.hint', 'Predefined format: format_version, source_name, headline, body, note, published_at'),
+    'externalSourceTemplate' => t_def('slides.external.template', 'Load template'),
+    'externalSourcePreview' => t_def('slides.external.preview', 'External source preview'),
+    'errorExternalSourceJson' => t_def('slides.external.error_json', 'The external source field contains invalid JSON.'),
+    'emptyExternalSource' => t_def('slides.external.empty', 'No external source data.'),
+    'toolbar.list' => t_def('slides.toolbar.list', '• List'),
+    'toolbar.left' => t_def('slides.toolbar.left', 'Left'),
+    'toolbar.center' => t_def('slides.toolbar.center', 'Center'),
+    'toolbar.right' => t_def('slides.toolbar.right', 'Right'),
+    'toolbar.fontFamily' => t_def('slides.toolbar.font_family', 'Font'),
+    'toolbar.fontSize' => t_def('slides.toolbar.font_size', 'Size'),
+    'toolbar.color' => t_def('slides.toolbar.color', 'Color'),
+    'toolbar.highlight' => t_def('slides.toolbar.highlight', 'Highlight'),
+    'external.preview.source' => t_def('slides.external.preview.source', 'Source'),
+    'external.preview.date' => t_def('slides.external.preview.date', 'Date'),
 ];
 
 include '../admin/header.php';
 ?>
 
 <div class="panel" style="margin-bottom:12px;">
-    <div class="panel-title"><?php echo htmlspecialchars(t_def('slides.collection.title', 'Slide gyűjtemény')); ?></div>
-    <div class="muted"><?php echo htmlspecialchars(t_def('slides.collection.desc', 'Előre elkészített rich-text slide tartalmak (háttérszínnel/háttérképpel), amelyeket a Text modulban lehet kiválasztani.')); ?></div>
+    <div class="panel-title"><?php echo htmlspecialchars(t_def('slides.collection.title', 'Slide collection')); ?></div>
+    <div class="muted"><?php echo htmlspecialchars(t_def('slides.collection.desc', 'Prebuilt rich-text slide content (background color/image) selectable from the Text module.')); ?></div>
 </div>
 
 <div style="display:grid; grid-template-columns: 1.1fr 1fr; gap:12px; align-items:start;">
     <div class="panel">
-        <div class="panel-title"><?php echo htmlspecialchars(t_def('slides.editor.title', 'Elem szerkesztése')); ?></div>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('slides.editor.title', 'Edit item')); ?></div>
 
         <input type="hidden" id="tc-id" value="0">
 
-        <label style="display:block; margin-bottom:6px; font-weight:700;"><?php echo htmlspecialchars(t_def('common.name', 'Név')); ?></label>
-        <input id="tc-title" type="text" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px; margin-bottom:10px;" maxlength="180" placeholder="<?php echo htmlspecialchars(t_def('slides.name.placeholder', 'Pl.: Reggeli hirdetmény')); ?>">
+        <label style="display:block; margin-bottom:6px; font-weight:700;"><?php echo htmlspecialchars(t_def('common.name', 'Name')); ?></label>
+        <input id="tc-title" type="text" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px; margin-bottom:10px;" maxlength="180" placeholder="<?php echo htmlspecialchars(t_def('slides.name.placeholder', 'Example: Morning announcement')); ?>">
 
         <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
             <button type="button" data-richcmd="bold" class="btn btn-small">B</button>
             <button type="button" data-richcmd="italic" class="btn btn-small">I</button>
             <button type="button" data-richcmd="underline" class="btn btn-small">U</button>
-            <button type="button" data-richcmd="insertUnorderedList" class="btn btn-small">• Lista</button>
-            <button type="button" data-richcmd="justifyLeft" class="btn btn-small">Bal</button>
-            <button type="button" data-richcmd="justifyCenter" class="btn btn-small">Közép</button>
-            <button type="button" data-richcmd="justifyRight" class="btn btn-small">Jobb</button>
-            <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Betűtípus
+            <button type="button" data-richcmd="insertUnorderedList" class="btn btn-small"><?php echo htmlspecialchars(t_def('slides.toolbar.list', '• List')); ?></button>
+            <button type="button" data-richcmd="justifyLeft" class="btn btn-small"><?php echo htmlspecialchars(t_def('slides.toolbar.left', 'Left')); ?></button>
+            <button type="button" data-richcmd="justifyCenter" class="btn btn-small"><?php echo htmlspecialchars(t_def('slides.toolbar.center', 'Center')); ?></button>
+            <button type="button" data-richcmd="justifyRight" class="btn btn-small"><?php echo htmlspecialchars(t_def('slides.toolbar.right', 'Right')); ?></button>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px;"><?php echo htmlspecialchars(t_def('slides.toolbar.font_family', 'Font')); ?>
                 <select id="tc-font-family" style="height:30px; border:1px solid #d1d5db; border-radius:4px;">
                     <option value="Arial">Arial</option>
                     <option value="Verdana">Verdana</option>
@@ -78,7 +88,7 @@ include '../admin/header.php';
                     <option value="Courier New">Courier New</option>
                 </select>
             </label>
-            <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Méret
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px;"><?php echo htmlspecialchars(t_def('slides.toolbar.font_size', 'Size')); ?>
                 <select id="tc-font-size" style="height:30px; border:1px solid #d1d5db; border-radius:4px;">
                     <option value="12">12 px</option>
                     <option value="14">14 px</option>
@@ -89,57 +99,57 @@ include '../admin/header.php';
                     <option value="48">48 px</option>
                 </select>
             </label>
-            <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Szín <input type="color" id="tc-color" value="#ffffff"></label>
-            <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Háttér jelölés <input type="color" id="tc-mark" value="#ffd54f"></label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px;"><?php echo htmlspecialchars(t_def('slides.toolbar.color', 'Color')); ?> <input type="color" id="tc-color" value="#ffffff"></label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px;"><?php echo htmlspecialchars(t_def('slides.toolbar.highlight', 'Highlight')); ?> <input type="color" id="tc-mark" value="#ffd54f"></label>
         </div>
 
         <div id="tc-content" contenteditable="true" style="min-height:240px; border:1px solid #d1d5db; border-radius:6px; padding:10px; background:#000; color:#fff; overflow:auto; white-space:pre-wrap; word-break:break-word;"></div>
 
         <div style="margin-top:10px;">
-            <label style="display:block; margin-bottom:6px; font-weight:700;"><?php echo htmlspecialchars(t_def('slides.external.label', 'Külső forrás (JSON v1)')); ?></label>
+            <label style="display:block; margin-bottom:6px; font-weight:700;"><?php echo htmlspecialchars(t_def('slides.external.label', 'External source (JSON v1)')); ?></label>
             <textarea id="tc-external-source" rows="8" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px; font-family:Consolas, 'Courier New', monospace; font-size:12px;"></textarea>
-            <div class="muted" style="margin-top:6px;"><?php echo htmlspecialchars(t_def('slides.external.hint', 'Előre megszabott formátum: format_version, source_name, headline, body, note, published_at')); ?></div>
-            <div style="margin-top:8px;"><button id="tc-external-template" type="button" class="btn btn-small"><?php echo htmlspecialchars(t_def('slides.external.template', 'Sablon betöltése')); ?></button></div>
+            <div class="muted" style="margin-top:6px;"><?php echo htmlspecialchars(t_def('slides.external.hint', 'Predefined format: format_version, source_name, headline, body, note, published_at')); ?></div>
+            <div style="margin-top:8px;"><button id="tc-external-template" type="button" class="btn btn-small"><?php echo htmlspecialchars(t_def('slides.external.template', 'Load template')); ?></button></div>
         </div>
 
         <div style="margin-top:10px;">
-            <label style="display:block; margin-bottom:6px; font-weight:700;"><?php echo htmlspecialchars(t_def('slides.external.preview', 'Külső forrás előnézet')); ?></label>
+            <label style="display:block; margin-bottom:6px; font-weight:700;"><?php echo htmlspecialchars(t_def('slides.external.preview', 'External source preview')); ?></label>
             <div id="tc-external-preview" style="border:1px solid #d1d5db; border-radius:6px; padding:10px; background:#f8fafc; color:#0f172a; min-height:90px;"></div>
         </div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
             <div>
-                <label style="display:block; margin-bottom:6px; font-weight:700;">Háttérszín</label>
+                <label style="display:block; margin-bottom:6px; font-weight:700;"><?php echo htmlspecialchars(t_def('slides.bg.color', 'Background color')); ?></label>
                 <input id="tc-bg-color" type="color" value="#000000" style="width:100%; height:40px; border-radius:6px; border:1px solid #d1d5db;">
             </div>
             <div>
-                <label style="display:block; margin-bottom:6px; font-weight:700;">Háttérkép</label>
+                <label style="display:block; margin-bottom:6px; font-weight:700;"><?php echo htmlspecialchars(t_def('slides.bg.image', 'Background image')); ?></label>
                 <input id="tc-bg-image-file" type="file" accept="image/*" style="width:100%;">
                 <input id="tc-bg-image-data" type="hidden" value="">
             </div>
         </div>
 
         <div style="display:flex; gap:8px; margin-top:10px;">
-            <button id="tc-save-btn" type="button" class="btn btn-primary">💾 <?php echo htmlspecialchars(t_def('common.save', 'Mentés')); ?></button>
-            <button id="tc-new-btn" type="button" class="btn"><?php echo htmlspecialchars(t_def('common.new_item', 'Új elem')); ?></button>
-            <button id="tc-remove-bg" type="button" class="btn btn-danger"><?php echo htmlspecialchars(t_def('slides.bg.remove', 'Háttérkép törlése')); ?></button>
+            <button id="tc-save-btn" type="button" class="btn btn-primary">💾 <?php echo htmlspecialchars(t_def('common.save', 'Save')); ?></button>
+            <button id="tc-new-btn" type="button" class="btn"><?php echo htmlspecialchars(t_def('common.new_item', 'New item')); ?></button>
+            <button id="tc-remove-bg" type="button" class="btn btn-danger"><?php echo htmlspecialchars(t_def('slides.bg.remove', 'Remove background image')); ?></button>
         </div>
         <div id="tc-status" class="muted" style="margin-top:8px;"></div>
     </div>
 
     <div class="panel">
-        <div class="panel-title"><?php echo htmlspecialchars(t_def('slides.items.title', 'Gyűjtemény elemek')); ?></div>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('slides.items.title', 'Collection items')); ?></div>
         <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
-                        <th><?php echo htmlspecialchars(t_def('common.name', 'Név')); ?></th>
-                        <th><?php echo htmlspecialchars(t_def('common.updated', 'Frissítve')); ?></th>
-                        <th><?php echo htmlspecialchars(t_def('common.action', 'Művelet')); ?></th>
+                        <th><?php echo htmlspecialchars(t_def('common.name', 'Name')); ?></th>
+                        <th><?php echo htmlspecialchars(t_def('common.updated', 'Updated')); ?></th>
+                        <th><?php echo htmlspecialchars(t_def('common.action', 'Action')); ?></th>
                     </tr>
                 </thead>
                 <tbody id="tc-list-body">
-                    <tr><td colspan="3" class="muted"><?php echo htmlspecialchars(t_def('common.loading', 'Betöltés...')); ?></td></tr>
+                    <tr><td colspan="3" class="muted"><?php echo htmlspecialchars(t_def('common.loading', 'Loading...')); ?></td></tr>
                 </tbody>
             </table>
         </div>
@@ -234,8 +244,8 @@ include '../admin/header.php';
         }
 
         const blocks = [];
-        if (source.source_name) blocks.push(`<div><strong>Forrás:</strong> ${escapeHtml(source.source_name)}</div>`);
-        if (source.published_at) blocks.push(`<div><strong>Dátum:</strong> ${escapeHtml(source.published_at)}</div>`);
+        if (source.source_name) blocks.push(`<div><strong>${escapeHtml(I18N['external.preview.source'])}:</strong> ${escapeHtml(source.source_name)}</div>`);
+        if (source.published_at) blocks.push(`<div><strong>${escapeHtml(I18N['external.preview.date'])}:</strong> ${escapeHtml(source.published_at)}</div>`);
         if (source.headline) blocks.push(`<div style="margin-top:6px; font-weight:700;">${escapeHtml(source.headline)}</div>`);
         if (source.body) blocks.push(`<div style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(source.body)}</div>`);
         if (source.note) blocks.push(`<div style="margin-top:6px; color:#475467;"><em>${escapeHtml(source.note)}</em></div>`);

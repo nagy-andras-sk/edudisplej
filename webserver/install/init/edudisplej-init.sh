@@ -144,6 +144,29 @@ read_kiosk_preferences() {
     local kiosk_mode_file="${EDUDISPLEJ_HOME}/.kiosk_mode"
     local console_user_file="${EDUDISPLEJ_HOME}/.console_user"
     local user_home_file="${EDUDISPLEJ_HOME}/.user_home"
+    local hardware_profile_file="${EDUDISPLEJ_HOME}/.hardware_profile"
+
+    detect_runtime_user() {
+        local user_candidate=""
+
+        if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]] && id -u "${SUDO_USER}" >/dev/null 2>&1; then
+            user_candidate="${SUDO_USER}"
+        fi
+
+        if [[ -z "$user_candidate" ]] && command -v loginctl >/dev/null 2>&1; then
+            user_candidate="$(loginctl list-sessions --no-legend 2>/dev/null | awk '$3 != "" && $3 != "root" {print $3; exit}' || true)"
+        fi
+
+        if [[ -z "$user_candidate" ]]; then
+            user_candidate="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
+        fi
+
+        if [[ -z "$user_candidate" ]]; then
+            user_candidate="$(awk -F: '($3>=1000 && $1!="nobody" && $7 !~ /(nologin|false)$/){print $1; exit}' /etc/passwd || true)"
+        fi
+
+        echo "$user_candidate"
+    }
     
     # Kiosk mod -- Kiosk mod (surf browser)
     # Read from file if exists, otherwise use default
@@ -158,8 +181,8 @@ read_kiosk_preferences() {
     if [[ -f "$console_user_file" ]]; then
         CONSOLE_USER=$(tr -d '\r\n' < "$console_user_file")
     else
-        CONSOLE_USER="$(awk -F: '$3==1000{print $1}' /etc/passwd | head -n1 || true)"
-        [[ -z "$CONSOLE_USER" ]] && CONSOLE_USER="pi"
+        CONSOLE_USER="$(detect_runtime_user)"
+        [[ -z "$CONSOLE_USER" ]] && CONSOLE_USER="root"
     fi
     print_info "Felhasznalo -- Pouzivatel: $CONSOLE_USER"
     
@@ -174,8 +197,16 @@ read_kiosk_preferences() {
         USER_HOME="/home/$CONSOLE_USER"
     fi
     print_info "Home konyvtar -- Domovsky adresar: $USER_HOME"
+
+    if [[ -f "$hardware_profile_file" ]]; then
+        HARDWARE_PROFILE=$(tr -d '\r\n' < "$hardware_profile_file")
+    else
+        HARDWARE_PROFILE="generic-debian"
+    fi
+    [[ -z "$HARDWARE_PROFILE" ]] && HARDWARE_PROFILE="generic-debian"
+    print_info "Hardver profil -- Hardware profile: $HARDWARE_PROFILE"
     
-    export KIOSK_MODE CONSOLE_USER USER_HOME
+    export KIOSK_MODE CONSOLE_USER USER_HOME HARDWARE_PROFILE
 }
 
 echo ""

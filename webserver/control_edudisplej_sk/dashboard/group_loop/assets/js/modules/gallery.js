@@ -6,6 +6,98 @@ const GroupLoopGalleryModule = (() => {
     let globalDropGuardsCleanup = null;
     let libraryItems = [];
     const DEBUG_PREFIX = '[GroupLoopGallery]';
+    const i18nCatalog = (window.GroupLoopBootstrap?.i18n && typeof window.GroupLoopBootstrap.i18n === 'object')
+        ? window.GroupLoopBootstrap.i18n
+        : {};
+
+    const resolveUiLang = () => {
+        const customizationLabel = String(i18nCatalog['group_loop.customization'] || '').toLowerCase();
+        if (customizationLabel.includes('testresz')) return 'hu';
+        if (customizationLabel.includes('prispôsob') || customizationLabel.includes('prisposob')) return 'sk';
+        if (customizationLabel.includes('custom')) return 'en';
+
+        const htmlLang = String(document?.documentElement?.lang || '').toLowerCase();
+        if (htmlLang.startsWith('hu')) return 'hu';
+        if (htmlLang.startsWith('sk')) return 'sk';
+        return 'en';
+    };
+
+    const galleryText = (id, vars = null) => {
+        const lang = resolveUiLang();
+        const dict = {
+            hu: {
+                no_previous_images: 'Nincs korábban feltöltött kép.',
+                found_items: 'Talált elemek: {count}',
+                loading: 'Betöltés...',
+                library_error: 'Library betöltési hiba: {error}',
+                unknown_error: 'ismeretlen hiba',
+                select_image_import: 'Jelölj ki legalább egy képet az importhoz.',
+                max_images_used: 'Maximum {max} kép használható.',
+                import_ready: 'Import kész. Galéria: {count}/{max} kép',
+                uploaded_count: 'Feltöltve: {count}/{max} kép',
+                no_uploaded_images: 'Még nincs feltöltött kép.',
+                image_item: '{index}. kép',
+                delete: 'Törlés',
+                max_images_upload: 'Maximum {max} kép tölthető fel.',
+                no_valid_images: 'Nincs érvényes kép a kiválasztott fájlok között.',
+                upload_status: 'Feltöltés: {done}/{total}',
+                upload_status_with_file: 'Feltöltés: {done}/{total} ({file})',
+                upload_error: 'Kép feltöltési hiba: {error}',
+                done: 'Kész: {done}/{total} kép',
+                upload_done: 'Feltöltés kész. Galéria: {count}/{max} kép'
+            },
+            sk: {
+                no_previous_images: 'Nie sú žiadne predtým nahraté obrázky.',
+                found_items: 'Nájdené položky: {count}',
+                loading: 'Načítavam...',
+                library_error: 'Chyba načítania knižnice: {error}',
+                unknown_error: 'neznáma chyba',
+                select_image_import: 'Vyberte aspoň jeden obrázok na import.',
+                max_images_used: 'Je možné použiť maximálne {max} obrázkov.',
+                import_ready: 'Import hotový. Galéria: {count}/{max} obrázkov',
+                uploaded_count: 'Nahraté: {count}/{max} obrázkov',
+                no_uploaded_images: 'Zatiaľ nie je nahratý žiadny obrázok.',
+                image_item: '{index}. obrázok',
+                delete: 'Vymazať',
+                max_images_upload: 'Je možné nahrať maximálne {max} obrázkov.',
+                no_valid_images: 'Medzi vybranými súbormi nie je žiadny platný obrázok.',
+                upload_status: 'Nahrávanie: {done}/{total}',
+                upload_status_with_file: 'Nahrávanie: {done}/{total} ({file})',
+                upload_error: 'Chyba nahrávania obrázka: {error}',
+                done: 'Hotovo: {done}/{total} obrázkov',
+                upload_done: 'Nahrávanie dokončené. Galéria: {count}/{max} obrázkov'
+            },
+            en: {
+                no_previous_images: 'No previously uploaded images.',
+                found_items: 'Found items: {count}',
+                loading: 'Loading...',
+                library_error: 'Library load error: {error}',
+                unknown_error: 'unknown error',
+                select_image_import: 'Select at least one image to import.',
+                max_images_used: 'Maximum {max} images can be used.',
+                import_ready: 'Import done. Gallery: {count}/{max} images',
+                uploaded_count: 'Uploaded: {count}/{max} images',
+                no_uploaded_images: 'No uploaded images yet.',
+                image_item: '{index}. image',
+                delete: 'Delete',
+                max_images_upload: 'Maximum {max} images can be uploaded.',
+                no_valid_images: 'No valid image files in the selection.',
+                upload_status: 'Uploading: {done}/{total}',
+                upload_status_with_file: 'Uploading: {done}/{total} ({file})',
+                upload_error: 'Image upload error: {error}',
+                done: 'Done: {done}/{total} images',
+                upload_done: 'Upload complete. Gallery: {count}/{max} images'
+            }
+        };
+
+        let text = (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        if (vars && typeof vars === 'object') {
+            Object.entries(vars).forEach(([name, value]) => {
+                text = text.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value ?? ''));
+            });
+        }
+        return text;
+    };
 
     const logDebug = (...args) => {
         if (typeof console !== 'undefined' && typeof console.debug === 'function') {
@@ -241,12 +333,12 @@ const GroupLoopGalleryModule = (() => {
 
         if (!libraryItems.length) {
             list.innerHTML = '';
-            status.textContent = 'Nincs korábban feltöltött kép.';
+            status.textContent = galleryText('no_previous_images');
             logDebug('renderLibrary: no items');
             return;
         }
 
-        status.textContent = `Talált elemek: ${libraryItems.length}`;
+        status.textContent = galleryText('found_items', { count: libraryItems.length });
         logDebug('renderLibrary: rendering items', {
             count: libraryItems.length,
             first: libraryItems[0] || null
@@ -270,7 +362,7 @@ const GroupLoopGalleryModule = (() => {
     const loadLibrary = async () => {
         const status = document.getElementById('gallery-library-status');
         if (status) {
-            status.textContent = 'Betöltés...';
+            status.textContent = galleryText('loading');
         }
 
         try {
@@ -323,7 +415,7 @@ const GroupLoopGalleryModule = (() => {
             libraryItems = [];
             renderLibrary();
             if (status) {
-                status.textContent = `Library betöltési hiba: ${error?.message || 'ismeretlen hiba'}`;
+                status.textContent = galleryText('library_error', { error: error?.message || galleryText('unknown_error') });
             }
         }
     };
@@ -331,14 +423,14 @@ const GroupLoopGalleryModule = (() => {
     const importSelectedFromLibrary = () => {
         const checked = Array.from(document.querySelectorAll('[data-library-asset-id]:checked'));
         if (!checked.length) {
-            alert('Jelölj ki legalább egy képet az importhoz.');
+            alert(galleryText('select_image_import'));
             return;
         }
 
         const current = getImageUrls();
         const freeSlots = Math.max(0, MAX_IMAGES - current.length);
         if (freeSlots <= 0) {
-            alert(`Maximum ${MAX_IMAGES} kép használható.`);
+            alert(galleryText('max_images_used', { max: MAX_IMAGES }));
             return;
         }
 
@@ -353,7 +445,7 @@ const GroupLoopGalleryModule = (() => {
 
         const status = document.getElementById('gallery-upload-status');
         if (status) {
-            status.textContent = `Import kész. Galéria: ${merged.length}/${MAX_IMAGES} kép`;
+            status.textContent = galleryText('import_ready', { count: merged.length, max: MAX_IMAGES });
         }
 
         checked.forEach((el) => {
@@ -572,14 +664,14 @@ const GroupLoopGalleryModule = (() => {
             imageUrls = imageUrls.slice(0, 1);
             writeImageUrls(imageUrls);
         }
-        status.textContent = `Feltöltve: ${imageUrls.length}/${MAX_IMAGES} kép`;
+        status.textContent = galleryText('uploaded_count', { count: imageUrls.length, max: MAX_IMAGES });
         logDebug('renderImageList: rendering image list', {
             count: imageUrls.length,
             urls: imageUrls
         });
 
         if (!imageUrls.length) {
-            list.innerHTML = '<div style="font-size:12px; color:#7b8794;">Még nincs feltöltött kép.</div>';
+            list.innerHTML = `<div style="font-size:12px; color:#7b8794;">${galleryText('no_uploaded_images')}</div>`;
             updateLivePreview();
             return;
         }
@@ -588,8 +680,8 @@ const GroupLoopGalleryModule = (() => {
             const safeUrl = String(url).replace(/"/g, '&quot;');
             return `<div style="display:flex; align-items:center; gap:8px; border:1px solid #dde3eb; border-radius:6px; padding:6px 8px; background:#fff;">
                         <img src="${safeUrl}" data-gallery-thumb="${idx}" alt="img-${idx + 1}" style="width:54px; height:40px; object-fit:cover; border-radius:4px; border:1px solid #d0d7df;">
-                        <span style="font-size:12px; color:#344054; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${idx + 1}. kép</span>
-                        <button type="button" data-gallery-remove="${idx}" style="padding:4px 7px; border:1px solid #c43b2f; color:#c43b2f; background:#fff; border-radius:4px; cursor:pointer;">Törlés</button>
+                        <span style="font-size:12px; color:#344054; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${galleryText('image_item', { index: idx + 1 })}</span>
+                        <button type="button" data-gallery-remove="${idx}" style="padding:4px 7px; border:1px solid #c43b2f; color:#c43b2f; background:#fff; border-radius:4px; cursor:pointer;">${galleryText('delete')}</button>
                     </div>`;
         }).join('');
 
@@ -684,7 +776,7 @@ const GroupLoopGalleryModule = (() => {
         let imageUrls = getImageUrls();
         const freeSlots = Math.max(0, MAX_IMAGES - imageUrls.length);
         if (freeSlots <= 0) {
-            alert(`Maximum ${MAX_IMAGES} kép tölthető fel.`);
+            alert(galleryText('max_images_upload', { max: MAX_IMAGES }));
             return;
         }
 
@@ -694,7 +786,7 @@ const GroupLoopGalleryModule = (() => {
 
         if (!selected.length) {
             if (status) {
-                status.textContent = 'Nincs érvényes kép a kiválasztott fájlok között.';
+                status.textContent = galleryText('no_valid_images');
             }
             logWarn('handleFiles: no valid image files selected', {
                 incomingCount: Array.isArray(files) ? files.length : (files?.length || 0)
@@ -713,20 +805,20 @@ const GroupLoopGalleryModule = (() => {
 
         let uploaded = 0;
 
-        setUploadProgress(0, `Feltöltés: 0/${selected.length}`);
+        setUploadProgress(0, galleryText('upload_status', { done: 0, total: selected.length }));
 
         for (const file of selected) {
             try {
                 if (status) {
-                    status.textContent = `Feltöltés: ${uploaded + 1}/${selected.length} (${file.name})`;
+                    status.textContent = galleryText('upload_status_with_file', { done: uploaded + 1, total: selected.length, file: file.name });
                 }
 
                 const itemBasePercent = Math.round((uploaded / selected.length) * 100);
-                setUploadProgress(itemBasePercent, `Feltöltés: ${uploaded}/${selected.length}`);
+                setUploadProgress(itemBasePercent, galleryText('upload_status', { done: uploaded, total: selected.length }));
 
                 const result = await uploadImageAsset(file, (filePercent) => {
                     const totalPercent = Math.round(((uploaded + (filePercent / 100)) / selected.length) * 100);
-                    setUploadProgress(totalPercent, `Feltöltés: ${uploaded + 1}/${selected.length} • ${filePercent}%`);
+                    setUploadProgress(totalPercent, `${galleryText('upload_status', { done: uploaded + 1, total: selected.length })} • ${filePercent}%`);
                 });
 
                 imageUrls.push(String(result.asset_url || '').trim());
@@ -745,17 +837,17 @@ const GroupLoopGalleryModule = (() => {
                     fileName: file?.name || null,
                     error: error?.message || String(error)
                 });
-                alert(`Kép feltöltési hiba: ${error?.message || 'ismeretlen hiba'}`);
+                alert(galleryText('upload_error', { error: error?.message || galleryText('unknown_error') }));
             }
         }
 
-        setUploadProgress(100, `Kész: ${uploaded}/${selected.length} kép`);
+        setUploadProgress(100, galleryText('done', { done: uploaded, total: selected.length }));
         const wrap = document.getElementById('gallery-upload-progress-wrap');
         if (wrap) {
             wrap.setAttribute('data-keep-visible', '1');
         }
         if (status) {
-            status.textContent = `Feltöltés kész. Galéria: ${imageUrls.length}/${MAX_IMAGES} kép`;
+            status.textContent = galleryText('upload_done', { count: imageUrls.length, max: MAX_IMAGES });
         }
 
         renderImageList();

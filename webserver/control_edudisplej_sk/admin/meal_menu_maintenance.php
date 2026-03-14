@@ -386,7 +386,7 @@ try {
             $idsCsv = implode(',', $selectedManualInstitutionIds);
             $cliArgs[] = '--jedalen-institution-ids=' . escapeshellarg($idsCsv);
             $httpParams['jedalen_institution_ids'] = $idsCsv;
-            $successBase = 'Kézi Jedalen étrend-lekérdezés lefutott a kiválasztott intézményekre.';
+            $successBase = 'Kézi étrend-lekérdezés lefutott a kiválasztott intézményekre.';
         }
 
         $manualRun = meal_maintenance_run_manual_sync($runScript, $cliArgs, $httpParams);
@@ -413,12 +413,12 @@ try {
     $lastJob = $jobStmt->get_result()->fetch_assoc();
     $jobStmt->close();
 
-    $manualInstitutionsStmt = $conn->prepare("SELECT mi.id, mi.institution_name, mi.city, mi.external_key
+        $manualInstitutionsStmt = $conn->prepare("SELECT mi.id, mi.institution_name, mi.city, mi.external_key, ms.site_key, ms.site_name
                                               FROM meal_plan_institutions mi
                                               INNER JOIN meal_plan_sites ms ON ms.id = mi.site_id
-                                              WHERE ms.site_key = 'jedalen.sk'
+                                                                                            WHERE ms.site_key IN ('jedalen.sk', 'webkredit')
                                                 AND mi.company_id = 0
-                                              ORDER BY mi.institution_name ASC");
+                                                                                            ORDER BY ms.site_name ASC, mi.institution_name ASC");
     if ($manualInstitutionsStmt) {
         $manualInstitutionsStmt->execute();
         $manualInstitutionsRes = $manualInstitutionsStmt->get_result();
@@ -537,14 +537,16 @@ include 'header.php';
 
 <div class="panel" style="margin-bottom:12px;">
     <div class="panel-title">Étrend modul – technikai vezérlés</div>
-    <div class="muted">Itt állítható a Jedalen szinkron, és indítható kézi adatlekérés.</div>
+    <div class="muted">Itt állítható az automatikus étrend szinkron, és indítható kézi adatlekérés Jedalen és WebKredit forrásokra.</div>
+    <div class="muted" style="margin-top:6px;">Alapból felvett WebKredit intézmények: W. JFMed UNIBA, W. STU STUBA SvF, W. UJS Konferencia-központ. A rendszer további WebKredit intézményekkel is bővíthető, igény esetén kapcsolat: edudisplej@gmail.com.</div>
 </div>
 
 <div class="panel" style="margin-bottom:12px;">
     <div class="panel-title">Jedalen automatikus szinkron beállítások</div>
     <form method="post" style="display:grid; gap:10px; max-width:680px;">
         <label><input type="checkbox" name="jedalen_sync_enabled" value="1" <?php echo (!empty($settings['jedalen_sync_enabled']) && (string)$settings['jedalen_sync_enabled'] === '1') ? 'checked' : ''; ?>> Szinkron engedélyezve</label>
-        <label><input type="checkbox" name="jedalen_sync_every_cycle" value="1" <?php echo (!empty($settings['jedalen_sync_every_cycle']) && (string)$settings['jedalen_sync_every_cycle'] === '1') ? 'checked' : ''; ?>> Minden maintenance ciklusban fusson (ha nincs bepipálva: napi 1x, updated_at alapján)</label>
+        <label><input type="checkbox" name="jedalen_sync_every_cycle" value="1" <?php echo (!empty($settings['jedalen_sync_every_cycle']) && (string)$settings['jedalen_sync_every_cycle'] === '1') ? 'checked' : ''; ?>> Minden maintenance ciklusban fusson (ha nincs bepipálva: napi 1x az első elérhető maintenance futáskor)</label>
+        <div class="muted">Az automatikus Jedalen letöltés legfeljebb a mai naptól számított 7 napig ment menüket. A futtatási ablak mezők nem blokkolják a napi egyszeri szinkront.</div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div>
@@ -570,7 +572,7 @@ include 'header.php';
 
 <div class="panel" style="margin-bottom:12px;">
     <div class="panel-title">Kézi lekérdezés</div>
-    <div class="muted" style="margin-bottom:8px;">A Jedalen kézi lekérés két külön lépésre bontva futtatható. A menülekérdezés több hétre is próbálkozik (aktuális + következő hetek), ha az aktuális hét üres.</div>
+    <div class="muted" style="margin-bottom:8px;">A kézi lekérés két külön lépésre bontva futtatható. Jedalen forrásnál a menülekérdezés több hétre is próbálkozik (aktuális + következő hetek), ha az aktuális hét üres. WebKredit forrásnál a rendszer közvetlenül az RSS feedet dolgozza fel.</div>
     <div class="muted" style="margin-bottom:8px;">Technikai megjegyzés: a rendszer HTTPS-en kéri le az EatMenu oldalakat, mert HTTP alatt több intézménynél üres/noeat tartalom érkezik.</div>
 
     <form method="post" style="margin-bottom:10px;">
@@ -580,7 +582,7 @@ include 'header.php';
     <form method="post" style="display:grid; gap:8px;">
         <label style="display:block; margin-bottom:2px;"><strong>Intézmények kiválasztása menü letöltéshez</strong></label>
         <?php if (empty($manualInstitutionRows)): ?>
-            <div class="muted">Nincs betöltött Jedalen intézménylista. Előbb futtasd az intézménylista letöltést.</div>
+            <div class="muted">Nincs betöltött központi intézménylista. Előbb futtasd az intézménylista letöltést.</div>
         <?php else: ?>
             <select name="selected_institution_ids[]" multiple size="10" style="min-height:220px;">
                 <?php foreach ($manualInstitutionRows as $instRow): ?>
@@ -589,9 +591,13 @@ include 'header.php';
                         $instName = trim((string)($instRow['institution_name'] ?? ''));
                         $instCity = trim((string)($instRow['city'] ?? ''));
                         $instExt = trim((string)($instRow['external_key'] ?? ''));
+                        $instSiteName = trim((string)($instRow['site_name'] ?? ''));
                         $instLabel = $instName;
                         if ($instCity !== '') {
                             $instLabel .= ' (' . $instCity . ')';
+                        }
+                        if ($instSiteName !== '') {
+                            $instLabel .= ' - ' . $instSiteName;
                         }
                         if ($instExt !== '') {
                             $instLabel .= ' [' . $instExt . ']';
@@ -604,7 +610,7 @@ include 'header.php';
         <?php endif; ?>
 
         <div>
-            <button type="submit" name="run_jedalen_menus_for_selected" class="btn btn-primary" <?php echo empty($manualInstitutionRows) ? 'disabled' : ''; ?>>Etrend letöltése a kiválasztott intézményekre</button>
+            <button type="submit" name="run_jedalen_menus_for_selected" class="btn btn-primary" <?php echo empty($manualInstitutionRows) ? 'disabled' : ''; ?>>Étrend letöltése a kiválasztott intézményekre</button>
         </div>
     </form>
 </div>
@@ -616,14 +622,14 @@ include 'header.php';
             <div class="muted" style="margin-bottom:8px;"><?php echo htmlspecialchars($manualRunnerInfo); ?></div>
         <?php endif; ?>
         <?php if (stripos($manualOutput, 'no menu rows parsed') !== false): ?>
-            <div class="alert error" style="margin-bottom:8px;">A kiválasztott intézménynél a Jedalen oldalon nem található publikált menü a bejárt heteken sem. Ellenőrizd az intézmény EatMenu oldalát, vagy válassz másik intézményt.</div>
+            <div class="alert error" style="margin-bottom:8px;">A kiválasztott intézménynél nem található feldolgozható publikált menü. Jedalen esetén ellenőrizd az EatMenu oldalt, WebKredit esetén az RSS feed elérhetőségét.</div>
         <?php endif; ?>
         <pre style="white-space:pre-wrap; max-height:340px; overflow:auto;"><?php echo htmlspecialchars($manualOutput); ?></pre>
     </div>
 <?php endif; ?>
 
 <div class="panel" style="margin-bottom:12px;">
-    <div class="panel-title">Utolsó Jedalen futás állapota</div>
+    <div class="panel-title">Utolsó automatikus étrend szinkron állapota</div>
     <?php if ($lastJob): ?>
         <div><strong>Státusz:</strong> <?php echo htmlspecialchars((string)($lastJob['last_status'] ?? '')); ?></div>
         <div><strong>Utoljára futott:</strong> <?php echo htmlspecialchars((string)($lastJob['last_run_at'] ?? '')); ?></div>

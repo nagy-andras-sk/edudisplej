@@ -53,10 +53,10 @@ try {
     }
 
     if ($asset_id > 0) {
-        $stmt = $conn->prepare("SELECT id, company_id, mime_type, original_name, storage_rel_path, is_active FROM module_asset_store WHERE id = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, company_id, mime_type, original_name, storage_rel_path, file_size, sha256, is_active FROM module_asset_store WHERE id = ? LIMIT 1");
         $stmt->bind_param('i', $asset_id);
     } else {
-        $stmt = $conn->prepare("SELECT id, company_id, mime_type, original_name, storage_rel_path, is_active FROM module_asset_store WHERE storage_rel_path = ? ORDER BY id DESC LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, company_id, mime_type, original_name, storage_rel_path, file_size, sha256, is_active FROM module_asset_store WHERE storage_rel_path = ? ORDER BY id DESC LIMIT 1");
         $stmt->bind_param('s', $normalized_path);
     }
 
@@ -159,12 +159,21 @@ try {
 
     clearstatcache(true, $resolved_file);
     $file_size = filesize($resolved_file);
+    $stored_file_size = (int)($asset['file_size'] ?? 0);
+    if ($stored_file_size > 0 && ($file_size === false || (int)$file_size !== $stored_file_size)) {
+        $file_size = $stored_file_size;
+    }
+    $sha256 = strtolower(trim((string)($asset['sha256'] ?? '')));
+    if ($sha256 === '' && is_file($resolved_file)) {
+        $sha256 = strtolower((string)(hash_file('sha256', $resolved_file) ?: ''));
+    }
 
     $asset_file_debug('streaming asset response', [
         'asset_id' => (int)($asset['id'] ?? 0),
         'company_id' => (int)($asset['company_id'] ?? 0),
         'mime_type' => $mime_type,
         'file_size' => $file_size,
+        'sha256' => $sha256,
         'resolved_file' => $resolved_file,
     ]);
 
@@ -172,11 +181,22 @@ try {
     if ($file_size !== false && $file_size > 0) {
         header('Content-Length: ' . (string)$file_size);
     }
+    if ($sha256 !== '') {
+        header('ETag: "' . $sha256 . '"');
+        header('X-Asset-Sha256: ' . $sha256);
+    }
+    if ($file_size !== false && $file_size > 0) {
+        header('X-Asset-Size: ' . (string)$file_size);
+    }
     header('X-Content-Type-Options: nosniff');
     header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
     header('Expires: 0');
     header('Content-Disposition: inline; filename="' . str_replace('"', '', $original_name) . '"');
+
+    if (strcasecmp((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'), 'HEAD') === 0) {
+        exit;
+    }
 
     $bytes_sent = readfile($resolved_file);
     if ($bytes_sent === false) {

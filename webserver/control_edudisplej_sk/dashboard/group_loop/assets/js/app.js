@@ -48,6 +48,202 @@
             return 'en';
         }
 
+        function loopActionUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    customize: 'Testreszabás',
+                    duplicate: 'Duplikálás',
+                    delete: 'Törlés',
+                    default_group_locked: 'A default csoport nem szerkeszthető'
+                },
+                sk: {
+                    customize: 'Prispôsobenie',
+                    duplicate: 'Duplikovať',
+                    delete: 'Vymazať',
+                    default_group_locked: 'Predvolená skupina sa nedá upravovať'
+                },
+                en: {
+                    customize: 'Customize',
+                    duplicate: 'Duplicate',
+                    delete: 'Delete',
+                    default_group_locked: 'Default group is not editable'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function defaultLogoUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    fixed_content: 'Fix tartalom:',
+                    tagline: 'Szívvel az oktatásért.',
+                    not_editable: 'A default logo modul tartalma nem szerkeszthető.'
+                },
+                sk: {
+                    fixed_content: 'Fixný obsah:',
+                    tagline: 'Srdcom pre vzdelávanie.',
+                    not_editable: 'Obsah modulu predvoleného loga nie je možné upraviť.'
+                },
+                en: {
+                    fixed_content: 'Fixed content:',
+                    tagline: 'With heart for education.',
+                    not_editable: 'Default logo module content is not editable.'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function galleryUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    upload_title: '🖼️ Képek feltöltése',
+                    drop_or_click: 'Húzz ide képeket vagy',
+                    click_to_pick: 'kattints a kiválasztáshoz',
+                    limits: 'Max 10 kép, képenként max 15 MB',
+                    cloud_title: '☁️ Korábban feltöltött képek (Company Cloud)',
+                    refresh: 'Frissítés',
+                    loading: 'Betöltés...',
+                    import_selected: 'Kijelöltek importálása',
+                    display_mode: 'Megjelenítési mód',
+                    mode_slideshow: 'Slideshow',
+                    mode_collage: 'Kollázs',
+                    mode_single: 'Egy kép',
+                    fit_mode: 'Kép igazítás',
+                    slide_interval: 'Slideshow váltás (s)',
+                    transition_enabled: 'Áttűnés bekapcsolva',
+                    collage_columns: 'Kollázs oszlopok',
+                    background_color: 'Háttérszín',
+                    preview: 'Előnézet',
+                    preview_empty: 'Tölts fel legalább 1 képet az előnézethez.'
+                },
+                sk: {
+                    upload_title: '🖼️ Nahratie obrázkov',
+                    drop_or_click: 'Pretiahnite sem obrázky alebo',
+                    click_to_pick: 'kliknite pre výber',
+                    limits: 'Max 10 obrázkov, max 15 MB na obrázok',
+                    cloud_title: '☁️ Predtým nahraté obrázky (Company Cloud)',
+                    refresh: 'Obnoviť',
+                    loading: 'Načítavam...',
+                    import_selected: 'Importovať vybrané',
+                    display_mode: 'Režim zobrazenia',
+                    mode_slideshow: 'Prezentácia',
+                    mode_collage: 'Koláž',
+                    mode_single: 'Jeden obrázok',
+                    fit_mode: 'Prispôsobenie obrázka',
+                    slide_interval: 'Interval prezentácie (s)',
+                    transition_enabled: 'Zapnúť prechod',
+                    collage_columns: 'Stĺpce koláže',
+                    background_color: 'Farba pozadia',
+                    preview: 'Náhľad',
+                    preview_empty: 'Nahrajte aspoň 1 obrázok pre náhľad.'
+                },
+                en: {
+                    upload_title: '🖼️ Upload images',
+                    drop_or_click: 'Drop images here or',
+                    click_to_pick: 'click to choose',
+                    limits: 'Max 10 images, max 15 MB each',
+                    cloud_title: '☁️ Previously uploaded images (Company Cloud)',
+                    refresh: 'Refresh',
+                    loading: 'Loading...',
+                    import_selected: 'Import selected',
+                    display_mode: 'Display mode',
+                    mode_slideshow: 'Slideshow',
+                    mode_collage: 'Collage',
+                    mode_single: 'Single image',
+                    fit_mode: 'Image fit',
+                    slide_interval: 'Slideshow interval (s)',
+                    transition_enabled: 'Enable transition',
+                    collage_columns: 'Collage columns',
+                    background_color: 'Background color',
+                    preview: 'Preview',
+                    preview_empty: 'Upload at least 1 image for preview.'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
+        function videoUiText(id) {
+            const lang = resolveUiLang();
+            const dict = {
+                hu: {
+                    upload_title: '🎬 Videó feltöltés (automatikus optimalizálás)',
+                    drop_or_click: 'Húzz ide videót vagy',
+                    click_to_pick: 'kattints a kiválasztáshoz',
+                    limits: 'Böngészőben automatikus konvertálás: MP4 (H.264/AAC), max 1280×720, max 120 mp, max 25 MB',
+                    cloud_title: '☁️ Korábban feltöltött videók',
+                    refresh: 'Frissítés',
+                    loading: 'Betöltés...',
+                    import_selected: 'Kiválasztott importálása',
+                    fit_mode: 'Kitöltés',
+                    muted: 'Némítás',
+                    muted_playback: 'Lejátszás némítva',
+                    background_color: 'Háttérszín',
+                    duration_fixed: 'Loop időtartam: {seconds} s (fix, videó hossza)',
+                    duration_none: 'Loop időtartam: még nincs videó',
+                    preview: 'Előnézet',
+                    preview_empty: 'Tölts fel videót az előnézethez.',
+                    fit_contain: 'Contain',
+                    fit_cover: 'Cover',
+                    fit_fill: 'Fill',
+                    summary_video: 'Videó',
+                    summary_muted: 'némítva',
+                    summary_unmuted: 'hanggal'
+                },
+                sk: {
+                    upload_title: '🎬 Nahratie videa (automatická optimalizácia)',
+                    drop_or_click: 'Pretiahnite sem video alebo',
+                    click_to_pick: 'kliknite pre výber',
+                    limits: 'Automatická konverzia v prehliadači: MP4 (H.264/AAC), max 1280×720, max 120 s, max 25 MB',
+                    cloud_title: '☁️ Predtým nahraté videá',
+                    refresh: 'Obnoviť',
+                    loading: 'Načítavam...',
+                    import_selected: 'Importovať vybrané',
+                    fit_mode: 'Prispôsobenie',
+                    muted: 'Stlmiť zvuk',
+                    muted_playback: 'Prehrávanie stlmené',
+                    background_color: 'Farba pozadia',
+                    duration_fixed: 'Trvanie loopu: {seconds} s (fixné podľa dĺžky videa)',
+                    duration_none: 'Trvanie loopu: zatiaľ bez videa',
+                    preview: 'Náhľad',
+                    preview_empty: 'Nahrajte video pre náhľad.',
+                    fit_contain: 'Contain',
+                    fit_cover: 'Cover',
+                    fit_fill: 'Fill',
+                    summary_video: 'Video',
+                    summary_muted: 'stlmené',
+                    summary_unmuted: 'so zvukom'
+                },
+                en: {
+                    upload_title: '🎬 Upload video (automatic optimization)',
+                    drop_or_click: 'Drop video here or',
+                    click_to_pick: 'click to choose',
+                    limits: 'Automatic browser conversion: MP4 (H.264/AAC), max 1280×720, max 120 s, max 25 MB',
+                    cloud_title: '☁️ Previously uploaded videos',
+                    refresh: 'Refresh',
+                    loading: 'Loading...',
+                    import_selected: 'Import selected',
+                    fit_mode: 'Fit',
+                    muted: 'Mute',
+                    muted_playback: 'Muted playback',
+                    background_color: 'Background color',
+                    duration_fixed: 'Loop duration: {seconds} s (fixed to video length)',
+                    duration_none: 'Loop duration: no video yet',
+                    preview: 'Preview',
+                    preview_empty: 'Upload a video for preview.',
+                    fit_contain: 'Contain',
+                    fit_cover: 'Cover',
+                    fit_fill: 'Fill',
+                    summary_video: 'Video',
+                    summary_muted: 'muted',
+                    summary_unmuted: 'with sound'
+                }
+            };
+            return (dict[lang] && dict[lang][id]) || dict.en[id] || String(id || '');
+        }
+
         function overlayUiText(id) {
             const lang = resolveUiLang();
             const dict = {
@@ -948,13 +1144,15 @@
             }
 
             bar.style.display = isDraftDirty ? 'flex' : 'none';
-            const versionText = planVersionToken ? ` • Verzió: ${planVersionToken}` : '';
+            const versionText = planVersionToken
+                ? ` • ${tr('group_loop.version_label', 'Version')}: ${planVersionToken}`
+                : '';
             label.textContent = isDraftDirty
-                ? `Nem mentett változtatások${versionText}`
-                : `Minden változtatás mentve${versionText}`;
+                ? `${tr('group_loop.unsaved_changes', 'Unsaved changes')}${versionText}`
+                : `${tr('group_loop.all_changes_saved', 'All changes saved')}${versionText}`;
             actions.innerHTML = `
-                <button type="button" class="btn pending-save-btn" onclick="publishLoopPlan()">💾 Mentés</button>
-                <button type="button" class="btn pending-discard-btn" onclick="discardLocalDraft()" title="Elvetés">✕</button>
+                <button type="button" class="btn pending-save-btn" onclick="publishLoopPlan()">💾 ${tr('group_loop.save', 'Save')}</button>
+                <button type="button" class="btn pending-discard-btn" onclick="discardLocalDraft()" title="${tr('group_loop.discard', 'Discard')}">✕</button>
             `;
         }
 
@@ -6131,14 +6329,14 @@
             return `
                 <div style="display: grid; gap: 15px;">
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fix tartalom:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">${defaultLogoUiText('fixed_content')}</label>
                         <div style="padding:10px; border:1px solid #d1d5db; border-radius:6px; background:#f8fafc; color:#1f2937;">
                             <div style="font-weight:700;">EDUdisplej.sk</div>
-                            <div style="margin-top:4px; opacity:0.85;">With heart for education.</div>
+                            <div style="margin-top:4px; opacity:0.85;">${defaultLogoUiText('tagline')}</div>
                         </div>
                     </div>
                     <div class="muted" style="font-size:12px;">
-                        A default logo modul tartalma nem szerkeszthető.
+                        ${defaultLogoUiText('not_editable')}
                     </div>
                 </div>
             `;
@@ -6660,6 +6858,7 @@
         }
 
         function buildGalleryCustomizationHtml(settings) {
+            const gt = galleryUiText;
             let galleryImages = [];
             try {
                 const parsed = JSON.parse(String(settings.imageUrlsJson || '[]'));
@@ -6674,20 +6873,20 @@
             return `
                 <div style="display:grid; gap:14px;">
                     <div>
-                        <label style="display:block; margin-bottom:6px; font-weight:bold;">🖼️ Képek feltöltése</label>
+                        <label style="display:block; margin-bottom:6px; font-weight:bold;">${gt('upload_title')}</label>
                         <div id="gallery-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
                             <input type="file" id="gallery-file-input" accept="image/*" multiple style="display:none;">
-                            <div style="font-size:14px; color:#425466;">Húzz ide képeket vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
-                            <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Max 10 kép, képenként max 15 MB</div>
+                            <div style="font-size:14px; color:#425466;">${gt('drop_or_click')} <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">${gt('click_to_pick')}</span></div>
+                            <div style="font-size:12px; color:#8a97a6; margin-top:6px;">${gt('limits')}</div>
                         </div>
                         <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
                             <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
-                                <strong style="font-size:13px; color:#1f2a37;">☁️ Korábban feltöltött képek (Company Cloud)</strong>
-                                <button type="button" id="gallery-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">Frissítés</button>
+                                <strong style="font-size:13px; color:#1f2a37;">${gt('cloud_title')}</strong>
+                                <button type="button" id="gallery-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">${gt('refresh')}</button>
                             </div>
-                            <div id="gallery-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">Betöltés...</div>
+                            <div id="gallery-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">${gt('loading')}</div>
                             <div id="gallery-library-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px;"></div>
-                            <button type="button" id="gallery-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">Kijelöltek importálása</button>
+                            <button type="button" id="gallery-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">${gt('import_selected')}</button>
                         </div>
                         <input type="hidden" id="gallery-image-urls-json" value='${safeGalleryJson}'>
                         <div id="gallery-upload-status" style="font-size:12px; color:#425466; margin-top:6px;"></div>
@@ -6702,15 +6901,15 @@
 
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Megjelenítési mód</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${gt('display_mode')}</label>
                             <select id="gallery-display-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                <option value="slideshow" ${(settings.displayMode || 'slideshow') === 'slideshow' ? 'selected' : ''}>Slideshow</option>
-                                <option value="collage" ${settings.displayMode === 'collage' ? 'selected' : ''}>Kollázs</option>
-                                <option value="single" ${settings.displayMode === 'single' ? 'selected' : ''}>Egy kép</option>
+                                <option value="slideshow" ${(settings.displayMode || 'slideshow') === 'slideshow' ? 'selected' : ''}>${gt('mode_slideshow')}</option>
+                                <option value="collage" ${settings.displayMode === 'collage' ? 'selected' : ''}>${gt('mode_collage')}</option>
+                                <option value="single" ${settings.displayMode === 'single' ? 'selected' : ''}>${gt('mode_single')}</option>
                             </select>
                         </div>
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Kép igazítás</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${gt('fit_mode')}</label>
                             <select id="gallery-fit-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                                 <option value="cover" ${settings.fitMode === 'cover' ? 'selected' : ''}>Cover</option>
                                 <option value="contain" ${(settings.fitMode || 'contain') === 'contain' ? 'selected' : ''}>Contain</option>
@@ -6718,31 +6917,31 @@
                             </select>
                         </div>
                         <div id="gallery-slide-interval-wrap">
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Slideshow váltás (s)</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${gt('slide_interval')}</label>
                             <input type="number" id="gallery-slide-interval" value="${settings.slideIntervalSec || 5}" min="1" max="30" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                         </div>
                         <div id="gallery-transition-toggle-wrap" style="display:flex; align-items:flex-end;">
                             <label style="display:flex; align-items:center; gap:8px; font-weight:bold; margin-bottom:4px; cursor:pointer;">
                                 <input type="checkbox" id="gallery-transition-enabled" ${(settings.transitionEnabled !== false && Number(settings.transitionMs || 450) !== 0) ? 'checked' : ''}>
-                                <span>Áttűnés bekapcsolva</span>
+                                <span>${gt('transition_enabled')}</span>
                             </label>
                         </div>
                         <div id="gallery-collage-columns-wrap">
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Kollázs oszlopok</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${gt('collage_columns')}</label>
                             <input type="number" id="gallery-collage-columns" value="${settings.collageColumns || 3}" min="2" max="5" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                         </div>
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Háttérszín</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${gt('background_color')}</label>
                             <input type="color" id="gallery-bg-color" value="${settings.bgColor || '#000000'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
                         </div>
                     </div>
 
                     <div style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
-                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">${gt('preview')}</div>
                         <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
                             <iframe id="gallery-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
                         </div>
-                        <div id="gallery-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${galleryImages.length ? 'none' : 'block'};">Tölts fel legalább 1 képet az előnézethez.</div>
+                        <div id="gallery-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${galleryImages.length ? 'none' : 'block'};">${gt('preview_empty')}</div>
                     </div>
                 </div>
             `;
@@ -6868,61 +7067,62 @@
         }
 
         function buildVideoCustomizationHtml(item, settings) {
+            const vt = videoUiText;
             const durationSec = parseInt(settings.videoDurationSec || item.duration_seconds || 10, 10) || 10;
 
             return `
                 <div style="display:grid; gap:14px;">
                     <div>
-                        <label style="display:block; margin-bottom:6px; font-weight:bold;">🎬 Videó feltöltés (automatikus optimalizálás)</label>
+                        <label style="display:block; margin-bottom:6px; font-weight:bold;">${vt('upload_title')}</label>
                         <div id="video-upload-area" style="border:2px dashed #1e40af; border-radius:8px; padding:20px; text-align:center; cursor:pointer; background:#f8f9fa;">
                             <input type="file" id="video-file-input" accept="video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v" style="display:none;">
-                            <div style="font-size:14px; color:#425466;">Húzz ide videót vagy <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">kattints a kiválasztáshoz</span></div>
-                            <div style="font-size:12px; color:#8a97a6; margin-top:6px;">Böngészőben automatikus konvertálás: MP4 (H.264/AAC), max 1280×720, max 120 mp, max 25 MB</div>
+                            <div style="font-size:14px; color:#425466;">${vt('drop_or_click')} <span style="color:#1e40af; font-weight:bold; text-decoration:underline;">${vt('click_to_pick')}</span></div>
+                            <div style="font-size:12px; color:#8a97a6; margin-top:6px;">${vt('limits')}</div>
                         </div>
                         <div style="margin-top:10px; padding:10px; border:1px solid #dde3eb; border-radius:8px; background:#fcfdff;">
                             <div style="display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px;">
-                                <strong style="font-size:13px; color:#1f2a37;">☁️ Korábban feltöltött videók</strong>
-                                <button type="button" id="video-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">Frissítés</button>
+                                <strong style="font-size:13px; color:#1f2a37;">${vt('cloud_title')}</strong>
+                                <button type="button" id="video-library-refresh" style="padding:5px 8px; border:1px solid #1e40af; background:#fff; color:#1e40af; border-radius:5px; cursor:pointer; font-size:12px;">${vt('refresh')}</button>
                             </div>
-                            <div id="video-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">Betöltés...</div>
+                            <div id="video-library-status" style="font-size:12px; color:#425466; margin-bottom:6px;">${vt('loading')}</div>
                             <div id="video-library-list" style="display:grid; gap:6px;"></div>
-                            <button type="button" id="video-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">Kiválasztott importálása</button>
+                            <button type="button" id="video-library-import" style="margin-top:8px; padding:6px 10px; border:1px solid #16a34a; background:#16a34a; color:#fff; border-radius:5px; cursor:pointer; font-size:12px;">${vt('import_selected')}</button>
                         </div>
                         <div id="video-upload-status" style="font-size:12px; color:#425466; margin-top:8px;"></div>
                     </div>
 
                     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Kitöltés</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${vt('fit_mode')}</label>
                             <select id="video-fit-mode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                <option value="contain" ${(settings.fitMode || 'contain') === 'contain' ? 'selected' : ''}>Contain</option>
-                                <option value="cover" ${settings.fitMode === 'cover' ? 'selected' : ''}>Cover</option>
-                                <option value="fill" ${settings.fitMode === 'fill' ? 'selected' : ''}>Fill</option>
+                                <option value="contain" ${(settings.fitMode || 'contain') === 'contain' ? 'selected' : ''}>${vt('fit_contain')}</option>
+                                <option value="cover" ${settings.fitMode === 'cover' ? 'selected' : ''}>${vt('fit_cover')}</option>
+                                <option value="fill" ${settings.fitMode === 'fill' ? 'selected' : ''}>${vt('fit_fill')}</option>
                             </select>
                         </div>
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Némítás</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${vt('muted')}</label>
                             <label style="display:flex; align-items:center; gap:8px; border:1px solid #d1d5db; border-radius:5px; padding:8px;">
                                 <input type="checkbox" id="video-muted" ${(settings.muted !== false) ? 'checked' : ''}>
-                                <span style="font-size:13px;">Lejátszás némítva</span>
+                                <span style="font-size:13px;">${vt('muted_playback')}</span>
                             </label>
                         </div>
                         <div>
-                            <label style="display:block; margin-bottom:4px; font-weight:bold;">Háttérszín</label>
+                            <label style="display:block; margin-bottom:4px; font-weight:bold;">${vt('background_color')}</label>
                             <input type="color" id="video-bg-color" value="${settings.bgColor || '#000000'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
                         </div>
                     </div>
 
                     <div id="video-duration-badge" style="padding:10px; border:1px solid #c7e7d2; background:#ecfdf3; border-radius:8px; color:#0f5132; font-size:13px;">
-                        Loop időtartam: ${durationSec} s (fix, videó hossza)
+                        ${vt('duration_fixed').replace('{seconds}', String(durationSec))}
                     </div>
 
                     <div style="border:1px solid #d6dde8; border-radius:8px; padding:10px; background:#f8fafc;">
-                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">Előnézet</div>
+                        <div style="font-weight:700; color:#425466; margin-bottom:8px;">${vt('preview')}</div>
                         <div style="height:320px; border:1px solid #e0e6ed; border-radius:6px; background:#fff; overflow:hidden;">
                             <iframe id="video-live-preview-iframe" style="width:100%; height:100%; border:0; background:#000;"></iframe>
                         </div>
-                        <div id="video-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${settings.videoAssetUrl ? 'none' : 'block'};">Tölts fel videót az előnézethez.</div>
+                        <div id="video-preview-empty" style="font-size:12px; color:#8a97a6; margin-top:8px; display:${settings.videoAssetUrl ? 'none' : 'block'};">${vt('preview_empty')}</div>
                     </div>
                 </div>
             `;
@@ -7966,25 +8166,50 @@
         }
 
         function getTextLoopItemSummary(settings) {
+            const lang = resolveUiLang();
+            const labelMap = {
+                hu: {
+                    module: 'Szöveg modul',
+                    align: { left: 'balra', center: 'középre', right: 'jobbra' },
+                    bold: 'félkövér',
+                    scroll: 'gördítés',
+                    bgImage: 'háttérkép'
+                },
+                sk: {
+                    module: 'Textový modul',
+                    align: { left: 'vľavo', center: 'na stred', right: 'vpravo' },
+                    bold: 'tučné',
+                    scroll: 'rolovanie',
+                    bgImage: 'obrázok pozadia'
+                },
+                en: {
+                    module: 'Text module',
+                    align: { left: 'left', center: 'center', right: 'right' },
+                    bold: 'bold',
+                    scroll: 'scroll',
+                    bgImage: 'background image'
+                }
+            };
+            const labels = labelMap[lang] || labelMap.en;
             const snippet = String(settings.text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            const baseText = snippet ? snippet.slice(0, 48) : 'Szöveg modul';
+            const baseText = snippet ? snippet.slice(0, 48) : labels.module;
 
             const details = [];
             if (settings.fontSize) {
                 details.push(`${parseInt(settings.fontSize, 10) || 72}px`);
             }
             if (settings.textAlign) {
-                const alignMap = { left: 'balra', center: 'középre', right: 'jobbra' };
+                const alignMap = labels.align;
                 details.push(alignMap[String(settings.textAlign)] || String(settings.textAlign));
             }
             if (settings.fontWeight && String(settings.fontWeight) !== '400') {
-                details.push('félkövér');
+                details.push(labels.bold);
             }
             if (settings.scrollMode) {
-                details.push('scroll');
+                details.push(labels.scroll);
             }
             if (String(settings.bgImageData || '').trim()) {
-                details.push('háttérkép');
+                details.push(labels.bgImage);
             }
 
             return details.length > 0
@@ -7993,34 +8218,77 @@
         }
 
         function getGalleryLoopItemSummary(settings) {
+            const lang = resolveUiLang();
+            const labels = {
+                hu: {
+                    image: 'kép',
+                    mode: 'Mód',
+                    slideshow: 'slideshow',
+                    collage: 'kollázs',
+                    single: 'egy kép',
+                    overlay: 'Overlay',
+                    clock: 'óra',
+                    text: 'szöveg',
+                    top: 'fent',
+                    bottom: 'lent'
+                },
+                sk: {
+                    image: 'obrázok',
+                    mode: 'Režim',
+                    slideshow: 'prezentácia',
+                    collage: 'koláž',
+                    single: 'jeden obrázok',
+                    overlay: 'Overlay',
+                    clock: 'hodiny',
+                    text: 'text',
+                    top: 'hore',
+                    bottom: 'dole'
+                },
+                en: {
+                    image: 'image',
+                    mode: 'Mode',
+                    slideshow: 'slideshow',
+                    collage: 'collage',
+                    single: 'single image',
+                    overlay: 'Overlay',
+                    clock: 'clock',
+                    text: 'text',
+                    top: 'top',
+                    bottom: 'bottom'
+                }
+            }[lang] || {
+                image: 'image', mode: 'Mode', slideshow: 'slideshow', collage: 'collage', single: 'single image',
+                overlay: 'Overlay', clock: 'clock', text: 'text', top: 'top', bottom: 'bottom'
+            };
             const galleryImages = normalizeGalleryImageUrls(settings.imageUrlsJson ?? settings.imageUrls ?? []);
             const imageCount = galleryImages.length;
 
             const modeMap = {
-                slideshow: 'slideshow',
-                collage: 'kollázs',
-                single: 'egy kép'
+                slideshow: labels.slideshow,
+                collage: labels.collage,
+                single: labels.single
             };
             const mode = modeMap[getGalleryModeFromSettings(settings)] || 'slideshow';
             const overlayFlags = [];
             if (settings.clockOverlayEnabled) {
-                overlayFlags.push(`óra:${settings.clockOverlayPosition === 'bottom' ? 'lent' : 'fent'}`);
+                overlayFlags.push(`${labels.clock}:${settings.clockOverlayPosition === 'bottom' ? labels.bottom : labels.top}`);
             }
             if (settings.textOverlayEnabled) {
-                overlayFlags.push(`szöveg:${settings.textOverlayPosition === 'bottom' ? 'lent' : 'fent'}`);
+                overlayFlags.push(`${labels.text}:${settings.textOverlayPosition === 'bottom' ? labels.bottom : labels.top}`);
             }
-            const overlayLine = overlayFlags.length ? `<br>Overlay: ${overlayFlags.join(' • ')}` : '';
-            return `${imageCount} kép<br>Mód: ${mode}${overlayLine}`;
+            const overlayLine = overlayFlags.length ? `<br>${labels.overlay}: ${overlayFlags.join(' • ')}` : '';
+            return `${imageCount} ${labels.image}<br>${labels.mode}: ${mode}${overlayLine}`;
         }
 
         function getVideoLoopItemSummary(item, settings) {
+            const vt = videoUiText;
             const duration = parseInt(settings.videoDurationSec || item.duration_seconds || 0, 10);
             const fit = String(settings.fitMode || 'contain');
-            const muted = settings.muted === false ? 'hanggal' : 'némítva';
+            const muted = settings.muted === false ? vt('summary_unmuted') : vt('summary_muted');
             if (duration > 0) {
                 return `${duration}s • ${fit}<br>${muted}`;
             }
-            return `Videó • ${fit}<br>${muted}`;
+            return `${vt('summary_video')} • ${fit}<br>${muted}`;
         }
 
         function getMealMenuLoopItemSummary(settings) {
@@ -8125,16 +8393,16 @@
 
         function buildLoopItemActionButtonsHtml(index) {
             if (isDefaultGroup) {
-                return `<button class="loop-btn" disabled title="A default csoport nem szerkeszthető">🔒</button>`;
+                return `<button class="loop-btn" disabled title="${loopActionUiText('default_group_locked')}">🔒</button>`;
             }
 
             if (isContentOnlyMode) {
-                return `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="Testreszabás">⚙️</button>`;
+                return `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="${loopActionUiText('customize')}">⚙️</button>`;
             }
 
-            return `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="Testreszabás">⚙️</button>
-                        <button class="loop-btn" onclick="duplicateLoopItem(${index}); event.stopPropagation();" title="Duplikálás">📄</button>
-                        <button class="loop-btn" onclick="removeFromLoop(${index}); event.stopPropagation();" title="Törlés">🗑️</button>`;
+            return `<button class="loop-btn" onclick="customizeModule(${index}); event.stopPropagation();" title="${loopActionUiText('customize')}">⚙️</button>
+                        <button class="loop-btn" onclick="duplicateLoopItem(${index}); event.stopPropagation();" title="${loopActionUiText('duplicate')}">📄</button>
+                        <button class="loop-btn" onclick="removeFromLoop(${index}); event.stopPropagation();" title="${loopActionUiText('delete')}">🗑️</button>`;
         }
 
         function createLoopItemElement(item, index) {
