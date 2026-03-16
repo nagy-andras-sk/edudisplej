@@ -40,3 +40,4 @@ webserver/control_edudisplej_sk/screenshots/
 # Old backup files
 *_old.html
 *.old
+/webserver/control_edudisplej_sk/uploads/companies
