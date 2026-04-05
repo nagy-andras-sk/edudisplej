@@ -34,6 +34,7 @@ EDUDISPLEJ_HOME="/opt/edudisplej"
 INIT_DIR="${EDUDISPLEJ_HOME}/init"
 LOCAL_WEB_DIR="${EDUDISPLEJ_HOME}/localweb"
 DISPLAY="${DISPLAY:-:0}"
+DOWNLOAD_OK=1
 
 # Colors for output
 RED='\033[0;31m'
@@ -129,8 +130,8 @@ else
         DOWNLOAD_EXIT=$?
         log_terminal "Module download failed with exit code: $DOWNLOAD_EXIT"
         echo -e "${RED}✗ Module download failed (exit code: $DOWNLOAD_EXIT)${NC}"
-        echo "Retrying after service restart..."
-        exit 1
+        echo "Continuing with the last known content, self-heal active..."
+        DOWNLOAD_OK=0
     fi
 fi
 
@@ -206,6 +207,85 @@ create_startup_splash_page() {
 EOF
 }
 
+create_recovery_page() {
+    local reason="$1"
+    local target_url="$2"
+
+    cat > "$STARTUP_SPLASH_PAGE" <<EOF
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduDisplej Recovery</title>
+    <style>
+        html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #070b14;
+            color: #e7eefb;
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+        .wrap {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            place-items: center;
+            background: radial-gradient(circle at 50% 35%, #111a31 0%, #070b14 70%);
+        }
+        .card {
+            width: min(860px, 88vw);
+            border: 1px solid rgba(95, 140, 214, 0.35);
+            border-radius: 16px;
+            padding: 30px 34px;
+            background: rgba(9, 14, 27, 0.78);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        }
+        .title {
+            font-size: clamp(26px, 3.4vw, 44px);
+            font-weight: 700;
+            letter-spacing: .06em;
+            color: #8ec5ff;
+            margin-bottom: 12px;
+        }
+        .desc {
+            font-size: clamp(13px, 1.4vw, 20px);
+            opacity: .9;
+            line-height: 1.5;
+        }
+        .pulse {
+            margin-top: 22px;
+            color: #9ed194;
+            font-size: clamp(12px, 1.2vw, 18px);
+            letter-spacing: .08em;
+            animation: pulse 1.3s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: .55; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="card">
+            <div class="title">EDUDISPLEJ SELF-HEAL</div>
+            <div class="desc">${reason}</div>
+            <div class="pulse">AUTOMATIKUS HELYREÁLLÍTÁS FOLYAMATBAN...</div>
+        </div>
+    </div>
+    <script>
+        window.setTimeout(function () {
+            window.location.replace('file://${target_url}');
+        }, 12000);
+    </script>
+</body>
+</html>
+EOF
+}
+
 # Check if device is registered, if not show waiting page
 if [ ! -f "$KIOSK_CONF" ]; then
     if [ -f "$WAITING_PAGE" ]; then
@@ -213,8 +293,7 @@ if [ ! -f "$KIOSK_CONF" ]; then
         echo "Device not registered yet."
         echo "Showing waiting screen until admin assigns this device..."
         echo ""
-        
-        # Create a temporary version of waiting page with hostname injected
+
         HOSTNAME=$(hostname)
         TEMP_WAITING_PAGE="/tmp/waiting_registration_with_hostname.html"
         cp "$WAITING_PAGE" "$TEMP_WAITING_PAGE"
@@ -237,9 +316,24 @@ if [ ! -f "$LOOP_PLAYER" ]; then
     log_terminal "ERROR: Loop player not found: $LOOP_PLAYER"
     echo -e "${RED}✗ Loop player not found!${NC}"
     echo "Expected: $LOOP_PLAYER"
-    echo ""
-    sleep 10
-    exit 1
+    echo "Showing self-heal recovery page..."
+
+    if [ -f "$WAITING_PAGE" ]; then
+        create_recovery_page "A kijelző tartalom ideiglenesen nem elérhető. A rendszer automatikusan próbál helyreállni." "$WAITING_PAGE"
+        log_terminal "Loop player missing, using waiting page in recovery mode"
+    else
+        create_recovery_page "A kijelző tartalom ideiglenesen nem elérhető. A rendszer automatikusan próbál helyreállni." "$STARTUP_SPLASH_PAGE"
+        log_terminal "Loop player and waiting page missing, using static recovery page"
+    fi
+
+    surf -F "file://${STARTUP_SPLASH_PAGE}"
+    log_terminal "Recovery page exited"
+    sleep 5
+    exit 0
+fi
+
+if [ "$DOWNLOAD_OK" -eq 0 ]; then
+    log_terminal "Download failed, launching browser with last known local content"
 fi
 
 echo "Starting surf browser..."
