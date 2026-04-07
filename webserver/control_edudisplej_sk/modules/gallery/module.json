@@ -4,5 +4,7 @@
   "description": "Több kép megjelenítése slideshow vagy kollázs nézetben.",
   "renderer": "m_gallery.html",
   "version": "1.0.0",
-  "defaults": "config/default_settings.json"
+  "config": {
+    "defaults": "config/default_settings.json"
+  }
 }

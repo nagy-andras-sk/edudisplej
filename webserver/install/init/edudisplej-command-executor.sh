@@ -316,6 +316,31 @@ report_command_result() {
     "output": $(echo -n "$output" | jq -Rs .),
     "error": $(echo -n "$error" | jq -Rs .)
 }
+EOF
+)
+
+    log_debug "Reporting command result: $command_id -> $status"
+
+    local response=$(curl -s -X POST \
+        -H "Authorization: Bearer $token" \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        --max-time 10 --connect-timeout 5 \
+        "$COMMAND_RESULT_API" 2>/dev/null || echo "{\"success\": false}")
+
+    if is_auth_error "$response"; then
+        reset_to_unconfigured
+        return 1
+    fi
+
+    if echo "$response" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
+        log_success "Command result reported: $command_id"
+        return 0
+    else
+        log_error "Failed to report command result: $response"
+        return 1
+    fi
+}
 
 write_offline_status() {
     local active="$1"
@@ -373,31 +398,6 @@ display_force_on() {
         DISPLAY=:0 xset -dpms >/dev/null 2>&1 || true
         DISPLAY=:0 xset s off >/dev/null 2>&1 || true
         DISPLAY=:0 xset s noblank >/dev/null 2>&1 || true
-    fi
-}
-EOF
-)
-
-    log_debug "Reporting command result: $command_id -> $status"
-
-    local response=$(curl -s -X POST \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -d "$payload" \
-        --max-time 10 --connect-timeout 5 \
-        "$COMMAND_RESULT_API" 2>/dev/null || echo "{\"success\": false}")
-
-    if is_auth_error "$response"; then
-        reset_to_unconfigured
-        return 1
-    fi
-
-    if echo "$response" | grep -q '"success"[[:space:]]*:[[:space:]]*true'; then
-        log_success "Command result reported: $command_id"
-        return 0
-    else
-        log_error "Failed to report command result: $response"
-        return 1
     fi
 }
 

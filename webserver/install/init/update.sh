@@ -10,6 +10,10 @@ LOCAL_WEB_DIR="${TARGET_DIR}/localweb"
 INIT_BASE="https://install.edudisplej.sk/init"
 BACKUP_DIR="${TARGET_DIR}.backup.$(date +%s)"
 TOKEN_FILE="${TARGET_DIR}/lic/token"
+CONSOLE_USER="${CONSOLE_USER:-${SUDO_USER:-edudisplej}}"
+if ! id "$CONSOLE_USER" >/dev/null 2>&1; then
+    CONSOLE_USER="edudisplej"
+fi
 APT_UPDATED="false"
 APT_COMMON_OPTS=(
     "-o" "Dpkg::Use-Pty=0"
@@ -252,6 +256,17 @@ if [ "$USE_STRUCTURE" = true ]; then
     else
         USE_JQ=true
     fi
+
+    # Ak je structure.json neplatny alebo neobsahuje pole files, prepneme sa na staru metodu.
+    if ! echo "$STRUCTURE_JSON" | jq -e '.files | type == "array"' >/dev/null 2>&1; then
+        echo "[!] structure.json je neplatny alebo neobsahuje files[]"
+        echo "[!] Prepínam na staru metodu (getfiles)..."
+        USE_STRUCTURE=false
+    fi
+
+fi
+
+if [ "$USE_STRUCTURE" = true ]; then
     
     # Parsovanie JSON / JSON elemzes
     if [ "$USE_JQ" = true ]; then

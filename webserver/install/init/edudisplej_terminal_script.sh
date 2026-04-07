@@ -164,8 +164,8 @@ create_startup_splash_page() {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: #000;
-            color: #fff;
+            background: #0f1d3a;
+            color: #f8fbff;
             font-family: 'Segoe UI', Arial, sans-serif;
         }
         .wrap {
@@ -176,14 +176,14 @@ create_startup_splash_page() {
             justify-content: center;
             flex-direction: column;
             gap: 18px;
-            background: radial-gradient(circle at center, #111 0%, #000 70%);
+            background: radial-gradient(circle at center, #2c4b86 0%, #0f1d3a 72%);
         }
         .logo {
             font-size: clamp(48px, 8vw, 128px);
             font-weight: 700;
             letter-spacing: 0.18em;
-            color: #fff;
-            text-shadow: 0 0 18px rgba(255,255,255,0.2);
+            color: #ffffff;
+            text-shadow: 0 0 22px rgba(255,255,255,0.35);
         }
         .sub {
             font-size: clamp(12px, 1.4vw, 22px);

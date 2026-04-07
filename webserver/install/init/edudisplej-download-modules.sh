@@ -1889,7 +1889,7 @@ main() {
 
     if [ ${#failed_modules[@]} -gt 0 ]; then
         log_error "Required modules failed to download: ${failed_modules[*]}"
-        exit 1
+        log_error "Continuing with cached/local content so the kiosk stays online"
     fi
 
     # Download and localize external assets referenced by module settings
