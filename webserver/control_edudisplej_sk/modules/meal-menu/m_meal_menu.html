@@ -1627,6 +1627,14 @@
         const title = document.getElementById('title');
         const t = i18n(settings.language);
 
+        if (!isWeekdayIsoDate(isoDateOffset(0))) {
+            cards.innerHTML = '<div class="empty"></div>';
+            subtitle.textContent = '';
+            subtitle.style.display = 'none';
+            foot.innerHTML = '';
+            return;
+        }
+
         const dayText = String(data?.menu_date || '').trim();
         const institutionName = String(data?.institution_name || '').trim();
 
@@ -1731,6 +1739,14 @@
         const foot = document.getElementById('foot');
         const title = document.getElementById('title');
         const t = i18n(settings.language);
+
+        if (!isWeekdayIsoDate(isoDateOffset(0))) {
+            cards.innerHTML = '<div class="empty"></div>';
+            subtitle.textContent = '';
+            subtitle.style.display = 'none';
+            foot.innerHTML = '';
+            return;
+        }
 
         if (title) {
             const customTitle = String(settings.customHeaderTitle || '').trim();
@@ -1988,6 +2004,17 @@
         return `${yy}-${mm}-${dd}`;
     }
 
+    function isWeekdayIsoDate(isoDate) {
+        const raw = String(isoDate || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            return false;
+        }
+        const [y, m, d] = raw.split('-').map((value) => parseInt(value, 10));
+        const dt = new Date(y, (m || 1) - 1, d || 1, 12, 0, 0, 0);
+        const day = dt.getDay();
+        return day >= 1 && day <= 5;
+    }
+
     function hasAnyMeals(data) {
         const meals = Array.isArray(data?.meals) ? data.meals : [];
         return meals.some((meal) => mealHasRenderableRows(meal));
@@ -2192,12 +2219,21 @@
     }
 
     async function refreshSingleModeFromApi(settings, cacheKey, debugState) {
-        let data = await fetchMenuData(settings, isoDateOffset(0), false, debugState);
+        const todayIso = isoDateOffset(0);
+        if (!isWeekdayIsoDate(todayIso)) {
+            pushDebug(debugState, 'Single mode skipped: weekend day');
+            return false;
+        }
+
+        let data = await fetchMenuData(settings, todayIso, false, debugState);
         const shouldProbeFallback = (!data || data.__serverDataAvailable !== false) && settings.maxFallbackDaysAhead > 0;
         if ((!data || !hasAnyMeals(data)) && shouldProbeFallback) {
-            const fallbackData = await findNextMenuWithMeals(settings, 1, settings.maxFallbackDaysAhead, debugState);
-            if (fallbackData) {
-                data = fallbackData;
+            const tomorrowIso = isoDateShift(todayIso, 1);
+            if (isWeekdayIsoDate(tomorrowIso)) {
+                const tomorrowFallback = await fetchMenuData(settings, tomorrowIso, true, debugState);
+                if (tomorrowFallback && hasAnyMeals(tomorrowFallback)) {
+                    data = tomorrowFallback;
+                }
             }
         }
 
@@ -2219,19 +2255,29 @@
 
     async function refreshSquareModeFromApi(settings, cacheKey, debugState) {
         const todayDate = isoDateOffset(0);
+        if (!isWeekdayIsoDate(todayDate)) {
+            pushDebug(debugState, 'Square mode skipped: weekend day');
+            return false;
+        }
+
         let todayData = await fetchMenuData(settings, todayDate, false, debugState);
         const shouldProbeFallbackToday = (!todayData || todayData.__serverDataAvailable !== false) && settings.maxFallbackDaysAhead > 0;
         if ((!todayData || !hasAnyMeals(todayData)) && shouldProbeFallbackToday) {
-            const fallbackToday = await findNextMenuWithMeals(settings, 1, settings.maxFallbackDaysAhead, debugState);
-            if (fallbackToday) {
-                todayData = fallbackToday;
+            const tomorrowDate = isoDateShift(todayDate, 1);
+            if (isWeekdayIsoDate(tomorrowDate)) {
+                const fallbackTomorrow = await fetchMenuData(settings, tomorrowDate, true, debugState);
+                if (fallbackTomorrow && hasAnyMeals(fallbackTomorrow)) {
+                    todayData = fallbackTomorrow;
+                }
             }
         }
 
         const effectiveTodayDate = String(todayData?.menu_date || todayDate).trim() || todayDate;
         const effectiveTomorrowDate = isoDateShift(effectiveTodayDate, 1);
         const tomorrowData = settings.showTomorrowInSquare !== false
-            ? await fetchMenuData(settings, effectiveTomorrowDate, true, debugState)
+            ? (isWeekdayIsoDate(effectiveTomorrowDate)
+                ? await fetchMenuData(settings, effectiveTomorrowDate, true, debugState)
+                : null)
             : null;
 
         if (!todayData && !tomorrowData) {

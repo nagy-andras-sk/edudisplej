@@ -316,6 +316,7 @@ function edudisplej_maintenance_ensure_settings_table(mysqli $conn): void {
         'jedalen_sync_enabled' => '1',
         'jedalen_sync_window_start' => '0',
         'jedalen_sync_window_end' => '5',
+        'jedalen_sync_slots' => '06:00,12:00,18:00',
         'jedalen_sync_regions' => 'TT,NR,TN,BB,PO,KE,BA,ZA',
         'jedalen_sync_every_cycle' => '0',
     ];
@@ -379,10 +380,26 @@ function edudisplej_maintenance_get_jedalen_sync_config(mysqli $conn): array {
         $regions = ['TT' => true, 'NR' => true, 'TN' => true, 'BB' => true, 'PO' => true, 'KE' => true, 'BA' => true, 'ZA' => true];
     }
 
+    $slotsRaw = (string)($map['jedalen_sync_slots'] ?? '06:00,12:00,18:00');
+    $slots = [];
+    foreach (explode(',', $slotsRaw) as $part) {
+        $token = trim($part);
+        if (!preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/', $token, $matches)) {
+            continue;
+        }
+        $slots[] = sprintf('%02d:%02d', (int)$matches[1], (int)$matches[2]);
+    }
+    $slots = array_values(array_unique($slots));
+    sort($slots);
+    if (empty($slots)) {
+        $slots = ['06:00', '12:00', '18:00'];
+    }
+
     return [
         'enabled' => $enabled,
         'window_start' => $windowStart,
         'window_end' => $windowEnd,
+        'slots' => $slots,
         'regions' => array_values(array_keys($regions)),
         'every_cycle' => in_array(strtolower(trim((string)($map['jedalen_sync_every_cycle'] ?? '0'))), ['1', 'true', 'yes', 'on'], true),
     ];
@@ -623,27 +640,51 @@ function edudisplej_maintenance_should_run_jedalen_today(mysqli $conn, string $j
         return ['run' => false, 'reason' => 'disabled', 'last_run_at' => null];
     }
 
+    $weekday = (int)date('N');
+    if ($weekday < 1 || $weekday > 5) {
+        return ['run' => false, 'reason' => 'weekend', 'last_run_at' => null];
+    }
+
+    $slots = array_values(array_filter(array_map('strval', (array)($syncConfig['slots'] ?? ['06:00', '12:00', '18:00']))));
+    if (empty($slots)) {
+        $slots = ['06:00', '12:00', '18:00'];
+    }
+
+    $now = new DateTimeImmutable('now');
+    $currentMinutes = ((int)$now->format('H')) * 60 + (int)$now->format('i');
+    $activeSlot = null;
+    foreach ($slots as $slot) {
+        if (!preg_match('/^(\d{2}):(\d{2})$/', $slot, $m)) {
+            continue;
+        }
+        $slotMinutes = ((int)$m[1]) * 60 + (int)$m[2];
+        if ($currentMinutes >= $slotMinutes && $currentMinutes < ($slotMinutes + 60)) {
+            $activeSlot = $slot;
+            break;
+        }
+    }
+
+    if ($activeSlot === null) {
+        return ['run' => false, 'reason' => 'outside_slot_window', 'last_run_at' => null];
+    }
+
+    $slotJobKey = $jobKey . '_' . $now->format('Ymd') . '_' . str_replace(':', '', $activeSlot);
+
     $stmt = $conn->prepare("SELECT last_run_at FROM maintenance_job_runs WHERE job_key = ? LIMIT 1");
     if (!$stmt) {
-        return ['run' => true, 'reason' => 'no_state_read', 'last_run_at' => null];
+        return ['run' => true, 'reason' => 'no_state_read', 'last_run_at' => null, 'slot' => $activeSlot, 'slot_job_key' => $slotJobKey];
     }
-    $stmt->bind_param('s', $jobKey);
+    $stmt->bind_param('s', $slotJobKey);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
     if (!$row || empty($row['last_run_at'])) {
-        return ['run' => true, 'reason' => 'first_run', 'last_run_at' => null];
+        return ['run' => true, 'reason' => 'first_run_in_slot', 'last_run_at' => null, 'slot' => $activeSlot, 'slot_job_key' => $slotJobKey];
     }
 
     $lastRunAt = (string)$row['last_run_at'];
-    $lastRunDate = date('Y-m-d', strtotime((string)$row['last_run_at']));
-    $today = date('Y-m-d');
-    if ($lastRunDate === $today) {
-        return ['run' => false, 'reason' => 'already_ran_today', 'last_run_at' => $lastRunAt];
-    }
-
-    return ['run' => true, 'reason' => 'new_day', 'last_run_at' => $lastRunAt];
+    return ['run' => false, 'reason' => 'already_ran_in_slot', 'last_run_at' => $lastRunAt, 'slot' => $activeSlot, 'slot_job_key' => $slotJobKey];
 }
 
 function edudisplej_maintenance_should_force_jedalen_sync_for_missing_data(mysqli $conn, array $targets): array {
@@ -2442,6 +2483,7 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
 
     $everyCycle = !empty($syncConfig['every_cycle']);
     $dailyGate = edudisplej_maintenance_should_run_jedalen_today($conn, $jobKey, $syncConfig);
+    $effectiveJobKey = (string)($dailyGate['slot_job_key'] ?? $jobKey);
 
     $linkedInstitutionIds = [];
     $linkedGroupIds = [];
@@ -2510,7 +2552,8 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
         logResult('Jedalen sync skipped: daily gate blocked run (' . (string)($dailyGate['reason'] ?? 'unknown') . '), last daily run: ' . $lastDailyRunAt . '.', 'info');
         return;
     } else {
-        logResult('Jedalen sync: daily run started (' . (string)($dailyGate['reason'] ?? 'scheduled') . ').', 'info');
+        $slotLabel = (string)($dailyGate['slot'] ?? 'n/a');
+        logResult('Jedalen sync: scheduled run started (' . (string)($dailyGate['reason'] ?? 'scheduled') . ', slot: ' . $slotLabel . ').', 'info');
     }
 
     try {
@@ -2816,11 +2859,11 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
             . ", stored 0 days: $institutionsStoredZero"
             . ", skipped unsupported targets: $institutionsSkippedUnsupported"
             . ", missing institution config: $institutionsMissingConfig";
-        edudisplej_maintenance_mark_job_run($conn, $jobKey, 'success', $message);
+        edudisplej_maintenance_mark_job_run($conn, $effectiveJobKey, 'success', $message);
         logResult('Meal sync completed: ' . $message, 'success');
     } catch (Throwable $e) {
         $message = 'Meal sync failed: ' . $e->getMessage();
-        edudisplej_maintenance_mark_job_run($conn, $jobKey, 'error', $message);
+        edudisplej_maintenance_mark_job_run($conn, $effectiveJobKey, 'error', $message);
         logError($message);
     }
 }

@@ -20,6 +20,25 @@ try {
         throw new Exception('Invalid JSON data');
     }
 
+    $conn->query("CREATE TABLE IF NOT EXISTS kiosk_install_progress (
+        kiosk_id INT NOT NULL,
+        company_id INT NOT NULL,
+        phase VARCHAR(120) NOT NULL DEFAULT 'unknown',
+        step INT NOT NULL DEFAULT 0,
+        total INT NOT NULL DEFAULT 0,
+        percent INT NOT NULL DEFAULT 0,
+        state VARCHAR(40) NOT NULL DEFAULT 'running',
+        message VARCHAR(500) NULL,
+        eta_seconds INT NULL,
+        payload_json LONGTEXT NULL,
+        reported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (kiosk_id),
+        KEY idx_company_id (company_id),
+        KEY idx_state (state),
+        KEY idx_reported_at (reported_at),
+        CONSTRAINT fk_kiosk_install_progress_kiosk FOREIGN KEY (kiosk_id) REFERENCES kiosks(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     $kiosk_node = is_array($data['kiosk'] ?? null) ? $data['kiosk'] : [];
 
     $device_id = trim((string)($kiosk_node['device_id'] ?? $data['device_id'] ?? ''));

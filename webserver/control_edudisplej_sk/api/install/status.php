@@ -30,6 +30,16 @@ try {
 
     api_require_company_match($api_company, $kiosk['company_id'], 'Unauthorized');
 
+    $table_exists = $conn->query("SHOW TABLES LIKE 'kiosk_install_progress'");
+    if (!$table_exists || $table_exists->num_rows === 0) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'No install progress available for this kiosk',
+            'kiosk_id' => $kiosk_id
+        ]);
+        exit;
+    }
+
     $stmt = $conn->prepare('
         SELECT kiosk_id, phase, step, total, percent, state, message, eta_seconds, payload_json, reported_at
         FROM kiosk_install_progress

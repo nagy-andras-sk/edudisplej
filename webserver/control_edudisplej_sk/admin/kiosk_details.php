@@ -16,6 +16,8 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['
 $kiosk_id = (int)($_GET['id'] ?? 0);
 $kiosk = null;
 $logs = [];
+$install_progress = null;
+$install_progress_stale = false;
 
 if ($kiosk_id > 0) {
     try {
@@ -43,6 +45,24 @@ if ($kiosk_id > 0) {
             $stmt->close();
         }
 
+        if ($kiosk) {
+            $table_exists = $conn->query("SHOW TABLES LIKE 'kiosk_install_progress'");
+            if ($table_exists && $table_exists->num_rows > 0) {
+                $stmt = $conn->prepare("SELECT phase, step, total, percent, state, message, eta_seconds, reported_at FROM kiosk_install_progress WHERE kiosk_id = ? LIMIT 1");
+                $stmt->bind_param("i", $kiosk_id);
+                $stmt->execute();
+                $install_progress = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                if ($install_progress && ($install_progress['state'] ?? '') === 'running' && !empty($install_progress['reported_at'])) {
+                    $reported_ts = strtotime((string)$install_progress['reported_at']);
+                    if ($reported_ts !== false && (time() - $reported_ts) > 900) {
+                        $install_progress_stale = true;
+                    }
+                }
+            }
+        }
+
         closeDbConnection($conn);
     } catch (Exception $e) {
         error_log($e->getMessage());
@@ -55,7 +75,7 @@ if (!$kiosk) {
 }
 
 // Load latest system version from versions.json
-$latest_system_version = '1.0.0';
+$latest_system_version = '1.1.0';
 $versions_file = dirname(__DIR__) . '/install/init/versions.json';
 if (file_exists($versions_file)) {
     $versions_data = json_decode(file_get_contents($versions_file), true);
@@ -141,6 +161,30 @@ include 'header.php';
             </tbody>
         </table>
     </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">Core update állapot</div>
+    <?php if ($install_progress): ?>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr><th>Fázis</th><td><?php echo htmlspecialchars((string)($install_progress['phase'] ?? '-')); ?></td></tr>
+                    <tr><th>Állapot</th><td><?php echo htmlspecialchars((string)($install_progress['state'] ?? '-')); ?></td></tr>
+                    <tr><th>Előrehaladás</th><td><?php echo (int)($install_progress['percent'] ?? 0); ?>% (<?php echo (int)($install_progress['step'] ?? 0); ?>/<?php echo (int)($install_progress['total'] ?? 0); ?>)</td></tr>
+                    <tr><th>Üzenet</th><td><?php echo htmlspecialchars((string)($install_progress['message'] ?? '-')); ?></td></tr>
+                    <tr><th>Jelentve</th><td><?php echo !empty($install_progress['reported_at']) ? date('Y-m-d H:i:s', strtotime((string)$install_progress['reported_at'])) : '-'; ?></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <?php if ($install_progress_stale): ?>
+            <div style="margin-top:10px;color:#b91c1c;font-weight:600;">
+                ⚠ Lehetséges elakadás: a telepítési státusz több mint 15 perce nem frissült.
+            </div>
+        <?php endif; ?>
+    <?php else: ?>
+        <div class="muted">Nincs telepítési/core update státusz jelentés.</div>
+    <?php endif; ?>
 </div>
 
 <div class="panel">

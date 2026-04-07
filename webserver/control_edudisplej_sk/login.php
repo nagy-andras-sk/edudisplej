@@ -14,6 +14,49 @@ require_once 'auth_roles.php';
 require_once 'security_config.php';
 require_once 'email_helper.php';
 
+function edudisplej_password_is_strong(string $password): bool {
+    if (strlen($password) < 8) {
+        return false;
+    }
+    if (!preg_match('/[a-z]/', $password)) {
+        return false;
+    }
+    if (!preg_match('/[A-Z]/', $password)) {
+        return false;
+    }
+    if (!preg_match('/[^a-zA-Z0-9]/', $password)) {
+        return false;
+    }
+    return true;
+}
+
+function edudisplej_user_has_pending_activation(mysqli $conn, int $userId): bool {
+    if ($userId <= 0) {
+        return false;
+    }
+
+    $checkTable = $conn->query("SHOW TABLES LIKE 'user_email_activation'");
+    if (!$checkTable || $checkTable->num_rows === 0) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("SELECT verified_at FROM user_email_activation WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        return false;
+    }
+
+    return empty($row['verified_at']);
+}
+
 $script_name = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
 if (preg_match('~/login\.php$~i', $script_name)) {
     $base_dir = rtrim(dirname($script_name), '/');
@@ -147,8 +190,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($token_val)) {
             $error = t_def('password_reset.error.invalid_token', 'Érvénytelen token.');
-        } elseif (strlen($new_pass) < 8) {
-            $error = t_def('password_reset.error.password_short', 'A jelszónak legalább 8 karakter hosszúnak kell lennie.');
+        } elseif (!edudisplej_password_is_strong($new_pass)) {
+            $error = t_def('password_reset.error.password_policy', 'Heslo musi mat aspon 8 znakov, jedno male, jedno velke pismeno a jeden specialny znak.');
         } elseif ($new_pass !== $confirm_pass) {
             $error = t_def('password_reset.error.password_mismatch', 'A jelszavak nem egyeznek.');
         } else {
@@ -226,8 +269,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 
                 // Verify password
                 if (password_verify($password, $user['password'])) {
-                    // Check if OTP is enabled
-                    if ($user['otp_enabled'] && $user['otp_verified']) {
+                    if (edudisplej_user_has_pending_activation($conn, (int)$user['id'])) {
+                        $error = t_def('login.error.activation_required', 'Ucet este nie je aktivovany. Dokoncite aktivaciu cez emailovy kod.');
+                        $log_username = $user['username'] ?: ($user['email'] ?? $email);
+                        log_security_event('failed_login', null, $log_username, get_client_ip(), get_user_agent(), ['reason' => 'activation_required']);
+                    } elseif ($user['otp_enabled'] && $user['otp_verified']) {
                         if (empty($otp_code)) {
                             // OTP required but not provided
                             // Store encrypted temporary token instead of user_id

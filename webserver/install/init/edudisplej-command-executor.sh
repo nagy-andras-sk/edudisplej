@@ -24,14 +24,20 @@ TOKEN_FILE="${CONFIG_DIR}/lic/token"
 LOG_DIR="${CONFIG_DIR}/logs"
 LOG_FILE="${LOG_DIR}/command_executor.log"
 LOOP_FILE="${CONFIG_DIR}/localweb/modules/loop.json"
+LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
 LOCAL_POWER_STATE_FILE="${DATA_DIR}/local_display_power_state"
+OFFLINE_STATUS_FILE="${LOCAL_WEB_DIR}/offline_status.json"
 COMMAND_TIMEOUT=300  # 5 minutes timeout per command
 DEBUG="${EDUDISPLEJ_DEBUG:-false}"
 COMMAND_POLL_INTERVAL="${EDUDISPLEJ_COMMAND_POLL_INTERVAL:-30}"
 SCHEDULE_ENFORCE_INTERVAL="${EDUDISPLEJ_SCHEDULE_ENFORCE_INTERVAL:-5}"
+OFFLINE_CHECK_INTERVAL="${EDUDISPLEJ_OFFLINE_CHECK_INTERVAL:-60}"
+OFFLINE_FAIL_THRESHOLD="${EDUDISPLEJ_OFFLINE_FAIL_THRESHOLD:-20}"
+DISPLAY_WAKE_KEEPALIVE_SEC="${EDUDISPLEJ_DISPLAY_WAKE_KEEPALIVE_SEC:-300}"
+DISPLAY_OFF_ENFORCE_SEC="${EDUDISPLEJ_DISPLAY_OFF_ENFORCE_SEC:-60}"
 
 # Create directories
-mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
+mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR" "$LOCAL_WEB_DIR"
 
 # Logging functions
 log() {
@@ -310,6 +316,65 @@ report_command_result() {
     "output": $(echo -n "$output" | jq -Rs .),
     "error": $(echo -n "$error" | jq -Rs .)
 }
+
+write_offline_status() {
+    local active="$1"
+    local fail_count="$2"
+    local last_ok_epoch="$3"
+    local now_epoch
+    now_epoch=$(date +%s)
+
+    local last_ok_iso=""
+    if [ "$last_ok_epoch" -gt 0 ] 2>/dev/null; then
+        if date -d "@${last_ok_epoch}" '+%Y-%m-%d %H:%M:%S' >/dev/null 2>&1; then
+            last_ok_iso=$(date -d "@${last_ok_epoch}" '+%Y-%m-%d %H:%M:%S')
+        fi
+    fi
+
+    cat > "$OFFLINE_STATUS_FILE" <<EOF
+{
+  "active": ${active},
+  "message": "Server je momentalne nedostupny",
+  "failed_checks": ${fail_count},
+  "threshold": ${OFFLINE_FAIL_THRESHOLD},
+  "updated_at_epoch": ${now_epoch},
+  "last_ok_epoch": ${last_ok_epoch},
+  "last_ok_at": "${last_ok_iso}"
+}
+EOF
+}
+
+server_reachable() {
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 4 --max-time 8 "${API_BASE_URL}/" 2>/dev/null || echo "000")
+    [ "$http_code" != "000" ]
+}
+
+display_force_off() {
+    service_action stop edudisplej-kiosk.service || true
+    if command -v xset >/dev/null 2>&1; then
+        DISPLAY=:0 xset dpms force off >/dev/null 2>&1 || true
+    fi
+    if command -v vcgencmd >/dev/null 2>&1; then
+        vcgencmd display_power 0 >/dev/null 2>&1 || true
+    elif [ -x /opt/vc/bin/tvservice ]; then
+        /opt/vc/bin/tvservice -o >/dev/null 2>&1 || true
+    fi
+}
+
+display_force_on() {
+    if command -v vcgencmd >/dev/null 2>&1; then
+        vcgencmd display_power 1 >/dev/null 2>&1 || true
+    elif [ -x /opt/vc/bin/tvservice ]; then
+        /opt/vc/bin/tvservice -p >/dev/null 2>&1 || true
+    fi
+    if command -v xset >/dev/null 2>&1; then
+        DISPLAY=:0 xset dpms force on >/dev/null 2>&1 || true
+        DISPLAY=:0 xset -dpms >/dev/null 2>&1 || true
+        DISPLAY=:0 xset s off >/dev/null 2>&1 || true
+        DISPLAY=:0 xset s noblank >/dev/null 2>&1 || true
+    fi
+}
 EOF
 )
 
@@ -469,20 +534,13 @@ apply_local_schedule_mode() {
 
     if [ "$mode" = "TURNED_OFF" ]; then
         log "Local schedule mode switch: ACTIVE -> TURNED_OFF"
-        service_action stop edudisplej-kiosk.service || true
-        if command -v vcgencmd >/dev/null 2>&1; then
-            vcgencmd display_power 0 >/dev/null 2>&1 || true
-        elif [ -x /opt/vc/bin/tvservice ]; then
-            /opt/vc/bin/tvservice -o >/dev/null 2>&1 || true
-        fi
+        display_force_off
+        LAST_DISPLAY_OFF_EPOCH=0
     else
         log "Local schedule mode switch: TURNED_OFF -> ACTIVE"
-        if command -v vcgencmd >/dev/null 2>&1; then
-            vcgencmd display_power 1 >/dev/null 2>&1 || true
-        elif [ -x /opt/vc/bin/tvservice ]; then
-            /opt/vc/bin/tvservice -p >/dev/null 2>&1 || true
-        fi
+        display_force_on
         service_action restart edudisplej-kiosk.service || true
+        LAST_DISPLAY_WAKE_EPOCH=0
     fi
 
     echo "$mode" > "$LOCAL_POWER_STATE_FILE"
@@ -490,8 +548,54 @@ apply_local_schedule_mode() {
 
 enforce_local_schedule_power_state() {
     local mode
+    local now_ts
     mode=$(resolve_local_schedule_mode)
     apply_local_schedule_mode "$mode"
+
+    now_ts=$(date +%s)
+    if [ "$mode" = "TURNED_OFF" ]; then
+        if [ $((now_ts - LAST_DISPLAY_OFF_EPOCH)) -ge "$DISPLAY_OFF_ENFORCE_SEC" ]; then
+            display_force_off
+            LAST_DISPLAY_OFF_EPOCH=$now_ts
+        fi
+        return 0
+    fi
+
+    if [ $((now_ts - LAST_DISPLAY_WAKE_EPOCH)) -ge "$DISPLAY_WAKE_KEEPALIVE_SEC" ]; then
+        display_force_on
+        if ! systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
+            service_action restart edudisplej-kiosk.service || true
+        fi
+        LAST_DISPLAY_WAKE_EPOCH=$now_ts
+    fi
+}
+
+enforce_offline_status() {
+    local now_ts
+    now_ts=$(date +%s)
+
+    if [ $((now_ts - LAST_OFFLINE_CHECK_EPOCH)) -lt "$OFFLINE_CHECK_INTERVAL" ]; then
+        return 0
+    fi
+
+    LAST_OFFLINE_CHECK_EPOCH=$now_ts
+    if server_reachable; then
+        if [ "$OFFLINE_FAIL_COUNT" -ge "$OFFLINE_FAIL_THRESHOLD" ]; then
+            log "Server reachability restored, clearing offline overlay state"
+        fi
+        OFFLINE_FAIL_COUNT=0
+        LAST_SERVER_OK_EPOCH=$now_ts
+        write_offline_status false "$OFFLINE_FAIL_COUNT" "$LAST_SERVER_OK_EPOCH"
+        return 0
+    fi
+
+    OFFLINE_FAIL_COUNT=$((OFFLINE_FAIL_COUNT + 1))
+    log_error "Server reachability check failed (${OFFLINE_FAIL_COUNT}/${OFFLINE_FAIL_THRESHOLD})"
+    if [ "$OFFLINE_FAIL_COUNT" -ge "$OFFLINE_FAIL_THRESHOLD" ]; then
+        write_offline_status true "$OFFLINE_FAIL_COUNT" "$LAST_SERVER_OK_EPOCH"
+    else
+        write_offline_status false "$OFFLINE_FAIL_COUNT" "$LAST_SERVER_OK_EPOCH"
+    fi
 }
 
 # Main loop
@@ -557,9 +661,16 @@ trap 'log "Command Executor Service stopped"; exit 0' SIGTERM SIGINT
 
 # Main loop - enforce schedule frequently, poll commands on a slower interval
 last_command_poll=0
+LAST_OFFLINE_CHECK_EPOCH=0
+LAST_SERVER_OK_EPOCH=$(date +%s)
+OFFLINE_FAIL_COUNT=0
+LAST_DISPLAY_WAKE_EPOCH=0
+LAST_DISPLAY_OFF_EPOCH=0
+write_offline_status false 0 "$LAST_SERVER_OK_EPOCH"
 while true; do
     now_ts=$(date +%s)
     enforce_local_schedule_power_state
+    enforce_offline_status
 
     if [ $((now_ts - last_command_poll)) -ge "$COMMAND_POLL_INTERVAL" ]; then
         main

@@ -27,6 +27,16 @@ try {
         $company_id = intval($api_company['id']);
     }
 
+    $table_exists = $conn->query("SHOW TABLES LIKE 'kiosk_install_progress'");
+    if (!$table_exists || $table_exists->num_rows === 0) {
+        echo json_encode([
+            'success' => true,
+            'count' => 0,
+            'items' => []
+        ]);
+        exit;
+    }
+
     $query = '
         SELECT
             k.id AS kiosk_id,

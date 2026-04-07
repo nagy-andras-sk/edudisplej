@@ -985,7 +985,7 @@ create_unconfigured_page() {
     local unconfigured_page="${LOCAL_WEB_DIR}/unconfigured.html"
     cat > "$unconfigured_page" <<'UNCONFIG_EOF'
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="sk">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -1000,8 +1000,8 @@ create_unconfigured_page() {
 </head>
 <body>
     <div class="card">
-        <h1>Ez a kijelző még nincs konfigurálva</h1>
-        <p>Kérjük, rendeld hozzá a kijelzőt a vezérlőpultban.</p>
+        <h1>Tento displej este nie je nakonfigurovany</h1>
+        <p>Priradte prosim displej v administratorskom paneli.</p>
         <p class="small">EduDisplej • control.edudisplej.sk</p>
     </div>
 </body>
@@ -1020,7 +1020,7 @@ create_loop_player() {
     
     cat > "$LOOP_PLAYER" <<LOOP_PLAYER_EOF
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="sk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1119,6 +1119,41 @@ create_loop_player() {
             margin: 0;
             padding: 8px 10px;
         }
+
+        #offline-overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at top, #1f2937, #020617 65%);
+            color: #e2e8f0;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 11000;
+            text-align: center;
+            padding: 4vh 4vw;
+            gap: 2vh;
+        }
+
+        #offline-clock {
+            font-size: clamp(64px, 16vw, 180px);
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            line-height: 1;
+        }
+
+        #offline-date {
+            font-size: clamp(24px, 4.2vw, 56px);
+            opacity: 0.9;
+        }
+
+        #offline-warning {
+            margin-top: auto;
+            margin-bottom: 4vh;
+            font-size: clamp(24px, 2.8vw, 42px);
+            color: #fca5a5;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -1127,7 +1162,7 @@ create_loop_player() {
     </div>
     
     <div id="error-display">
-        <h2>⚠️ Hiba történt</h2>
+        <h2>⚠️ Nastala chyba</h2>
         <p id="error-message"></p>
         <pre id="error-details"></pre>
     </div>
@@ -1135,6 +1170,12 @@ create_loop_player() {
     <div id="debug-terminal">
         <div id="debug-terminal-header">DEBUG TERMINAL • sync.log</div>
         <pre id="debug-terminal-body"></pre>
+    </div>
+
+    <div id="offline-overlay">
+        <div id="offline-clock">--:--:--</div>
+        <div id="offline-date">--.--.----</div>
+        <div id="offline-warning">Server je momentalne nedostupny</div>
     </div>
     
     <script id="loop-config" type="application/json">
@@ -1156,6 +1197,13 @@ $loop_json
                 this.debugModeEnabled = false;
                 this.debugModeTimer = null;
                 this.debugLogTimer = null;
+                this.offlineOverlay = document.getElementById('offline-overlay');
+                this.offlineClock = document.getElementById('offline-clock');
+                this.offlineDate = document.getElementById('offline-date');
+                this.offlineWarning = document.getElementById('offline-warning');
+                this.offlineTimer = null;
+                this.clockTimer = null;
+                this.isOfflineActive = false;
                 this.enablePassiveConfigWatch = (window.EDUDISPLEJ_ENABLE_LOOP_WATCH === true);
                 
                 this.init();
@@ -1165,6 +1213,8 @@ $loop_json
                 this.log('Loop Player initializing...');
                 
                 try {
+                    this.startClock();
+                    this.startOfflineMonitor();
                     await this.loadLoopConfig();
 
                     const activeLoop = this.resolveActiveLoop(new Date());
@@ -1232,6 +1282,74 @@ $loop_json
                     if (!this.debugModeEnabled) return;
                     this.updateDebugLogTail().catch(() => {});
                 }, 3000);
+            }
+
+            startClock() {
+                if (this.clockTimer) {
+                    return;
+                }
+
+                const render = () => {
+                    const now = new Date();
+                    this.offlineClock.textContent = now.toLocaleTimeString('sk-SK', { hour12: false });
+                    this.offlineDate.textContent = now.toLocaleDateString('sk-SK', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                };
+
+                render();
+                this.clockTimer = setInterval(render, 1000);
+            }
+
+            startOfflineMonitor() {
+                if (this.offlineTimer) {
+                    return;
+                }
+
+                const poll = async () => {
+                    try {
+                        let response = await fetch(new URL('offline_status.json', window.location.href), { cache: 'no-store' });
+                        if (!response.ok) {
+                            response = await fetch('file:///opt/edudisplej/localweb/offline_status.json?ts=' + Date.now(), { cache: 'no-store' });
+                        }
+
+                        if (!response.ok) {
+                            this.setOfflineOverlay(false, null);
+                            return;
+                        }
+
+                        const payload = await response.json();
+                        this.setOfflineOverlay(!!payload.active, payload);
+                    } catch (error) {
+                        this.setOfflineOverlay(false, null);
+                    }
+                };
+
+                poll();
+                this.offlineTimer = setInterval(poll, 60000);
+            }
+
+            setOfflineOverlay(isActive, payload) {
+                if (this.isOfflineActive === isActive) {
+                    if (isActive && payload && payload.message) {
+                        this.offlineWarning.textContent = payload.message;
+                    }
+                    return;
+                }
+
+                this.isOfflineActive = isActive;
+                if (!isActive) {
+                    this.offlineOverlay.style.display = 'none';
+                    return;
+                }
+
+                this.offlineWarning.textContent = (payload && payload.message)
+                    ? payload.message
+                    : 'Server je momentalne nedostupny';
+                this.offlineOverlay.style.display = 'flex';
             }
 
             async checkDebugModeAndUpdate() {

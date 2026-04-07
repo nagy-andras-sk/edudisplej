@@ -236,7 +236,8 @@ try {
             COALESCE(k.debug_mode, 0) as debug_mode,
                 COALESCE(k.screenshot_interval_seconds, 3) as screenshot_interval_seconds,
                 k.screenshot_requested_until,
-                k.company_id, c.name as company_name, k.loop_last_update
+                k.company_id, c.name as company_name, k.loop_last_update,
+                k.version
            FROM kiosks k
            LEFT JOIN companies c ON k.company_id = c.id
           WHERE k.mac = ?"
@@ -507,6 +508,32 @@ try {
     $response['company_id']                = $kiosk['company_id'];
     $response['company_name']              = $kiosk['company_name'] ?? '';
     $response['needs_update']              = $need_update;
+
+    $kiosk_version_raw = trim((string)($kiosk['version'] ?? ''));
+    $latest_system_version = '1.1.0';
+    $versions_file = dirname(__DIR__, 3) . '/install/init/versions.json';
+    if (is_file($versions_file)) {
+        $versions_data = json_decode((string)file_get_contents($versions_file), true);
+        if (is_array($versions_data) && !empty($versions_data['system_version'])) {
+            $latest_system_version = trim((string)$versions_data['system_version']);
+        }
+    }
+
+    $core_update_required = false;
+    if ($kiosk_version_raw !== '' && $latest_system_version !== '') {
+        $core_update_required = version_compare($kiosk_version_raw, $latest_system_version, '<');
+    }
+
+    $response['current_system_version'] = $kiosk_version_raw;
+    $response['latest_system_version'] = $latest_system_version;
+    $response['core_update_required'] = $core_update_required;
+    $response['core_update'] = [
+        'required' => $core_update_required,
+        'scope' => 'core',
+        'current_version' => $kiosk_version_raw,
+        'target_version' => $latest_system_version,
+    ];
+
     if ($need_update) {
         $response['update_reason'] = $update_reason;
         $response['update_action'] = 'restart';

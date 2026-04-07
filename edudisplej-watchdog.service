@@ -1,0 +1,24 @@
+[Unit]
+Description=EduDisplej Watchdog Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=edudisplej
+Group=edudisplej
+ExecStart=/usr/bin/python3 /usr/local/bin/edudisplej_watchdog.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/edudisplej
+
+[Install]
+WantedBy=multi-user.target

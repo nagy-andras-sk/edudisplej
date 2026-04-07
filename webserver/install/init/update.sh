@@ -20,6 +20,30 @@ APT_COMMON_OPTS=(
     "-o" "Acquire::https::Timeout=30"
 )
 
+CORE_ONLY=false
+UPDATE_SOURCE="manual"
+TARGET_VERSION=""
+PROGRESS_API="https://control.edudisplej.sk/api/install/progress.php"
+PROGRESS_STEP=0
+PROGRESS_TOTAL=100
+CURRENT_PHASE="init"
+CURRENT_STATE="running"
+LAST_PROGRESS_MESSAGE="Initialization"
+
+for arg in "$@"; do
+    case "$arg" in
+        --core-only)
+            CORE_ONLY=true
+            ;;
+        --source=*)
+            UPDATE_SOURCE="${arg#*=}"
+            ;;
+        --target-version=*)
+            TARGET_VERSION="${arg#*=}"
+            ;;
+    esac
+done
+
 wait_for_apt_locks() {
     local timeout_seconds="${1:-180}"
     local waited=0
@@ -58,6 +82,86 @@ apt_install_missing() {
         apt-get -y "${APT_COMMON_OPTS[@]}" install "$package" < /dev/null >/dev/null 2>&1
 }
 
+get_config_json_value() {
+    local key="$1"
+    local config_file="${TARGET_DIR}/data/config.json"
+
+    if [ ! -f "$config_file" ]; then
+        echo ""
+        return 0
+    fi
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -r ".${key} // empty" "$config_file" 2>/dev/null || echo ""
+    else
+        grep -o '"'"${key}"'"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" | head -1 | cut -d'"' -f4
+    fi
+}
+
+report_progress() {
+    local phase="$1"
+    local state="$2"
+    local message="$3"
+    local step="$4"
+    local total="$5"
+    local percent="$6"
+
+    LAST_PROGRESS_MESSAGE="$message"
+    CURRENT_PHASE="$phase"
+    CURRENT_STATE="$state"
+    PROGRESS_STEP="$step"
+    PROGRESS_TOTAL="$total"
+
+    if [ "$percent" -lt 0 ]; then percent=0; fi
+    if [ "$percent" -gt 100 ]; then percent=100; fi
+
+    if [ -z "${API_TOKEN:-}" ]; then
+        return 0
+    fi
+
+    local kiosk_id
+    local device_id
+    local hostname
+    kiosk_id=$(get_config_json_value "kiosk_id")
+    device_id=$(get_config_json_value "device_id")
+    hostname=$(hostname 2>/dev/null || echo "unknown")
+
+    local payload
+    payload=$(cat <<EOF
+{
+  "phase": "${phase}",
+  "state": "${state}",
+  "message": "${message}",
+  "step": ${step},
+  "total": ${total},
+  "percent": ${percent},
+  "source": "${UPDATE_SOURCE}",
+  "scope": "core",
+  "core_only": ${CORE_ONLY},
+  "target_version": "${TARGET_VERSION}",
+  "kiosk": {
+    "kiosk_id": ${kiosk_id:-0},
+    "device_id": "${device_id}",
+    "hostname": "${hostname}"
+  }
+}
+EOF
+)
+
+    curl -s -X POST "$PROGRESS_API" \
+        -H "Authorization: Bearer ${API_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        --max-time 10 --connect-timeout 5 >/dev/null 2>&1 || true
+}
+
+on_update_error() {
+    local line_no="$1"
+    report_progress "$CURRENT_PHASE" "failed" "Hiba a core update közben (line ${line_no}): ${LAST_PROGRESS_MESSAGE}" "$PROGRESS_STEP" "$PROGRESS_TOTAL" "$PROGRESS_STEP"
+}
+
+trap 'on_update_error $LINENO' ERR
+
 # Kontrola root opravneni / Root jogok ellenorzese
 echo "[*] Kontrola opravneni root..."
 if [ "$(id -u)" -ne 0 ]; then
@@ -95,12 +199,15 @@ if [ -z "$API_TOKEN" ]; then
     exit 1
 fi
 
+report_progress "prepare" "running" "Core update indult" 2 100 2
+
 AUTH_HEADER=( -H "Authorization: Bearer ${API_TOKEN}" )
 echo "[*] Vytvaranie zalohy..."
 echo "    Zaloha: $BACKUP_DIR"
 
 # Vytvorenie zalohy / Biztonsagi mentes
 cp -r "$TARGET_DIR" "$BACKUP_DIR"
+report_progress "backup" "running" "Biztonsági mentés elkészült" 8 100 8
 
 # Kontrola ci server podporuje structure.json / Ellenorzes hogy a szerver tamogatja-e a structure.json-t
 echo "[*] Kontrolujem dostupnost structure.json..."
@@ -167,6 +274,8 @@ if [ "$USE_STRUCTURE" = true ]; then
     echo "Stahovanie: ${TOTAL_FILES} suborov"
     echo "=========================================="
     echo ""
+
+    report_progress "download_core" "running" "Core fájlok letöltése elkezdődött" 12 "$TOTAL_FILES" 12
     
     # Stiahnutie a inštalácia súborov podľa structure.json
     # Letoltes es telepites structure.json szerint
@@ -194,6 +303,7 @@ except:
         PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
         
         echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) ${SOURCE} -> ${DESTINATION}"
+        report_progress "download_core" "running" "Core fájl: ${SOURCE}" "$CURRENT_FILE" "$TOTAL_FILES" "$PERCENT"
         
         # Vytvorenie cieľového adresára / Cel konyvtar letrehozasa
         DEST_DIR=$(dirname "$DESTINATION")
@@ -300,6 +410,8 @@ else
     echo "Stahovanie: ${TOTAL_FILES} suborov"
     echo "=========================================="
     echo ""
+
+    report_progress "download_core" "running" "Core fájlok letöltése elkezdődött" 12 "$TOTAL_FILES" 12
     
     # Stiahnutie suborov / Fajlok letoltese
     while IFS=";" read -r NAME SIZE MODIFIED; do
@@ -309,6 +421,7 @@ else
         PERCENT=$((CURRENT_FILE * 100 / TOTAL_FILES))
         
         echo "[${CURRENT_FILE}/${TOTAL_FILES}] (${PERCENT}%) ${NAME} (${SIZE} bajtov)"
+        report_progress "download_core" "running" "Core fájl: ${NAME}" "$CURRENT_FILE" "$TOTAL_FILES" "$PERCENT"
         
         MAX_DOWNLOAD_ATTEMPTS=3
         DOWNLOAD_SUCCESS=false
@@ -375,6 +488,8 @@ else
     # Ensure config.json is readable by screenshot service
     [ -f "${TARGET_DIR}/data/config.json" ] && chmod 644 "${TARGET_DIR}/data/config.json"
 fi
+
+report_progress "services" "running" "Service telepítés és restart" 75 100 75
 
 # ============================================================================
 # SERVICE INSTALLATION / SZOLGALTATASOK TELEPITESE
@@ -517,6 +632,12 @@ install_services
 # REFRESH LOOP PLAYER / LOOP LEJATSZO FRISSITESE
 # ============================================================================
 
+if [ "$CORE_ONLY" = true ]; then
+    echo ""
+    echo "[*] Core-only mod: modul/content frissites kihagyva"
+    report_progress "core_only" "running" "Core-only mód: tartalomfrissítés kihagyva" 82 100 82
+else
+
 echo ""
 echo "=========================================="
 echo "[*] Modulok frissitese es loop player ujrageneralasa"
@@ -543,6 +664,8 @@ if [ -f "$TERMINAL_SCRIPT" ]; then
     nohup "$TERMINAL_SCRIPT" >/opt/edudisplej/logs/update_terminal_script.log 2>&1 &
 else
     echo "[!] Nem talalhato: $TERMINAL_SCRIPT"
+fi
+
 fi
 
 echo ""
@@ -591,6 +714,8 @@ else
     echo "[!] Ziadne sluzby edudisplej nenajdene"
     echo "[!] Mozno je potrebny manualy restart"
 fi
+
+report_progress "restart" "running" "Core szolgáltatások újraindítva" 96 100 96
 
 # ============================================================================
 # ENSURE DATA DIRECTORY EXISTS / OVERENIE EXISTENCIE DATA ADRESARA
@@ -686,3 +811,9 @@ echo ""
 echo "Stary backup mozete zmazat pomocou:"
 echo "  sudo rm -rf $BACKUP_DIR"
 echo ""
+
+if [ -n "$TARGET_VERSION" ]; then
+    echo "$TARGET_VERSION" > "${TARGET_DIR}/VERSION" 2>/dev/null || true
+fi
+
+report_progress "completed" "completed" "Core update sikeresen lefutott" 100 100 100

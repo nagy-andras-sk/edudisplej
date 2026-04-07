@@ -58,6 +58,12 @@ LOOP_CHECK_NEEDS_UPDATE="false"
 LAST_SCREENSHOT_STATUS="not_run"
 CYCLE_REFRESH_DONE="false"
 LAST_SERVICE_UPDATE_CHECK_EPOCH=0
+CORE_UPDATE_REQUIRED="false"
+CORE_UPDATE_TARGET_VERSION=""
+CORE_UPDATE_CURRENT_VERSION=""
+CORE_UPDATE_LOCK_DIR="/tmp/edudisplej_core_update.lock"
+CORE_UPDATE_LAST_ATTEMPT_FILE="/tmp/edudisplej_core_update.last_attempt"
+CORE_UPDATE_RETRY_COOLDOWN="${EDUDISPLEJ_CORE_UPDATE_RETRY_COOLDOWN:-1800}"
 
 # Create directories
 mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
@@ -629,12 +635,85 @@ sync_hw_data() {
                 LOOP_CHECK_NEEDS_UPDATE="true"
             fi
         fi
+
+        CORE_UPDATE_REQUIRED=$(json_get "$response" "core_update_required")
+        CORE_UPDATE_TARGET_VERSION=$(json_get "$response" "latest_system_version")
+        CORE_UPDATE_CURRENT_VERSION=$(json_get "$response" "current_system_version")
+
+        [ -z "$CORE_UPDATE_REQUIRED" ] && CORE_UPDATE_REQUIRED="false"
+        [ "$CORE_UPDATE_TARGET_VERSION" = "null" ] && CORE_UPDATE_TARGET_VERSION=""
+        [ "$CORE_UPDATE_CURRENT_VERSION" = "null" ] && CORE_UPDATE_CURRENT_VERSION=""
+
+        if [ "$CORE_UPDATE_REQUIRED" = "true" ]; then
+            log "⬆️ Core update required: ${CORE_UPDATE_CURRENT_VERSION:-unknown} -> ${CORE_UPDATE_TARGET_VERSION:-unknown}"
+        else
+            log_debug "Core update not required"
+        fi
         
         return 0
     else
         log_error "HW data sync failed: $response"
         return 1
     fi
+}
+
+trigger_core_update_if_needed() {
+    if [ "$CORE_UPDATE_REQUIRED" != "true" ]; then
+        return 0
+    fi
+
+    if [ -z "$CORE_UPDATE_TARGET_VERSION" ]; then
+        log_error "Core update required but target version missing"
+        return 1
+    fi
+
+    if ! mkdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null; then
+        log_debug "Core update lock active, another update run is in progress"
+        return 0
+    fi
+
+    local unlock_needed=1
+    local now_epoch
+    now_epoch=$(date +%s)
+
+    if [ -f "$CORE_UPDATE_LAST_ATTEMPT_FILE" ]; then
+        local last_attempt
+        last_attempt=$(cat "$CORE_UPDATE_LAST_ATTEMPT_FILE" 2>/dev/null || echo 0)
+        if [[ "$last_attempt" =~ ^[0-9]+$ ]]; then
+            local elapsed=$((now_epoch - last_attempt))
+            if [ "$elapsed" -lt "$CORE_UPDATE_RETRY_COOLDOWN" ]; then
+                log "⏳ Core update retry cooldown active (${elapsed}s/${CORE_UPDATE_RETRY_COOLDOWN}s), skipping this cycle"
+                rmdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null || true
+                return 0
+            fi
+        fi
+    fi
+
+    echo "$now_epoch" > "$CORE_UPDATE_LAST_ATTEMPT_FILE" 2>/dev/null || true
+
+    local update_script="${CONFIG_DIR}/init/update.sh"
+    local update_log="${LOG_DIR}/core_update.log"
+
+    if [ ! -x "$update_script" ]; then
+        log_error "Core update script missing or not executable: $update_script"
+        rmdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null || true
+        return 1
+    fi
+
+    log "🚀 Starting core-only self-update (${CORE_UPDATE_CURRENT_VERSION:-unknown} -> ${CORE_UPDATE_TARGET_VERSION})"
+    if bash "$update_script" --core-only --source=auto-sync --target-version="$CORE_UPDATE_TARGET_VERSION" >> "$update_log" 2>&1; then
+        log_success "✅ Core-only self-update finished"
+        rmdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null || true
+        unlock_needed=0
+        return 0
+    fi
+
+    log_error "❌ Core-only self-update failed (see $update_log)"
+
+    if [ "$unlock_needed" -eq 1 ]; then
+        rmdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null || true
+    fi
+    return 1
 }
 
 # Check loop changes and update modules if needed
@@ -979,6 +1058,9 @@ EOF
         # Update sync interval from server
         if sync_hw_data; then
             log "Sync interval: ${SYNC_INTERVAL}s"
+            if ! trigger_core_update_if_needed; then
+                log_error "Core update attempt failed (non-critical for current sync cycle)"
+            fi
         fi
         
         # Always check for loop updates if we have a device_id
