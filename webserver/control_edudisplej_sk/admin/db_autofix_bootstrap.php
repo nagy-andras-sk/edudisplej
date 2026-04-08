@@ -191,6 +191,34 @@ function edudisplej_db_autofix_run(): void {
             CONSTRAINT archived_users_restored_by_fk FOREIGN KEY (restored_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
             CONSTRAINT archived_users_restored_user_fk FOREIGN KEY (restored_user_id) REFERENCES users(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $conn->query("CREATE TABLE IF NOT EXISTS archived_kiosks (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            original_kiosk_id INT NULL,
+            company_id INT NULL,
+            hostname VARCHAR(255) NULL,
+            friendly_name VARCHAR(255) NULL,
+            device_id VARCHAR(255) NULL,
+            mac VARCHAR(32) NULL,
+            public_ip VARCHAR(64) NULL,
+            status VARCHAR(32) NULL,
+            location VARCHAR(255) NULL,
+            comment TEXT NULL,
+            version VARCHAR(64) NULL,
+            screen_resolution VARCHAR(64) NULL,
+            sync_interval INT NULL,
+            license_active TINYINT(1) NOT NULL DEFAULT 0,
+            snapshot_json LONGTEXT NULL,
+            archived_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            archived_by_user_id INT NULL,
+            archive_reason VARCHAR(64) NOT NULL DEFAULT 'manual_delete',
+            archive_note TEXT NULL,
+            INDEX idx_archived_at (archived_at),
+            INDEX idx_original_kiosk (original_kiosk_id),
+            INDEX idx_company (company_id),
+            INDEX idx_hostname (hostname),
+            CONSTRAINT archived_kiosks_company_fk FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL,
+            CONSTRAINT archived_kiosks_archived_by_fk FOREIGN KEY (archived_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
         $conn->query("CREATE TABLE IF NOT EXISTS kiosk_migrations (
             id INT AUTO_INCREMENT PRIMARY KEY,

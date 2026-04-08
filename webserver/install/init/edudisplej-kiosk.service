@@ -4,6 +4,9 @@ Documentation=https://github.com/nagy-andras-sk/edudisplej
 After=network-online.target systemd-user-sessions.service
 Wants=network-online.target
 Conflicts=getty@tty1.service
+OnFailure=getty@tty1.service
+StartLimitIntervalSec=120
+StartLimitBurst=4
 
 [Service]
 Type=simple
@@ -30,8 +33,6 @@ ExecStart=/opt/edudisplej/init/kiosk-start.sh
 # Restart policy
 Restart=on-failure
 RestartSec=8
-StartLimitIntervalSec=120
-StartLimitBurst=4
 
 # Security and resource limits
 # Allow access to graphics and input devices

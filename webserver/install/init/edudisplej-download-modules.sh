@@ -1036,7 +1036,7 @@ create_loop_player() {
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            background: #000;
+            background: linear-gradient(180deg, #f8fbff 0%, #eaf2ff 100%);
             font-family: Arial, sans-serif;
         }
         
@@ -1051,7 +1051,7 @@ create_loop_player() {
             height: 100%;
             border: none;
             display: block;
-            background: #000;
+            background: #f8fbff;
         }
         
         #error-display {
@@ -1123,8 +1123,8 @@ create_loop_player() {
         #offline-overlay {
             position: fixed;
             inset: 0;
-            background: radial-gradient(circle at top, #1f2937, #020617 65%);
-            color: #e2e8f0;
+            background: radial-gradient(circle at top, #eff6ff, #dbeafe 65%);
+            color: #0f172a;
             display: none;
             flex-direction: column;
             justify-content: center;
@@ -1151,9 +1151,10 @@ create_loop_player() {
             margin-top: auto;
             margin-bottom: 4vh;
             font-size: clamp(24px, 2.8vw, 42px);
-            color: #fca5a5;
+            color: #1d4ed8;
             font-weight: 600;
         }
+
     </style>
 </head>
 <body>

@@ -164,8 +164,8 @@ create_startup_splash_page() {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: #0f1d3a;
-            color: #f8fbff;
+            background: #f7fbff;
+            color: #0f172a;
             font-family: 'Segoe UI', Arial, sans-serif;
         }
         .wrap {
@@ -176,31 +176,75 @@ create_startup_splash_page() {
             justify-content: center;
             flex-direction: column;
             gap: 18px;
-            background: radial-gradient(circle at center, #2c4b86 0%, #0f1d3a 72%);
+            background:
+                linear-gradient(135deg, rgba(14,165,233,0.14), rgba(59,130,246,0.18)),
+                radial-gradient(circle at center, #ffffff 0%, #dbeafe 70%, #bfdbfe 100%);
+            border: 16px solid #0f172a;
+            box-sizing: border-box;
         }
         .logo {
-            font-size: clamp(48px, 8vw, 128px);
-            font-weight: 700;
-            letter-spacing: 0.18em;
-            color: #ffffff;
-            text-shadow: 0 0 22px rgba(255,255,255,0.35);
+            font-size: clamp(54px, 8vw, 138px);
+            font-weight: 900;
+            letter-spacing: 0.12em;
+            color: #0f172a;
+            text-shadow: 0 4px 0 rgba(255,255,255,0.75);
         }
         .sub {
-            font-size: clamp(12px, 1.4vw, 22px);
-            opacity: 0.8;
+            font-size: clamp(14px, 1.6vw, 24px);
+            opacity: 0.95;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+        .chiprow {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        .chip {
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 2px solid #0f172a;
+            background: rgba(255,255,255,0.88);
+            font-size: 13px;
+            font-weight: 700;
             letter-spacing: 0.08em;
+        }
+        .footer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 18px 24px;
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            color: #0f172a;
+            background: rgba(255,255,255,0.65);
+            border-top: 2px solid rgba(15,23,42,0.2);
         }
     </style>
 </head>
 <body>
     <div class="wrap">
         <div class="logo">EDUDISPLEJ</div>
-        <div class="sub">KIOSK LOADING...</div>
+        <div class="sub">KIOSK LOADING... HDMI OUTPUT TEST</div>
+        <div class="chiprow">
+            <div class="chip">DISPLAY :0</div>
+            <div class="chip">PRIMARY HDMI</div>
+            <div class="chip">HIGH CONTRAST</div>
+        </div>
+    </div>
+    <div class="footer">
+        <div>Startup splash active</div>
+        <div>Target: ${target_url}</div>
     </div>
     <script>
         window.setTimeout(function () {
             window.location.replace('file://${target_url}');
-        }, 120);
+        }, 5000);
     </script>
 </body>
 </html>

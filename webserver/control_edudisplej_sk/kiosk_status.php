@@ -13,16 +13,31 @@ function kiosk_status_reference_time(array $kiosk): ?string
         $kiosk['last_heartbeat'] ?? null,
         $kiosk['heartbeat_at'] ?? null,
         $kiosk['health_timestamp'] ?? null,
+        $kiosk['screenshot_timestamp'] ?? null,
         $kiosk['timestamp'] ?? null,
     ];
 
+    $latestRaw = null;
+    $latestTs = null;
+
     foreach ($candidates as $candidate) {
-        if ($candidate !== null && $candidate !== '') {
-            return (string)$candidate;
+        if ($candidate === null || $candidate === '') {
+            continue;
+        }
+
+        $candidateRaw = (string)$candidate;
+        $candidateTs = strtotime($candidateRaw);
+        if ($candidateTs === false) {
+            continue;
+        }
+
+        if ($latestTs === null || $candidateTs > $latestTs) {
+            $latestTs = $candidateTs;
+            $latestRaw = $candidateRaw;
         }
     }
 
-    return null;
+    return $latestRaw;
 }
 
 function kiosk_upgrade_timed_out(array $kiosk, int $timeoutSeconds = KIOSK_UPGRADE_ERROR_TIMEOUT_SECONDS): bool

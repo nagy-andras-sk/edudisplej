@@ -147,6 +147,28 @@ apt_exec_with_stream() {
     return "$status"
 }
 
+repair_dpkg_state() {
+    print_warning "Checking dpkg state..."
+
+    set +e
+    env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a \
+        dpkg --configure -a >> "$APT_LOG" 2>&1
+    local dpkg_status=$?
+
+    env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none NEEDRESTART_MODE=a \
+        apt-get "${APT_COMMON_OPTS[@]}" -f install >> "$APT_LOG" 2>&1
+    local fix_status=$?
+    set -e
+
+    if [[ $dpkg_status -eq 0 && $fix_status -eq 0 ]]; then
+        print_success "dpkg state repaired"
+        return 0
+    fi
+
+    print_warning "dpkg repair returned non-zero (dpkg=${dpkg_status}, fix=${fix_status})"
+    return 1
+}
+
 # =============================================================================
 # Package Management Functions
 # =============================================================================
@@ -242,6 +264,9 @@ install_packages() {
         return 1
     fi
 
+    # Heal interrupted package state before any apt operation.
+    repair_dpkg_state || true
+
     show_installer_banner
     
     local total_steps=$((1 + ${#missing[@]}))
@@ -265,6 +290,7 @@ install_packages() {
                 break
             else
                 print_warning "APT update attempt ${attempt}/3 failed"
+                repair_dpkg_state || true
                 if [[ $attempt -lt 3 ]]; then
                     sleep 5
                 fi
@@ -306,6 +332,7 @@ install_packages() {
             report_install_status "install_package" "$current_step" "$total_steps" "running" "Installed package: $pkg" "$eta_seconds"
         else
             echo "⟳ Retrying: $pkg"
+            repair_dpkg_state || true
             sleep 2
             if apt_exec_with_stream 1200 install "$pkg"; then
                 ((installed_count++))

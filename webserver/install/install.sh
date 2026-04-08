@@ -886,13 +886,10 @@ else
     rm -f /etc/sudoers.d/edudisplej
 fi
 
-# Deaktivacia getty@tty1 - Disable getty
-if [ "$HARDWARE_PROFILE" = "raspberry" ]; then
-    systemctl disable getty@tty1.service 2>/dev/null || true
-    echo "[*] Raspberry profile: getty@tty1 disabled"
-else
-    echo "[*] Generic Debian profile: keeping getty@tty1 enabled for compatibility"
-fi
+# Keep getty@tty1 enabled as a safety fallback.
+# If kiosk startup fails, tty1 login remains recoverable instead of black screen lockout.
+systemctl enable getty@tty1.service 2>/dev/null || true
+echo "[*] Safety mode: keeping getty@tty1 enabled for local recovery"
 
 # ============================================================================
 # INITIALIZE CENTRALIZED DATA DIRECTORY / CENTRALIZOVANY DATOVY ADRESAR

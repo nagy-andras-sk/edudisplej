@@ -146,8 +146,8 @@ try {
     
     file_put_contents($filepath, $image_data);
     
-    // Update kiosk
-    $stmt = $conn->prepare("UPDATE kiosks SET screenshot_url = ?, screenshot_timestamp = NOW(), screenshot_requested = 0 WHERE mac = ?");
+    // Screenshot upload proves the device is reachable, so refresh live status markers too.
+    $stmt = $conn->prepare("UPDATE kiosks SET screenshot_url = ?, screenshot_timestamp = NOW(), screenshot_requested = 0, last_seen = NOW(), status = 'online' WHERE mac = ?");
     $relative_path = 'screenshots/' . $filename;
     $stmt->bind_param("ss", $relative_path, $mac);
     

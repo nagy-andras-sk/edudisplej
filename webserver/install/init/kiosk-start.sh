@@ -8,6 +8,10 @@ FLAG="/opt/edudisplej/.kiosk_system_configured"
 STARTUP_LOG="/tmp/kiosk-startup.log"
 RUN_USER="$(whoami)"
 RUN_UID="$(id -u "$RUN_USER" 2>/dev/null || echo 1000)"
+RUN_HOME="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+if [ -z "$RUN_HOME" ]; then
+    RUN_HOME="/home/$RUN_USER"
+fi
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$STARTUP_LOG"
@@ -49,8 +53,8 @@ cleanup_stale_x_state() {
         pgrep Xorg >/dev/null 2>&1 && pkill -9 Xorg 2>/dev/null || true
     fi
 
-    [ -f /tmp/.X0-lock ] && rm -f /tmp/.X0-lock
-    [ -S /tmp/.X11-unix/X0 ] && rm -f /tmp/.X11-unix/X0
+    [ -f /tmp/.X0-lock ] && rm -f /tmp/.X0-lock 2>/dev/null || true
+    [ -S /tmp/.X11-unix/X0 ] && rm -f /tmp/.X11-unix/X0 2>/dev/null || true
 }
 
 prepare_runtime_dirs() {
@@ -67,6 +71,14 @@ prepare_runtime_dirs() {
     chown "$RUN_USER:$RUN_USER" "$XDG_RUNTIME_DIR" 2>/dev/null || true
     rm -rf "$XDG_RUNTIME_DIR/dconf" 2>/dev/null || true
     export XDG_RUNTIME_DIR
+
+    # Ensure X authority file exists and is owned by runtime user.
+    if [ ! -f "$RUN_HOME/.Xauthority" ]; then
+        touch "$RUN_HOME/.Xauthority" 2>/dev/null || true
+    fi
+    chown "$RUN_USER:$RUN_USER" "$RUN_HOME/.Xauthority" 2>/dev/null || true
+    chmod 600 "$RUN_HOME/.Xauthority" 2>/dev/null || true
+    export XAUTHORITY="$RUN_HOME/.Xauthority"
 }
 
 start_x_session() {

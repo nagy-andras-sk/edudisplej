@@ -46,12 +46,12 @@ try {
 
     api_require_company_match($api_company, $kiosk_row['company_id'], 'Unauthorized');
 
-    // Update last_sync timestamp
+    // Successful sync indicates the kiosk is online now.
     if ($loop_last_update) {
-        $stmt = $conn->prepare("UPDATE kiosks SET last_sync = ?, loop_last_update = ? WHERE mac = ?");
+        $stmt = $conn->prepare("UPDATE kiosks SET last_sync = ?, loop_last_update = ?, last_seen = NOW(), status = 'online' WHERE mac = ?");
         $stmt->bind_param("sss", $last_sync, $loop_last_update, $mac);
     } else {
-        $stmt = $conn->prepare("UPDATE kiosks SET last_sync = ? WHERE mac = ?");
+        $stmt = $conn->prepare("UPDATE kiosks SET last_sync = ?, last_seen = NOW(), status = 'online' WHERE mac = ?");
         $stmt->bind_param("ss", $last_sync, $mac);
     }
     

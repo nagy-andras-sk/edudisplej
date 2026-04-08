@@ -87,49 +87,7 @@ if (file_exists($versions_file)) {
 $kiosk_version = $kiosk['version'] ?? null;
 $update_available = $kiosk_version !== null && version_compare($kiosk_version, $latest_system_version, '<');
 
-$can_hard_delete_kiosk = false;
-try {
-    $conn = getDbConnection();
-    $default_company_id = 0;
-
-    $default_stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'admin_default_company_id' LIMIT 1");
-    if ($default_stmt) {
-        $default_stmt->execute();
-        $default_row = $default_stmt->get_result()->fetch_assoc();
-        $default_stmt->close();
-        $default_company_id = (int)($default_row['setting_value'] ?? 0);
-    }
-
-    if ($default_company_id <= 0) {
-        $fallback_stmt = $conn->prepare("SELECT id FROM companies WHERE name IN ('Default Institution', 'Default Company') ORDER BY id ASC LIMIT 1");
-        if ($fallback_stmt) {
-            $fallback_stmt->execute();
-            $fallback_row = $fallback_stmt->get_result()->fetch_assoc();
-            $fallback_stmt->close();
-            $default_company_id = (int)($fallback_row['id'] ?? 0);
-        }
-    }
-
-    if ($default_company_id > 0) {
-        $kiosk_company_id = (int)($kiosk['company_id'] ?? 0);
-        $session_company_id = (int)($_SESSION['company_id'] ?? 0);
-        $acting_company_id = (int)($_SESSION['admin_acting_company_id'] ?? 0);
-
-        $is_default_kiosk = $kiosk_company_id === $default_company_id;
-        $scope_ok = true;
-        if ($session_company_id > 0 && $session_company_id !== $default_company_id) {
-            $scope_ok = false;
-        }
-        if ($acting_company_id > 0 && $acting_company_id !== $default_company_id) {
-            $scope_ok = false;
-        }
-
-        $can_hard_delete_kiosk = $is_default_kiosk && $scope_ok;
-    }
-    closeDbConnection($conn);
-} catch (Exception $e) {
-    error_log('kiosk_details hard-delete visibility: ' . $e->getMessage());
-}
+$can_archive_kiosk = true;
 
 include 'header.php';
 ?>
@@ -303,18 +261,18 @@ include 'header.php';
     </div>
 </div>
 
-<?php if ($can_hard_delete_kiosk): ?>
+<?php if ($can_archive_kiosk): ?>
 <div class="panel">
-    <div class="panel-title">Végleges törlés</div>
+    <div class="panel-title">Archiválás és törlés</div>
     <p style="font-size:13px;color:#b91c1c;margin-bottom:12px;">
-        Figyelem: ez a művelet végleges. A kijelző minden kapcsolódó adatával együtt törlődik (screenshotok, logok, parancsok stb.).
+        A kijelző adatai először archiválásra kerülnek, utána a kijelző és a kapcsolódó operatív adatok törlődnek.
     </p>
     <div>
-        <button id="btn-hard-delete" onclick="hardDeleteKiosk(<?php echo (int)$kiosk['id']; ?>, <?php echo htmlspecialchars(json_encode((string)($kiosk['friendly_name'] ?: $kiosk['hostname'] ?: ('#' . (int)$kiosk['id']))), ENT_QUOTES, 'UTF-8'); ?>)"
+        <button id="btn-archive-kiosk" onclick="archiveKiosk(<?php echo (int)$kiosk['id']; ?>, <?php echo htmlspecialchars(json_encode((string)($kiosk['friendly_name'] ?: $kiosk['hostname'] ?: ('#' . (int)$kiosk['id']))), ENT_QUOTES, 'UTF-8'); ?>)"
             style="background:#b91c1c;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">
-            🗑 Teljes törlés
+            🗂 Archiválás és törlés
         </button>
-        <span id="hard-delete-msg" style="margin-left:10px;font-size:13px;color:#555;"></span>
+        <span id="archive-kiosk-msg" style="margin-left:10px;font-size:13px;color:#555;"></span>
     </div>
 </div>
 <?php endif; ?>
@@ -507,28 +465,28 @@ function setScreenOffMode(kioskId, mode) {
     });
 }
 
-function hardDeleteKiosk(kioskId, kioskName) {
-    var msg = document.getElementById('hard-delete-msg');
-    var btn = document.getElementById('btn-hard-delete');
+function archiveKiosk(kioskId, kioskName) {
+    var msg = document.getElementById('archive-kiosk-msg');
+    var btn = document.getElementById('btn-archive-kiosk');
     var safeName = String(kioskName || ('#' + String(kioskId || '')));
 
-    var confirmText = 'Biztosan teljesen törlöd ezt a kijelzőt?\n\n'
+    var confirmText = 'Biztosan archiválod és törlöd ezt a kijelzőt?\n\n'
         + safeName
-        + '\n\nEz végleges: minden kapcsolódó log, screenshot és egyéb kioszk adat is törlődik.';
+        + '\n\nA kijelző mentése az archivumba kerül, majd a kapcsolódó operatív adatok törlődnek.';
 
     if (!confirm(confirmText)) {
         return;
     }
 
     if (msg) {
-        msg.textContent = 'Törlés folyamatban...';
+        msg.textContent = 'Archiválás folyamatban...';
         msg.style.color = '#555';
     }
     if (btn) {
         btn.disabled = true;
     }
 
-    fetch('../api/admin_hard_delete_kiosk.php', {
+    fetch('../api/admin_archive_kiosk.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({kiosk_id: kioskId})
@@ -537,7 +495,7 @@ function hardDeleteKiosk(kioskId, kioskName) {
     .then(function(data) {
         if (data && data.success) {
             if (msg) {
-                msg.textContent = '✓ Kijelző véglegesen törölve';
+                msg.textContent = '✓ Kijelző archiválva és törölve';
                 msg.style.color = '#166534';
             }
             setTimeout(function() {
@@ -545,7 +503,7 @@ function hardDeleteKiosk(kioskId, kioskName) {
             }, 700);
         } else {
             if (msg) {
-                msg.textContent = '⚠ Hiba: ' + ((data && data.message) ? data.message : 'Törlési hiba');
+                msg.textContent = '⚠ Hiba: ' + ((data && data.message) ? data.message : 'Archiválási hiba');
                 msg.style.color = '#b91c1c';
             }
             if (btn) {
