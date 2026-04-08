@@ -2968,6 +2968,7 @@ try {
                 'screenshot_url' => "text DEFAULT NULL",
                 'screenshot_enabled' => "tinyint(1) DEFAULT 1",
                 'debug_mode' => "tinyint(1) DEFAULT 0",
+                'screen_off_mode' => "varchar(20) DEFAULT 'signal_off'",
                 'screenshot_requested' => "tinyint(1) DEFAULT 0",
                 'screenshot_timestamp' => "timestamp NULL DEFAULT NULL",
                 'screenshot_requested_until' => "datetime DEFAULT NULL",

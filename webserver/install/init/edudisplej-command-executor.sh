@@ -243,6 +243,33 @@ execute_command() {
             fi
             ;;
 
+        display_black_screen)
+            log "Executing display black screen sequence..."
+            local black_errors=0
+
+            service_action stop edudisplej-kiosk.service || black_errors=$((black_errors + 1))
+
+            if command -v xsetroot >/dev/null 2>&1; then
+                DISPLAY=:0 xsetroot -solid black >/dev/null 2>&1 || black_errors=$((black_errors + 1))
+            fi
+
+            if command -v xset >/dev/null 2>&1; then
+                DISPLAY=:0 xset -dpms >/dev/null 2>&1 || true
+                DISPLAY=:0 xset s off >/dev/null 2>&1 || true
+                DISPLAY=:0 xset s noblank >/dev/null 2>&1 || true
+            fi
+
+            if [ "$black_errors" -eq 0 ]; then
+                output="Display black screen applied (browser stopped, Openbox kept running)"
+                log_success "$output"
+            else
+                output="Display black screen attempted with partial issues"
+                status="failed"
+                error="One or more black screen operations failed"
+                log_error "$error"
+            fi
+            ;;
+
         display_power_on)
             log "Executing display power ON sequence..."
             local on_errors=0

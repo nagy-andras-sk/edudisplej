@@ -206,6 +206,27 @@ include 'header.php';
 </div>
 
 <div class="panel">
+    <div class="panel-title">Screen off mode</div>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;">
+        Meghatározza, mi történjen éjszakai kijelző kikapcsoláskor.
+    </p>
+    <p style="font-size:13px;color:#555;margin-bottom:12px;">
+        Jelenlegi mód: <strong><?php echo htmlspecialchars((($kiosk['screen_off_mode'] ?? 'signal_off') === 'black_screen') ? 'Fekete képernyő' : 'Jel lekapcsolása'); ?></strong>
+    </p>
+    <div>
+        <button id="btn-screen-off-signal" onclick="setScreenOffMode(<?php echo (int)$kiosk['id']; ?>, 'signal_off')"
+            style="background:#1e40af;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;margin-right:8px;">
+            ⛔ Jel lekapcsolása
+        </button>
+        <button id="btn-screen-off-black" onclick="setScreenOffMode(<?php echo (int)$kiosk['id']; ?>, 'black_screen')"
+            style="background:#111827;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">
+            ⚫ Fekete képernyő
+        </button>
+        <span id="screen-off-mode-msg" style="margin-left:10px;font-size:13px;color:#555;"></span>
+    </div>
+</div>
+
+<div class="panel">
     <div class="panel-title">Verzió és frissítés</div>
     <div class="table-wrap">
         <table>
@@ -452,6 +473,35 @@ function setScreenshotEnabled(kioskId, enable) {
         }
     })
     .catch(function(e) {
+        msg.textContent = '⚠ Hálózati hiba';
+        msg.style.color = '#b91c1c';
+    });
+}
+
+function setScreenOffMode(kioskId, mode) {
+    var msg = document.getElementById('screen-off-mode-msg');
+    msg.textContent = 'Küldés...';
+    msg.style.color = '#555';
+
+    fetch('../api/update_screen_off_mode.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({kiosk_id: kioskId, screen_off_mode: mode})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            msg.textContent = mode === 'black_screen'
+                ? '✓ Fekete képernyő mód beállítva'
+                : '✓ Jel lekapcsolása mód beállítva';
+            msg.style.color = '#166534';
+            setTimeout(function() { window.location.reload(); }, 700);
+        } else {
+            msg.textContent = '⚠ Hiba: ' + (data.message || 'Ismeretlen hiba');
+            msg.style.color = '#b91c1c';
+        }
+    })
+    .catch(function() {
         msg.textContent = '⚠ Hálózati hiba';
         msg.style.color = '#b91c1c';
     });

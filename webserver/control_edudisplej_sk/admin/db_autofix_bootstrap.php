@@ -124,6 +124,7 @@ function edudisplej_db_autofix_run(): void {
             'license_active' => "ALTER TABLE kiosks ADD COLUMN license_active TINYINT(1) NOT NULL DEFAULT 1",
             'activated_at' => "ALTER TABLE kiosks ADD COLUMN activated_at DATETIME DEFAULT NULL",
             'debug_mode' => "ALTER TABLE kiosks ADD COLUMN debug_mode TINYINT(1) NOT NULL DEFAULT 0",
+            'screen_off_mode' => "ALTER TABLE kiosks ADD COLUMN screen_off_mode VARCHAR(20) NOT NULL DEFAULT 'signal_off'",
             'upgrade_started_at' => "ALTER TABLE kiosks ADD COLUMN upgrade_started_at DATETIME DEFAULT NULL"
         ];
 

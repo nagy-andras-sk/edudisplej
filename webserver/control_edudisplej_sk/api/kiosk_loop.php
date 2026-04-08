@@ -576,12 +576,13 @@ function edudisplej_kiosk_loop_requires_turned_off(array $loop_config): bool {
     return $has_turned_off;
 }
 
-function edudisplej_kiosk_loop_apply_terminal_power_mode(mysqli $conn, int $kiosk_id, bool $should_turn_off): array {
-    $turn_off_command = 'display_power_off';
+function edudisplej_kiosk_loop_apply_terminal_power_mode(mysqli $conn, int $kiosk_id, bool $should_turn_off, string $screen_off_mode = 'signal_off'): array {
+    $off_command = edudisplej_display_off_command_for_mode($screen_off_mode);
+    $turn_off_command = $off_command['command'] ?? 'display_power_off';
     $turn_on_command = 'display_power_on';
 
     $target_command = $should_turn_off ? $turn_off_command : $turn_on_command;
-    $target_command_type = $should_turn_off ? 'display_power_off' : 'display_power_on';
+    $target_command_type = $should_turn_off ? ($off_command['command_type'] ?? 'display_power_off') : 'display_power_on';
     $mode = $should_turn_off ? 'TURNED_OFF' : 'ACTIVE';
     $queued = false;
 
@@ -629,7 +630,7 @@ try {
     edudisplej_ensure_time_block_schema($conn);
     
     // Get kiosk by device_id
-    $stmt = $conn->prepare("SELECT id, device_id, company_id FROM kiosks WHERE device_id = ?");
+    $stmt = $conn->prepare("SELECT id, device_id, company_id, COALESCE(screen_off_mode, 'signal_off') AS screen_off_mode FROM kiosks WHERE device_id = ?");
     $stmt->bind_param("s", $device_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -1063,7 +1064,7 @@ try {
     $loop_last_update = edudisplej_pick_newer_timestamp($loop_last_update, $meal_prefetch_latest) ?? $loop_last_update;
     
     $should_turn_off = edudisplej_kiosk_loop_requires_turned_off($loop_config);
-    $terminal_state = edudisplej_kiosk_loop_apply_terminal_power_mode($conn, (int)$kiosk_id, $should_turn_off);
+    $terminal_state = edudisplej_kiosk_loop_apply_terminal_power_mode($conn, (int)$kiosk_id, $should_turn_off, (string)($kiosk['screen_off_mode'] ?? 'signal_off'));
 
     closeDbConnection($conn);
     

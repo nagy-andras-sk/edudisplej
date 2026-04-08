@@ -68,6 +68,23 @@ function edudisplej_resolve_module_runtime(string $moduleKey): array
     ];
 }
 
+function edudisplej_display_off_command_for_mode(?string $screenOffMode): array
+{
+    $mode = strtolower(trim((string)$screenOffMode));
+
+    if ($mode === 'black_screen') {
+        return [
+            'command_type' => 'display_black_screen',
+            'command' => 'display_black_screen',
+        ];
+    }
+
+    return [
+        'command_type' => 'display_power_off',
+        'command' => 'display_power_off',
+    ];
+}
+
 function edudisplej_validate_manifest_payload(array $manifest): array
 {
     $errors = [];

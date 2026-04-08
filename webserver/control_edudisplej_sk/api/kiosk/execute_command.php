@@ -34,7 +34,7 @@ try {
     }
     
     // Security: Validate command type for predefined commands
-    $allowed_types = ['custom', 'reboot', 'restart_service', 'enable_fast_loop', 'disable_fast_loop', 'display_power_off', 'display_power_on'];
+    $allowed_types = ['custom', 'reboot', 'restart_service', 'enable_fast_loop', 'disable_fast_loop', 'display_power_off', 'display_power_on', 'display_black_screen'];
     if (!in_array($command_type, $allowed_types)) {
         throw new Exception('Invalid command type');
     }

@@ -543,12 +543,13 @@ function edudisplej_modules_sync_loop_requires_turned_off(array $modules): bool 
     return $has_turned_off;
 }
 
-function edudisplej_modules_sync_apply_terminal_power_mode(mysqli $conn, int $kiosk_id, bool $should_turn_off): array {
-    $turn_off_command = 'display_power_off';
+function edudisplej_modules_sync_apply_terminal_power_mode(mysqli $conn, int $kiosk_id, bool $should_turn_off, string $screen_off_mode = 'signal_off'): array {
+    $off_command = edudisplej_display_off_command_for_mode($screen_off_mode);
+    $turn_off_command = $off_command['command'] ?? 'display_power_off';
     $turn_on_command = 'display_power_on';
 
     $target_command = $should_turn_off ? $turn_off_command : $turn_on_command;
-    $target_command_type = $should_turn_off ? 'display_power_off' : 'display_power_on';
+    $target_command_type = $should_turn_off ? ($off_command['command_type'] ?? 'display_power_off') : 'display_power_on';
     $mode = $should_turn_off ? 'TURNED_OFF' : 'ACTIVE';
     $queued = false;
 
@@ -606,10 +607,10 @@ try {
             echo json_encode($response);
             exit;
         }
-        $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval, loop_last_update FROM kiosks WHERE id = ?");
+        $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval, loop_last_update, COALESCE(screen_off_mode, 'signal_off') AS screen_off_mode FROM kiosks WHERE id = ?");
         $stmt->bind_param("i", $kiosk_id);
     } else {
-        $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval, loop_last_update FROM kiosks WHERE mac = ?");
+        $stmt = $conn->prepare("SELECT id, is_configured, company_id, device_id, sync_interval, loop_last_update, COALESCE(screen_off_mode, 'signal_off') AS screen_off_mode FROM kiosks WHERE mac = ?");
         $stmt->bind_param("s", $mac);
     }
     
@@ -985,7 +986,7 @@ try {
     $response['preload_modules'] = array_values($preload_map);
 
     $should_turn_off = edudisplej_modules_sync_loop_requires_turned_off($modules);
-    $terminal_state = edudisplej_modules_sync_apply_terminal_power_mode($conn, (int)$kiosk['id'], $should_turn_off);
+    $terminal_state = edudisplej_modules_sync_apply_terminal_power_mode($conn, (int)$kiosk['id'], $should_turn_off, (string)($kiosk['screen_off_mode'] ?? 'signal_off'));
     $response['terminal_power_mode'] = $terminal_state['terminal_power_mode'];
     $response['terminal_power_command_queued'] = $terminal_state['terminal_power_command_queued'];
     

@@ -620,7 +620,6 @@ install_services_from_structure() {
     if fetch_with_retry "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" "$structure_tmp" 4; then
         STRUCTURE_JSON="$(tr -d '\r' < "$structure_tmp")"
     fi
-    rm -f "$structure_tmp"
     
     if [ -z "$STRUCTURE_JSON" ]; then
         echo "[!] Nemozem stiahnut structure.json, pouzivam staru metodu"
@@ -630,25 +629,69 @@ install_services_from_structure() {
     # Cache structure.json locally for runtime version comparisons
     echo "$STRUCTURE_JSON" > "${TARGET_DIR}/structure.json"
     chmod 644 "${TARGET_DIR}/structure.json"
-    
-    # Extract services using Python
-    SERVICES_JSON=$(echo "$STRUCTURE_JSON" | python3 -c "
+
+    # Extract services using Python with robust error handling
+    # Parse from downloaded file directly to avoid shell stdin/heredoc collisions.
+    if ! SERVICES_JSON="$(python3 - "$structure_tmp" << 'PYTHON_EOF'
 import json
 import sys
-try:
-    data = json.load(sys.stdin)
-    if 'services' in data:
-        for svc in data['services']:
-            print(f\"{svc['source']}|{svc['name']}|{svc.get('enabled', False)}|{svc.get('autostart', False)}|{svc.get('description', '')}\")
-except Exception as e:
-    print(f'ERROR: {e}', file=sys.stderr)
+
+if len(sys.argv) < 2:
+    sys.stderr.write("ERROR: Missing structure file path\n")
     sys.exit(1)
-")
-    
-    if [ $? -ne 0 ]; then
+
+path = sys.argv[1]
+try:
+    with open(path, "rb") as f:
+        raw = f.read()
+
+    if not raw:
+        sys.stderr.write("ERROR: Empty structure.json\n")
+        sys.exit(1)
+
+    # Remove UTF-8 BOM if present
+    text = raw.decode("utf-8-sig", errors="replace").strip()
+
+    # If backend accidentally prepends non-JSON text, salvage JSON envelope.
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        sys.stderr.write("ERROR: structure.json does not contain valid JSON object\n")
+        sys.exit(1)
+
+    payload = text[start:end + 1]
+    data = json.loads(payload)
+
+    services = data.get("services", [])
+    if not isinstance(services, list):
+        sys.stderr.write("ERROR: services is not a list\n")
+        sys.exit(1)
+
+    for svc in services:
+        if not isinstance(svc, dict):
+            continue
+        source = str(svc.get("source", "")).strip()
+        name = str(svc.get("name", "")).strip()
+        enabled = str(bool(svc.get("enabled", False))).lower()
+        autostart = str(bool(svc.get("autostart", False))).lower()
+        description = str(svc.get("description", "")).replace("|", ";").strip()
+
+        if source and name:
+            print(f"{source}|{name}|{enabled}|{autostart}|{description}")
+except json.JSONDecodeError as e:
+    sys.stderr.write(f"ERROR: Invalid JSON in structure.json: {e}\n")
+    sys.exit(1)
+except Exception as e:
+    sys.stderr.write(f"ERROR: Failed to parse structure.json: {e}\n")
+    sys.exit(1)
+PYTHON_EOF
+)"; then
+        rm -f "$structure_tmp"
         echo "[!] Chyba pri parsovani services z structure.json"
         return 1
     fi
+
+    rm -f "$structure_tmp"
     
     if [ -z "$SERVICES_JSON" ]; then
         echo "[*] Ziadne services na instalaciu"
@@ -903,16 +946,24 @@ echo ""
 if [ "${AUTO_REBOOT}" = "false" ] || [ "${AUTO_REBOOT}" = "0" ]; then
     response="n"
     echo "[*] Auto reboot disabled via EDUDISPLEJ_AUTO_REBOOT=${AUTO_REBOOT}"
-elif read -t 30 -p "Restartovat teraz? [Y/n] (automaticky za 30s) - Restart now? [Y/n] (auto in 30s): " response; then
-    :
-else
-    READ_EXIT=$?
-    if [ $READ_EXIT -gt 128 ]; then
-        response="y"
-        echo "(automaticky restartujem - auto restarting)"
+elif [ -t 0 ]; then
+    # Interactive terminal (TTY) - show prompt with timeout
+    if read -t 30 -p "Restartovat teraz? [Y/n] (automaticky za 30s) - Restart now? [Y/n] (auto in 30s): " response; then
+        :
     else
-        response="y"
+        READ_EXIT=$?
+        if [ $READ_EXIT -gt 128 ]; then
+            response="y"
+            echo "(automaticky restartujem - auto restarting)"
+        else
+            response="y"
+        fi
     fi
+else
+    # Non-interactive (piped stdin from curl | bash) - auto-reboot for fleet installs
+    echo "[*] Detekovan instalator bez interaktivneho terminalu - Detected non-interactive install"
+    echo "[*] Automaticky restartujem za 3 sekundy - Auto restarting in 3 seconds..."
+    response="y"
 fi
 echo ""
 
