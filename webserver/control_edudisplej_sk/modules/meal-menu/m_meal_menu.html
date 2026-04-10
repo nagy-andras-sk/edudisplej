@@ -52,31 +52,6 @@
         .meal-row-icon { width: clamp(24px, 1.5vw, 34px); height: clamp(24px, 1.5vw, 34px); display:inline-flex; color:#bfdbfe; margin-top: 4px; flex: 0 0 auto; }
         .meal-row-text { font-size: clamp(28px, var(--meal-text-font-size, 2.3vw), 54px); line-height: var(--meal-line-height, 1.38); font-weight: var(--meal-text-weight, 650); color: #f8fafc; display:flex; align-items:center; gap: 8px; flex-wrap: nowrap; min-width: 0; white-space: nowrap; }
         .meal-row-line { display: block; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
-        .meal-inline-allergens { display:inline-flex; align-items:center; gap:6px; margin-left: 10px; vertical-align: middle; }
-        .meal-inline-allergen-num { display:inline-flex; align-items:center; justify-content:center; min-width:1.8em; border-radius:999px; padding:3px 9px; font-size:.84em; line-height:1; font-weight:800; color:#111827; background:#fbbf24; border:1px solid rgba(251, 191, 36, .8); }
-        .allergen-wrap { margin-top: 6px; padding: 10px 10px 0; border-top: 1px solid rgba(148, 163, 184, 0.2); background: rgba(15, 23, 42, 0.38); border-radius: 12px; }
-        .allergen-title { font-size: clamp(14px, .95vw, 18px); letter-spacing: .03em; font-weight: 700; color: #cbd5e1; margin-bottom: 6px; text-transform: uppercase; }
-        .allergen-row { display: flex; flex-wrap: wrap; gap: 6px; }
-        .allergen-badge { font-size: clamp(13px, .95vw, 17px); line-height: 1.1; border: 1px solid rgba(148, 163, 184, 0.34); border-radius: 999px; padding: 6px 10px; background: rgba(15, 23, 42, 0.72); color: #e2e8f0; display:inline-flex; align-items:center; gap:7px; font-weight: 600; }
-        .allergen-icon { width: clamp(14px, .9vw, 18px); height: clamp(14px, .9vw, 18px); display:inline-flex; color:#93c5fd; flex: 0 0 auto; }
-        .meal-allergen-inline { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top: 2px; }
-        .meal-allergen-dot { width: clamp(24px, 1.4vw, 32px); height: clamp(24px, 1.4vw, 32px); border-radius: 999px; border:1px solid rgba(148,163,184,.36); display:inline-flex; align-items:center; justify-content:center; background: rgba(15, 23, 42, 0.72); color:#93c5fd; }
-        .meal-allergen-dot svg { width: 72%; height: 72%; display:block; }
-        .meal-allergen-count { font-size: clamp(12px, .8vw, 15px); color:#cbd5e1; font-weight:700; margin-left: 2px; }
-        .meal-allergen-code { font-size: clamp(13px, .9vw, 16px); line-height: 1.1; border:1px solid rgba(148,163,184,.36); border-radius:999px; padding: 4px 9px; font-weight:700; color:#f8fafc; background: rgba(15, 23, 42, 0.78); display:inline-flex; align-items:center; gap:6px; }
-        .meal-allergen-num { font-weight: 900; color:#fde68a; background: rgba(59, 130, 246, 0.26); border:1px solid rgba(125, 211, 252, 0.44); border-radius:999px; padding:2px 7px; min-width:1.6em; text-align:center; }
-        .meal-allergen-code i { font-style: normal; opacity: .86; font-weight:600; font-size: .88em; }
-        .allergen-gluten, .allergen-celery, .allergen-mustard { background: rgba(120, 53, 15, 0.35); border-color: rgba(251, 191, 36, 0.48); }
-        .allergen-milk, .allergen-egg, .allergen-fish { background: rgba(3, 105, 161, 0.28); border-color: rgba(125, 211, 252, 0.5); }
-        .allergen-nut, .allergen-sesame, .allergen-lupin, .allergen-shell { background: rgba(127, 29, 29, 0.3); border-color: rgba(252, 165, 165, 0.52); }
-        .allergen-soy, .allergen-sulfite, .allergen-warning { background: rgba(30, 64, 175, 0.28); border-color: rgba(147, 197, 253, 0.52); }
-        .allergen-fixed { display:none; border:1px solid rgba(148,163,184,.26); border-radius:14px; padding:10px 12px; background: rgba(15, 23, 42, 0.72); overflow:hidden; }
-        .allergen-fixed.show { display:block; }
-        .allergen-fixed-title { font-size: clamp(13px, .95vw, 18px); font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
-        .allergen-fixed-row { display:flex; flex-wrap:wrap; gap: 8px; }
-        .allergen-fixed-badge { display:inline-flex; align-items:center; gap:8px; padding: 6px 10px; border:1px solid rgba(148,163,184,.36); border-radius:999px; background: rgba(15, 23, 42, 0.75); color:#e2e8f0; font-size: clamp(12px, .88vw, 15px); }
-        .allergen-fixed-num { font-weight: 800; min-width: 1.7em; text-align:center; border-radius:999px; padding:2px 8px; background: rgba(2, 6, 23, 0.42); color:#f8fafc; }
-        .allergen-fixed-label { font-weight: 600; color:#dbeafe; }
         @media (max-width: 1366px) {
             .content-layer { padding: 2.2vh 2vw; gap: 1.3vh; }
             .title { font-size: clamp(42px, 6vw, 90px); }
@@ -88,7 +63,6 @@
         }
         .empty { grid-column: 1 / -1; border: 1px dashed rgba(148,163,184,.35); border-radius: 12px; padding: 16px; color: #cbd5e1; font-size: clamp(18px, 1.7vw, 32px); }
         .foot { font-size: clamp(16px, 1.2vw, 24px); color: #94a3b8; }
-        .foot-allergens { display:block; margin-top:4px; font-size: clamp(11px, .8vw, 14px); color:#cbd5e1; opacity:.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .root.scroll-mode { justify-items: center; text-align: center; }
         .root.scroll-mode .head { width: 100%; justify-content: center; }
         .root.scroll-mode .title-wrap { display:flex; flex-direction:column; align-items:center; }
@@ -110,8 +84,6 @@
         .root.small-mode .meal-row { min-height: 0; height: 100%; grid-template-columns: 1fr; align-items: stretch; padding: 0 .9vw; }
         .root.small-mode .meal-row-icon { display: none; }
         .root.small-mode .meal-row-text { width: 100%; height: 100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height: 1.03; font-size: clamp(18px, 3.5vw, 70px); font-weight: 800; white-space: nowrap; }
-        .root.small-mode .meal-inline-allergens { margin-left: 14px; gap: 8px; }
-        .root.small-mode .meal-inline-allergen-num { font-size: .68em; padding: 4px 10px; }
         .root.small-mode .small-page-card { padding: .35vh .35vw; }
         .root.small-mode .small-page-table { height: 100%; min-height: 0; display:grid; grid-template-rows: repeat(var(--small-page-rows, 3), minmax(0, 1fr)); gap: .35vh; }
         .root.small-mode .small-page-row { border:1px solid rgba(148,163,184,.26); border-radius:12px; background: rgba(30, 41, 59, 0.68); min-height:0; display:grid; grid-template-columns: clamp(46px, 4.2vw, 92px) minmax(0, 1fr); align-items:center; text-align:left; padding: 0 .8vw; column-gap: .7vw; }
@@ -164,7 +136,7 @@
         .day-meal-label { font-size: clamp(19px, 1.35vw, 26px); font-weight: 700; color: #cbd5e1; margin-bottom: .3vh; display:flex; align-items:center; gap:8px; }
         .day-meal-icon { width: clamp(18px, 1.05vw, 24px); height: clamp(18px, 1.05vw, 24px); display:inline-flex; color:#bfdbfe; flex: 0 0 auto; }
         .day-meal-text { font-size: clamp(19px, 1.3vw, 26px); line-height: 1.3; color:#f8fafc; white-space: pre-wrap; word-break: break-word; }
-        .meal-icon svg, .meal-row-icon svg, .allergen-icon svg, .day-title-icon svg, .day-meal-icon svg {
+        .meal-icon svg, .meal-row-icon svg, .day-title-icon svg, .day-meal-icon svg {
             width: 100%;
             height: 100%;
             display: block;
@@ -211,7 +183,6 @@
             <div class="status" id="status">🔄 Szerver lekérés</div>
         </div>
         <div class="cards-wrap" id="cards-wrap"><div class="cards" id="cards"></div></div>
-        <div class="allergen-fixed" id="allergen-fixed"></div>
         <div class="foot" id="foot"></div>
     </div>
 </div>
@@ -325,7 +296,6 @@
             showInstitutionName: false,
             showMealTypeEmojis: false,
             showMealTypeSvgIcons: true,
-            showAllergenEmojis: true,
             centerAlign: false,
             slowScrollOnOverflow: true,
             slowScrollSpeedPxPerSec: 40,
@@ -411,7 +381,6 @@
             })(),
             showMealTypeEmojis: parseBool(params.get('showMealTypeEmojis') ?? injected.showMealTypeEmojis, defaults.showMealTypeEmojis),
             showMealTypeSvgIcons: parseBool(params.get('showMealTypeSvgIcons') ?? injected.showMealTypeSvgIcons ?? (injected.showMealTypeEmojis === true ? true : defaults.showMealTypeSvgIcons), defaults.showMealTypeSvgIcons),
-            showAllergenEmojis: parseBool(params.get('showAllergenEmojis') ?? injected.showAllergenEmojis, defaults.showAllergenEmojis),
             centerAlign: parseBool(params.get('centerAlign') ?? injected.centerAlign, defaults.centerAlign),
             slowScrollOnOverflow: true,
             slowScrollSpeedPxPerSec: Math.max(40, parseNum(params.get('slowScrollSpeedPxPerSec') ?? injected.slowScrollSpeedPxPerSec, defaults.slowScrollSpeedPxPerSec)),
@@ -487,7 +456,6 @@
                 today: 'Mai menü',
                 tomorrow: 'Holnapi menü',
                 tomorrowTag: 'HOLNAP',
-                allergens: 'Allergének',
                 sourcePrefix: 'Étrend forrása',
                 mealLabels: { breakfast: 'Reggeli', snack_am: 'Tízórai', lunch: 'Ebéd', snack_pm: 'Uzsonna', dinner: 'Vacsora' },
                 tomorrowMealLabels: { breakfast: 'HOLNAPI REGGELI', snack_am: 'HOLNAPI TÍZÓRAI', lunch: 'HOLNAPI EBÉD', snack_pm: 'HOLNAPI UZSONNA', dinner: 'HOLNAPI VACSORA' }
@@ -502,7 +470,6 @@
                 today: 'Dnešné menu',
                 tomorrow: 'Zajtrajšie menu',
                 tomorrowTag: 'ZAJTRA',
-                allergens: 'Alergény',
                 sourcePrefix: 'Zdroj jedálneho lístka',
                 mealLabels: { breakfast: 'Raňajky', snack_am: 'Desiata', lunch: 'Obed', snack_pm: 'Olovrant', dinner: 'Večera' },
                 tomorrowMealLabels: { breakfast: 'ZAJTRAJŠIE RAŇAJKY', snack_am: 'ZAJTRAJŠIA DESIATA', lunch: 'ZAJTRAJŠÍ OBED', snack_pm: 'ZAJTRAJŠÍ OLOVRANT', dinner: 'ZAJTRAJŠIA VEČERA' }
@@ -517,7 +484,6 @@
                 today: "Today's menu",
                 tomorrow: "Tomorrow's menu",
                 tomorrowTag: 'TOMORROW',
-                allergens: 'Allergens',
                 sourcePrefix: 'Menu source',
                 mealLabels: { breakfast: 'Breakfast', snack_am: 'Morning snack', lunch: 'Lunch', snack_pm: 'Afternoon snack', dinner: 'Dinner' },
                 tomorrowMealLabels: { breakfast: 'TOMORROW BREAKFAST', snack_am: 'TOMORROW MORNING SNACK', lunch: 'TOMORROW LUNCH', snack_pm: 'TOMORROW AFTERNOON SNACK', dinner: 'TOMORROW DINNER' }
@@ -679,11 +645,11 @@
         return rows;
     }
 
-    function extractInlineAllergenCodesFromLine(lineText) {
+    function stripTrailingMealCodesFromLine(lineText) {
         const raw = String(lineText || '').trim();
         const match = raw.match(/\((\s*[0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*)\)\s*$/u);
         if (!match) {
-            return { text: raw, codes: [] };
+            return raw;
         }
 
         const codeSet = new Set();
@@ -696,18 +662,7 @@
         });
 
         const cleanText = raw.replace(/\((\s*[0-9]{1,2}(?:\s*,\s*[0-9]{1,2})*)\)\s*$/u, '').trim();
-        return {
-            text: cleanText || raw,
-            codes: Array.from(codeSet.values()).sort((a, b) => a - b)
-        };
-    }
-
-    function inlineAllergenCodesHtml(codes) {
-        const list = Array.isArray(codes) ? codes : [];
-        if (!list.length) {
-            return '';
-        }
-        return `<span class="meal-inline-allergens">${list.map((code) => `<span class="meal-inline-allergen-num">${escapeHtml(String(code))}</span>`).join('')}</span>`;
+        return codeSet.size > 0 ? (cleanText || raw) : raw;
     }
 
     function parseHmToMinutes(value, fallbackMinutes) {
@@ -1001,112 +956,6 @@
         }[m]));
     }
 
-    function allergenBadgeSvg(kind) {
-        const safe = String(kind || '').toLowerCase();
-        const icons = {
-            gluten: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18"/><path d="M8 7c0 2-1 3-3 4 2 1 3 2 3 4"/><path d="M16 7c0 2 1 3 3 4-2 1-3 2-3 4"/></svg>',
-            milk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6"/><path d="M10 3v3l-2 3v9a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V9l-2-3V3"/></svg>',
-            egg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4c3 0 6 4 6 8a6 6 0 1 1-12 0c0-4 3-8 6-8z"/></svg>',
-            fish: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12c3-4 8-6 13-5v10c-5 1-10-1-13-5z"/><path d="M16 12h5"/></svg>',
-            nut: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 10c0-3 2-5 4-5s4 2 4 5-2 9-4 9-4-6-4-9z"/></svg>',
-            soy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 14c0-4 2-6 6-6 4 0 6 2 6 6 0 3-2 5-6 5-4 0-6-2-6-5z"/></svg>',
-            celery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 20V8"/><path d="M12 20V6"/><path d="M16 20V9"/><path d="M7 8c-2-2-2-4 0-6"/><path d="M12 6c-2-2-2-4 0-6"/></svg>',
-            mustard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>',
-            sesame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 13c0-3 2-5 4-5s4 2 4 5-2 5-4 5-4-2-4-5z"/><circle cx="12" cy="13" r="1"/></svg>',
-            sulfite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h10l2 6-7 12-7-12z"/></svg>',
-            shell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14c0-5 4-9 8-9s8 4 8 9"/><path d="M4 14h16"/><path d="M12 5v9"/></svg>',
-            lupin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18"/><path d="M12 8c2-2 4-2 6 0"/><path d="M12 12c2-2 4-2 6 0"/><path d="M12 16c2-2 4-2 6 0"/></svg>',
-            warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l9 16H3l9-16z"/><path d="M12 9v4"/><circle cx="12" cy="16" r="1"/></svg>'
-        };
-        return icons[safe] || icons.warning;
-    }
-
-    function allergenMap() {
-        return {
-            1: { icon: 'gluten', label: 'Glutén' },
-            2: { icon: 'shell', label: 'Rákfélék' },
-            3: { icon: 'egg', label: 'Tojás' },
-            4: { icon: 'fish', label: 'Hal' },
-            5: { icon: 'nut', label: 'Földimogyoró' },
-            6: { icon: 'soy', label: 'Szója' },
-            7: { icon: 'milk', label: 'Tej' },
-            8: { icon: 'nut', label: 'Diófélék' },
-            9: { icon: 'celery', label: 'Zeller' },
-            10: { icon: 'mustard', label: 'Mustár' },
-            11: { icon: 'sesame', label: 'Szezámmag' },
-            12: { icon: 'sulfite', label: 'Kén-dioxid/szulfitok' },
-            13: { icon: 'lupin', label: 'Csillagfürt' },
-            14: { icon: 'shell', label: 'Puhatestűek' }
-        };
-    }
-
-    function extractAllergenLabels(text) {
-        if (MU && typeof MU.extractAllergenLabels === 'function') {
-            return MU.extractAllergenLabels(text);
-        }
-        const raw = String(text || '');
-        const labels = [];
-        const matches = raw.match(/ALERG[ÉE]NY:\s*([^\n\r)]+)/giu) || [];
-        matches.forEach((m) => {
-            const part = String(m).replace(/ALERG[ÉE]NY:\s*/iu, '').trim();
-            part.split(',').map((item) => item.trim()).filter(Boolean).forEach((item) => labels.push(item));
-        });
-        return Array.from(new Set(labels));
-    }
-
-    function normalizeAllergenLabel(label) {
-        return String(label || '')
-            .toLowerCase()
-            .replace(/[()]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-    function allergenIconForLabel(label) {
-        const n = normalizeAllergenLabel(label);
-        if (n.includes('lepok') || n.includes('obilnin')) return 'gluten';
-        if (n.includes('vajcia') || n.includes('toj')) return 'egg';
-        if (n.includes('mlieko') || n.includes('tej')) return 'milk';
-        if (n.includes('ryb') || n.includes('hal')) return 'fish';
-        if (n.includes('horcica') || n.includes('must')) return 'mustard';
-        if (n.includes('zeler')) return 'celery';
-        if (n.includes('soj')) return 'soy';
-        if (n.includes('orech') || n.includes('dio')) return 'nut';
-        if (n.includes('sezam')) return 'sesame';
-        if (n.includes('siričit') || n.includes('sulfit')) return 'sulfite';
-        if (n.includes('rak')) return 'shell';
-        if (n.includes('makkys')) return 'nut';
-        return 'warning';
-    }
-
-    function extractAllergenCodes(text) {
-        if (MU && typeof MU.extractAllergenCodes === 'function') {
-            return MU.extractAllergenCodes(text);
-        }
-        const raw = String(text || '');
-        const codeSet = new Set();
-        const patterns = [
-            /\((?:allerg[eé]n(?:ek)?|alerg[eé]ny(?:ek)?)\s*:\s*([^)]+)\)/giu,
-            /(?:allerg[eé]n(?:ek)?|alerg[eé]ny(?:ek)?)\s*:\s*([^\n\r;]+)/giu
-        ];
-
-        patterns.forEach((pattern) => {
-            let match;
-            while ((match = pattern.exec(raw)) !== null) {
-                const part = String(match[1] || '');
-                const nums = part.match(/\b([1-9]|1[0-4])\b/g) || [];
-                nums.forEach((numStr) => {
-                    const code = parseInt(numStr, 10);
-                    if (code >= 1 && code <= 14) {
-                        codeSet.add(code);
-                    }
-                });
-            }
-        });
-
-        return Array.from(codeSet).sort((a, b) => a - b);
-    }
-
     function stripAllergenAnnotations(text) {
         if (MU && typeof MU.stripAllergenAnnotations === 'function') {
             return MU.stripAllergenAnnotations(text);
@@ -1254,8 +1103,7 @@
             .map((item) => item.row);
     }
 
-    function mealCardHtml(meal, settings, t, options = {}) {
-        const showAllergens = options.showAllergens === true;
+    function mealCardHtml(meal, settings, t) {
         const key = String(meal.key || '').trim();
         const customDisplayLabel = String(meal?.__displayLabel || '').trim();
         const localized = String(t.mealLabels?.[key] || '').trim();
@@ -1268,8 +1116,6 @@
             : '';
         const name = escapeHtml(rawName);
         const originalText = stripSourceNoise(String(meal.text || '').trim());
-        const allergenCodes = extractAllergenCodes(originalText);
-        const allergenLabels = extractAllergenLabels(originalText);
 
         const structuredRows = sortStructuredRowsForMeal(Array.isArray(meal?.structured_rows) ? meal.structured_rows : [], key);
         const textLines = structuredRows.length > 0
@@ -1277,9 +1123,7 @@
                 .map((row) => normalizeMealLine(String(row?.text || '')))
                 .filter((line) => line !== '')
             : (() => {
-                const displayTextRaw = showAllergens
-                    ? (stripAllergenAnnotations(originalText) || originalText)
-                    : originalText;
+                const displayTextRaw = stripAllergenAnnotations(originalText) || originalText;
                 return String(displayTextRaw || '—')
                     .split(/\r?\n/)
                     .map((line) => normalizeMealLine(line))
@@ -1288,34 +1132,15 @@
 
         const rowHtml = textLines.length > 0
             ? textLines.map((line, idx) => {
-                const inlineParsed = extractInlineAllergenCodesFromLine(line);
-                const safeLine = escapeHtml(inlineParsed.text || line);
-                const inlineCodes = inlineAllergenCodesHtml(inlineParsed.codes);
+                const safeLine = escapeHtml(stripTrailingMealCodesFromLine(line) || line);
                 const rowIcon = settings.showMealTypeSvgIcons === true
                     ? `<span class="meal-row-icon" aria-hidden="true">${mealLineSvg(line, key, idx)}</span>`
                     : `<span class="meal-row-icon" aria-hidden="true">${iconSvg('food')}</span>`;
-                return `<div class="meal-row">${rowIcon}<div class="meal-row-text"><span class="meal-row-line">${safeLine}</span>${inlineCodes}</div></div>`;
+                return `<div class="meal-row">${rowIcon}<div class="meal-row-text"><span class="meal-row-line">${safeLine}</span></div></div>`;
             }).join('')
             : `<div class="meal-row"><span class="meal-row-icon" aria-hidden="true">${iconSvg('food')}</span><div class="meal-row-text">—</div></div>`;
 
-        const map = allergenMap();
-        const inlineCodeBadges = allergenCodes.map((code) => {
-            const item = map[code] || { icon: 'warning', label: t.allergens || 'Allergens' };
-            const title = escapeHtml(`${item.label} (${code})`);
-            return `<span class="meal-allergen-code allergen-${escapeHtml(item.icon)}" title="${title}"><span class="meal-allergen-num">${escapeHtml(String(code))}</span><i>${escapeHtml(item.label)}</i></span>`;
-        });
-        const inlineLabelBadges = allergenCodes.length === 0
-            ? allergenLabels.slice(0, 3).map((label) => {
-                const iconKey = allergenIconForLabel(label);
-                const safeLabel = escapeHtml(label);
-                return `<span class="meal-allergen-dot allergen-${escapeHtml(iconKey)}" title="${safeLabel}"><span aria-hidden="true">${allergenBadgeSvg(iconKey)}</span></span>`;
-            })
-            : [];
-        const inlineAllergenHtml = showAllergens && (inlineCodeBadges.length > 0 || inlineLabelBadges.length > 0)
-            ? `<span class="meal-allergen-inline">${inlineCodeBadges.slice(0, 4).join('')}${inlineLabelBadges.join('')}${inlineCodeBadges.length > 4 ? `<span class="meal-allergen-count">+${inlineCodeBadges.length - 4}</span>` : ''}</span>`
-            : '';
-
-        return `<div class="card ${mealBandClass(key)}"><div class="meal"><span class="meal-main">${mealIconHtml}<span class="meal-name">${name}</span>${tomorrowBadge}</span>${inlineAllergenHtml}</div><div class="meal-table">${rowHtml}</div></div>`;
+        return `<div class="card ${mealBandClass(key)}"><div class="meal"><span class="meal-main">${mealIconHtml}<span class="meal-name">${name}</span>${tomorrowBadge}</span></div><div class="meal-table">${rowHtml}</div></div>`;
     }
 
     function fitCardText(cardEl, minPx, maxPx) {
@@ -1546,77 +1371,8 @@
             list.push({ key: 'other', label: '—', text: '—' });
         }
 
-        cards.innerHTML = list.map((meal) => mealCardHtml(meal, settings, t, { showAllergens: true })).join('');
+        cards.innerHTML = list.map((meal) => mealCardHtml(meal, settings, t)).join('');
         fitVisibleMealCards('large_screen', settings);
-    }
-
-    function renderFixedAllergenPanel(meals, settings, t) {
-        const panel = document.getElementById('allergen-fixed');
-        if (!panel) return;
-
-        if (settings.showAllergenEmojis !== true || String(settings.mealDisplayMode || 'small_screen') !== 'large_screen') {
-            panel.classList.remove('show');
-            panel.innerHTML = '';
-            return;
-        }
-
-        const map = allergenMap();
-        const found = new Map();
-        (Array.isArray(meals) ? meals : []).forEach((meal) => {
-            const raw = stripSourceNoise(String(meal?.text || '').trim());
-            extractAllergenCodes(raw).forEach((code) => {
-                const key = String(code);
-                if (!found.has(key)) {
-                    const entry = map[key] || { icon: 'warning', label: t.allergens || 'Allergens' };
-                    found.set(key, { code: key, icon: entry.icon, label: entry.label });
-                }
-            });
-        });
-
-        const items = Array.from(found.values()).sort((a, b) => Number(a.code) - Number(b.code));
-        if (items.length === 0) {
-            panel.classList.remove('show');
-            panel.innerHTML = '';
-            return;
-        }
-
-        const badges = items.map((item) => `
-            <span class="allergen-fixed-badge allergen-${escapeHtml(item.icon)}" title="${escapeHtml(`${item.label} (${item.code})`)}">
-                <span class="allergen-fixed-num">${escapeHtml(item.code)}</span>
-                <span class="allergen-fixed-label">${escapeHtml(item.label)}</span>
-            </span>
-        `).join('');
-
-        panel.innerHTML = `<div class="allergen-fixed-title">${escapeHtml(t.allergens || 'Allergens')}</div><div class="allergen-fixed-row">${badges}</div>`;
-        panel.classList.add('show');
-    }
-
-    function footerAllergenSummary(meals, t) {
-        const list = Array.isArray(meals) ? meals : [];
-        const labels = new Set();
-        const codeLabels = allergenMap();
-        list.forEach((meal) => {
-            const raw = stripSourceNoise(String(meal?.text || '').trim());
-            extractAllergenLabels(raw).forEach((label) => {
-                const clean = String(label || '').replace(/^ALERG[ÉE]NY:\s*/iu, '').replace(/[ \t]{2,}/g, ' ').trim();
-                if (clean) {
-                    labels.add(clean);
-                }
-            });
-            extractAllergenCodes(raw).forEach((code) => {
-                const normalized = parseInt(code, 10);
-                if (normalized >= 1 && normalized <= 14 && codeLabels[normalized]?.label) {
-                    labels.add(String(codeLabels[normalized].label));
-                }
-            });
-        });
-
-        const sorted = Array.from(labels).sort((a, b) => String(a).localeCompare(String(b), 'sk'));
-        if (!sorted.length) {
-            return '';
-        }
-
-        return `${String(t.allergens || 'Allergens')}: ${sorted.join(', ')}`;
     }
 
     function render(data, settings, context = {}) {
@@ -1698,18 +1454,12 @@
                 renderSmallScreenPagedMeals(displayMeals, settings, t);
             }
         }
-        renderFixedAllergenPanel(displayMode === 'large_screen' ? displayMeals : [], settings, t);
-
         if (displayMode === 'small_screen') {
-            const allergensLine = footerAllergenSummary(displayMeals, t);
             const hasTomorrowPreview = displayMeals.some((meal) => meal?.__tomorrowPreview === true);
             const baseDateText = hasTomorrowPreview
                 ? String(t.tomorrowTag || t.tomorrow || 'ZAJTRA').trim()
                 : String(dayText || '').trim();
-            const combinedLine = [baseDateText, String(allergensLine || '').trim()]
-                .filter(Boolean)
-                .join(' • ');
-            foot.innerHTML = `<span class="foot-line">${escapeHtml(combinedLine || baseDateText || '')}</span>`;
+            foot.innerHTML = `<span class="foot-line">${escapeHtml(baseDateText || '')}</span>`;
         } else {
             const serverTs = String(data?.updated_at || '').trim();
             const appetiteText = String(settings.appetiteMessageText || '').trim();
@@ -1724,10 +1474,6 @@
             }
             if (settings.showSourceUrl === true && sourceUrl !== '') {
                 lines.push(`<span class="foot-source">${escapeHtml(`${String(t.sourcePrefix || 'Menu source')}: ${sourceUrl}`)}</span>`);
-            }
-            const allergensLine = footerAllergenSummary(displayMeals, t);
-            if (allergensLine !== '') {
-                lines.push(`<span class="foot-allergens">${escapeHtml(allergensLine)}</span>`);
             }
             foot.innerHTML = lines.join('');
         }
@@ -1810,8 +1556,6 @@
         cards.innerHTML = `<div class="dual-days ${dayBlocks.length === 1 ? 'single-day' : ''}">${daysHtml}</div>`;
 
         const allVisibleMeals = dayBlocks.flatMap((day) => Array.isArray(day.data?.meals) ? day.data.meals : []);
-        renderFixedAllergenPanel(allVisibleMeals, settings, t);
-
         const tsCandidates = [String(todayData?.updated_at || '').trim(), String(tomorrowData?.updated_at || '').trim()].filter(Boolean);
         const ts = tsCandidates.length > 0 ? tsCandidates.sort().slice(-1)[0] : '';
         const appetiteText = String(settings.appetiteMessageText || '').trim();
@@ -1823,10 +1567,6 @@
         }
         if (settings.showSourceUrl === true && sourceUrl !== '') {
             lines.push(`<span class="foot-source">${escapeHtml(`${String(t.sourcePrefix || 'Menu source')}: ${sourceUrl}`)}</span>`);
-        }
-        const allVisibleMealsSummary = footerAllergenSummary(allVisibleMeals, t);
-        if (allVisibleMealsSummary !== '') {
-            lines.push(`<span class="foot-allergens">${escapeHtml(allVisibleMealsSummary)}</span>`);
         }
         foot.innerHTML = lines.join('');
     }

@@ -20,7 +20,6 @@
   "scheduleDinnerUntil": "23:59",
   "showMealTypeEmojis": false,
   "showMealTypeSvgIcons": true,
-  "showAllergenEmojis": false,
   "centerAlign": false,
   "slowScrollOnOverflow": true,
   "slowScrollSpeedPxPerSec": 40,

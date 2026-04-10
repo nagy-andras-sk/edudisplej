@@ -161,7 +161,6 @@ function edudisplej_module_policy_registry(): array
                 'scheduleDinnerUntil' => ['type' => 'string', 'maxLen' => 5, 'default' => '23:59'],
                 'showMealTypeEmojis' => ['type' => 'bool', 'default' => false],
                 'showMealTypeSvgIcons' => ['type' => 'bool', 'default' => true],
-                'showAllergenEmojis' => ['type' => 'bool', 'default' => false],
                 'centerAlign' => ['type' => 'bool', 'default' => false],
                 'slowScrollOnOverflow' => ['type' => 'bool', 'default' => true],
                 'slowScrollSpeedPxPerSec' => ['type' => 'int', 'min' => 40, 'max' => 120, 'default' => 40],

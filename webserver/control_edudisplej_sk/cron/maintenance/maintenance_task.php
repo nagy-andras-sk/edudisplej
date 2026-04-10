@@ -1696,27 +1696,6 @@ function edudisplej_maintenance_extract_jedalen_menu_from_html(string $html): ar
                 continue;
             }
 
-            $allergenNodes = $xpath->query('.//img[@title]', $tr);
-            $allergens = [];
-            if ($allergenNodes) {
-                foreach ($allergenNodes as $img) {
-                    $title = trim((string)$img->getAttribute('title'));
-                    if ($title !== '') {
-                        $allergens[] = $title;
-                    }
-                }
-            }
-
-            $allergenTextNodes = $xpath->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' eat-menu-sensitive ')]", $tr);
-            if ($allergenTextNodes) {
-                foreach ($allergenTextNodes as $node) {
-                    $text = trim((string)$node->textContent);
-                    if ($text !== '') {
-                        $allergens[] = $text;
-                    }
-                }
-            }
-
             $mealParts = preg_split('/\r?\n/u', $mealName) ?: [$mealName];
             foreach ($mealParts as $mealPartRaw) {
                 $mealPart = edudisplej_maintenance_clean_jedalen_meal_text((string)$mealPartRaw);
@@ -1744,12 +1723,7 @@ function edudisplej_maintenance_extract_jedalen_menu_from_html(string $html): ar
                 }
                 $seenBySlot[$slot][$dedupKey] = true;
 
-                $line = $mealPart;
-                if (!empty($allergens)) {
-                    $line .= ' (Allergens: ' . implode(', ', array_unique($allergens)) . ')';
-                }
-
-                $result[$menuDate][$slot][] = $line;
+                $result[$menuDate][$slot][] = $mealPart;
             }
         }
     }

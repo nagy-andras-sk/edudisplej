@@ -361,7 +361,6 @@
                     snack_pm: 'Uzsonna',
                     dinner: 'Vacsora',
                     show_icons: 'Étkezés ikonok megjelenítése',
-                    allergens_large_only: 'Allergén számok (csak nagy kijelző profilnál)',
                     appetite_toggle: '„Prajeme dobrú chuť” sor megjelenítése',
                     appetite_text: 'Dobrú chuť szöveg',
                     source_url_toggle: 'Forrás URL megjelenítése alul',
@@ -379,8 +378,6 @@
                     no_meals_selected: 'Nincs kijelölt étkezés',
                     institution_short: 'intézmény',
                     language_short: 'nyelv',
-                    allergens_on: 'allergének: be',
-                    allergens_off: 'allergének: ki',
                     icons_on: 'SVG ikon: be',
                     icons_off: 'SVG ikon: ki'
                 },
@@ -421,7 +418,6 @@
                     snack_pm: 'Olovrant',
                     dinner: 'Večera',
                     show_icons: 'Zobraziť ikony jedál',
-                    allergens_large_only: 'Čísla alergénov (len pre veľký displej)',
                     appetite_toggle: 'Zobraziť riadok „Prajeme dobrú chuť”',
                     appetite_text: 'Text „Dobrú chuť”',
                     source_url_toggle: 'Zobraziť URL zdroja dole',
@@ -439,8 +435,6 @@
                     no_meals_selected: 'Nie je vybrané žiadne jedlo',
                     institution_short: 'inštitúcia',
                     language_short: 'jazyk',
-                    allergens_on: 'alergény: zap',
-                    allergens_off: 'alergény: vyp',
                     icons_on: 'SVG ikony: zap',
                     icons_off: 'SVG ikony: vyp'
                 },
@@ -482,7 +476,6 @@
                     snack_pm: 'Afternoon snack',
                     dinner: 'Dinner',
                     show_icons: 'Show meal icons',
-                    allergens_large_only: 'Allergen numbers (large-screen only)',
                     appetite_toggle: 'Show “Prajeme dobrú chuť” line',
                     appetite_text: '“Dobrú chuť” text',
                     source_url_toggle: 'Show source URL at bottom',
@@ -500,8 +493,6 @@
                     no_meals_selected: 'No meal selected',
                     institution_short: 'institution',
                     language_short: 'language',
-                    allergens_on: 'allergens: on',
-                    allergens_off: 'allergens: off',
                     icons_on: 'SVG icons: on',
                     icons_off: 'SVG icons: off'
                 }
@@ -4908,7 +4899,6 @@
                     showDinner: true,
                     showMealTypeEmojis: false,
                     showMealTypeSvgIcons: true,
-                    showAllergenEmojis: true,
                     centerAlign: false,
                     slowScrollOnOverflow: true,
                     slowScrollSpeedPxPerSec: 40,
@@ -5289,7 +5279,6 @@
             const mealOverlayWrap = document.getElementById('meal-overlay-wrap');
             const mealSmallSettings = document.getElementById('meal-small-settings');
             const mealLargeHeaderSettings = document.getElementById('meal-large-header-settings');
-            const mealLargeAllergenSettings = document.getElementById('meal-large-allergen-settings');
             const mealLargeMessageSettings = document.getElementById('meal-large-message-settings');
             const mealLargeSourceSettings = document.getElementById('meal-large-source-settings');
 
@@ -5297,7 +5286,6 @@
                 const isLarge = isMealLargeScreenMode(displayModeSelect?.value);
                 setElementDisplay(mealSmallSettings, !isLarge, 'grid');
                 setElementDisplay(mealLargeHeaderSettings, isLarge, 'grid');
-                setElementDisplay(mealLargeAllergenSettings, isLarge, 'block');
                 setElementDisplay(mealLargeMessageSettings, isLarge, 'grid');
                 setElementDisplay(mealLargeSourceSettings, isLarge, 'grid');
             };
@@ -6788,9 +6776,6 @@
                         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showSnackPm" ${settings.showSnackPm === true ? 'checked' : ''}> ${mt('snack_pm')}</label>
                         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showDinner" ${settings.showDinner === true ? 'checked' : ''}> ${mt('dinner')}</label>
                         <label style="display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;"><input type="checkbox" id="setting-showMealTypeSvgIcons" ${settings.showMealTypeSvgIcons !== false ? 'checked' : ''}> ${mt('show_icons')}</label>
-                        <div id="meal-large-allergen-settings" style="display:${isSmallMode ? 'none' : 'block'};">
-                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showAllergenEmojis" ${settings.showAllergenEmojis === true ? 'checked' : ''}> ${mt('allergens_large_only')}</label>
-                        </div>
                         <div id="meal-large-message-settings" style="display:${isSmallMode ? 'none' : 'grid'}; gap:8px; margin-top:6px; border-top:1px solid #eef2f7; padding-top:8px;">
                             <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showAppetiteMessage" ${settings.showAppetiteMessage === true ? 'checked' : ''}> ${mt('appetite_toggle')}</label>
                             <div>
@@ -7572,7 +7557,6 @@
                 showDinner: document.getElementById('setting-showDinner')?.checked === true,
                 showMealTypeEmojis: false,
                 showMealTypeSvgIcons: document.getElementById('setting-showMealTypeSvgIcons')?.checked !== false,
-                showAllergenEmojis: document.getElementById('setting-showAllergenEmojis')?.checked === true,
                 centerAlign: false,
                 slowScrollOnOverflow: false,
                 slowScrollSpeedPxPerSec: 40,
@@ -7984,7 +7968,6 @@
             params.append('showSnackPm', settings.showSnackPm === true ? 'true' : 'false');
             params.append('showDinner', settings.showDinner === true ? 'true' : 'false');
             params.append('showMealTypeSvgIcons', settings.showMealTypeSvgIcons === false ? 'false' : 'true');
-            params.append('showAllergenEmojis', settings.showAllergenEmojis === true ? 'true' : 'false');
             params.append('centerAlign', settings.centerAlign === true ? 'true' : 'false');
             params.append('slowScrollOnOverflow', settings.slowScrollOnOverflow === true ? 'true' : 'false');
             params.append('slowScrollSpeedPxPerSec', String(Math.max(8, Math.min(120, parseInt(settings.slowScrollSpeedPxPerSec || 28, 10) || 28))));
@@ -8304,9 +8287,8 @@
             if (settings.showDinner === true) visibleMeals.push(mt('dinner'));
 
             const mealsText = visibleMeals.length > 0 ? visibleMeals.join(', ') : mt('no_meals_selected');
-            const allergenText = ` • ${settings.showAllergenEmojis === true ? mt('allergens_on') : mt('allergens_off')}`;
             const iconText = ` • ${settings.showMealTypeSvgIcons === false ? mt('icons_off') : mt('icons_on')}`;
-            return `${siteKey} • ${mt('institution_short')} #${institutionId} • ${mt('language_short')}: ${language.toUpperCase()}<br>${mealsText}${allergenText}${iconText}`;
+            return `${siteKey} • ${mt('institution_short')} #${institutionId} • ${mt('language_short')}: ${language.toUpperCase()}<br>${mealsText}${iconText}`;
         }
 
         function getRoomOccupancyLoopItemSummary(settings) {
