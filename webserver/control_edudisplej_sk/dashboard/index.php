@@ -279,7 +279,8 @@ include '../admin/header.php';
                     $data_groups = implode(' ', array_map(fn($id) => 'g' . $id, $gids));
                     $location_value = trim((string)($k['location'] ?? ''));
                     $location_value_lc = strtolower($location_value);
-                    $last_seen_str = $k['last_sync'] ? date('Y-m-d H:i', strtotime($k['last_sync'])) : ($k['last_seen'] ? date('Y-m-d H:i', strtotime($k['last_seen'])) : 'Soha');
+                    $last_activity_raw = kiosk_status_reference_time($k);
+                    $last_seen_str = $last_activity_raw ? date('Y-m-d H:i', strtotime($last_activity_raw)) : 'Soha';
                     $display_name = trim((string)($k['friendly_name'] ?? ''));
                     if ($display_name === '') {
                         $display_name = $k['hostname'] ?? 'N/A';

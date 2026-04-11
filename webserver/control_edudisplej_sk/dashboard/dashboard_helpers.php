@@ -122,6 +122,21 @@ function edudisplej_filter_matching_blocks(array $schedule_blocks, DateTimeImmut
         }
 
         $type = strtolower(trim((string)($block['block_type'] ?? 'weekly')));
+
+        if ($type === 'datetime_range') {
+            $start_dt = strtotime(str_replace('T', ' ', (string)($block['start_datetime'] ?? '')));
+            $end_dt = strtotime(str_replace('T', ' ', (string)($block['end_datetime'] ?? '')));
+            $now_ts = $now->getTimestamp();
+            if ($start_dt === false || $end_dt === false) {
+                continue;
+            }
+            if (!($now_ts >= $start_dt && $now_ts < $end_dt)) {
+                continue;
+            }
+            $matches[] = $block;
+            continue;
+        }
+
         $start = (string)($block['start_time'] ?? '00:00:00');
         $end = (string)($block['end_time'] ?? '00:00:00');
         
@@ -162,8 +177,18 @@ function edudisplej_filter_matching_blocks(array $schedule_blocks, DateTimeImmut
  */
 function edudisplej_sort_schedule_matches(array &$matches): void {
     usort($matches, static function ($a, $b) {
-        $ta = strtolower((string)($a['block_type'] ?? 'weekly')) === 'date' ? 2 : 1;
-        $tb = strtolower((string)($b['block_type'] ?? 'weekly')) === 'date' ? 2 : 1;
+        $type_weight = static function (string $type): int {
+            if ($type === 'datetime_range') {
+                return 3;
+            }
+            if ($type === 'date') {
+                return 2;
+            }
+            return 1;
+        };
+
+        $ta = $type_weight(strtolower((string)($a['block_type'] ?? 'weekly')));
+        $tb = $type_weight(strtolower((string)($b['block_type'] ?? 'weekly')));
         if ($ta !== $tb) {
             return $tb <=> $ta;
         }
@@ -182,6 +207,19 @@ function edudisplej_sort_schedule_matches(array &$matches): void {
 function edudisplej_format_schedule_info(array $block, array $style_map, DateTimeImmutable $now, int $default_style_id): array {
     $style_id = (int)($block['loop_style_id'] ?? $default_style_id);
     $loop_name = trim((string)($style_map[$style_id] ?? '')) ?: 'DEFAULT';
+
+    if (strtolower((string)($block['block_type'] ?? 'weekly')) === 'datetime_range') {
+        $start_dt = str_replace('T', ' ', (string)($block['start_datetime'] ?? ''));
+        $end_dt = str_replace('T', ' ', (string)($block['end_datetime'] ?? ''));
+        return [
+            'loop_name' => $loop_name,
+            'schedule_text' => edudisplej_dashboard_t(
+                'dashboard.schedule.datetime_range',
+                'Special interval {start} → {end}',
+                ['start' => $start_dt !== '' ? $start_dt : '—', 'end' => $end_dt !== '' ? $end_dt : '—']
+            ),
+        ];
+    }
 
     $start = substr((string)($block['start_time'] ?? '00:00:00'), 0, 5);
     $end = substr((string)($block['end_time'] ?? '00:00:00'), 0, 5);

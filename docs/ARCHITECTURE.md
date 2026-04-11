@@ -296,7 +296,7 @@ Response: `{ "success": true, "screenshot_requested_until": "2025-01-01 12:01:00
 
 - `screenshot_requested`: `true` when `screenshot_requested_until > NOW()` (TTL active)
 - `screenshot_enabled`: persistent per-kiosk toggle
-- `screenshot_interval_seconds`: how often the kiosk should send screenshots (default 3 s)
+- `screenshot_interval_seconds`: how often the kiosk should send screenshots (default 3 s, independent from `sync_interval`)
 
 ### 4.3 Kiosk-side behaviour
 
@@ -304,6 +304,7 @@ Response: `{ "success": true, "screenshot_requested_until": "2025-01-01 12:01:00
 1. Reads `screenshot_requested` from `/opt/edudisplej/last_sync_response.json` (written by the sync service after each successful v1 sync)
 2. If `true` → captures and uploads screenshot, then sleeps `screenshot_interval_seconds`
 3. If `false` and `screenshot_enabled` (config) is also false → skips, sleeps default interval
+4. The main device sync uses a separate cadence: 5 minutes by default, 2 minutes when portal activity is fresh.
 
 The sync service writes the full v1 sync response to `/opt/edudisplej/last_sync_response.json` after every successful call. This lets the screenshot service read the latest policy without an extra API call.
 

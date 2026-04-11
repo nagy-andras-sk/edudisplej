@@ -1507,8 +1507,21 @@ $loop_json
                     return false;
                 }
 
-                const blockType = String(block.block_type || 'weekly').toLowerCase() === 'date' ? 'date' : 'weekly';
+                const blockTypeRaw = String(block.block_type || 'weekly').toLowerCase();
+                const blockType = (blockTypeRaw === 'date' || blockTypeRaw === 'datetime_range') ? blockTypeRaw : 'weekly';
                 const dateKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+                if (blockType === 'datetime_range') {
+                    const startRaw = String(block.start_datetime || '').replace(' ', 'T');
+                    const endRaw = String(block.end_datetime || '').replace(' ', 'T');
+                    const startTs = Date.parse(startRaw);
+                    const endTs = Date.parse(endRaw);
+                    if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) {
+                        return false;
+                    }
+                    const nowTs = now.getTime();
+                    return nowTs >= startTs && nowTs < endTs;
+                }
 
                 if (blockType === 'date') {
                     if (String(block.specific_date || '') !== dateKey) {
@@ -1545,8 +1558,14 @@ $loop_json
                 }
 
                 candidates.sort((a, b) => {
-                    const typeA = String(a.block_type || 'weekly').toLowerCase() === 'date' ? 2 : 1;
-                    const typeB = String(b.block_type || 'weekly').toLowerCase() === 'date' ? 2 : 1;
+                    const typeWeight = (blockType) => {
+                        const type = String(blockType || 'weekly').toLowerCase();
+                        if (type === 'datetime_range') return 3;
+                        if (type === 'date') return 2;
+                        return 1;
+                    };
+                    const typeA = typeWeight(a.block_type);
+                    const typeB = typeWeight(b.block_type);
                     if (typeA !== typeB) {
                         return typeB - typeA;
                     }

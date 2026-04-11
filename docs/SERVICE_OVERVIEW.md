@@ -85,6 +85,7 @@ Ez a dokumentum a Raspberry-n futó EduDisplej service-eket írja le:
 - `ExecStart=/opt/edudisplej/init/edudisplej_sync_service.sh start`
 - `Restart=always`, `RestartSec=30`
 - Alap ciklus: `SYNC_INTERVAL=300s`
+- Portal-aktív gyorsítás: a szerver `sync_interval=120s` értéket ad vissza, ha az adott cégnél friss a portal activity
 - Fast loop: `FAST_LOOP_INTERVAL=30s` (ha `/opt/edudisplej/.fast_loop_enabled` létezik)
 
 **Egy ciklusban mit csinál:**

@@ -80,7 +80,9 @@ function edudisplej_module_policy_registry(): array
         ],
         'turned-off' => [
             'duration' => ['fixed' => 120],
-            'settings' => [],
+            'settings' => [
+                'screen_off_mode' => ['type' => 'enum', 'allowed' => ['signal_off', 'black_screen'], 'default' => 'signal_off'],
+            ],
         ],
         'pdf' => [
             'duration' => ['min' => 1, 'max' => 3600, 'default' => 10],

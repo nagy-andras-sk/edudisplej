@@ -556,24 +556,45 @@ function edudisplej_module_runtime_payload_for_sync(string $module_key): array {
     ];
 }
 
-function edudisplej_kiosk_loop_requires_turned_off(array $loop_config): bool {
+function edudisplej_kiosk_loop_resolve_turned_off_state(array $loop_config, string $default_mode = 'signal_off'): array {
+    $fallback_mode = strtolower(trim($default_mode));
+    if (!in_array($fallback_mode, ['signal_off', 'black_screen'], true)) {
+        $fallback_mode = 'signal_off';
+    }
+
     if (empty($loop_config)) {
-        return false;
+        return [
+            'should_turn_off' => false,
+            'screen_off_mode' => $fallback_mode,
+        ];
     }
 
     $has_turned_off = false;
+    $resolved_mode = $fallback_mode;
+
     foreach ($loop_config as $item) {
         $module_key = edudisplej_canonical_module_key((string)($item['module_key'] ?? ''));
         if ($module_key === 'turned-off') {
             $has_turned_off = true;
+            $settings = is_array($item['settings'] ?? null) ? $item['settings'] : [];
+            $candidate_mode = strtolower(trim((string)($settings['screen_off_mode'] ?? $settings['screenOffMode'] ?? '')));
+            if (in_array($candidate_mode, ['signal_off', 'black_screen'], true)) {
+                $resolved_mode = $candidate_mode;
+            }
             continue;
         }
         if ($module_key !== '') {
-            return false;
+            return [
+                'should_turn_off' => false,
+                'screen_off_mode' => $fallback_mode,
+            ];
         }
     }
 
-    return $has_turned_off;
+    return [
+        'should_turn_off' => $has_turned_off,
+        'screen_off_mode' => $has_turned_off ? $resolved_mode : $fallback_mode,
+    ];
 }
 
 function edudisplej_kiosk_loop_apply_terminal_power_mode(mysqli $conn, int $kiosk_id, bool $should_turn_off, string $screen_off_mode = 'signal_off'): array {
@@ -781,11 +802,17 @@ try {
                     }
 
                     $loop_style_id = (int)($block['loop_style_id'] ?? 0);
+                    $planner_block_type = strtolower((string)($block['block_type'] ?? 'weekly'));
+                    if (!in_array($planner_block_type, ['weekly', 'date', 'datetime_range'], true)) {
+                        $planner_block_type = 'weekly';
+                    }
                     $planner_blocks[] = [
                         'id' => (int)($block['id'] ?? 0),
                         'block_name' => (string)($block['block_name'] ?? 'Időblokk'),
-                        'block_type' => strtolower((string)($block['block_type'] ?? 'weekly')) === 'date' ? 'date' : 'weekly',
+                        'block_type' => $planner_block_type,
                         'specific_date' => !empty($block['specific_date']) ? (string)$block['specific_date'] : null,
+                        'start_datetime' => !empty($block['start_datetime']) ? (string)$block['start_datetime'] : null,
+                        'end_datetime' => !empty($block['end_datetime']) ? (string)$block['end_datetime'] : null,
                         'start_time' => edudisplej_kiosk_loop_normalize_time($block['start_time'] ?? '00:00:00', '00:00:00'),
                         'end_time' => edudisplej_kiosk_loop_normalize_time($block['end_time'] ?? '00:00:00', '00:00:00'),
                         'days_mask' => (string)($block['days_mask'] ?? '1,2,3,4,5,6,7'),
@@ -809,7 +836,22 @@ try {
                         continue;
                     }
 
-                    $block_type = strtolower((string)($block['block_type'] ?? 'weekly')) === 'date' ? 'date' : 'weekly';
+                    $block_type = strtolower((string)($block['block_type'] ?? 'weekly'));
+
+                    if ($block_type === 'datetime_range') {
+                        $range_start_ts = strtotime(str_replace('T', ' ', (string)($block['start_datetime'] ?? '')));
+                        $range_end_ts = strtotime(str_replace('T', ' ', (string)($block['end_datetime'] ?? '')));
+                        $now_ts = time();
+                        if ($range_start_ts === false || $range_end_ts === false) {
+                            continue;
+                        }
+                        if (!($now_ts >= $range_start_ts && $now_ts < $range_end_ts)) {
+                            continue;
+                        }
+                        $candidates[] = $block;
+                        continue;
+                    }
+
                     if ($block_type === 'date' && (string)($block['specific_date'] ?? '') !== $now_date) {
                         continue;
                     }
@@ -843,8 +885,18 @@ try {
 
                 if (!empty($candidates)) {
                     usort($candidates, function ($a, $b) {
-                        $typeA = strtolower((string)($a['block_type'] ?? 'weekly')) === 'date' ? 2 : 1;
-                        $typeB = strtolower((string)($b['block_type'] ?? 'weekly')) === 'date' ? 2 : 1;
+                        $typeWeight = static function (string $type): int {
+                            if ($type === 'datetime_range') {
+                                return 3;
+                            }
+                            if ($type === 'date') {
+                                return 2;
+                            }
+                            return 1;
+                        };
+
+                        $typeA = $typeWeight(strtolower((string)($a['block_type'] ?? 'weekly')));
+                        $typeB = $typeWeight(strtolower((string)($b['block_type'] ?? 'weekly')));
                         if ($typeA !== $typeB) {
                             return $typeB <=> $typeA;
                         }
@@ -1063,8 +1115,13 @@ try {
     }
     $loop_last_update = edudisplej_pick_newer_timestamp($loop_last_update, $meal_prefetch_latest) ?? $loop_last_update;
     
-    $should_turn_off = edudisplej_kiosk_loop_requires_turned_off($loop_config);
-    $terminal_state = edudisplej_kiosk_loop_apply_terminal_power_mode($conn, (int)$kiosk_id, $should_turn_off, (string)($kiosk['screen_off_mode'] ?? 'signal_off'));
+    $turned_off_state = edudisplej_kiosk_loop_resolve_turned_off_state($loop_config, (string)($kiosk['screen_off_mode'] ?? 'signal_off'));
+    $terminal_state = edudisplej_kiosk_loop_apply_terminal_power_mode(
+        $conn,
+        (int)$kiosk_id,
+        (bool)($turned_off_state['should_turn_off'] ?? false),
+        (string)($turned_off_state['screen_off_mode'] ?? 'signal_off')
+    );
 
     closeDbConnection($conn);
     

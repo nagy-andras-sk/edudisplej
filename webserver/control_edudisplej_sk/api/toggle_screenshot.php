@@ -43,19 +43,18 @@ try {
     
     // Verify kiosk belongs to user's company or token company
     if ($api_company && !api_is_admin_session($api_company)) {
-        $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE id = ?");
+        $stmt = $conn->prepare("SELECT id, company_id, sync_interval FROM kiosks WHERE id = ?");
         $stmt->bind_param("i", $kiosk_id);
     } else {
-        $stmt = $conn->prepare("SELECT id FROM kiosks WHERE id = ? AND company_id = ?");
+        $stmt = $conn->prepare("SELECT id, sync_interval FROM kiosks WHERE id = ? AND company_id = ?");
         $stmt->bind_param("ii", $kiosk_id, $company_id);
     }
     $stmt->execute();
     $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
 
     if ($api_company && !api_is_admin_session($api_company)) {
-        $row = $result->fetch_assoc();
         api_require_company_match($api_company, $row['company_id'] ?? null, 'Unauthorized');
-        $result->data_seek(0);
     }
     
     if ($result->num_rows === 0) {
@@ -65,22 +64,18 @@ try {
     }
     $stmt->close();
     
-    // Determine sync_interval based on screenshot_enabled
-    // If screenshot enabled: 15 seconds, if disabled: 120 seconds
-    $sync_interval = $screenshot_enabled ? 15 : 120;
-    
-    // Update kiosk settings
-    $stmt = $conn->prepare("UPDATE kiosks SET screenshot_enabled = ?, sync_interval = ? WHERE id = ?");
-    $stmt->bind_param("iii", $screenshot_enabled, $sync_interval, $kiosk_id);
+    // Update kiosk settings without changing the main sync cadence.
+    $stmt = $conn->prepare("UPDATE kiosks SET screenshot_enabled = ? WHERE id = ?");
+    $stmt->bind_param("ii", $screenshot_enabled, $kiosk_id);
     
     if ($stmt->execute()) {
         $response['success'] = true;
         $response['message'] = 'Screenshot setting updated successfully';
         $response['screenshot_enabled'] = $screenshot_enabled;
-        $response['sync_interval'] = $sync_interval;
+        $response['sync_interval'] = isset($row['sync_interval']) ? (int)$row['sync_interval'] : null;
         
         // Log the change
-        error_log("Screenshot " . ($screenshot_enabled ? "enabled" : "disabled") . " for kiosk ID: $kiosk_id, sync interval set to: {$sync_interval}s");
+        error_log("Screenshot " . ($screenshot_enabled ? "enabled" : "disabled") . " for kiosk ID: $kiosk_id");
     } else {
         $response['message'] = 'Failed to update screenshot setting';
     }

@@ -77,23 +77,24 @@ try {
         $response['screenshot_enabled'] = $screenshot_enabled;
     }
     
-    // Handle custom sync interval for screenshot
+    // Handle custom screenshot interval independently from the main sync interval
     if (isset($data['screenshot_interval'])) {
         $screenshot_interval = intval($data['screenshot_interval']);
         
-        // Validate interval (between 5 and 600 seconds)
-        if ($screenshot_interval < 5 || $screenshot_interval > 600) {
-            $response['message'] = 'Screenshot interval must be between 5 and 600 seconds';
+        // Validate interval (between 3 and 600 seconds)
+        if ($screenshot_interval < 3 || $screenshot_interval > 600) {
+            $response['message'] = 'Screenshot interval must be between 3 and 600 seconds';
             echo json_encode($response);
             exit();
         }
         
-        $stmt = $conn->prepare("UPDATE kiosks SET sync_interval = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE kiosks SET screenshot_interval_seconds = ? WHERE id = ?");
         $stmt->bind_param("ii", $screenshot_interval, $kiosk_id);
         $stmt->execute();
         $stmt->close();
         
         $response['screenshot_interval'] = $screenshot_interval;
+        $response['screenshot_interval_seconds'] = $screenshot_interval;
     }
     
     $response['success'] = true;

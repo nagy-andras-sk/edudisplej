@@ -121,14 +121,16 @@ function v1_has_recent_control_panel_activity(mysqli $conn, int $company_id, int
     $stmt = $conn->prepare("SELECT id
                             FROM users
                             WHERE company_id = ?
-                              AND last_activity_at IS NOT NULL
-                              AND last_activity_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+                              AND (
+                                  last_activity_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+                                  OR last_login >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+                              )
                             LIMIT 1");
     if (!$stmt) {
         return false;
     }
 
-    $stmt->bind_param("ii", $company_id, $window_seconds);
+    $stmt->bind_param("iii", $company_id, $window_seconds, $window_seconds);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -218,7 +220,7 @@ try {
         "UPDATE kiosks
             SET hostname = ?, hw_info = ?, public_ip = ?,
                 version = ?, screen_resolution = ?, screen_status = ?,
-                status = 'online', last_seen = NOW(), upgrade_started_at = NULL
+                status = 'online', last_seen = NOW(), last_sync = NOW(), upgrade_started_at = NULL
           WHERE mac = ?"
     );
     $stmt->bind_param("sssssss",
@@ -491,11 +493,16 @@ try {
     $screenshot_requested = $screenshot_ttl_active || (bool)$kiosk['screenshot_requested'];
 
     $activity_window_seconds = 10 * 60;
-    $fast_interval_seconds = 30;
+    $fast_interval_seconds = 2 * 60;
     $default_interval_seconds = 5 * 60;
+    $default_screenshot_interval_seconds = 3;
     $company_id_for_activity = (int)($kiosk['company_id'] ?? 0);
     $has_recent_activity = v1_has_recent_control_panel_activity($conn, $company_id_for_activity, $activity_window_seconds);
     $effective_interval = $has_recent_activity ? $fast_interval_seconds : $default_interval_seconds;
+    $screenshot_interval_seconds = (int)($kiosk['screenshot_interval_seconds'] ?? 0);
+    if ($screenshot_interval_seconds <= 0) {
+        $screenshot_interval_seconds = $default_screenshot_interval_seconds;
+    }
 
     $response['success']                   = true;
     $response['kiosk_id']                  = $kiosk_id;
@@ -504,7 +511,7 @@ try {
     $response['screenshot_requested']      = $screenshot_requested;
     $response['screenshot_enabled']        = (bool)$kiosk['screenshot_enabled'];
     $response['debug_mode']                = (bool)$kiosk['debug_mode'];
-    $response['screenshot_interval_seconds'] = $effective_interval;
+    $response['screenshot_interval_seconds'] = $screenshot_interval_seconds;
     $response['company_id']                = $kiosk['company_id'];
     $response['company_name']              = $kiosk['company_name'] ?? '';
     $response['needs_update']              = $need_update;
@@ -520,8 +527,13 @@ try {
     }
 
     $core_update_required = false;
-    if ($kiosk_version_raw !== '' && $latest_system_version !== '') {
-        $core_update_required = version_compare($kiosk_version_raw, $latest_system_version, '<');
+    if ($latest_system_version !== '') {
+        if ($kiosk_version_raw === '') {
+            // Unknown kiosk version should receive a core refresh to recover drifted/stale clients.
+            $core_update_required = true;
+        } else {
+            $core_update_required = version_compare($kiosk_version_raw, $latest_system_version, '<');
+        }
     }
 
     $response['current_system_version'] = $kiosk_version_raw;

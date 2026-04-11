@@ -31,7 +31,7 @@ TTYVTDisallocate=yes
 ExecStart=/opt/edudisplej/init/kiosk-start.sh
 
 # Restart policy
-Restart=on-failure
+Restart=always
 RestartSec=8
 
 # Security and resource limits

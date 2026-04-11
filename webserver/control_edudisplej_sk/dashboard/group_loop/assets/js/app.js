@@ -579,6 +579,9 @@
                     turned_off_name: 'Kikapcsolás',
                     turned_off_desc: 'Ütemezett kijelző kikapcsolás (tartalom leáll + HDMI ki).',
                     turned_off_period: 'Kijelző kikapcsolási idősáv',
+                    turned_off_mode_label: 'Kikapcsolási mód',
+                    turned_off_mode_signal_off: 'Jel lekapcsolása (nincs kimeneti jel)',
+                    turned_off_mode_black_screen: 'Fekete képernyő (surf bezárás)',
                     display_singular: 'kijelző',
                     display_plural: 'kijelző'
                 },
@@ -594,6 +597,9 @@
                     turned_off_name: 'Vypnutie',
                     turned_off_desc: 'Plánované vypnutie displeja (zastavenie obsahu + HDMI off).',
                     turned_off_period: 'Časový blok vypnutia displeja',
+                    turned_off_mode_label: 'Režim vypnutia',
+                    turned_off_mode_signal_off: 'Vypnúť obrazový výstup (bez signálu)',
+                    turned_off_mode_black_screen: 'Čierna obrazovka (zatvoriť surf)',
                     display_singular: 'displej',
                     display_plural: 'displeje'
                 },
@@ -609,6 +615,9 @@
                     turned_off_name: 'Turned Off',
                     turned_off_desc: 'Scheduled display power off (content service stop + HDMI off).',
                     turned_off_period: 'Display power-off time block',
+                    turned_off_mode_label: 'Power-off behavior',
+                    turned_off_mode_signal_off: 'Turn off display signal (no output signal)',
+                    turned_off_mode_black_screen: 'Black screen only (close surf)',
                     display_singular: 'display',
                     display_plural: 'displays'
                 }
@@ -1324,8 +1333,16 @@
                     return Number.isFinite(parsedId) && parsedId !== 0 ? parsedId : nextTempTimeBlockId--;
                 })(),
                 block_name: String(block.block_name || 'Időblokk'),
-                block_type: String(block.block_type || 'weekly') === 'date' ? 'date' : 'weekly',
+                block_type: (() => {
+                    const normalizedType = String(block.block_type || 'weekly').toLowerCase();
+                    if (normalizedType === 'date' || normalizedType === 'datetime_range') {
+                        return normalizedType;
+                    }
+                    return 'weekly';
+                })(),
                 specific_date: block.specific_date ? String(block.specific_date).slice(0, 10) : null,
+                start_datetime: block.start_datetime ? String(block.start_datetime).slice(0, 19) : null,
+                end_datetime: block.end_datetime ? String(block.end_datetime).slice(0, 19) : null,
                 start_time: String(block.start_time || '08:00:00').slice(0, 8),
                 end_time: String(block.end_time || '12:00:00').slice(0, 8),
                 days_mask: normalizeDaysMask(block.days_mask),
@@ -2018,6 +2035,17 @@
                     }
                 }
 
+                if (String(candidate.block_type || 'weekly') === 'datetime_range') {
+                    const candStart = Date.parse(String(candidate.start_datetime || '').replace(' ', 'T'));
+                    const candEnd = Date.parse(String(candidate.end_datetime || '').replace(' ', 'T'));
+                    const existStart = Date.parse(String(existing.start_datetime || '').replace(' ', 'T'));
+                    const existEnd = Date.parse(String(existing.end_datetime || '').replace(' ', 'T'));
+                    if (!Number.isFinite(candStart) || !Number.isFinite(candEnd) || !Number.isFinite(existStart) || !Number.isFinite(existEnd)) {
+                        return false;
+                    }
+                    return candStart < existEnd && existStart < candEnd;
+                }
+
                 return hasPairOverlap(candidate, existing);
             });
         }
@@ -2457,6 +2485,11 @@
         function getScopeLabel(block) {
             const start = String(block.start_time || '00:00:00').slice(0, 5);
             const end = String(block.end_time || '00:00:00').slice(0, 5);
+            if (block.block_type === 'datetime_range') {
+                const startDt = String(block.start_datetime || '').replace('T', ' ').slice(0, 16);
+                const endDt = String(block.end_datetime || '').replace('T', ' ').slice(0, 16);
+                return `${startDt || '—'} → ${endDt || '—'} • ${block.block_name || 'Speciális intervallum'}`;
+            }
             if (block.block_type === 'date') {
                 return `${block.specific_date || '—'} ${start}-${end} • ${block.block_name || 'Speciális'}`;
             }
@@ -3172,18 +3205,27 @@
             const focusedDate = String(document.getElementById('special-day-focus')?.value || '').trim();
 
             const specialBlocks = timeBlocks
-                .filter((block) => block.block_type === 'date')
+                .filter((block) => block.block_type === 'date' || block.block_type === 'datetime_range')
                 .filter((block) => {
-                    if (focusedDate && String(block.specific_date || '') !== focusedDate) {
-                        return false;
+                    if (focusedDate) {
+                        if (block.block_type === 'date' && String(block.specific_date || '') !== focusedDate) {
+                            return false;
+                        }
+                        if (block.block_type === 'datetime_range') {
+                            const startDate = String(block.start_datetime || '').slice(0, 10);
+                            const endDate = String(block.end_datetime || '').slice(0, 10);
+                            if (focusedDate < startDate || focusedDate > endDate) {
+                                return false;
+                            }
+                        }
                     }
                     if (!searchTerm) {
                         return true;
                     }
-                    const haystack = `${String(block.specific_date || '')} ${String(block.block_name || '')} ${String(block.start_time || '')} ${String(block.end_time || '')}`.toLowerCase();
+                    const haystack = `${String(block.specific_date || '')} ${String(block.start_datetime || '')} ${String(block.end_datetime || '')} ${String(block.block_name || '')} ${String(block.start_time || '')} ${String(block.end_time || '')}`.toLowerCase();
                     return haystack.includes(searchTerm);
                 })
-                .sort((a, b) => String(a.specific_date || '').localeCompare(String(b.specific_date || '')) || String(a.start_time).localeCompare(String(b.start_time)));
+                .sort((a, b) => getScopeLabel(a).localeCompare(getScopeLabel(b)));
 
             if (specialBlocks.length === 0) {
                 wrap.innerHTML = `<div class="item"><span class="muted">${searchTerm ? 'Nincs találat a keresésre.' : 'Nincs speciális dátumos idősáv.'}</span></div>`;
@@ -3194,7 +3236,7 @@
                 const active = activeScope === `block:${block.id}` ? ' style="font-weight:700;"' : '';
                 const style = getLoopStyleById(block.loop_style_id || 0);
                 return `<div class="item">
-                    <span${active}>${block.specific_date} ${String(block.start_time).slice(0,5)}-${String(block.end_time).slice(0,5)} • ${block.block_name} • ${style ? style.name : 'N/A'}</span>
+                    <span${active}>${getScopeLabel(block)} • ${style ? style.name : 'N/A'}</span>
                     <button class="btn" type="button" onclick="setActiveScope('block:${block.id}', true)">Szerkesztés</button>
                 </div>`;
             }).join('');
@@ -3244,6 +3286,18 @@
                             </select>
                             <button type="button" class="btn" onclick="addSpecialDayBlockFromPlanner('${dateVal}')">Hozzáadás</button>
                         </div>
+                        <div style="font-size:12px; color:#425466; margin-bottom:6px;">Speciális intervallum (egyszeri, dátum+idő):</div>
+                        <div style="display:grid; grid-template-columns:minmax(160px,1fr) minmax(160px,1fr) 1fr auto; gap:8px; align-items:center; margin-bottom:12px;">
+                            <input id="special-range-start" type="datetime-local" aria-label="Intervallum kezdete">
+                            <input id="special-range-end" type="datetime-local" aria-label="Intervallum vége">
+                            <select id="special-range-loop">
+                                ${loopStyles
+                                    .filter((style) => parseInt(style.id, 10) !== parseInt(defaultLoopStyleId || 0, 10))
+                                    .map((style) => `<option value="${style.id}">${String(style.name || 'Loop')}</option>`)
+                                    .join('')}
+                            </select>
+                            <button type="button" class="btn" onclick="addSpecialRangeBlockFromPlanner()">Intervallum hozzáadása</button>
+                        </div>
                         <div style="display:flex; justify-content:flex-end;">
                             <button type="button" class="btn" onclick="closeTimeBlockModal()">Bezárás</button>
                         </div>
@@ -3253,6 +3307,74 @@
 
             set24HourTimeSelectValue('special-day-plan-start', '08:00');
             set24HourTimeSelectValue('special-day-plan-end', '10:00');
+
+            const startRangeInput = document.getElementById('special-range-start');
+            const endRangeInput = document.getElementById('special-range-end');
+            const styleRangeSelect = document.getElementById('special-range-loop');
+            if (styleRangeSelect) {
+                const fallbackStyle = parseInt(document.getElementById('special-day-plan-loop')?.value || 0, 10);
+                if (fallbackStyle) {
+                    styleRangeSelect.value = String(fallbackStyle);
+                }
+            }
+            if (startRangeInput && !startRangeInput.value) {
+                startRangeInput.value = `${dateVal}T14:00`;
+            }
+            if (endRangeInput && !endRangeInput.value) {
+                endRangeInput.value = `${dateVal}T16:00`;
+            }
+        }
+
+        function addSpecialRangeBlockFromPlanner() {
+            const startVal = String(document.getElementById('special-range-start')?.value || '').trim();
+            const endVal = String(document.getElementById('special-range-end')?.value || '').trim();
+            const styleId = parseInt(document.getElementById('special-range-loop')?.value || 0, 10);
+
+            if (!startVal || !endVal || !styleId) {
+                showAutosaveToast('⚠️ Hiányos intervallum adat', true);
+                return;
+            }
+
+            const startTs = Date.parse(startVal);
+            const endTs = Date.parse(endVal);
+            if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) {
+                showAutosaveToast('⚠️ Az intervallum vége legyen később a kezdésnél', true);
+                return;
+            }
+
+            const startDateObj = new Date(startTs);
+            const endDateObj = new Date(endTs);
+            const startDate = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}-${String(startDateObj.getDate()).padStart(2, '0')}`;
+            const endDate = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
+            const startTime = `${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}:00`;
+            const endTime = `${String(endDateObj.getHours()).padStart(2, '0')}:${String(endDateObj.getMinutes()).padStart(2, '0')}:00`;
+
+            const payload = {
+                id: nextTempTimeBlockId--,
+                block_name: `Speciális intervallum ${startDate} ${startTime.slice(0, 5)}-${endDate} ${endTime.slice(0, 5)}`,
+                block_type: 'datetime_range',
+                start_datetime: `${startDate} ${startTime}`,
+                end_datetime: `${endDate} ${endTime}`,
+                specific_date: startDate,
+                start_time: startTime,
+                end_time: endTime,
+                days_mask: '',
+                priority: 400,
+                loop_style_id: styleId,
+                is_active: 1,
+                loops: []
+            };
+
+            if (!resolveScheduleConflicts(payload, null)) {
+                return;
+            }
+
+            timeBlocks.push(payload);
+            activeScope = `block:${payload.id}`;
+            setActiveScope(activeScope, true);
+            scheduleAutoSave(120);
+            showAutosaveToast('✓ Speciális intervallum létrehozva');
+            closeTimeBlockModal();
         }
 
         function addSpecialDayBlockFromPlanner(dateVal) {
@@ -3324,6 +3446,16 @@
                 return false;
             }
 
+            if (String(block.block_type || 'weekly') === 'datetime_range') {
+                const startTs = Date.parse(String(block.start_datetime || '').replace(' ', 'T'));
+                const endTs = Date.parse(String(block.end_datetime || '').replace(' ', 'T'));
+                const nowTs = dt.getTime();
+                if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) {
+                    return false;
+                }
+                return nowTs >= startTs && nowTs < endTs;
+            }
+
             const hhmmss = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}:00`;
             const start = String(block.start_time || '00:00:00');
             const end = String(block.end_time || '00:00:00');
@@ -3352,8 +3484,14 @@
             }
 
             matching.sort((a, b) => {
-                const typeWeightA = String(a.block_type || 'weekly') === 'date' ? 2 : 1;
-                const typeWeightB = String(b.block_type || 'weekly') === 'date' ? 2 : 1;
+                const getTypeWeight = (typeRaw) => {
+                    const type = String(typeRaw || 'weekly');
+                    if (type === 'datetime_range') return 3;
+                    if (type === 'date') return 2;
+                    return 1;
+                };
+                const typeWeightA = getTypeWeight(a.block_type);
+                const typeWeightB = getTypeWeight(b.block_type);
                 if (typeWeightA !== typeWeightB) {
                     return typeWeightB - typeWeightA;
                 }
@@ -4861,7 +4999,9 @@
                     fitMode: 'contain',
                     bgColor: '#000000'
                 },
-                'turned-off': {},
+                'turned-off': {
+                    screenOffMode: 'signal_off'
+                },
                 'image-gallery': {
                     imageUrlsJson: '[]',
                     displayMode: 'slideshow',
@@ -6161,6 +6301,8 @@
                 formHtml = buildClockCustomizationHtml(settings);
             } else if (moduleKey === 'default-logo') {
                 formHtml = buildDefaultLogoCustomizationHtml();
+            } else if (moduleKey === 'turned-off') {
+                formHtml = buildTurnedOffCustomizationHtml(settings);
             } else if (moduleKey === 'text') {
                 formHtml = buildTextCustomizationHtml(item, settings);
             } else if (moduleKey === 'meal-menu') {
@@ -6325,6 +6467,26 @@
                     </div>
                     <div class="muted" style="font-size:12px;">
                         ${defaultLogoUiText('not_editable')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function buildTurnedOffCustomizationHtml(settings) {
+            const rawMode = String(settings.screenOffMode || settings.screen_off_mode || 'signal_off').toLowerCase();
+            const mode = rawMode === 'black_screen' ? 'black_screen' : 'signal_off';
+
+            return `
+                <div style="display:grid; gap:12px;">
+                    <div class="muted" style="font-size:13px; line-height:1.45;">
+                        ${loopUiText('turned_off_desc')}
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:6px; font-weight:700;">${loopUiText('turned_off_mode_label')}</label>
+                        <select id="setting-turnedOffMode" style="width:100%; padding:8px; border-radius:5px; border:1px solid #ccc;">
+                            <option value="signal_off" ${mode === 'signal_off' ? 'selected' : ''}>${loopUiText('turned_off_mode_signal_off')}</option>
+                            <option value="black_screen" ${mode === 'black_screen' ? 'selected' : ''}>${loopUiText('turned_off_mode_black_screen')}</option>
+                        </select>
                     </div>
                 </div>
             `;
@@ -7585,6 +7747,15 @@
                 apiBaseUrl: '../../api/room_occupancy.php'
             };
         }
+
+        function collectTurnedOffSettingsFromForm() {
+            const rawMode = String(document.getElementById('setting-turnedOffMode')?.value || 'signal_off').toLowerCase();
+            const mode = rawMode === 'black_screen' ? 'black_screen' : 'signal_off';
+            return {
+                screenOffMode: mode,
+                screen_off_mode: mode
+            };
+        }
         
         function saveCustomization(index) {
             if (isDefaultGroup) {
@@ -7617,6 +7788,8 @@
                 Object.assign(newSettings, collectMealMenuSettingsFromForm());
             } else if (moduleKey === 'room-occupancy') {
                 Object.assign(newSettings, collectRoomOccupancySettingsFromForm());
+            } else if (moduleKey === 'turned-off') {
+                Object.assign(newSettings, collectTurnedOffSettingsFromForm());
             }
 
             if (isOverlayCarrierModule(moduleKey)) {
@@ -8336,7 +8509,11 @@
             }
 
             if (moduleKey === 'turned-off') {
-                return loopUiText('turned_off_period');
+                const rawMode = String(settings.screenOffMode || settings.screen_off_mode || 'signal_off').toLowerCase();
+                const modeLabel = rawMode === 'black_screen'
+                    ? loopUiText('turned_off_mode_black_screen')
+                    : loopUiText('turned_off_mode_signal_off');
+                return `${loopUiText('turned_off_period')}<br>${modeLabel}`;
             }
 
             return '';

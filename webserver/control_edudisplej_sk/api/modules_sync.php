@@ -523,24 +523,45 @@ function edudisplej_optimize_module_settings_for_sync(mysqli $conn, int $company
     return $normalized;
 }
 
-function edudisplej_modules_sync_loop_requires_turned_off(array $modules): bool {
+function edudisplej_modules_sync_resolve_turned_off_state(array $modules, string $default_mode = 'signal_off'): array {
+    $fallback_mode = strtolower(trim($default_mode));
+    if (!in_array($fallback_mode, ['signal_off', 'black_screen'], true)) {
+        $fallback_mode = 'signal_off';
+    }
+
     if (empty($modules)) {
-        return false;
+        return [
+            'should_turn_off' => false,
+            'screen_off_mode' => $fallback_mode,
+        ];
     }
 
     $has_turned_off = false;
+    $resolved_mode = $fallback_mode;
+
     foreach ($modules as $module) {
         $module_key = edudisplej_canonical_module_key((string)($module['module_key'] ?? ''));
         if ($module_key === 'turned-off') {
             $has_turned_off = true;
+            $settings = is_array($module['settings'] ?? null) ? $module['settings'] : [];
+            $candidate_mode = strtolower(trim((string)($settings['screen_off_mode'] ?? $settings['screenOffMode'] ?? '')));
+            if (in_array($candidate_mode, ['signal_off', 'black_screen'], true)) {
+                $resolved_mode = $candidate_mode;
+            }
             continue;
         }
         if ($module_key !== '') {
-            return false;
+            return [
+                'should_turn_off' => false,
+                'screen_off_mode' => $fallback_mode,
+            ];
         }
     }
 
-    return $has_turned_off;
+    return [
+        'should_turn_off' => $has_turned_off,
+        'screen_off_mode' => $has_turned_off ? $resolved_mode : $fallback_mode,
+    ];
 }
 
 function edudisplej_modules_sync_apply_terminal_power_mode(mysqli $conn, int $kiosk_id, bool $should_turn_off, string $screen_off_mode = 'signal_off'): array {
@@ -985,8 +1006,13 @@ try {
     $response['modules'] = $modules;
     $response['preload_modules'] = array_values($preload_map);
 
-    $should_turn_off = edudisplej_modules_sync_loop_requires_turned_off($modules);
-    $terminal_state = edudisplej_modules_sync_apply_terminal_power_mode($conn, (int)$kiosk['id'], $should_turn_off, (string)($kiosk['screen_off_mode'] ?? 'signal_off'));
+    $turned_off_state = edudisplej_modules_sync_resolve_turned_off_state($modules, (string)($kiosk['screen_off_mode'] ?? 'signal_off'));
+    $terminal_state = edudisplej_modules_sync_apply_terminal_power_mode(
+        $conn,
+        (int)$kiosk['id'],
+        (bool)($turned_off_state['should_turn_off'] ?? false),
+        (string)($turned_off_state['screen_off_mode'] ?? 'signal_off')
+    );
     $response['terminal_power_mode'] = $terminal_state['terminal_power_mode'];
     $response['terminal_power_command_queued'] = $terminal_state['terminal_power_command_queued'];
     

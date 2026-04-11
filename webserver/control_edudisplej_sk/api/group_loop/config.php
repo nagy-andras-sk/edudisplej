@@ -100,7 +100,7 @@ function edudisplej_validate_time_blocks_conflicts(array $time_blocks) {
         }
 
         $type = strtolower(trim((string)($block['block_type'] ?? 'weekly')));
-        if (!in_array($type, ['weekly', 'date'], true)) {
+        if (!in_array($type, ['weekly', 'date', 'datetime_range'], true)) {
             $type = 'weekly';
         }
 
@@ -126,6 +126,8 @@ function edudisplej_validate_time_blocks_conflicts(array $time_blocks) {
             'index' => $index,
             'type' => $type,
             'specific_date' => trim((string)($block['specific_date'] ?? '')),
+            'start_datetime' => trim((string)($block['start_datetime'] ?? '')),
+            'end_datetime' => trim((string)($block['end_datetime'] ?? '')),
             'start' => $start,
             'end' => $end,
             'days' => $days,
@@ -140,6 +142,26 @@ function edudisplej_validate_time_blocks_conflicts(array $time_blocks) {
             $b = $normalized[$j];
 
             if ($a['type'] !== $b['type']) {
+                continue;
+            }
+
+            if ($a['type'] === 'datetime_range') {
+                $aStart = strtotime(str_replace('T', ' ', $a['start_datetime']));
+                $aEnd = strtotime(str_replace('T', ' ', $a['end_datetime']));
+                $bStart = strtotime(str_replace('T', ' ', $b['start_datetime']));
+                $bEnd = strtotime(str_replace('T', ' ', $b['end_datetime']));
+
+                if ($aStart === false || $aEnd === false || $bStart === false || $bEnd === false) {
+                    continue;
+                }
+
+                if ($aStart < $bEnd && $bStart < $aEnd) {
+                    return [
+                        'ok' => false,
+                        'message' => "Ütköző idősáv: '{$a['name']}' és '{$b['name']}'"
+                    ];
+                }
+
                 continue;
             }
 
@@ -666,15 +688,33 @@ try {
 
                 $block_name = trim((string)($block['block_name'] ?? 'Időblokk'));
                 $block_type = strtolower(trim((string)($block['block_type'] ?? 'weekly')));
-                if (!in_array($block_type, ['weekly', 'date'], true)) {
+                if (!in_array($block_type, ['weekly', 'date', 'datetime_range'], true)) {
                     $block_type = 'weekly';
                 }
+
+                $start_datetime_raw = trim((string)($block['start_datetime'] ?? ''));
+                $end_datetime_raw = trim((string)($block['end_datetime'] ?? ''));
+                $start_datetime_ts = $block_type === 'datetime_range' ? strtotime(str_replace('T', ' ', $start_datetime_raw)) : false;
+                $end_datetime_ts = $block_type === 'datetime_range' ? strtotime(str_replace('T', ' ', $end_datetime_raw)) : false;
+
                 $specific_date = $block_type === 'date' ? trim((string)($block['specific_date'] ?? '')) : null;
+                if ($block_type === 'datetime_range' && $start_datetime_ts !== false) {
+                    $specific_date = date('Y-m-d', $start_datetime_ts);
+                }
+
                 $start_time = edudisplej_normalize_time_value($block['start_time'] ?? '08:00:00', '08:00:00');
                 $end_time = edudisplej_normalize_time_value($block['end_time'] ?? '12:00:00', '12:00:00');
+                if ($block_type === 'datetime_range' && $start_datetime_ts !== false && $end_datetime_ts !== false) {
+                    $start_time = date('H:i:s', $start_datetime_ts);
+                    $end_time = date('H:i:s', $end_datetime_ts);
+                }
+
                 $days_mask = trim((string)($block['days_mask'] ?? '1,2,3,4,5,6,7'));
                 $is_active_block = !isset($block['is_active']) || (int)$block['is_active'] !== 0 ? 1 : 0;
                 $priority = (int)($block['priority'] ?? ($block_type === 'date' ? 300 : 100));
+                if ($block_type === 'datetime_range' && !isset($block['priority'])) {
+                    $priority = 400;
+                }
                 $loop_style_id = (int)($block['loop_style_id'] ?? 0);
 
                 if ($block_name === '') {

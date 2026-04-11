@@ -20,6 +20,7 @@ API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 SCREENSHOT_API="${API_BASE_URL}/api/screenshot_sync.php"
 # File written by the sync service with the last sync response (for screenshot policy)
 LAST_SYNC_RESPONSE="${CONFIG_DIR}/last_sync_response.json"
+KIOSK_CONF="${CONFIG_DIR}/kiosk.conf"
 
 # Create temp directory
 mkdir -p "$TEMP_DIR"
@@ -64,7 +65,40 @@ reset_to_unconfigured() {
 
 # Get MAC address
 get_mac_address() {
-    local mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':')
+    local mac_lines
+    local mac
+    local device_id_suffix=""
+
+    mac_lines=$(ip -o link show | awk '/link\/ether/ {print $2" "$17}')
+
+    # Prefer interface that matches DEVICE_ID suffix from kiosk.conf when available.
+    if [ -f "$KIOSK_CONF" ]; then
+        device_id_suffix=$(sed -n 's/^DEVICE_ID=//p' "$KIOSK_CONF" | head -1 | tr -d '\r\n' | tr '[:lower:]' '[:upper:]')
+        if [ -n "$device_id_suffix" ]; then
+            device_id_suffix="${device_id_suffix: -6}"
+            while read -r iface raw_mac; do
+                [ -z "$raw_mac" ] && continue
+                mac=$(echo "$raw_mac" | tr -d ':' | tr '[:lower:]' '[:upper:]')
+                if [ "${mac: -6}" = "$device_id_suffix" ]; then
+                    echo "$mac"
+                    return 0
+                fi
+            done <<< "$mac_lines"
+        fi
+    fi
+
+    # Fallback preference: wired interface first.
+    while read -r iface raw_mac; do
+        [ "$iface" = "eth0:" ] || continue
+        mac=$(echo "$raw_mac" | tr -d ':' | tr '[:lower:]' '[:upper:]')
+        if [ -n "$mac" ]; then
+            echo "$mac"
+            return 0
+        fi
+    done <<< "$mac_lines"
+
+    # Last fallback: first available MAC.
+    mac=$(echo "$mac_lines" | awk 'NR==1 {print $2}' | tr -d ':' | tr '[:lower:]' '[:upper:]')
     echo "$mac"
 }
 
@@ -202,8 +236,10 @@ upload_screenshot() {
         return 1
     fi
     
-    # Prepare JSON request
-    local request_data="{\"mac\":\"$mac\",\"filename\":\"$filename\",\"screenshot\":\"data:image/png;base64,$base64_data\"}"
+    # Prepare JSON request in a temp file to avoid argv size limits.
+    local payload_file
+    payload_file=$(mktemp)
+    printf '{"mac":"%s","filename":"%s","screenshot":"data:image/png;base64,%s"}' "$mac" "$filename" "$base64_data" > "$payload_file"
     
     log_debug "Sending to API: $SCREENSHOT_API"
     
@@ -214,11 +250,12 @@ upload_screenshot() {
     local response=$(curl -s -X POST "$SCREENSHOT_API" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
-        -d "$request_data" \
+        --data-binary "@$payload_file" \
         --max-time 30 --connect-timeout 10 2>&1)
 
     if is_auth_error "$response"; then
         reset_to_unconfigured
+        rm -f "$payload_file"
         rm -f "$screenshot_file"
         return 1
     fi
@@ -226,16 +263,19 @@ upload_screenshot() {
     local curl_code=$?
     if [ $curl_code -ne 0 ]; then
         log_error "Curl error ($curl_code) uploading screenshot: $response"
+        rm -f "$payload_file"
         rm -f "$screenshot_file"
         return 1
     fi
     
     if echo "$response" | grep -q '"success":true'; then
         log "✓ Screenshot uploaded: $filename"
+        rm -f "$payload_file"
         rm -f "$screenshot_file"
         return 0
     else
         log_error "API error - Upload failed: $response"
+        rm -f "$payload_file"
         rm -f "$screenshot_file"
         return 1
     fi
