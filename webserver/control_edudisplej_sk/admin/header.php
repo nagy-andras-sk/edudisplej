@@ -64,6 +64,13 @@ if (isset($_SESSION['user_id'])) {
 $is_admin_user = !empty($_SESSION['isadmin']);
 $is_admin_acting_company = $is_admin_user && !empty($_SESSION['admin_acting_company_id']);
 $current_user_role = edudisplej_get_session_role();
+
+// Dashboard pages must always use Slovak language.
+if (in_array('dashboard', $path_segments, true)) {
+    $_SESSION['language'] = 'sk';
+    $_SESSION['lang'] = 'sk';
+}
+
 $current_lang = edudisplej_apply_language_preferences();
 
 if (!function_exists('edudisplej_nav_has_module_license')) {
@@ -156,17 +163,19 @@ $admin_nav_pages = [
 
 // Dashboard nav page map
 $dashboard_nav_pages = [
-    'index.php'          => ['href' => 'index.php',          'label' => t('nav.kiosks'),  'key' => 'kiosks'],
-    'groups.php'         => ['href' => 'groups.php',         'label' => '📁 ' . t('nav.groups'),  'key' => 'groups'],
-    'modules.php'        => ['href' => 'modules.php',        'label' => '🧩 ' . t('nav.modules'), 'key' => 'modules_page'],
-    'profile.php'        => ['href' => 'profile.php',        'label' => '🏢 ' . t('nav.profile'), 'key' => 'profile'],
-    'settings.php'       => ['href' => 'settings.php',       'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
+    'index.php' => ['href' => 'index.php', 'label' => t('nav.kiosks'), 'key' => 'kiosks'],
+    'quick_messages.php' => ['href' => 'quick_messages.php', 'label' => '📅 ' . t_def('nav.special_plan', 'Specialis terv'), 'key' => 'special_plan'],
+    'groups.php' => ['href' => 'groups.php', 'label' => '📁 ' . t('nav.groups'), 'key' => 'groups'],
+    'modules.php' => ['href' => 'modules.php', 'label' => '🧩 ' . t('nav.modules'), 'key' => 'modules_page'],
+    'profile.php' => ['href' => 'profile.php', 'label' => '🏢 ' . t('nav.profile'), 'key' => 'profile'],
+    'settings.php' => ['href' => 'settings.php', 'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
 ];
 
 if (!$is_admin_user) {
     if ($current_user_role === 'easy_user') {
         $dashboard_nav_pages = [
             'index.php' => ['href' => 'easy_user/', 'label' => t_def('nav.easy_user.control', 'Easy Control'), 'key' => 'easy_user'],
+            'quick_messages.php' => ['href' => '../quick_messages.php', 'label' => '📅 ' . t_def('nav.special_plan', 'Specialis terv'), 'key' => 'special_plan'],
             'settings.php' => ['href' => 'settings.php', 'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
         ];
     }

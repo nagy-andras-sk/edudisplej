@@ -189,8 +189,161 @@ function edudisplej_room_occ_verify_company_token(mysqli $conn, int $companyId, 
 
 function edudisplej_room_occ_external_token(): string {
     $headers = function_exists('getallheaders') ? (array)getallheaders() : [];
+    $authHeader = (string)($headers['Authorization'] ?? $headers['authorization'] ?? '');
+    if (preg_match('/Bearer\s+(.+)$/i', $authHeader, $matches)) {
+        return trim((string)$matches[1]);
+    }
+
     $token = trim((string)($headers['X-API-Token'] ?? $headers['x-api-token'] ?? $_GET['token'] ?? $_POST['token'] ?? ''));
     return $token;
+}
+
+function edudisplej_room_occ_company_from_token(mysqli $conn, string $token): ?array {
+    if ($token === '') {
+        return null;
+    }
+
+    $stmt = $conn->prepare("SELECT id, name, license_key, is_active, api_token FROM companies WHERE api_token = ? LIMIT 1");
+    $stmt->bind_param('s', $token);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        return null;
+    }
+
+    if (empty($row['is_active']) || empty($row['license_key'])) {
+        return null;
+    }
+
+    return [
+        'id' => (int)$row['id'],
+        'name' => (string)$row['name'],
+        'license_key' => (string)$row['license_key'],
+        'api_token' => (string)$row['api_token'],
+    ];
+}
+
+function edudisplej_room_occ_external_company_context(mysqli $conn, ?int $companyIdInput = null): array {
+    $token = edudisplej_room_occ_external_token();
+    if ($token === '') {
+        edudisplej_room_occ_error('Hiányzó API token', 401);
+    }
+
+    $company = edudisplej_room_occ_company_from_token($conn, $token);
+    if (!$company) {
+        edudisplej_room_occ_error('Érvénytelen API token', 401);
+    }
+
+    if ($companyIdInput !== null && $companyIdInput > 0 && $companyIdInput !== (int)$company['id']) {
+        edudisplej_room_occ_error('A company_id nem egyezik a tokenhez tartozó céggel.', 403);
+    }
+
+    return $company;
+}
+
+function edudisplej_room_occ_external_generated_ref(string $serverKey, string $roomKey, string $eventDate, string $startTime, string $endTime): string {
+    $seed = strtolower(trim($serverKey)) . '|' . strtolower(trim($roomKey)) . '|' . $eventDate . '|' . $startTime . '|' . $endTime;
+    return 'auto-' . substr(sha1($seed), 0, 24);
+}
+
+function edudisplej_room_occ_upsert_room_record(mysqli $conn, int $companyId, string $roomKey, string $roomName, int $capacity, int $isActive): int {
+    $cleanKey = edudisplej_room_occ_room_key($roomKey);
+    if ($cleanKey === '') {
+        return 0;
+    }
+
+    $safeName = edudisplej_room_occ_trim($roomName, 220);
+    if ($safeName === '') {
+        $safeName = strtoupper($cleanKey);
+    }
+
+    $stmt = $conn->prepare("SELECT id FROM room_occupancy_rooms WHERE company_id = ? AND room_key = ? LIMIT 1");
+    $stmt->bind_param('is', $companyId, $cleanKey);
+    $stmt->execute();
+    $existing = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!empty($existing['id'])) {
+        $update = $conn->prepare("UPDATE room_occupancy_rooms
+                                  SET room_name = ?, capacity = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                                  WHERE id = ? AND company_id = ? LIMIT 1");
+        $roomId = (int)$existing['id'];
+        $update->bind_param('siiii', $safeName, $capacity, $isActive, $roomId, $companyId);
+        $update->execute();
+        $update->close();
+        return $roomId;
+    }
+
+    $insert = $conn->prepare("INSERT INTO room_occupancy_rooms (company_id, room_key, room_name, capacity, is_active)
+                              VALUES (?, ?, ?, ?, ?)");
+    $insert->bind_param('issii', $companyId, $cleanKey, $safeName, $capacity, $isActive);
+    $insert->execute();
+    $roomId = (int)$insert->insert_id;
+    $insert->close();
+
+    return $roomId;
+}
+
+function edudisplej_room_occ_upsert_external_event(mysqli $conn, int $companyId, string $serverKey, array $event): bool {
+    $roomId = (int)($event['room_id'] ?? 0);
+    $roomKey = edudisplej_room_occ_room_key($event['room_key'] ?? '');
+    $roomName = edudisplej_room_occ_trim($event['room_name'] ?? '', 220);
+
+    if ($roomId <= 0) {
+        $roomId = edudisplej_room_occ_find_or_create_room($conn, $companyId, $roomKey, $roomName);
+    }
+
+    $eventDate = edudisplej_room_occ_event_date($event['event_date'] ?? $event['date'] ?? date('Y-m-d'));
+    $startTime = edudisplej_room_occ_time($event['start_time'] ?? $event['from'] ?? $event['start'] ?? '');
+    $endTime = edudisplej_room_occ_time($event['end_time'] ?? $event['to'] ?? $event['until'] ?? '');
+    $eventTitle = edudisplej_room_occ_trim($event['event_title'] ?? $event['title'] ?? 'Foglaltság', 260);
+    $eventNote = edudisplej_room_occ_trim($event['event_note'] ?? $event['comment'] ?? $event['note'] ?? '', 4000);
+    $externalRef = edudisplej_room_occ_trim($event['external_ref'] ?? '', 160);
+
+    if ($externalRef === '') {
+        $externalRef = edudisplej_room_occ_external_generated_ref($serverKey, $roomKey !== '' ? $roomKey : (string)$roomId, $eventDate, $startTime, $endTime);
+    }
+
+    if ($roomId <= 0 || $startTime === '' || $endTime === '' || $eventTitle === '' || $externalRef === '') {
+        return false;
+    }
+    if (strcmp($startTime, $endTime) >= 0) {
+        return false;
+    }
+
+    $existingStmt = $conn->prepare("SELECT id FROM room_occupancy_events
+                                   WHERE company_id = ? AND room_id = ? AND event_date = ? AND external_ref = ?
+                                   LIMIT 1");
+    $existingStmt->bind_param('iiss', $companyId, $roomId, $eventDate, $externalRef);
+    $existingStmt->execute();
+    $existingRow = $existingStmt->get_result()->fetch_assoc();
+    $existingStmt->close();
+    $excludeId = (int)($existingRow['id'] ?? 0);
+
+    if (edudisplej_room_occ_has_overlap($conn, $companyId, $roomId, $eventDate, $startTime, $endTime, $excludeId)) {
+        return false;
+    }
+
+    if ($excludeId > 0) {
+        $stmt = $conn->prepare("UPDATE room_occupancy_events
+                                SET room_id = ?, event_date = ?, start_time = ?, end_time = ?, event_title = ?, event_note = ?, source_type = 'external', updated_at = CURRENT_TIMESTAMP
+                                WHERE id = ? AND company_id = ? LIMIT 1");
+        $stmt->bind_param('isssssii', $roomId, $eventDate, $startTime, $endTime, $eventTitle, $eventNote, $excludeId, $companyId);
+        $stmt->execute();
+        $stmt->close();
+        return true;
+    }
+
+    $stmt = $conn->prepare("INSERT INTO room_occupancy_events
+                            (company_id, room_id, event_date, start_time, end_time, event_title, event_note, source_type, external_ref)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'external', ?)");
+    $stmt->bind_param('iissssss', $companyId, $roomId, $eventDate, $startTime, $endTime, $eventTitle, $eventNote, $externalRef);
+    $stmt->execute();
+    $stmt->close();
+
+    return true;
 }
 
 function edudisplej_room_occ_find_or_create_room(mysqli $conn, int $companyId, string $roomKey, string $roomName): int {
@@ -348,26 +501,17 @@ try {
         exit();
     }
 
-    if ($action === 'external_upsert') {
-        $token = edudisplej_room_occ_external_token();
+    if (in_array($action, ['external_sync', 'external_rooms_sync', 'external_occupancy_sync', 'external_upsert'], true)) {
         $payload = json_decode((string)file_get_contents('php://input'), true);
         $input = is_array($payload) ? $payload : $_POST;
 
-        $companyIdInput = (int)($input['company_id'] ?? 0);
+        $company = edudisplej_room_occ_external_company_context($conn, isset($input['company_id']) ? (int)$input['company_id'] : null);
+        $companyIdInput = (int)$company['id'];
         $serverKey = edudisplej_room_occ_server_key($input['server_key'] ?? '');
-        if ($companyIdInput <= 0 || $token === '') {
-            closeDbConnection($conn);
-            edudisplej_room_occ_error('Hiányzó company_id vagy token', 401);
-        }
 
         if ($serverKey === '') {
             closeDbConnection($conn);
             edudisplej_room_occ_error('Hiányzó server_key', 400);
-        }
-
-        if (!edudisplej_room_occ_verify_company_token($conn, $companyIdInput, $token)) {
-            closeDbConnection($conn);
-            edudisplej_room_occ_error('Érvénytelen API token', 403);
         }
 
         if (!edudisplej_room_occ_verify_server_company_link($conn, $companyIdInput, $serverKey)) {
@@ -375,72 +519,67 @@ try {
             edudisplej_room_occ_error('A megadott szerver nincs ehhez a céghez párosítva.', 403);
         }
 
-        $events = isset($input['events']) && is_array($input['events']) ? $input['events'] : [];
-        if (empty($events)) {
-            closeDbConnection($conn);
-            edudisplej_room_occ_error('Hiányzó events tömb');
+        $rooms = isset($input['rooms']) && is_array($input['rooms']) ? $input['rooms'] : [];
+        $occupancies = [];
+        if (isset($input['occupancies']) && is_array($input['occupancies'])) {
+            $occupancies = $input['occupancies'];
+        } elseif (isset($input['events']) && is_array($input['events'])) {
+            $occupancies = $input['events'];
         }
 
-        $stored = 0;
+        if ($action === 'external_rooms_sync' && empty($rooms)) {
+            closeDbConnection($conn);
+            edudisplej_room_occ_error('Hiányzó rooms tömb');
+        }
+
+        if (($action === 'external_occupancy_sync' || $action === 'external_upsert') && empty($occupancies)) {
+            closeDbConnection($conn);
+            edudisplej_room_occ_error('Hiányzó occupancies/events tömb');
+        }
+
+        if ($action === 'external_sync' && empty($rooms) && empty($occupancies)) {
+            closeDbConnection($conn);
+            edudisplej_room_occ_error('A sync body-ban legalább rooms vagy occupancies tömb szükséges');
+        }
+
+        $storedRooms = 0;
+        $storedOccupancies = 0;
         $conn->begin_transaction();
 
-        $upsert = $conn->prepare("INSERT INTO room_occupancy_events
-            (company_id, room_id, event_date, start_time, end_time, event_title, event_note, source_type, external_ref)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'external', ?)
-            ON DUPLICATE KEY UPDATE
-                start_time = VALUES(start_time),
-                end_time = VALUES(end_time),
-                event_title = VALUES(event_title),
-                event_note = VALUES(event_note),
-                source_type = 'external',
-                updated_at = CURRENT_TIMESTAMP");
-
-        foreach ($events as $event) {
-            $roomId = (int)($event['room_id'] ?? 0);
-            if ($roomId <= 0) {
-                $roomKey = edudisplej_room_occ_room_key($event['room_key'] ?? '');
-                $roomName = edudisplej_room_occ_trim($event['room_name'] ?? '', 220);
-                $roomId = edudisplej_room_occ_find_or_create_room($conn, $companyIdInput, $roomKey, $roomName);
-            }
-
-            $eventDate = edudisplej_room_occ_event_date($event['event_date'] ?? date('Y-m-d'));
-            $startTime = edudisplej_room_occ_time($event['start_time'] ?? '');
-            $endTime = edudisplej_room_occ_time($event['end_time'] ?? '');
-            $eventTitle = edudisplej_room_occ_trim($event['event_title'] ?? '', 260);
-            $eventNote = edudisplej_room_occ_trim($event['event_note'] ?? '', 4000);
-            $externalRef = edudisplej_room_occ_trim($event['external_ref'] ?? '', 160);
-
-            if ($roomId <= 0 || $startTime === '' || $endTime === '' || $eventTitle === '' || $externalRef === '') {
+        foreach ($rooms as $room) {
+            if (!is_array($room)) {
                 continue;
             }
-            if (strcmp($startTime, $endTime) >= 0) {
-                continue;
-            }
-
-            $existingStmt = $conn->prepare("SELECT id FROM room_occupancy_events
-                                           WHERE company_id = ? AND room_id = ? AND event_date = ? AND external_ref = ?
-                                           LIMIT 1");
-            $existingStmt->bind_param('iiss', $companyIdInput, $roomId, $eventDate, $externalRef);
-            $existingStmt->execute();
-            $existingRow = $existingStmt->get_result()->fetch_assoc();
-            $existingStmt->close();
-            $excludeId = (int)($existingRow['id'] ?? 0);
-
-            if (edudisplej_room_occ_has_overlap($conn, $companyIdInput, $roomId, $eventDate, $startTime, $endTime, $excludeId)) {
-                continue;
-            }
-
-            $upsert->bind_param('iissssss', $companyIdInput, $roomId, $eventDate, $startTime, $endTime, $eventTitle, $eventNote, $externalRef);
-            if ($upsert->execute()) {
-                $stored++;
+            $roomId = edudisplej_room_occ_upsert_room_record(
+                $conn,
+                $companyIdInput,
+                (string)($room['room_key'] ?? $room['key'] ?? ''),
+                (string)($room['room_name'] ?? $room['name'] ?? ''),
+                max(0, min(100000, (int)($room['capacity'] ?? 0))),
+                !empty($room['is_active']) ? 1 : 0
+            );
+            if ($roomId > 0) {
+                $storedRooms++;
             }
         }
 
-        $upsert->close();
+        foreach ($occupancies as $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+            if (edudisplej_room_occ_upsert_external_event($conn, $companyIdInput, $serverKey, $event)) {
+                $storedOccupancies++;
+            }
+        }
+
         $conn->commit();
 
         closeDbConnection($conn);
-        echo json_encode(['success' => true, 'stored' => $stored], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        echo json_encode([
+            'success' => true,
+            'stored_rooms' => $storedRooms,
+            'stored_occupancies' => $storedOccupancies,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit();
     }
 

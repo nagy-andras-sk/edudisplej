@@ -76,8 +76,30 @@ function edudisplej_get_active_block_id(mysqli $conn, int $group_id): array {
     $candidates = [];
     foreach ($blocks as $block) {
         $block_type = strtolower(trim((string)($block['block_type'] ?? 'weekly')));
-        if (!in_array($block_type, ['weekly', 'date'], true)) {
+        if (!in_array($block_type, ['weekly', 'date', 'datetime_range'], true)) {
             $block_type = 'weekly';
+        }
+
+        if ($block_type === 'datetime_range') {
+            $specific_date = (string)($block['specific_date'] ?? '');
+            if ($specific_date !== $date_key) {
+                continue;
+            }
+
+            $start = (string)$block['start_time'];
+            $end = (string)$block['end_time'];
+            if ($start <= $end) {
+                if (!($now >= $start && $now <= $end)) {
+                    continue;
+                }
+            } else {
+                if (!($now >= $start || $now <= $end)) {
+                    continue;
+                }
+            }
+
+            $candidates[] = $block;
+            continue;
         }
 
         if ($block_type === 'date' && (string)($block['specific_date'] ?? '') !== $date_key) {
@@ -113,8 +135,18 @@ function edudisplej_get_active_block_id(mysqli $conn, int $group_id): array {
 
     if (!empty($candidates)) {
         usort($candidates, function ($a, $b) {
-            $typeA = strtolower(trim((string)($a['block_type'] ?? 'weekly'))) === 'date' ? 2 : 1;
-            $typeB = strtolower(trim((string)($b['block_type'] ?? 'weekly'))) === 'date' ? 2 : 1;
+            $typeWeight = static function (string $type): int {
+                if ($type === 'datetime_range') {
+                    return 3;
+                }
+                if ($type === 'date') {
+                    return 2;
+                }
+                return 1;
+            };
+
+            $typeA = $typeWeight(strtolower(trim((string)($a['block_type'] ?? 'weekly'))));
+            $typeB = $typeWeight(strtolower(trim((string)($b['block_type'] ?? 'weekly'))));
             if ($typeA !== $typeB) {
                 return $typeB <=> $typeA;
             }
@@ -225,6 +257,43 @@ function edudisplej_collect_meal_prefetch_latest_from_loop_items(array $items, ?
     }
 
     return $latest;
+}
+
+function edudisplej_format_core_version_label(string $version): string {
+    $trimmed = trim($version);
+    if ($trimmed === '') {
+        return '';
+    }
+
+    if (preg_match('/^v/i', $trimmed) === 1) {
+        return $trimmed;
+    }
+
+    return 'v' . $trimmed;
+}
+
+function edudisplej_apply_core_version_to_loop_items(array $items, string $core_version): array {
+    foreach ($items as $index => $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+
+        $module_key = edudisplej_canonical_module_key((string)($item['module_key'] ?? ''));
+        if ($module_key !== 'default-logo') {
+            continue;
+        }
+
+        $settings = is_array($item['settings'] ?? null) ? $item['settings'] : [];
+        $settings['showVersion'] = true;
+        if ($core_version !== '') {
+            $settings['version'] = $core_version;
+        }
+
+        $item['settings'] = $settings;
+        $items[$index] = $item;
+    }
+
+    return $items;
 }
 
 function edudisplej_sync_hydrate_text_collection_settings(mysqli $conn, int $company_id, array $settings): array {
@@ -651,7 +720,7 @@ try {
     edudisplej_ensure_time_block_schema($conn);
     
     // Get kiosk by device_id
-    $stmt = $conn->prepare("SELECT id, device_id, company_id, COALESCE(screen_off_mode, 'signal_off') AS screen_off_mode FROM kiosks WHERE device_id = ?");
+    $stmt = $conn->prepare("SELECT id, device_id, company_id, COALESCE(NULLIF(version, ''), '') AS core_version, COALESCE(screen_off_mode, 'signal_off') AS screen_off_mode FROM kiosks WHERE device_id = ?");
     $stmt->bind_param("s", $device_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -665,6 +734,7 @@ try {
     $kiosk = $result->fetch_assoc();
     $kiosk_id = $kiosk['id'];
     $company_id = $kiosk['company_id'];
+    $kiosk_core_version = edudisplej_format_core_version_label((string)($kiosk['core_version'] ?? ''));
     $stmt->close();
 
     // Enforce company ownership
@@ -1115,6 +1185,20 @@ try {
     }
     $loop_last_update = edudisplej_pick_newer_timestamp($loop_last_update, $meal_prefetch_latest) ?? $loop_last_update;
     
+    $loop_config = edudisplej_apply_core_version_to_loop_items($loop_config, $kiosk_core_version);
+    if (is_array($offline_plan['base_loop'] ?? null)) {
+        $offline_plan['base_loop'] = edudisplej_apply_core_version_to_loop_items($offline_plan['base_loop'], $kiosk_core_version);
+    }
+    if (is_array($offline_plan['time_blocks'] ?? null)) {
+        foreach ($offline_plan['time_blocks'] as $idx => $block) {
+            if (!is_array($block) || !is_array($block['loops'] ?? null)) {
+                continue;
+            }
+            $block['loops'] = edudisplej_apply_core_version_to_loop_items($block['loops'], $kiosk_core_version);
+            $offline_plan['time_blocks'][$idx] = $block;
+        }
+    }
+
     $turned_off_state = edudisplej_kiosk_loop_resolve_turned_off_state($loop_config, (string)($kiosk['screen_off_mode'] ?? 'signal_off'));
     $terminal_state = edudisplej_kiosk_loop_apply_terminal_power_mode(
         $conn,

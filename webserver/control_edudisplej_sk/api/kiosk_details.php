@@ -129,6 +129,21 @@ function resolve_kiosk_version(array $row): ?string {
     return null;
 }
 
+function touch_kiosk_details_activity(mysqli $conn, int $user_id): void {
+    if ($user_id <= 0) {
+        return;
+    }
+
+    $stmt = $conn->prepare("UPDATE users SET last_activity_at = NOW() WHERE id = ?");
+    if (!$stmt) {
+        return;
+    }
+
+    $stmt->bind_param('i', $user_id);
+    $stmt->execute();
+    $stmt->close();
+}
+
 function format_eta_seconds(int $seconds): string {
     $seconds = max(0, $seconds);
     if ($seconds < 60) {
@@ -287,9 +302,11 @@ if (!isset($_SESSION['user_id'])) {
 if (isset($_GET['refresh_list'])) {
     $kiosk_ids = array_map('intval', explode(',', $_GET['refresh_list']));
     $company_id = $_SESSION['company_id'] ?? null;
+    $user_id = (int)($_SESSION['user_id'] ?? 0);
     
     try {
         $conn = getDbConnection();
+        touch_kiosk_details_activity($conn, (int)$user_id);
         $placeholders = implode(',', array_fill(0, count($kiosk_ids), '?'));
         
         $query = "
@@ -411,6 +428,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         $conn = getDbConnection();
+        touch_kiosk_details_activity($conn, (int)$user_id);
         $conn->begin_transaction();
 
         $verify_stmt = $conn->prepare("SELECT id FROM kiosks WHERE id = ? AND company_id = ? LIMIT 1");
@@ -492,12 +510,14 @@ if (!$kiosk_id) {
 
 try {
     $conn = getDbConnection();
+    touch_kiosk_details_activity($conn, (int)$user_id);
     
     // Get kiosk data with group information
     $stmt = $conn->prepare("
         SELECT k.*, 
                GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as group_names,
                     GROUP_CONCAT(DISTINCT g.id SEPARATOR ',') as group_ids,
+                    k.screenshot_requested_until,
                     h.system_data, h.sync_data,
                     (SELECT DATE_FORMAT(MAX(COALESCE(kgm.updated_at, kgm.created_at)), '%Y%m%d%H%i%s')
                         FROM kiosk_group_assignments kga2
@@ -598,6 +618,8 @@ try {
     $response['server_loop_version'] = $server_loop_version ?? null;
     $response['loop_version_mismatch'] = $loop_version_mismatch ?? false;
     $response['loop_update_grace_active'] = $loop_update_grace_active ?? false;
+    $response['screenshot_requested_until'] = $kiosk['screenshot_requested_until'] ?? null;
+    $response['screenshot_watch_active'] = !empty($kiosk['screenshot_requested_until']) && strtotime((string)$kiosk['screenshot_requested_until']) > time();
     
     // Parse HW info
     if ($kiosk['hw_info']) {

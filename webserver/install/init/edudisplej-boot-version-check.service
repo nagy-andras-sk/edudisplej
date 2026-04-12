@@ -1,0 +1,28 @@
+[Unit]
+Description=EduDisplej Boot-time Core Version Check and Auto-Update
+Documentation=https://github.com/nagy-andras-sk/edudisplej
+# Run after network is available but before kiosk service
+After=network-online.target systemd-user-sessions.service
+Before=edudisplej-kiosk.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/edudisplej
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+
+# Run the boot-update script
+ExecStart=/opt/edudisplej/init/edudisplej-boot-update.sh
+
+# Timeout after 15 minutes (900 seconds) - should complete much sooner normally
+TimeoutStartSec=900
+
+# Always succeed - don't block boot if update fails
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

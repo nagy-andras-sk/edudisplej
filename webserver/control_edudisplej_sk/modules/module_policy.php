@@ -41,7 +41,7 @@ function edudisplej_module_policy_registry(): array
                 'textCollectionId' => ['type' => 'int', 'min' => 0, 'max' => 2147483647, 'default' => 0],
                 'textCollectionLabel' => ['type' => 'string', 'maxLen' => 180, 'default' => ''],
                 'textCollectionVersionTs' => ['type' => 'int', 'min' => 0, 'max' => 9999999999999, 'default' => 0],
-                'textExternalUrl' => ['type' => 'string', 'maxLen' => 2000, 'default' => ''],
+                'textExternalUrl' => ['type' => 'string', 'maxLen' => 2000, 'pattern' => '/\.html(?:[?#].*)?$/i', 'default' => ''],
                 'text' => ['type' => 'string', 'maxLen' => 30000, 'default' => ''],
                 'fontFamily' => ['type' => 'enum', 'allowed' => [
                     'Arial, sans-serif',
@@ -269,6 +269,17 @@ function edudisplej_module_policy_normalize_bool($value, bool $default): bool
     return $default;
 }
 
+function edudisplej_module_policy_matches_pattern(string $value, string $pattern): bool
+{
+    $pattern = trim($pattern);
+    if ($pattern === '') {
+        return true;
+    }
+
+    $result = @preg_match($pattern, $value);
+    return $result === 1;
+}
+
 function edudisplej_module_policy_normalize_field($value, array $rule)
 {
     $type = strtolower((string)($rule['type'] ?? 'string'));
@@ -322,6 +333,11 @@ function edudisplej_module_policy_normalize_field($value, array $rule)
     if ($maxLen > 0 && mb_strlen($normalized, 'UTF-8') > $maxLen) {
         $normalized = mb_substr($normalized, 0, $maxLen, 'UTF-8');
     }
+
+    if (isset($rule['pattern']) && !edudisplej_module_policy_matches_pattern($normalized, (string)$rule['pattern'])) {
+        return (string)$default;
+    }
+
     return $normalized;
 }
 
@@ -339,6 +355,10 @@ function edudisplej_sanitize_module_settings(string $moduleKey, $settings): arra
     foreach ($rules as $field => $rule) {
         $value = array_key_exists($field, $input) ? $input[$field] : ($rule['default'] ?? null);
         $output[$field] = edudisplej_module_policy_normalize_field($value, (array)$rule);
+    }
+
+    if ($moduleKey === 'text' && (($output['textSourceType'] ?? 'manual') === 'external') && trim((string)($output['textExternalUrl'] ?? '')) === '') {
+        $output['textSourceType'] = 'manual';
     }
 
     return $output;

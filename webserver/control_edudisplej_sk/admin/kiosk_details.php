@@ -13,6 +13,52 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['isadmin']) || !$_SESSION['
     exit();
 }
 
+function normalize_core_version_text($value) {
+    $text = trim((string)$value);
+    if ($text === '') {
+        return '';
+    }
+
+    if ($text[0] === 'v' || $text[0] === 'V') {
+        $text = substr($text, 1);
+    }
+
+    return trim($text);
+}
+
+function core_version_sort_key($value) {
+    $normalized = normalize_core_version_text($value);
+    if ($normalized === '') {
+        return '';
+    }
+
+    if (preg_match('/^\d{14}$/', $normalized)) {
+        return '2' . $normalized;
+    }
+
+    if (preg_match('/^\d+\.\d+\.\d+$/', $normalized)) {
+        [$major, $minor, $patch] = array_map('intval', explode('.', $normalized, 3));
+        return sprintf('1%03d%03d%03d', $major, $minor, $patch);
+    }
+
+    if (preg_match('/^\d+$/', $normalized)) {
+        return '1' . str_pad($normalized, 14, '0', STR_PAD_LEFT);
+    }
+
+    return '0' . strtolower($normalized);
+}
+
+function is_core_version_older($current, $target) {
+    $current_key = core_version_sort_key($current);
+    $target_key = core_version_sort_key($target);
+
+    if ($current_key === '' || $target_key === '') {
+        return false;
+    }
+
+    return strcmp($current_key, $target_key) < 0;
+}
+
 $kiosk_id = (int)($_GET['id'] ?? 0);
 $kiosk = null;
 $logs = [];
@@ -76,7 +122,7 @@ if (!$kiosk) {
 
 // Load latest system version from versions.json
 $latest_system_version = '1.1.0';
-$versions_file = dirname(__DIR__) . '/install/init/versions.json';
+$versions_file = dirname(__DIR__, 2) . '/install/init/versions.json';
 if (file_exists($versions_file)) {
     $versions_data = json_decode(file_get_contents($versions_file), true);
     if (!empty($versions_data['system_version'])) {
@@ -85,7 +131,7 @@ if (file_exists($versions_file)) {
 }
 
 $kiosk_version = $kiosk['version'] ?? null;
-$update_available = $kiosk_version !== null && version_compare($kiosk_version, $latest_system_version, '<');
+$update_available = $kiosk_version !== null && is_core_version_older($kiosk_version, $latest_system_version);
 
 $can_archive_kiosk = true;
 

@@ -175,6 +175,23 @@ try {
                 $response['message'] = 'Cannot delete own user';
                 break;
             }
+
+            $target_role_stmt = $conn->prepare("SELECT isadmin FROM users WHERE id = ? AND company_id = ? LIMIT 1");
+            $target_role_stmt->bind_param('ii', $target_user_id, $company_id);
+            $target_role_stmt->execute();
+            $target_role_row = $target_role_stmt->get_result()->fetch_assoc();
+            $target_role_stmt->close();
+
+            if (!$target_role_row) {
+                $response['message'] = 'User not found or access denied';
+                break;
+            }
+
+            $target_is_admin = !empty($target_role_row['isadmin']);
+            if (!$caller_is_admin && $target_is_admin) {
+                $response['message'] = 'Admin users cannot be deleted by non-admin users';
+                break;
+            }
             
             // Verify user belongs to company
             if ($caller_is_admin) {

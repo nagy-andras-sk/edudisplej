@@ -3816,7 +3816,10 @@ try {
         "CREATE INDEX IF NOT EXISTS idx_schedule_special_days_schedule ON schedule_special_days(schedule_id)",
         "CREATE INDEX IF NOT EXISTS idx_schedule_special_days_date ON schedule_special_days(date)",
         "CREATE INDEX IF NOT EXISTS idx_display_status_log_kijelzo ON display_status_log(kijelzo_id)",
-        "CREATE INDEX IF NOT EXISTS idx_display_status_log_created ON display_status_log(created_at)"
+        "CREATE INDEX IF NOT EXISTS idx_display_status_log_created ON display_status_log(created_at)",
+        // Group loop planner indexes used by scheduled special loop overrides
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_group_loop_plans_updated_at ON kiosk_group_loop_plans(updated_at)",
+        "CREATE INDEX IF NOT EXISTS idx_kiosk_group_loop_plans_plan_version ON kiosk_group_loop_plans(plan_version)"
     ];
     
     foreach ($indexes as $index_sql) {

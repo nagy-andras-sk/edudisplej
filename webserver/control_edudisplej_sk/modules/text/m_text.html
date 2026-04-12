@@ -254,6 +254,10 @@
             return escapeHtml(text).replace(/\n/g, '<br>');
         }
 
+        function isHtmlResourceUrl(value) {
+            return /\.html(?:[?#].*)?$/i.test(String(value || '').trim());
+        }
+
         function getSettings() {
             const defaults = {
                 textSourceType: 'manual',
@@ -340,7 +344,7 @@
             const sourceType = String(settings.textSourceType || 'manual').toLowerCase();
             const externalUrl = String(settings.textExternalUrl || '').trim();
 
-            if (sourceType === 'external' && externalUrl) {
+            if (sourceType === 'external' && externalUrl && isHtmlResourceUrl(externalUrl)) {
                 try {
                     const response = await fetch(externalUrl, {
                         method: 'GET',

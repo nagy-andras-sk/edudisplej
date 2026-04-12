@@ -56,6 +56,52 @@ function normalize_version_text($value) {
     return $text;
 }
 
+function normalize_core_version_text($value) {
+    $text = normalize_version_text($value);
+    if ($text === '') {
+        return '';
+    }
+
+    if ($text[0] === 'v' || $text[0] === 'V') {
+        $text = substr($text, 1);
+    }
+
+    return trim($text);
+}
+
+function core_version_sort_key($value) {
+    $normalized = normalize_core_version_text($value);
+    if ($normalized === '') {
+        return '';
+    }
+
+    if (preg_match('/^\d{14}$/', $normalized)) {
+        return '2' . $normalized;
+    }
+
+    if (preg_match('/^\d+\.\d+\.\d+$/', $normalized)) {
+        [$major, $minor, $patch] = array_map('intval', explode('.', $normalized, 3));
+        return sprintf('1%03d%03d%03d', $major, $minor, $patch);
+    }
+
+    if (preg_match('/^\d+$/', $normalized)) {
+        return '1' . str_pad($normalized, 14, '0', STR_PAD_LEFT);
+    }
+
+    return '0' . strtolower($normalized);
+}
+
+function is_core_version_older($current, $target) {
+    $current_key = core_version_sort_key($current);
+    $target_key = core_version_sort_key($target);
+
+    if ($current_key === '' || $target_key === '') {
+        return false;
+    }
+
+    return strcmp($current_key, $target_key) < 0;
+}
+
 function extract_version_recursive($data) {
     if (!is_array($data)) {
         return '';
@@ -179,6 +225,15 @@ $error = '';
 $companies = [];
 $kiosks = [];
 $company_license_overview = [];
+$latest_core_version = '1.1.0';
+
+$versions_file = dirname(__DIR__, 2) . '/install/init/versions.json';
+if (is_file($versions_file)) {
+    $versions_data = json_decode((string)file_get_contents($versions_file), true);
+    if (is_array($versions_data) && !empty($versions_data['system_version'])) {
+        $latest_core_version = normalize_version_text($versions_data['system_version']);
+    }
+}
 
 $filters = [
     'company_id' => isset($_GET['company_id']) ? (int)$_GET['company_id'] : 0,
@@ -382,6 +437,7 @@ include 'header.php';
         <span class="badge warning">Upgrading: <?php echo (int)($status_counts['upgrading'] ?? 0); ?></span>
         <span class="badge danger">Upgrade errors: <?php echo (int)($status_counts['error'] ?? 0); ?></span>
         <span class="badge info">Unconfigured: <?php echo (int)($status_counts['unconfigured'] ?? 0); ?></span>
+        <span class="badge info">Core version: <?php echo htmlspecialchars($latest_core_version); ?></span>
     </div>
 
     <?php if (!empty($failed_kiosks)): ?>
@@ -519,6 +575,7 @@ include 'header.php';
                         <th>RAM %</th>
                         <th>Disk %</th>
                         <th>RPI version</th>
+                        <th>Core update</th>
                         <th>Screen resolution</th>
                         <th>Last reboot</th>
                     </tr>
@@ -609,6 +666,11 @@ include 'header.php';
                                 $rpi_version = '-';
                             }
 
+                            $needs_core_update = false;
+                            if ($latest_core_version !== '' && $rpi_version !== '-') {
+                                $needs_core_update = is_core_version_older($rpi_version, $latest_core_version);
+                            }
+
                             $next_sync_eta = estimate_next_sync_eta(
                                 $kiosk['last_sync'] ?? null,
                                 $kiosk['sync_interval'] ?? 0,
@@ -641,6 +703,20 @@ include 'header.php';
                             <td><?php echo format_percent($memory_usage_value); ?></td>
                             <td><?php echo format_percent($disk_usage_value); ?></td>
                             <td><?php echo htmlspecialchars((string)$rpi_version); ?></td>
+                            <td class="nowrap">
+                                <?php if ($needs_core_update): ?>
+                                    <button
+                                        type="button"
+                                        class="btn btn-small btn-warning"
+                                        data-kiosk-id="<?php echo (int)$kiosk['id']; ?>"
+                                        data-hostname="<?php echo htmlspecialchars((string)($kiosk['hostname'] ?? '-')); ?>"
+                                        data-target-version="<?php echo htmlspecialchars($latest_core_version); ?>"
+                                        onclick="queueCoreUpdate(this)"
+                                    >Force core update</button>
+                                <?php else: ?>
+                                    <span class="badge success">Current</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo htmlspecialchars($kiosk['screen_resolution'] ?? '-'); ?></td>
                             <td class="nowrap"><?php echo htmlspecialchars((string)$last_reboot); ?></td>
                         </tr>
@@ -650,5 +726,43 @@ include 'header.php';
         </div>
     </div>
 <?php endforeach; ?>
+
+<script>
+async function queueCoreUpdate(button) {
+    const kioskId = button.dataset.kioskId;
+    const hostname = button.dataset.hostname || 'this kiosk';
+    const targetVersion = button.dataset.targetVersion || '';
+    const suffix = targetVersion ? ' to ' + targetVersion : '';
+
+    if (!window.confirm('Queue a core-only update for ' + hostname + suffix + '?')) {
+        return;
+    }
+
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Queueing...';
+
+    try {
+        const response = await fetch('../api/kiosk/queue_core_update.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ kiosk_id: parseInt(kioskId, 10) })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Failed to queue core update');
+        }
+
+        window.location.reload();
+    } catch (error) {
+        alert(error.message || 'Failed to queue core update');
+        button.disabled = false;
+        button.textContent = originalText;
+    }
+}
+</script>
 
 <?php include 'footer.php'; ?>

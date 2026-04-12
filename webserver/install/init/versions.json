@@ -1,14 +1,17 @@
 {
-  "system_version": "1.1.2",
-  "services": {
-    "edudisplej_sync_service.sh": "1.1.2",
-    "edudisplej_terminal_display.sh": "1.1.2",
-    "edudisplej_terminal_script.sh": "1.1.2",
-    "edudisplej-download-modules.sh": "1.1.2",
-    "edudisplej-watchdog.sh": "1.1.2",
-    "update.sh": "1.1.2",
-    "common.sh": "1.1.2",
-    "kiosk.sh": "1.1.2"
-  },
-  "last_updated": "2026-04-10T12:05:00Z"
+    "system_version": "v20260412125502",
+    "services": {
+        "edudisplej_sync_service.sh": "1.1.2",
+        "edudisplej_terminal_display.sh": "1.1.2",
+        "edudisplej_terminal_script.sh": "1.1.2",
+        "edudisplej-download-modules.sh": "1.1.2",
+        "edudisplej-watchdog.sh": "1.1.2",
+        "update.sh": "1.1.2",
+        "common.sh": "1.1.2",
+        "kiosk.sh": "1.1.2"
+    },
+    "last_updated": "2026-04-12T10:55:02Z",
+    "core_checksum": "bb610829785801acebc145cb5b64f54d987e1a2d09ca3e8b0ba9fa8e0ab17a82",
+    "core_checksum_files": 199,
+    "core_checksum_scanned_at": "2026-04-12T10:55:02Z"
 }

@@ -221,6 +221,7 @@ include '../admin/header.php';
     .kiosk-screenshot-cell .preview-card.placeholder .screenshot-loader {
         font-weight: 700;
     }
+
 </style>
 
 <?php if ($error): ?>
@@ -250,8 +251,8 @@ include '../admin/header.php';
 </div>
 
 <div id="active-location-filter" class="panel" style="display:none; margin-top:10px; padding:10px 14px;">
-    <strong><?php echo htmlspecialchars(t_def('dashboard.filter.active', 'Aktív szűrés:')); ?></strong> <?php echo htmlspecialchars(t_def('dashboard.filter.location_based', 'hely alapú')); ?> — <span id="active-location-filter-name"></span>
-    <button type="button" class="btn" style="margin-left:10px;" onclick="clearLocationFilter()"><?php echo htmlspecialchars(t_def('dashboard.filter.clear', 'Szűrés törlése')); ?></button>
+    <strong><?php echo htmlspecialchars(t_def('dashboard.filter.active', 'Aktívny filter:')); ?></strong> <?php echo htmlspecialchars(t_def('dashboard.filter.location_based', 'podľa miesta')); ?> — <span id="active-location-filter-name"></span>
+    <button type="button" class="btn" style="margin-left:10px;" onclick="clearLocationFilter()"><?php echo htmlspecialchars(t_def('dashboard.filter.clear', 'Zrušiť filter')); ?></button>
 </div>
 
 <!-- Kiosk table -->
@@ -259,18 +260,18 @@ include '../admin/header.php';
     <table class="minimal-table" id="kiosk-table">
         <thead>
             <tr>
-                <th><?php echo htmlspecialchars(t_def('dashboard.col.name', 'Megnevezés')); ?></th>
-                <th><?php echo htmlspecialchars(t_def('dashboard.col.status', 'Státusz')); ?></th>
-                <th><?php echo htmlspecialchars(t_def('dashboard.col.location', 'Hely')); ?></th>
-                <th><?php echo htmlspecialchars(t_def('dashboard.col.group', 'Csoport')); ?></th>
-                <th><?php echo htmlspecialchars(t_def('dashboard.col.current_content', 'Aktuális tartalom')); ?></th>
-                <th><?php echo htmlspecialchars(t_def('dashboard.col.last_sync', 'Utolsó szinkron')); ?></th>
-                <th><?php echo htmlspecialchars(t_def('dashboard.col.screen', 'Képernyő')); ?></th>
+                <th><?php echo htmlspecialchars(t_def('dashboard.col.name', 'Názov')); ?></th>
+                <th><?php echo htmlspecialchars(t_def('dashboard.col.status', 'Stav')); ?></th>
+                <th><?php echo htmlspecialchars(t_def('dashboard.col.location', 'Miesto')); ?></th>
+                <th><?php echo htmlspecialchars(t_def('dashboard.col.group', 'Skupina')); ?></th>
+                <th><?php echo htmlspecialchars(t_def('dashboard.col.current_content', 'Aktuálny obsah')); ?></th>
+                <th><?php echo htmlspecialchars(t_def('dashboard.col.last_sync', 'Posledná synchronizácia')); ?></th>
+                <th><?php echo htmlspecialchars(t_def('dashboard.col.screen', 'Obrazovka')); ?></th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($kiosks)): ?>
-                <tr><td colspan="7" style="text-align:center;color:#999;padding:20px;"><?php echo htmlspecialchars(t_def('dashboard.no_registered_kiosk', 'Nincs regisztrált kijelző.')); ?></td></tr>
+                <tr><td colspan="7" style="text-align:center;color:#999;padding:20px;"><?php echo htmlspecialchars(t_def('dashboard.no_registered_kiosk', 'Nie je registrovaný žiadny displej.')); ?></td></tr>
             <?php else: ?>
                 <?php
                 $dashboard_now = new DateTimeImmutable('now');
@@ -280,7 +281,7 @@ include '../admin/header.php';
                     $location_value = trim((string)($k['location'] ?? ''));
                     $location_value_lc = strtolower($location_value);
                     $last_activity_raw = kiosk_status_reference_time($k);
-                    $last_seen_str = $last_activity_raw ? date('Y-m-d H:i', strtotime($last_activity_raw)) : 'Soha';
+                    $last_seen_str = $last_activity_raw ? date('Y-m-d H:i', strtotime($last_activity_raw)) : 'Nikdy';
                     $display_name = trim((string)($k['friendly_name'] ?? ''));
                     if ($display_name === '') {
                         $display_name = $k['hostname'] ?? 'N/A';
@@ -298,9 +299,9 @@ include '../admin/header.php';
                         $group_names_arr = array_map('trim', explode(',', (string)$k['group_names']));
                     }
                     $screenshot_ts = $k['screenshot_timestamp'] ? date('Y-m-d H:i:s', strtotime($k['screenshot_timestamp'])) : null;
-                    $screenshot_ts_json = json_encode($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Nincs időbélyeg'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                    $screenshot_ts_json = json_encode($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
                     if ($screenshot_ts_json === false) {
-                        $screenshot_ts_json = json_encode(t_def('dashboard.screenshot.no_timestamp', 'Nincs időbélyeg'));
+                        $screenshot_ts_json = json_encode(t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky'));
                     }
                     $primary_group_id = !empty($gids) ? (int)$gids[0] : 0;
                     $current_content = ['loop_name' => '—', 'schedule_text' => '—'];
@@ -320,7 +321,7 @@ include '../admin/header.php';
                             </a>
                         </td>
                         <td>
-                            <span class="status-badge kiosk-status-badge status-<?php echo htmlspecialchars($k['status']); ?>" style="cursor:pointer;" onclick="filterByStatusValue('<?php echo htmlspecialchars($k['status'], ENT_QUOTES, 'UTF-8'); ?>')" title="<?php echo htmlspecialchars(t_def('dashboard.filter.status_title', 'Szűrés erre a státuszra')); ?>">
+                            <span class="status-badge kiosk-status-badge status-<?php echo htmlspecialchars($k['status']); ?>" style="cursor:pointer;" onclick="filterByStatusValue('<?php echo htmlspecialchars($k['status'], ENT_QUOTES, 'UTF-8'); ?>')" title="<?php echo htmlspecialchars(t_def('dashboard.filter.status_title', 'Filtrovať podľa tohto stavu')); ?>">
                                 <?php if ($k['status'] === 'online_error'): ?>
                                     ⚠️ <?php echo htmlspecialchars(t_def('dashboard.status.online_error', 'Online-Hiba')); ?>
                                 <?php elseif ($k['status'] === 'online_pending'): ?>
@@ -334,7 +335,7 @@ include '../admin/header.php';
                         </td>
                         <td>
                             <?php if ($location_value !== ''): ?>
-                                <a href="#" onclick="filterByLocationValue(<?php echo htmlspecialchars((json_encode($location_value, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '""'), ENT_QUOTES, 'UTF-8'); ?>); return false;" title="<?php echo htmlspecialchars(t_def('dashboard.filter.location_title', 'Szűrés erre a helyre')); ?>">
+                                <a href="#" onclick="filterByLocationValue(<?php echo htmlspecialchars((json_encode($location_value, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '""'), ENT_QUOTES, 'UTF-8'); ?>); return false;" title="<?php echo htmlspecialchars(t_def('dashboard.filter.location_title', 'Filtrovať podľa tohto miesta')); ?>">
                                     <?php echo htmlspecialchars($location_value); ?>
                                 </a>
                             <?php else: ?>
@@ -344,9 +345,9 @@ include '../admin/header.php';
                         <td class="muted">
                             <?php if (!empty($gids) && !empty($group_names_arr)): ?>
                                 <?php foreach ($gids as $idx => $gid):
-                                    $gname = $group_names_arr[$idx] ?? (t_def('dashboard.group_prefix', 'Csoport #') . $gid);
+                                    $gname = $group_names_arr[$idx] ?? (t_def('dashboard.group_prefix', 'Skupina #') . $gid);
                                 ?>
-                                    <a href="group_loop/index.php?id=<?php echo (int)$gid; ?>" title="<?php echo htmlspecialchars(t_def('dashboard.group.edit', 'Csoport szerkesztése')); ?>"><?php echo htmlspecialchars($gname); ?></a><?php echo $idx < (count($gids) - 1) ? ', ' : ''; ?>
+                                    <a href="group_loop/index.php?id=<?php echo (int)$gid; ?>" title="<?php echo htmlspecialchars(t_def('dashboard.group.edit', 'Upraviť skupinu')); ?>"><?php echo htmlspecialchars($gname); ?></a><?php echo $idx < (count($gids) - 1) ? ', ' : ''; ?>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 —
@@ -370,7 +371,7 @@ include '../admin/header.php';
                                          src="<?php echo htmlspecialchars($k['screenshot_url']); ?>"
                                          alt="Screenshot"
                                          loading="lazy">
-                                    <span class="screenshot-timestamp"><?php echo htmlspecialchars($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Nincs időbélyeg')); ?></span>
+                                    <span class="screenshot-timestamp"><?php echo htmlspecialchars($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky')); ?></span>
                                 </div>
                             <?php elseif ($k['status'] === 'offline'): ?>
                                 <div class="preview-card placeholder" style="cursor:pointer;" onclick="openScreenshotViewer(<?php echo (int)$k['id']; ?>, <?php echo htmlspecialchars($screenshot_url_json, ENT_QUOTES, 'UTF-8'); ?>, 'OFFLINE');" title="<?php echo htmlspecialchars(t_def('dashboard.screenshot.open_history', 'Előzmények megnyitása')); ?>">
@@ -408,12 +409,12 @@ include '../admin/header.php';
 <div id="screenshot-viewer-modal" class="kiosk-modal" onclick="handleScreenshotBackdropClick(event)">
     <div class="kiosk-modal-box" style="max-width: 980px;">
         <div class="kiosk-modal-header">
-            <span class="kiosk-modal-title"><?php echo htmlspecialchars(t_def('dashboard.screenshot.large_view', 'Képernyőkép nagy nézet')); ?></span>
+            <span class="kiosk-modal-title"><?php echo htmlspecialchars(t_def('dashboard.screenshot.large_view', 'Snímka obrazovky - veľké zobrazenie')); ?></span>
             <button class="kiosk-modal-close" onclick="closeScreenshotViewer()" aria-label="<?php echo htmlspecialchars(t('dashboard.modal.close')); ?>">&times;</button>
         </div>
         <div class="kiosk-modal-body" style="text-align:center;">
             <div id="screenshot-viewer-stage" style="position:relative;display:inline-block;max-width:100%;">
-                <img id="screenshot-viewer-img" src="" alt="Képernyőkép" style="display:block;width:min(860px, calc(100vw - 80px));height:min(70vh, calc((100vw - 80px) * 0.5625));max-width:100%;object-fit:contain;border:1px solid #d0d6dc;border-radius:6px;background:#f8f9fb;">
+                <img id="screenshot-viewer-img" src="" alt="Snímka obrazovky" style="display:block;width:min(860px, calc(100vw - 80px));height:min(70vh, calc((100vw - 80px) * 0.5625));max-width:100%;object-fit:contain;border:1px solid #d0d6dc;border-radius:6px;background:#f8f9fb;">
                 <div id="screenshot-viewer-placeholder" style="display:none;width:min(860px, calc(100vw - 80px));height:min(70vh, calc((100vw - 80px) * 0.5625));max-width:100%;border:1px solid #d0d6dc;border-radius:6px;background:repeating-linear-gradient(135deg, #d7dbe1 0 14px, #c8ced6 14px 28px);"></div>
                 <div id="screenshot-viewer-timestamp" style="position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,0.78);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;line-height:1.2;">—</div>
             </div>
@@ -424,7 +425,7 @@ include '../admin/header.php';
                     <span id="history-timeline-latest"><?php echo htmlspecialchars(t_def('dashboard.history.latest', 'Legfrissebb')); ?>: —</span>
                 </div>
                 <input type="range" id="history-timeline" min="0" max="0" value="0" step="0.001" oninput="onTimelineInput(this.value)" style="width:100%;direction:rtl;">
-                <div id="history-timeline-current" style="margin-top:4px;font-size:12px;color:#444;text-align:right;"><?php echo htmlspecialchars(t_def('dashboard.history.current', 'Aktuális')); ?>: —</div>
+                <div id="history-timeline-current" style="margin-top:4px;font-size:12px;color:#444;text-align:right;"><?php echo htmlspecialchars(t_def('dashboard.history.current', 'Aktuálne')); ?>: —</div>
                 <div id="history-timeline-labels" style="margin-top:6px;display:flex;justify-content:space-between;align-items:flex-start;gap:2px;min-height:92px;"></div>
             </div>
 
@@ -434,6 +435,11 @@ include '../admin/header.php';
                 <button type="button" class="btn" onclick="previousHistoryFrame()"><?php echo htmlspecialchars(t_def('dashboard.history.prev', '◀ Előző')); ?></button>
                 <button type="button" class="btn" onclick="nextHistoryFrame()"><?php echo htmlspecialchars(t_def('dashboard.history.next', 'Következő ▶')); ?></button>
                 <span id="history-player-status" class="muted"><?php echo htmlspecialchars(t('dashboard.screenshot.none')); ?></span>
+            </div>
+
+            <div style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn" id="screenshot-watch-toggle" onclick="toggleScreenshotWatch()">⏱ <?php echo htmlspecialchars(t_def('dashboard.toggle.realtime_view', 'Realtime zobrazenie')); ?></button>
+                <span id="screenshot-watch-status" class="muted"><?php echo htmlspecialchars(t_def('dashboard.screenshot.none', 'Žiadna snímka')); ?></span>
             </div>
 
             <div style="margin-top:18px;text-align:left;">
@@ -446,7 +452,7 @@ include '../admin/header.php';
                         <label for="history-date-to" style="display:block;font-size:12px;color:#555;"><?php echo htmlspecialchars(t_def('dashboard.history.date_to', 'Dátumig')); ?></label>
                         <input type="date" id="history-date-to">
                     </div>
-                    <button type="button" class="btn btn-primary" onclick="applyHistoryFilter()"><?php echo htmlspecialchars(t_def('dashboard.history.filter', 'Szűrés')); ?></button>
+                    <button type="button" class="btn btn-primary" onclick="applyHistoryFilter()"><?php echo htmlspecialchars(t_def('dashboard.history.filter', 'Filtrovať')); ?></button>
                     <button type="button" class="btn" onclick="clearHistoryFilter()"><?php echo htmlspecialchars(t_def('dashboard.history.filter_clear', 'Szűrő törlése')); ?></button>
                 </div>
 
@@ -486,6 +492,8 @@ var _historyCurrentIndex = 0;
 var _historyPlayerTimer = null;
 var _historyPlaybackElapsedMs = 0;
 var _dashboardAutoRefreshTimer = null;
+var _viewerWatchTimer = null;
+var _viewerWatchActive = false;
 var _summaryFilter = 'all';
 var _quickFilter = { type: null, value: null, label: null };
 var SCREENSHOT_LOADING_TEXT = <?php
@@ -501,24 +509,32 @@ var SCREENSHOT_NONE_TEXT = <?php
     echo $screenshot_none_text_json !== false ? $screenshot_none_text_json : '"No image"';
 ?>;
 var NO_TIMESTAMP_TEXT = <?php
-    $no_timestamp_text_json = json_encode(t_def('dashboard.screenshot.no_timestamp', 'Nincs időbélyeg'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $no_timestamp_text_json = json_encode(t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $no_timestamp_text_json !== false ? $no_timestamp_text_json : '"No timestamp"';
+?>;
+var SCREENSHOT_WATCH_ON_TEXT = <?php
+    $screenshot_watch_on_text_json = json_encode(t_def('dashboard.toggle.realtime_view', 'Realtime zobrazenie'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $screenshot_watch_on_text_json !== false ? $screenshot_watch_on_text_json : '"Realtime view"';
+?>;
+var SCREENSHOT_WATCH_OFF_TEXT = <?php
+    $screenshot_watch_off_text_json = json_encode(t_def('dashboard.screenshot.none', 'Žiadna snímka'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $screenshot_watch_off_text_json !== false ? $screenshot_watch_off_text_json : '"No image"';
 ?>;
 var SCREENSHOT_OFFLINE_TEXT = 'OFFLINE';
 var COMMON_LOADING_TEXT = <?php
-    $common_loading_text_json = json_encode(t_def('common.loading', 'Betöltés…'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $common_loading_text_json = json_encode(t_def('common.loading', 'Načítavam…'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $common_loading_text_json !== false ? $common_loading_text_json : '"Loading..."';
 ?>;
 var COMMON_LOAD_ERROR_TEXT = <?php
-    $common_load_error_text_json = json_encode(t_def('common.load_error', 'Betöltési hiba.'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $common_load_error_text_json = json_encode(t_def('common.load_error', 'Chyba načítania.'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $common_load_error_text_json !== false ? $common_load_error_text_json : '"Load error."';
 ?>;
 var COMMON_ERROR_PREFIX_TEXT = <?php
-    $common_error_prefix_text_json = json_encode(t_def('common.error_prefix', 'Hiba:'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $common_error_prefix_text_json = json_encode(t_def('common.error_prefix', 'Chyba:'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $common_error_prefix_text_json !== false ? $common_error_prefix_text_json : '"Error:"';
 ?>;
 var COMMON_UNKNOWN_TEXT = <?php
-    $common_unknown_text_json = json_encode(t_def('common.unknown', 'ismeretlen'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $common_unknown_text_json = json_encode(t_def('common.unknown', 'neznáme'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $common_unknown_text_json !== false ? $common_unknown_text_json : '"unknown"';
 ?>;
 var HISTORY_OFFLINE_SINCE_TEXT = <?php
@@ -526,27 +542,27 @@ var HISTORY_OFFLINE_SINCE_TEXT = <?php
     echo $history_offline_since_text_json !== false ? $history_offline_since_text_json : '"OFFLINE SINCE:"';
 ?>;
 var HISTORY_PAGE_TEXT = <?php
-    $history_page_text_json = json_encode(t_def('dashboard.history.page', 'Oldal'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $history_page_text_json = json_encode(t_def('dashboard.history.page', 'Strana'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $history_page_text_json !== false ? $history_page_text_json : '"Page"';
 ?>;
 var HISTORY_NO_RESULTS_TEXT = <?php
-    $history_no_results_text_json = json_encode(t_def('dashboard.history.no_results', 'Nincs találat.'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $history_no_results_text_json = json_encode(t_def('dashboard.history.no_results', 'Žiadne výsledky.'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $history_no_results_text_json !== false ? $history_no_results_text_json : '"No results."';
 ?>;
 var HISTORY_TIME_TEXT = <?php
-    $history_time_text_json = json_encode(t_def('dashboard.history.time', 'Időpont'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $history_time_text_json = json_encode(t_def('dashboard.history.time', 'Čas'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $history_time_text_json !== false ? $history_time_text_json : '"Time"';
 ?>;
 var HISTORY_OLDEST_TEXT = <?php
-    $history_oldest_text_json = json_encode(t_def('dashboard.history.oldest', 'Legrégebbi'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $history_oldest_text_json = json_encode(t_def('dashboard.history.oldest', 'Najstaršie'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $history_oldest_text_json !== false ? $history_oldest_text_json : '"Oldest"';
 ?>;
 var HISTORY_LATEST_TEXT = <?php
-    $history_latest_text_json = json_encode(t_def('dashboard.history.latest', 'Legfrissebb'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $history_latest_text_json = json_encode(t_def('dashboard.history.latest', 'Najnovšie'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $history_latest_text_json !== false ? $history_latest_text_json : '"Latest"';
 ?>;
 var HISTORY_CURRENT_TEXT = <?php
-    $history_current_text_json = json_encode(t_def('dashboard.history.current', 'Aktuális'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $history_current_text_json = json_encode(t_def('dashboard.history.current', 'Aktuálne'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $history_current_text_json !== false ? $history_current_text_json : '"Current"';
 ?>;
 var STATUS_ONLINE_TEXT = <?php
@@ -558,39 +574,39 @@ var STATUS_OFFLINE_TEXT = <?php
     echo $status_offline_text_json !== false ? $status_offline_text_json : '"Offline"';
 ?>;
 var STATUS_ONLINE_ERROR_TEXT = <?php
-    $status_online_error_text_json = json_encode(t_def('dashboard.status.online_error', 'Online-Hiba'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $status_online_error_text_json = json_encode(t_def('dashboard.status.online_error', 'Online - chyba'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $status_online_error_text_json !== false ? $status_online_error_text_json : '"Online error"';
 ?>;
 var STATUS_ONLINE_PENDING_TEXT = <?php
-    $status_online_pending_text_json = json_encode(t_def('dashboard.status.online_pending', 'Frissítésre vár'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $status_online_pending_text_json = json_encode(t_def('dashboard.status.online_pending', 'Čaká na obnovenie'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $status_online_pending_text_json !== false ? $status_online_pending_text_json : '"Waiting for refresh"';
 ?>;
 var DASHBOARD_COL_NAME_TEXT = <?php
-    $dashboard_col_name_text_json = json_encode(t_def('dashboard.col.name', 'Megnevezés'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $dashboard_col_name_text_json = json_encode(t_def('dashboard.col.name', 'Názov'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_col_name_text_json !== false ? $dashboard_col_name_text_json : '"Name"';
 ?>;
 var DASHBOARD_COL_LOCATION_TEXT = <?php
-    $dashboard_col_location_text_json = json_encode(t_def('dashboard.col.location', 'Hely'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $dashboard_col_location_text_json = json_encode(t_def('dashboard.col.location', 'Miesto'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_col_location_text_json !== false ? $dashboard_col_location_text_json : '"Location"';
 ?>;
 var DASHBOARD_COL_GROUP_TEXT = <?php
-    $dashboard_col_group_text_json = json_encode(t_def('dashboard.col.group', 'Csoport'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $dashboard_col_group_text_json = json_encode(t_def('dashboard.col.group', 'Skupina'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_col_group_text_json !== false ? $dashboard_col_group_text_json : '"Group"';
 ?>;
 var DASHBOARD_COL_STATUS_TEXT = <?php
-    $dashboard_col_status_text_json = json_encode(t_def('dashboard.col.status', 'Státusz'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $dashboard_col_status_text_json = json_encode(t_def('dashboard.col.status', 'Stav'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_col_status_text_json !== false ? $dashboard_col_status_text_json : '"Status"';
 ?>;
 var DASHBOARD_COL_LAST_SYNC_TEXT = <?php
-    $dashboard_col_last_sync_text_json = json_encode(t_def('dashboard.col.last_sync', 'Utolsó szinkron'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $dashboard_col_last_sync_text_json = json_encode(t_def('dashboard.col.last_sync', 'Posledná synchronizácia'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_col_last_sync_text_json !== false ? $dashboard_col_last_sync_text_json : '"Last sync"';
 ?>;
 var DASHBOARD_COL_VERSION_TEXT = <?php
-    $dashboard_col_version_text_json = json_encode(t_def('dashboard.col.version', 'Verzió'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $dashboard_col_version_text_json = json_encode(t_def('dashboard.col.version', 'Verzia'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_col_version_text_json !== false ? $dashboard_col_version_text_json : '"Version"';
 ?>;
 var DASHBOARD_ACTION_SAVE_TEXT = <?php
-    $dashboard_action_save_text_json = json_encode(t_def('common.save', 'Mentés'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $dashboard_action_save_text_json = json_encode(t_def('common.save', 'Uložiť'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_action_save_text_json !== false ? $dashboard_action_save_text_json : '"Save"';
 ?>;
 var DASHBOARD_LOOP_KIOSK_VERSION_TEXT = <?php
@@ -751,6 +767,33 @@ function clearLocationFilter() {
     applyCombinedFilters();
 }
 
+function toLocalDateTimeInputValue(date) {
+    var d = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+    return d.toISOString().slice(0, 16);
+}
+
+function parseLocalDateTimeInput(value) {
+    var text = String(value || '').trim();
+    var match = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+    if (!match) {
+        return null;
+    }
+    var year = parseInt(match[1], 10);
+    var month = parseInt(match[2], 10) - 1;
+    var day = parseInt(match[3], 10);
+    var hour = parseInt(match[4], 10);
+    var minute = parseInt(match[5], 10);
+    return new Date(year, month, day, hour, minute, 0, 0);
+}
+
+function toPlannerDateTimeValue(date) {
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    return [
+        date.getFullYear(), '-', pad(date.getMonth() + 1), '-', pad(date.getDate()),
+        ' ', pad(date.getHours()), ':', pad(date.getMinutes()), ':00'
+    ].join('');
+}
+
 function setScreenshotViewerTimestamp(timestampText) {
     var label = document.getElementById('screenshot-viewer-timestamp');
     if (!label) {
@@ -815,6 +858,8 @@ function openScreenshotViewer(kioskId, imageSrc, initialTimestamp) {
     setScreenshotViewerMedia(_viewerImageBase, isOfflineView);
     setScreenshotViewerTimestamp(initialTimestamp || NO_TIMESTAMP_TEXT);
     modal.style.display = 'flex';
+
+    setScreenshotWatchActive(false, null);
 
     loadScreenshotHistory(1);
 }
@@ -883,6 +928,86 @@ function loadScreenshotHistory(page) {
         });
 }
 
+
+    function updateScreenshotWatchUi(active) {
+        var button = document.getElementById('screenshot-watch-toggle');
+        var status = document.getElementById('screenshot-watch-status');
+
+        if (button) {
+            button.classList.toggle('btn-primary', !!active);
+            button.textContent = active
+                ? '⏱ Realtime zobrazenie: ZAPNUTÉ'
+                : '⏱ Realtime zobrazenie: VYPNUTÉ';
+        }
+
+        if (status) {
+            status.textContent = active ? '15 s / 5 min' : SCREENSHOT_WATCH_OFF_TEXT;
+        }
+    }
+
+    function refreshScreenshotViewerLiveImage() {
+        var img = document.getElementById('screenshot-viewer-img');
+        if (!img) {
+            return;
+        }
+
+        var base = img.getAttribute('data-base-src') || _viewerImageBase || '';
+        if (base === '') {
+            return;
+        }
+
+        img.setAttribute('data-base-src', base);
+        img.src = appendCacheBuster(base);
+    }
+
+    function stopScreenshotWatchTimer() {
+        if (_viewerWatchTimer) {
+            clearInterval(_viewerWatchTimer);
+            _viewerWatchTimer = null;
+        }
+    }
+
+    function startScreenshotWatchTimer() {
+        stopScreenshotWatchTimer();
+        if (!_viewerKioskId) {
+            return;
+        }
+
+        _viewerWatchTimer = setInterval(function () {
+            if (!_viewerWatchActive || !_viewerKioskId) {
+                return;
+            }
+            requestScreenshotTTL(_viewerKioskId, 300);
+            refreshScreenshotViewerLiveImage();
+        }, 15000);
+    }
+
+    function setScreenshotWatchActive(active, kioskId) {
+        _viewerWatchActive = !!active;
+        updateScreenshotWatchUi(_viewerWatchActive);
+
+        if (_viewerWatchActive) {
+            if (kioskId) {
+                requestScreenshotTTL(kioskId, 300);
+            }
+            refreshScreenshotViewerLiveImage();
+            startScreenshotWatchTimer();
+            return;
+        }
+
+        stopScreenshotWatchTimer();
+        if (kioskId) {
+            stopScreenshotTTL(kioskId);
+        }
+    }
+
+    function toggleScreenshotWatch() {
+        if (!_viewerKioskId) {
+            return;
+        }
+
+        setScreenshotWatchActive(!_viewerWatchActive, _viewerKioskId);
+    }
 function renderScreenshotHistoryRows(items) {
     var tbody = document.getElementById('history-table-body');
     if (!tbody) {
@@ -1195,15 +1320,18 @@ function closeScreenshotViewer() {
     var modal = document.getElementById('screenshot-viewer-modal');
     modal.style.display = 'none';
     stopHistoryPlayer();
+    stopScreenshotWatchTimer();
     if (_viewerKioskId) {
         stopScreenshotTTL(_viewerKioskId);
     }
     _viewerKioskId = null;
     _viewerImageBase = '';
+    _viewerWatchActive = false;
     _historyPage = 1;
     _historyTotalPages = 1;
     _historyItems = [];
     _historyCurrentIndex = 0;
+    updateScreenshotWatchUi(false);
     setScreenshotViewerMedia('', false);
     setScreenshotViewerTimestamp('—');
     updateHistoryTimeline();
@@ -1215,11 +1343,11 @@ function handleScreenshotBackdropClick(event) {
     }
 }
 
-function requestScreenshotTTL(kioskId) {
+function requestScreenshotTTL(kioskId, ttlSeconds) {
     fetch('../api/screenshot_request.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kiosk_id: kioskId, ttl_seconds: 60 })
+        body: JSON.stringify({ kiosk_id: kioskId, ttl_seconds: ttlSeconds || 300 })
     }).catch(function () {});
 }
 
@@ -1485,7 +1613,7 @@ function refreshDashboardData() {
 
                 var lastSeenEl = row.querySelector('.kiosk-last-seen');
                 if (lastSeenEl) {
-                    lastSeenEl.textContent = kiosk.last_seen || 'Soha';
+                    lastSeenEl.textContent = kiosk.last_seen || 'Nikdy';
                 }
 
                 var screenshotCell = row.querySelector('.kiosk-screenshot-cell');
@@ -1515,33 +1643,19 @@ function openKioskDetail(kioskId, hostname) {
     body.innerHTML = '<p class="muted">' + escapeHtml(COMMON_LOADING_TEXT) + '</p>';
     modal.style.display = 'flex';
 
-    requestScreenshotTTL(kioskId);
     if (_screenshotKeepaliveTimer) {
         clearInterval(_screenshotKeepaliveTimer);
+        _screenshotKeepaliveTimer = null;
     }
-    _screenshotKeepaliveTimer = setInterval(function () {
-        if (_currentModalKioskId) {
-            requestScreenshotTTL(_currentModalKioskId);
-            var img = document.getElementById('modal-screenshot-img');
-            if (img) {
-                var base = img.getAttribute('data-base-src') || img.getAttribute('src') || '';
-                if (base.indexOf('&t=') !== -1) {
-                    base = base.replace(/&t=\d+$/, '');
-                }
-                if (base.indexOf('?t=') !== -1) {
-                    base = base.replace(/\?t=\d+$/, '');
-                }
-                img.setAttribute('data-base-src', base);
-                img.src = appendCacheBuster(base);
-            }
-        }
-    }, 45000);
 
     fetch('../api/kiosk_details.php?id=' + kioskId)
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (data.success) {
                 body.innerHTML = buildKioskModalHTML(data);
+                if (typeof data.screenshot_watch_active !== 'undefined') {
+                    setScreenshotWatchActive(!!data.screenshot_watch_active, _viewerKioskId);
+                }
                 var loadedImg = document.getElementById('modal-screenshot-img');
                 if (loadedImg) {
                     loadedImg.setAttribute('data-base-src', loadedImg.getAttribute('src') || '');

@@ -1171,7 +1171,7 @@ $group_loop_localized_module_names['turned-off'] = t_def('group_loop.turned_off.
     <div class="loop-main-layout">
         <div class="loop-main-left">
             <div class="loop-builder" id="loop-builder">
-                <h2 id="loop-config-title">🔄 <?php echo htmlspecialchars(t_def('group_loop.title', 'Group loops')); ?></h2>
+                <h2 id="loop-config-title">🔄 <?php echo htmlspecialchars(t_def('group_loop.title', 'Skupinové slučky')); ?></h2>
 
                 <div class="loop-style-selector-panel">
                     <div class="loop-style-selector-row">
@@ -1247,15 +1247,7 @@ $group_loop_localized_module_names['turned-off'] = t_def('group_loop.turned_off.
                     </div>
 
                     <div class="loop-workspace-col loop-workspace-editor">
-                        <div class="planner-column-header" style="display:flex; align-items:center; justify-content:space-between; gap:8px; text-transform:none; letter-spacing:0; font-size:11px;">
-                            <span><?php echo htmlspecialchars(t_def('group_loop.edited_loop', 'Edited loop')); ?>: <strong id="active-loop-inline-name">—</strong><span id="active-loop-inline-schedule" style="margin-left:6px; font-weight:400; color:#425466;"></span></span>
-                            <?php if (!$is_default_group && !$is_content_only_mode): ?>
-                                <span style="display:flex; gap:6px; align-items:center;">
-                                    <button class="btn" type="button" onclick="renameActiveLoopStyle()" style="padding:4px 8px; font-size:11px;">✏️ <?php echo htmlspecialchars(t_def('group_loop.rename', 'Rename')); ?></button>
-                                    <button class="btn" type="button" onclick="duplicateActiveLoopStyle()" style="padding:4px 8px; font-size:11px;">📄 <?php echo htmlspecialchars(t_def('group_loop.duplicate', 'Duplicate')); ?></button>
-                                </span>
-                            <?php endif; ?>
-                        </div>
+                        <?php require __DIR__ . '/partials/editor_header.php'; ?>
                         <div style="padding:10px;">
                             <div id="loop-detail-placeholder" class="loop-detail-placeholder" style="display:none;">
                                 <?php echo htmlspecialchars(t_def('group_loop.select_for_edit', 'Select a loop from the dropdown list for editing.')); ?>
@@ -1351,11 +1343,11 @@ $group_loop_localized_module_names['turned-off'] = t_def('group_loop.turned_off.
     </div>
 
     <?php if (!$is_default_group): ?>
-    <div class="planner-panel">
-        <div class="planner-title"><?php echo htmlspecialchars(t_def('group_loop.schedule', 'Scheduling')); ?></div>
+    <div class="planner-panel" style="margin-top:14px;">
+        <div class="planner-title"><?php echo htmlspecialchars(t_def('group_loop.schedule', 'Plánovanie')); ?></div>
         <div class="planner-legend">
             <span><span class="dot weekly"></span><?php echo htmlspecialchars(t_def('group_loop.legend.weekly', 'Weekly block')); ?></span>
-            <span><span class="dot turned-off"></span><?php echo htmlspecialchars(t_def('group_loop.legend.turned_off', 'Turned off plan')); ?></span>
+            <span><span class="dot special"></span><?php echo htmlspecialchars(t_def('group_loop.legend.special', 'Special block')); ?></span>
             <span><span class="dot active"></span><?php echo htmlspecialchars(t_def('group_loop.legend.active', 'Active range')); ?></span>
         </div>
 
@@ -1369,7 +1361,7 @@ $group_loop_localized_module_names['turned-off'] = t_def('group_loop.turned_off.
                         <input type="hidden" id="fixed-plan-block-id" value="">
                         <input type="hidden" id="fixed-plan-loop-style" value="">
                         <div class="fixed-weekly-planner-head">
-                            <label id="fixed-weekly-planner-title" style="font-size:12px; font-weight:700; color:#1f2d3d; margin:0;"><?php echo htmlspecialchars(t_def('group_loop.edit_selected_weekly_block', 'Edit selected weekly block')); ?></label>
+                            <label id="fixed-weekly-planner-title" style="font-size:12px; font-weight:700; color:#1f2d3d; margin:0;">Alapterv szerkesztése</label>
                             <button type="button" class="fixed-weekly-close-btn" onclick="closeFixedWeeklyPlannerModal()" aria-label="<?php echo htmlspecialchars(t_def('common.close', 'Close')); ?>" title="<?php echo htmlspecialchars(t_def('common.close', 'Close')); ?>">✕</button>
                         </div>
                         <div id="fixed-plan-loop-label" style="font-size:12px; color:#425466; font-weight:600;"><?php echo htmlspecialchars(t_def('group_loop.selected_loop_empty', 'Selected loop: —')); ?></div>

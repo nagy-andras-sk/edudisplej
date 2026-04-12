@@ -19,6 +19,28 @@
             ? groupLoopBootstrap.localizedModuleNames
             : {};
         const i18nCatalog = (groupLoopBootstrap.i18n && typeof groupLoopBootstrap.i18n === 'object') ? groupLoopBootstrap.i18n : {};
+        const specialOnlyMode = !!groupLoopBootstrap.specialOnly;
+        const autoCreateSpecialLoop = !!groupLoopBootstrap.autoCreateSpecialLoop;
+        const specialWorkflowStart = String(groupLoopBootstrap.specialWorkflowStart || '').trim();
+        const specialWorkflowEnd = String(groupLoopBootstrap.specialWorkflowEnd || '').trim();
+        const forcedSpecialLoopName = String(groupLoopBootstrap.forcedSpecialLoopName || '').trim();
+
+        function resolveSpecialWorkflowRange() {
+            const pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+            if (pattern.test(specialWorkflowStart) && pattern.test(specialWorkflowEnd)) {
+                return { start: specialWorkflowStart, end: specialWorkflowEnd };
+            }
+
+            const query = new URLSearchParams(window.location.search || '');
+            const qsStart = String(query.get('wf_start') || '').trim();
+            const qsEnd = String(query.get('wf_end') || '').trim();
+            if (pattern.test(qsStart) && pattern.test(qsEnd)) {
+                return { start: qsStart, end: qsEnd };
+            }
+
+            return null;
+        }
 
         function tr(key, fallback, vars = null) {
             let text = String(i18nCatalog[key] ?? fallback ?? key ?? '');
@@ -1213,10 +1235,16 @@
             }
 
             const styles = Array.isArray(payload.loop_styles) ? payload.loop_styles : [];
-            const parsedStyles = normalizeLoopStyles(styles, Array.isArray(payload.base_loop) ? payload.base_loop : []);
+            const parsedStyles = normalizeLoopStyles(
+                styles,
+                Array.isArray(payload.base_loop) ? payload.base_loop : [],
+                specialOnlyMode
+            );
 
             loopStyles = parsedStyles;
-            defaultLoopStyleId = parseInt(payload.default_loop_style_id ?? loopStyles[0]?.id ?? 0, 10) || loopStyles[0]?.id || null;
+            defaultLoopStyleId = specialOnlyMode
+                ? null
+                : (parseInt(payload.default_loop_style_id ?? loopStyles[0]?.id ?? 0, 10) || loopStyles[0]?.id || null);
             timeBlocks = normalizeTimeBlocks(payload.schedule_blocks || payload.time_blocks || []);
             syncNextTempIdCursor();
 
@@ -1354,13 +1382,16 @@
             }));
         }
 
-        function normalizeLoopStyles(rawStyles, fallbackItems = []) {
+        function normalizeLoopStyles(rawStyles, fallbackItems = [], allowEmpty = false) {
             const styles = Array.isArray(rawStyles) ? rawStyles : [];
             const nowTs = Date.now();
             const usedIds = new Set();
             let nextGeneratedId = -1;
 
             if (styles.length === 0) {
+                if (allowEmpty) {
+                    return [];
+                }
                 return [createFallbackLoopStyle('DEFAULT', Array.isArray(fallbackItems) ? fallbackItems : [])];
             }
 
@@ -1459,6 +1490,9 @@
         }
 
         function normalizeDefaultLoopStyleName() {
+            if (specialOnlyMode) {
+                return;
+            }
             const defaultStyle = getLoopStyleById(defaultLoopStyleId);
             if (!defaultStyle) {
                 return;
@@ -1471,6 +1505,45 @@
         function getLoopStyleById(styleId) {
             const normalized = parseInt(styleId, 10);
             return loopStyles.find((style) => parseInt(style.id, 10) === normalized) || null;
+        }
+
+        function enforceSpecialActiveLoop() {
+            if (!specialOnlyMode) {
+                return;
+            }
+
+            const active = getLoopStyleById(activeLoopStyleId);
+            const activeName = String(active?.name || '').trim();
+            const activeLooksDefault = activeName === '' || /^default$/i.test(activeName);
+
+            if (active && !activeLooksDefault) {
+                return;
+            }
+
+            const special = loopStyles.find((entry) => /^special_/i.test(String(entry.name || '').trim())) || null;
+            if (!special) {
+                return;
+            }
+
+            activeLoopStyleId = parseInt(special.id, 10);
+            loopItems = deepClone(special.items || []);
+            normalizeLoopItems();
+            persistActiveLoopStyleItems();
+        }
+
+        function ensureNamedSpecialLoopStyle(loopName) {
+            const name = String(loopName || '').trim();
+            if (!name) {
+                return null;
+            }
+
+            let style = loopStyles.find((entry) => String(entry.name || '').trim() === name) || null;
+            if (!style) {
+                style = createFallbackLoopStyle(name, []);
+                loopStyles.push(style);
+                ensureSingleDefaultLoopStyle();
+            }
+            return style;
         }
 
         function persistActiveLoopStyleItems() {
@@ -1689,6 +1762,10 @@
         }
 
         function ensureSingleDefaultLoopStyle() {
+            if (specialOnlyMode) {
+                defaultLoopStyleId = null;
+                return;
+            }
             if (!Array.isArray(loopStyles) || loopStyles.length === 0) {
                 defaultLoopStyleId = null;
                 return;
@@ -1816,6 +1893,8 @@
         }
 
         function renderLoopStyleSelector() {
+            enforceSpecialActiveLoop();
+
             const dragList = document.getElementById('loop-style-drag-list');
             const fixedStyleInput = document.getElementById('fixed-plan-loop-style');
             const fixedStyleLabel = document.getElementById('fixed-plan-loop-label');
@@ -2335,7 +2414,7 @@
         }
 
         function createLoopStyle() {
-            if (isDefaultGroup || isContentOnlyMode) {
+            if (isDefaultGroup || isContentOnlyMode || specialOnlyMode) {
                 return;
             }
             persistActiveLoopStyleItems();
@@ -2350,8 +2429,90 @@
             scheduleAutoSave(250);
         }
 
+        function createAutoSpecialLoop() {
+            if (!specialOnlyMode) {
+                return;
+            }
+            const name = `special_${Date.now()}`;
+            const style = createFallbackLoopStyle(name, []);
+            loopStyles.push(style);
+            ensureSingleDefaultLoopStyle();
+            setActiveLoopStyle(style.id);
+            scheduleAutoSave(250);
+        }
+
+        function ensureSpecialLoopStyleForRange(startDateObj, endDateObj) {
+            const startDate = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}-${String(startDateObj.getDate()).padStart(2, '0')}`;
+            const endDate = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
+            const startTime = `${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}:00`;
+            const endTime = `${String(endDateObj.getHours()).padStart(2, '0')}:${String(endDateObj.getMinutes()).padStart(2, '0')}:00`;
+
+            const startDateClean = startDate.replace(/-/g, '');
+            const startTimeClean = startTime.slice(0, 5).replace(':', '');
+            const endDateClean = endDate.replace(/-/g, '');
+            const endTimeClean = endTime.slice(0, 5).replace(':', '');
+            const specialStyleName = `special_${startDateClean}${startTimeClean}-${endDateClean}${endTimeClean}`;
+            const wantedName = forcedSpecialLoopName || specialStyleName;
+            return ensureNamedSpecialLoopStyle(wantedName);
+        }
+
+        function createSpecialRangeBlockFromWorkflow(startDatetimeVal, endDatetimeVal) {
+            if (!specialOnlyMode || !startDatetimeVal || !endDatetimeVal) {
+                return false;
+            }
+
+            const startTs = Date.parse(startDatetimeVal);
+            const endTs = Date.parse(endDatetimeVal);
+            if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) {
+                return false;
+            }
+
+            const startDateObj = new Date(startTs);
+            const endDateObj = new Date(endTs);
+            const startDate = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}-${String(startDateObj.getDate()).padStart(2, '0')}`;
+            const endDate = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
+            const startTime = `${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}:00`;
+            const endTime = `${String(endDateObj.getHours()).padStart(2, '0')}:${String(endDateObj.getMinutes()).padStart(2, '0')}:00`;
+
+            const style = ensureSpecialLoopStyleForRange(startDateObj, endDateObj);
+
+            const styleId = parseInt(style.id || 0, 10);
+            if (!styleId) {
+                return false;
+            }
+
+            const payload = {
+                id: nextTempTimeBlockId--,
+                block_name: `Speciális ${startDate} ${startTime.slice(0, 5)}-${endDate} ${endTime.slice(0, 5)}`,
+                block_type: 'datetime_range',
+                start_datetime: `${startDate} ${startTime}`,
+                end_datetime: `${endDate} ${endTime}`,
+                specific_date: startDate,
+                start_time: startTime,
+                end_time: endTime,
+                days_mask: '',
+                priority: 400,
+                loop_style_id: styleId,
+                is_active: 1,
+                loops: []
+            };
+
+            if (!resolveScheduleConflicts(payload, null)) {
+                return false;
+            }
+
+            timeBlocks.push(payload);
+
+            setActiveLoopStyle(styleId);
+
+            activeScope = `block:${payload.id}`;
+            setActiveScope(activeScope, true);
+            scheduleAutoSave(250);
+            return true;
+        }
+
         function duplicateLoopStyleById(styleId) {
-            if (isDefaultGroup || isContentOnlyMode) {
+            if (isDefaultGroup || isContentOnlyMode || specialOnlyMode) {
                 return;
             }
 
@@ -2426,7 +2587,7 @@
         }
 
         function deleteLoopStyleById(styleId) {
-            if (isDefaultGroup || isContentOnlyMode) {
+            if (isDefaultGroup || isContentOnlyMode || specialOnlyMode) {
                 return;
             }
             if (loopStyles.length <= 1) {
@@ -2506,7 +2667,14 @@
                 baseOption.textContent = 'DEFAULT loop (időblokkon kívül)';
                 selector.appendChild(baseOption);
 
-                timeBlocks.forEach((block) => {
+                const visibleBlocks = specialOnlyMode
+                    ? timeBlocks
+                    : timeBlocks.filter((block) => {
+                        const type = String(block?.block_type || 'weekly').toLowerCase();
+                        return type === 'weekly';
+                    });
+
+                visibleBlocks.forEach((block) => {
                     const option = document.createElement('option');
                     option.value = `block:${block.id}`;
                     option.textContent = getScopeLabel(block);
@@ -3201,6 +3369,11 @@
                 return;
             }
 
+            if (!specialOnlyMode) {
+                wrap.innerHTML = '<div class="item"><span class="muted">A speciális események kezelése a Speciális terv oldalon érhető el.</span></div>';
+                return;
+            }
+
             const searchTerm = String(document.getElementById('special-date-search')?.value || '').trim().toLowerCase();
             const focusedDate = String(document.getElementById('special-day-focus')?.value || '').trim();
 
@@ -3243,6 +3416,11 @@
         }
 
         function openSpecialDayPlanner() {
+            if (!specialOnlyMode) {
+                showAutosaveToast('ℹ️ Speciális eseményt csak a Speciális terv oldalon lehet létrehozni', true);
+                return;
+            }
+
             const dateVal = String(document.getElementById('special-day-focus')?.value || '').trim();
             if (!dateVal) {
                 showAutosaveToast('⚠️ Előbb válassz napot', true);
@@ -3298,6 +3476,16 @@
                             </select>
                             <button type="button" class="btn" onclick="addSpecialRangeBlockFromPlanner()">Intervallum hozzáadása</button>
                         </div>
+                        <div style="font-size:12px; color:#425466; margin-bottom:6px;">Ideiglenes kampány (szövegek egymás után, fix intervallumban):</div>
+                        <div style="display:grid; grid-template-columns:minmax(160px,1fr) minmax(160px,1fr); gap:8px; align-items:center; margin-bottom:8px;">
+                            <input id="special-temp-start" type="datetime-local" aria-label="Kampány kezdete">
+                            <input id="special-temp-end" type="datetime-local" aria-label="Kampány vége">
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 120px auto; gap:8px; align-items:center; margin-bottom:12px;">
+                            <textarea id="special-temp-texts" rows="5" placeholder="Minden sor külön szöveg kártya" style="width:100%; resize:vertical;"></textarea>
+                            <input id="special-temp-duration" type="number" min="2" max="120" step="1" value="10" aria-label="Kártya időtartam (mp)">
+                            <button type="button" class="btn" onclick="createTemporaryRangeCampaignFromPlanner()">Kampány létrehozása</button>
+                        </div>
                         <div style="display:flex; justify-content:flex-end;">
                             <button type="button" class="btn" onclick="closeTimeBlockModal()">Bezárás</button>
                         </div>
@@ -3311,6 +3499,8 @@
             const startRangeInput = document.getElementById('special-range-start');
             const endRangeInput = document.getElementById('special-range-end');
             const styleRangeSelect = document.getElementById('special-range-loop');
+            const tempStartInput = document.getElementById('special-temp-start');
+            const tempEndInput = document.getElementById('special-temp-end');
             if (styleRangeSelect) {
                 const fallbackStyle = parseInt(document.getElementById('special-day-plan-loop')?.value || 0, 10);
                 if (fallbackStyle) {
@@ -3323,9 +3513,177 @@
             if (endRangeInput && !endRangeInput.value) {
                 endRangeInput.value = `${dateVal}T16:00`;
             }
+            if (tempStartInput) {
+                tempStartInput.value = startRangeInput?.value || `${dateVal}T16:00`;
+            }
+            if (tempEndInput) {
+                tempEndInput.value = endRangeInput?.value || `${dateVal}T22:00`;
+            }
+        }
+
+        function createTemporaryRangeCampaignFromPlanner() {
+            if (!specialOnlyMode) {
+                showAutosaveToast('ℹ️ Ideiglenes kampányt csak a Speciális terv oldalon lehet létrehozni', true);
+                return;
+            }
+
+            const startVal = String(document.getElementById('special-temp-start')?.value || '').trim();
+            const endVal = String(document.getElementById('special-temp-end')?.value || '').trim();
+            const rawTexts = String(document.getElementById('special-temp-texts')?.value || '');
+            const durationRaw = parseInt(document.getElementById('special-temp-duration')?.value || '10', 10);
+            const durationSeconds = Math.max(2, Math.min(120, Number.isFinite(durationRaw) ? durationRaw : 10));
+
+            createTemporaryRangeCampaignFromInput(startVal, endVal, rawTexts, durationSeconds, true);
+        }
+
+        function createTemporaryRangeCampaignFromInput(startVal, endVal, rawTexts, durationSeconds, closeModalAfter = false) {
+            if (!specialOnlyMode) {
+                showAutosaveToast('ℹ️ Ideiglenes kampányt csak a Speciális terv oldalon lehet létrehozni', true);
+                return false;
+            }
+
+            const normalizedDuration = Math.max(2, Math.min(120, Number.isFinite(parseInt(durationSeconds, 10)) ? parseInt(durationSeconds, 10) : 10));
+
+            if (!startVal || !endVal) {
+                showAutosaveToast('⚠️ Add meg a kampány kezdő és záró időpontját', true);
+                return false;
+            }
+
+            const textModule = getModuleCatalogEntryByKey('text');
+            if (!textModule || !parseInt(textModule.id || 0, 10)) {
+                showAutosaveToast('⚠️ A Text modul nem érhető el ehhez a kampányhoz', true);
+                return false;
+            }
+
+            const texts = rawTexts
+                .split(/\r?\n/)
+                .map((line) => String(line || '').trim())
+                .filter(Boolean)
+                .slice(0, 40);
+
+            if (texts.length === 0) {
+                showAutosaveToast('⚠️ Adj meg legalább egy szöveget (soronként egyet)', true);
+                return false;
+            }
+
+            const startTs = Date.parse(startVal);
+            const endTs = Date.parse(endVal);
+            if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) {
+                showAutosaveToast('⚠️ Az intervallum vége legyen később a kezdésnél', true);
+                return false;
+            }
+
+            const startDateObj = new Date(startTs);
+            const endDateObj = new Date(endTs);
+            const startDate = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}-${String(startDateObj.getDate()).padStart(2, '0')}`;
+            const endDate = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
+            const startTime = `${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}:00`;
+            const endTime = `${String(endDateObj.getHours()).padStart(2, '0')}:${String(endDateObj.getMinutes()).padStart(2, '0')}:00`;
+
+            const styleName = `Temp ${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}-${String(startDateObj.getDate()).padStart(2, '0')} ${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}`;
+            const textModuleId = parseInt(textModule.id, 10);
+            const textModuleName = getLocalizedModuleName('text', String(textModule.name || 'Text'));
+            const textModuleDesc = String(textModule.description || '');
+
+            const items = texts.map((line) => {
+                const item = buildLoopItemForModule(textModuleId, textModuleName, textModuleDesc, 'text');
+                const baseSettings = (item.settings && typeof item.settings === 'object') ? item.settings : getDefaultSettings('text');
+                item.duration_seconds = normalizedDuration;
+                item.settings = {
+                    ...baseSettings,
+                    textSourceType: 'manual',
+                    text: line
+                };
+                return item;
+            });
+
+            const createdStyle = createFallbackLoopStyle(styleName, items);
+            loopStyles.push(createdStyle);
+            ensureSingleDefaultLoopStyle();
+
+            const payload = {
+                id: nextTempTimeBlockId--,
+                block_name: `Temp kampány ${startDate} ${startTime.slice(0, 5)}-${endDate} ${endTime.slice(0, 5)}`,
+                block_type: 'datetime_range',
+                start_datetime: `${startDate} ${startTime}`,
+                end_datetime: `${endDate} ${endTime}`,
+                specific_date: startDate,
+                start_time: startTime,
+                end_time: endTime,
+                days_mask: '',
+                priority: 400,
+                loop_style_id: createdStyle.id,
+                is_active: 1,
+                loops: []
+            };
+
+            if (!resolveScheduleConflicts(payload, null)) {
+                return false;
+            }
+
+            timeBlocks.push(payload);
+            setActiveLoopStyle(createdStyle.id);
+            activeScope = `block:${payload.id}`;
+            setActiveScope(activeScope, true);
+            scheduleAutoSave(120);
+            showAutosaveToast('✓ Ideiglenes kampány létrehozva és ütemezve');
+            if (closeModalAfter) {
+                closeTimeBlockModal();
+            }
+            return true;
+        }
+
+        function createMobileQuickCampaign() {
+            if (!specialOnlyMode) {
+                showAutosaveToast('ℹ️ Ideiglenes kampányt csak a Speciális terv oldalon lehet létrehozni', true);
+                return;
+            }
+
+            const startVal = String(document.getElementById('mobile-temp-start')?.value || '').trim();
+            const endVal = String(document.getElementById('mobile-temp-end')?.value || '').trim();
+            const rawTexts = String(document.getElementById('mobile-temp-texts')?.value || '');
+            const durationRaw = parseInt(document.getElementById('mobile-temp-duration')?.value || '10', 10);
+            const durationSeconds = Math.max(2, Math.min(120, Number.isFinite(durationRaw) ? durationRaw : 10));
+
+            createTemporaryRangeCampaignFromInput(startVal, endVal, rawTexts, durationSeconds, false);
+        }
+
+        function initMobileQuickCampaignDefaults() {
+            const startInput = document.getElementById('mobile-temp-start');
+            const endInput = document.getElementById('mobile-temp-end');
+            if (!startInput || !endInput) {
+                return;
+            }
+
+            const now = new Date();
+            const nextHour = new Date(now.getTime());
+            nextHour.setMinutes(0, 0, 0);
+            nextHour.setHours(nextHour.getHours() + 1);
+
+            const plus6h = new Date(nextHour.getTime() + (6 * 60 * 60 * 1000));
+            const toLocalDatetimeValue = (dt) => {
+                const y = dt.getFullYear();
+                const m = String(dt.getMonth() + 1).padStart(2, '0');
+                const d = String(dt.getDate()).padStart(2, '0');
+                const hh = String(dt.getHours()).padStart(2, '0');
+                const mm = String(dt.getMinutes()).padStart(2, '0');
+                return `${y}-${m}-${d}T${hh}:${mm}`;
+            };
+
+            if (!String(startInput.value || '').trim()) {
+                startInput.value = toLocalDatetimeValue(nextHour);
+            }
+            if (!String(endInput.value || '').trim()) {
+                endInput.value = toLocalDatetimeValue(plus6h);
+            }
         }
 
         function addSpecialRangeBlockFromPlanner() {
+            if (!specialOnlyMode) {
+                showAutosaveToast('ℹ️ Speciális intervallumot csak a Speciális terv oldalon lehet létrehozni', true);
+                return;
+            }
+
             const startVal = String(document.getElementById('special-range-start')?.value || '').trim();
             const endVal = String(document.getElementById('special-range-end')?.value || '').trim();
             const styleId = parseInt(document.getElementById('special-range-loop')?.value || 0, 10);
@@ -3370,6 +3728,18 @@
             }
 
             timeBlocks.push(payload);
+            
+            if (specialOnlyMode) {
+                const style = getLoopStyleById(styleId);
+                if (style) {
+                    const startDateClean = startDate.replace(/-/g, '');
+                    const startTimeClean = startTime.slice(0, 5).replace(':', '');
+                    const endDateClean = endDate.replace(/-/g, '');
+                    const endTimeClean = endTime.slice(0, 5).replace(':', '');
+                    style.name = `special_${startDateClean}${startTimeClean}-${endDateClean}${endTimeClean}`;
+                }
+            }
+            
             activeScope = `block:${payload.id}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(120);
@@ -3378,6 +3748,11 @@
         }
 
         function addSpecialDayBlockFromPlanner(dateVal) {
+            if (!specialOnlyMode) {
+                showAutosaveToast('ℹ️ Speciális napi idősávot csak a Speciális terv oldalon lehet létrehozni', true);
+                return;
+            }
+
             const startVal = String(document.getElementById('special-day-plan-start')?.value || '').trim();
             const endVal = String(document.getElementById('special-day-plan-end')?.value || '').trim();
             const styleId = parseInt(document.getElementById('special-day-plan-loop')?.value || 0, 10);
@@ -3406,6 +3781,17 @@
             }
 
             timeBlocks.push(payload);
+            
+            if (specialOnlyMode) {
+                const style = getLoopStyleById(styleId);
+                if (style) {
+                    const startHM = startVal.replace(':', '');
+                    const endHM = endVal.replace(':', '');
+                    const cleanDate = dateVal.replace(/-/g, '');
+                    style.name = `special_${cleanDate}${startHM}-${cleanDate}${endHM}`;
+                }
+            }
+            
             activeScope = `block:${payload.id}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(120);
@@ -3569,7 +3955,9 @@
 
         function buildLoopPayload() {
             persistActiveLoopStyleItems();
-            const defaultStyle = getLoopStyleById(defaultLoopStyleId) || getLoopStyleById(activeLoopStyleId) || { items: [] };
+            const defaultStyle = specialOnlyMode
+                ? { items: [] }
+                : (getLoopStyleById(defaultLoopStyleId) || getLoopStyleById(activeLoopStyleId) || { items: [] });
             const expandedTimeBlocks = deepClone(timeBlocks).map((block) => {
                 const style = getLoopStyleById(block.loop_style_id || 0);
                 return {
@@ -3578,11 +3966,15 @@
                 };
             });
 
+            const loopStylePayload = specialOnlyMode
+                ? deepClone(loopStyles).filter((style) => isSpecialStyle(style))
+                : deepClone(loopStyles);
+
             return {
                 base_loop: deepClone(defaultStyle.items || []),
                 time_blocks: expandedTimeBlocks,
-                loop_styles: deepClone(loopStyles),
-                default_loop_style_id: defaultLoopStyleId,
+                loop_styles: loopStylePayload,
+                default_loop_style_id: specialOnlyMode ? null : defaultLoopStyleId,
                 schedule_blocks: deepClone(timeBlocks)
             };
         }
@@ -3684,9 +4076,19 @@
             const plannerStyles = Array.isArray(data.loop_styles) ? data.loop_styles : [];
             if (plannerStyles.length > 0) {
                 return {
-                    styles: normalizeLoopStyles(plannerStyles),
-                    defaultStyleId: parseInt(data.default_loop_style_id ?? plannerStyles[0]?.id ?? 0, 10) || plannerStyles[0]?.id || null,
+                    styles: normalizeLoopStyles(plannerStyles, [], specialOnlyMode),
+                    defaultStyleId: specialOnlyMode
+                        ? null
+                        : (parseInt(data.default_loop_style_id ?? plannerStyles[0]?.id ?? 0, 10) || plannerStyles[0]?.id || null),
                     blocks: normalizeTimeBlocks(data.schedule_blocks || data.time_blocks || [])
+                };
+            }
+
+            if (specialOnlyMode) {
+                return {
+                    styles: [],
+                    defaultStyleId: null,
+                    blocks: normalizeTimeBlocks(data.time_blocks || [])
                 };
             }
 
@@ -3732,6 +4134,50 @@
             hasLoadedInitialLoop = true;
             tryRestoreDraftFromCache();
             updatePendingSaveBar();
+
+            if (autoCreateSpecialLoop && specialOnlyMode) {
+                if (forcedSpecialLoopName) {
+                    const forcedStyle = ensureNamedSpecialLoopStyle(forcedSpecialLoopName);
+                    if (forcedStyle) {
+                        activeLoopStyleId = parseInt(forcedStyle.id, 10);
+                        loopItems = deepClone(forcedStyle.items || []);
+                        normalizeLoopItems();
+                        persistActiveLoopStyleItems();
+                    }
+                }
+
+                const workflowRange = resolveSpecialWorkflowRange();
+                const startDatetime = workflowRange ? workflowRange.start : '';
+                const endDatetime = workflowRange ? workflowRange.end : '';
+                let createdFromRange = false;
+
+                if (startDatetime && endDatetime) {
+                    const startTs = Date.parse(startDatetime);
+                    const endTs = Date.parse(endDatetime);
+                    if (Number.isFinite(startTs) && Number.isFinite(endTs) && endTs > startTs) {
+                        const ensuredStyle = ensureSpecialLoopStyleForRange(new Date(startTs), new Date(endTs));
+                        if (ensuredStyle) {
+                            setActiveLoopStyle(ensuredStyle.id);
+                        }
+                    }
+                    createdFromRange = createSpecialRangeBlockFromWorkflow(startDatetime, endDatetime);
+                }
+
+                if (!createdFromRange) {
+                    const existingSpecial = loopStyles.find((entry) => /^special_/i.test(String(entry.name || '').trim()));
+                    if (existingSpecial) {
+                        setActiveLoopStyle(existingSpecial.id);
+                    } else {
+                        const forcedStyle = ensureNamedSpecialLoopStyle(forcedSpecialLoopName);
+                        if (forcedStyle) {
+                            setActiveLoopStyle(forcedStyle.id);
+                        } else {
+                            createAutoSpecialLoop();
+                        }
+                    }
+                }
+            }
+
             renderLoopStyleSelector();
             renderScopeSelector();
             renderLoop();
@@ -3763,10 +4209,17 @@
             }
 
             const baselineItem = getDefaultUnconfiguredItem();
-            loopStyles = [{ id: -1, name: 'DEFAULT', items: baselineItem ? [baselineItem] : [] }];
-            defaultLoopStyleId = -1;
-            activeLoopStyleId = -1;
-            loopItems = deepClone(loopStyles[0].items || []);
+            if (specialOnlyMode) {
+                loopStyles = [];
+                defaultLoopStyleId = null;
+                activeLoopStyleId = null;
+                loopItems = [];
+            } else {
+                loopStyles = [{ id: -1, name: 'DEFAULT', items: baselineItem ? [baselineItem] : [] }];
+                defaultLoopStyleId = -1;
+                activeLoopStyleId = -1;
+                loopItems = deepClone(loopStyles[0].items || []);
+            }
             timeBlocks = [];
             activeScope = 'base';
             setActiveScope('base', false);
@@ -3776,11 +4229,24 @@
             hasLoadedInitialLoop = true;
             lastSavedSnapshot = getLoopSnapshot();
 
-            fetch(`../../api/group_loop/config.php?group_id=${groupId}`)
+            fetch(`../../api/group_loop/config.php?group_id=${groupId}${specialOnlyMode ? '&special_only=1' : ''}`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data || !data.success) {
                         showAutosaveToast('⚠️ A loop lista betöltése sikertelen, DEFAULT loop használatban', true);
+                        if (specialOnlyMode && autoCreateSpecialLoop) {
+                            const workflowRange = resolveSpecialWorkflowRange();
+                            const startDatetime = workflowRange ? workflowRange.start : '';
+                            const endDatetime = workflowRange ? workflowRange.end : '';
+                            if (startDatetime && endDatetime) {
+                                createSpecialRangeBlockFromWorkflow(startDatetime, endDatetime);
+                            } else {
+                                createAutoSpecialLoop();
+                            }
+                            renderLoopStyleSelector();
+                            renderScopeSelector();
+                            renderLoop();
+                        }
                         return;
                     }
 
@@ -3789,6 +4255,19 @@
                 .catch(error => {
                     console.error('Error loading loop:', error);
                     showAutosaveToast('⚠️ Hálózati hiba, DEFAULT loop használatban', true);
+                    if (specialOnlyMode && autoCreateSpecialLoop) {
+                        const workflowRange = resolveSpecialWorkflowRange();
+                        const startDatetime = workflowRange ? workflowRange.start : '';
+                        const endDatetime = workflowRange ? workflowRange.end : '';
+                        if (startDatetime && endDatetime) {
+                            createSpecialRangeBlockFromWorkflow(startDatetime, endDatetime);
+                        } else {
+                            createAutoSpecialLoop();
+                        }
+                        renderLoopStyleSelector();
+                        renderScopeSelector();
+                        renderLoop();
+                    }
                 });
         }
 
@@ -3864,6 +4343,23 @@
             }
             const items = Array.isArray(style.items) ? style.items : [];
             return items.length === 1 && isTurnedOffLoopItem(items[0]);
+        }
+
+        function isSpecialStyle(style) {
+            if (!style || typeof style !== 'object') {
+                return false;
+            }
+
+            if (isTurnedOffLoopStyle(style)) {
+                return true;
+            }
+
+            const name = String(style.name || '').trim();
+            if (/^special_/i.test(name)) {
+                return true;
+            }
+
+            return isTurnedOffLoopStyle(style);
         }
 
         function ensureTurnedOffLoopStyle() {
@@ -4393,13 +4889,21 @@
             return false;
         }
 
-        function handleSaveLoopSuccess(data, currentSnapshot) {
+        function handleSaveLoopSuccess(data, currentSnapshot, opts = {}) {
             lastSavedSnapshot = currentSnapshot;
             lastPublishedPayload = JSON.parse(currentSnapshot);
             planVersionToken = String(data.plan_version || data.plan_version_token || data.loop_version || planVersionToken || '');
             clearDraftCache();
             setDraftDirty(false);
             showAutosaveToast('✓ Mentés sikeres');
+
+            if (opts.source === 'publish' && specialOnlyMode && autoCreateSpecialLoop) {
+                const target = new URL(window.location.href);
+                target.searchParams.delete('workflow');
+                target.searchParams.delete('wf_start');
+                target.searchParams.delete('wf_end');
+                window.location.href = target.toString();
+            }
         }
 
         function handleSaveLoopFailure(data) {
@@ -4430,7 +4934,7 @@
 
             autoSaveInFlight = true;
             
-            fetch(`../../api/group_loop/config.php?group_id=${groupId}`, {
+            fetch(`../../api/group_loop/config.php?group_id=${groupId}${specialOnlyMode ? '&special_only=1' : ''}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -4440,7 +4944,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    handleSaveLoopSuccess(data, currentSnapshot);
+                    handleSaveLoopSuccess(data, currentSnapshot, opts);
                 } else {
                     handleSaveLoopFailure(data);
                 }
@@ -4836,6 +5340,15 @@
             const modules = modulesCatalog;
             const module = modules.find(m => m.id == moduleId);
             return module ? module.module_key : null;
+        }
+
+        function getModuleCatalogEntryByKey(moduleKey) {
+            const key = String(moduleKey || '').toLowerCase();
+            if (!key) {
+                return null;
+            }
+
+            return modulesCatalog.find((entry) => String(entry?.module_key || '').toLowerCase() === key) || null;
         }
 
         function isOverlayCarrierModule(moduleKey) {
@@ -6666,6 +7179,8 @@
                                     id="setting-textExternalUrl"
                                     value="${textExternalUrl}"
                                     placeholder="${textUiText('external_url_hint')}"
+                                    pattern=".*\\.html(?:[?#].*)?$"
+                                    title="${textUiText('external_url_hint')}"
                                     style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;"
                                 >
                             </div>
@@ -7559,12 +8074,13 @@
             const textExternalUrl = String(document.getElementById('setting-textExternalUrl')?.value || '').trim();
             const textHtml = sanitizeRichTextHtml(richEditor ? richEditor.innerHTML : (document.getElementById('setting-text')?.value || ''));
             const selectedCollection = sourceType === 'collection' ? getTextCollectionById(selectedCollectionId) : null;
+            const isHtmlResourceUrl = (url) => /\.html(?:[?#].*)?$/i.test(String(url || '').trim());
 
             settings.textSourceType = ['manual', 'collection', 'external'].includes(sourceType) ? sourceType : 'manual';
             settings.textCollectionId = sourceType === 'collection' ? selectedCollectionId : 0;
             settings.textCollectionLabel = sourceType === 'collection' ? String(selectedCollection?.title || '') : '';
             settings.textCollectionVersionTs = sourceType === 'collection' ? Date.now() : 0;
-            settings.textExternalUrl = sourceType === 'external' ? textExternalUrl : '';
+            settings.textExternalUrl = sourceType === 'external' && isHtmlResourceUrl(textExternalUrl) ? textExternalUrl : '';
 
             if (sourceType === 'collection' && selectedCollection) {
                 settings.text = sanitizeRichTextHtml(selectedCollection.content_html || '') || 'Sem vložte text...';
@@ -9001,6 +9517,7 @@
         
         reorderPrimaryPanels();
         bindModuleCatalogInteractions();
+        initMobileQuickCampaignDefaults();
 
         // Load resolutions on page load
         loadGroupResolutions();

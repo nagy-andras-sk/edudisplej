@@ -1430,13 +1430,19 @@ check_and_update() {
     if [ $time_diff -ge $update_interval ]; then
         log "Checking for system updates..."
         
-        # Run update.sh in background (so it doesn't block sync)
+        # Run update.sh detached so update-triggered service restarts do not terminate this sync loop.
         if [ -x "/opt/edudisplej/init/update.sh" ]; then
-            log "Running system update (this may take a few minutes)..."
-            if bash "/opt/edudisplej/init/update.sh" >> "$LOG_DIR/update.log" 2>&1; then
-                log_success "System update completed successfully"
+            log "Running system update in detached mode (non-blocking)..."
+            if pgrep -f '/opt/edudisplej/init/update.sh' >/dev/null 2>&1; then
+                log_debug "Update already running, skipping duplicate launch"
             else
-                log_error "System update failed (non-critical - sync will continue)"
+                nohup bash "/opt/edudisplej/init/update.sh" >> "$LOG_DIR/update.log" 2>&1 &
+                local update_pid=$!
+                if [ -n "${update_pid:-}" ] && kill -0 "$update_pid" 2>/dev/null; then
+                    log_success "System update started in background (PID: $update_pid)"
+                else
+                    log_error "Failed to start background system update (non-critical)"
+                fi
             fi
         fi
         

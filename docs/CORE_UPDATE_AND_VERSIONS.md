@@ -8,10 +8,12 @@ This document describes how EduDisplej core updates are detected, triggered, and
 - File: webserver/install/init/versions.json
 - Main key: system_version
 - Service keys: services.*
+- core_checksum stores the checksum of the tracked core file set used by the cron refresh job.
 - Example:
 ```json
 {
-  "system_version": "1.1.0",
+  "system_version": "v20260412095214",
+  "core_checksum": "sha256-of-tracked-core-files",
   "services": {
     "edudisplej_sync_service.sh": "1.1.0"
   }
@@ -36,6 +38,11 @@ This document describes how EduDisplej core updates are detected, triggered, and
 ### 2.2 Version fallback endpoint
 - Endpoint: /api/check_versions.php
 - Fallback latest version if reading versions.json fails is aligned with current release.
+
+### 2.3 Admin dashboard force-update action
+- Location: webserver/control_edudisplej_sk/admin/dashboard.php
+- The button is shown only when the kiosk core version is older than the current versions.json system_version.
+- The button queues /api/kiosk/queue_core_update.php, which inserts a core_update command into kiosk_command_queue.
 
 ## 3. Core Update Trigger Flow On Device
 
@@ -72,6 +79,10 @@ This document describes how EduDisplej core updates are detected, triggered, and
 - Endpoint: /api/install/progress.php
 - Kiosk can send progress phase, state, percent, message.
 
+### 4.3 Manual force update
+- The command executor now supports core_update.
+- The queued command runs update.sh with --core-only and an admin-dashboard source tag.
+
 ### 4.3 Success finalization
 - On successful completion, target version is written to:
   - /opt/edudisplej/VERSION
@@ -104,12 +115,33 @@ Mitigation:
 - Keep cooldown enabled to avoid rapid retry loops
 - As emergency workaround, deploy required init files and VERSION marker manually, then restart services
 
-## 7. Related Files
+## 7. Cron-based Core Version Refresh
+
+The maintenance cron now refreshes the core version metadata before the DB repair phase.
+
+### 7.1 What it scans
+- PHP files under webserver/control_edudisplej_sk
+- Shell, JSON, and service files under webserver/install/init
+- versions.json is excluded from the checksum to avoid a self-referential loop
+
+### 7.2 How it works
+- The cron job builds a sha256 signature from file path plus file content hashes.
+- The signature is stored in versions.json as core_checksum.
+- If the checksum changes, system_version is rewritten to a timestamp version like v20260412095214.
+- Admin and sync comparisons use the same timestamp-safe comparison logic.
+
+### 7.3 Related files
+- webserver/control_edudisplej_sk/cron/maintenance/run_maintenance.php
+- webserver/control_edudisplej_sk/cron/maintenance/core_version_refresh.php
+
+## 8. Related Files
 
 - webserver/install/init/versions.json
 - webserver/control_edudisplej_sk/api/v1/device/sync.php
 - webserver/control_edudisplej_sk/api/check_versions.php
+- webserver/control_edudisplej_sk/api/kiosk/queue_core_update.php
 - webserver/install/init/edudisplej_sync_service.sh
 - webserver/install/init/update.sh
 - webserver/control_edudisplej_sk/api/install/progress.php
 - webserver/control_edudisplej_sk/admin/kiosk_details.php
+- webserver/control_edudisplej_sk/admin/dashboard.php

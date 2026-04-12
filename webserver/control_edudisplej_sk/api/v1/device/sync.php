@@ -38,6 +38,52 @@ function v1_ensure_debug_mode_column(mysqli $conn): void {
     $conn->query("ALTER TABLE kiosks ADD COLUMN debug_mode TINYINT(1) NOT NULL DEFAULT 0");
 }
 
+function v1_normalize_core_version_text(string $value): string {
+    $text = trim($value);
+    if ($text === '') {
+        return '';
+    }
+
+    if ($text[0] === 'v' || $text[0] === 'V') {
+        $text = substr($text, 1);
+    }
+
+    return trim($text);
+}
+
+function v1_core_version_sort_key(string $value): string {
+    $normalized = v1_normalize_core_version_text($value);
+    if ($normalized === '') {
+        return '';
+    }
+
+    if (preg_match('/^\d{14}$/', $normalized)) {
+        return '2' . $normalized;
+    }
+
+    if (preg_match('/^\d+\.\d+\.\d+$/', $normalized)) {
+        [$major, $minor, $patch] = array_map('intval', explode('.', $normalized, 3));
+        return sprintf('1%03d%03d%03d', $major, $minor, $patch);
+    }
+
+    if (preg_match('/^\d+$/', $normalized)) {
+        return '1' . str_pad($normalized, 14, '0', STR_PAD_LEFT);
+    }
+
+    return '0' . strtolower($normalized);
+}
+
+function v1_is_core_version_older(string $current, string $target): bool {
+    $current_key = v1_core_version_sort_key($current);
+    $target_key = v1_core_version_sort_key($target);
+
+    if ($current_key === '' || $target_key === '') {
+        return false;
+    }
+
+    return strcmp($current_key, $target_key) < 0;
+}
+
 function v1_assign_default_group_for_company(mysqli $conn, int $kiosk_id, int $company_id): void {
     if ($kiosk_id <= 0 || $company_id <= 0) {
         return;
@@ -121,16 +167,13 @@ function v1_has_recent_control_panel_activity(mysqli $conn, int $company_id, int
     $stmt = $conn->prepare("SELECT id
                             FROM users
                             WHERE company_id = ?
-                              AND (
-                                  last_activity_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)
-                                  OR last_login >= DATE_SUB(NOW(), INTERVAL ? SECOND)
-                              )
+                                                            AND last_activity_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)
                             LIMIT 1");
     if (!$stmt) {
         return false;
     }
 
-    $stmt->bind_param("iii", $company_id, $window_seconds, $window_seconds);
+    $stmt->bind_param("ii", $company_id, $window_seconds);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -493,32 +536,35 @@ try {
     $screenshot_requested = $screenshot_ttl_active || (bool)$kiosk['screenshot_requested'];
 
     $activity_window_seconds = 10 * 60;
-    $fast_interval_seconds = 2 * 60;
+    $fast_interval_seconds = 30;
     $default_interval_seconds = 5 * 60;
-    $default_screenshot_interval_seconds = 3;
+    $watch_screenshot_interval_seconds = 15;
+    $idle_screenshot_interval_seconds = 30 * 60;
     $company_id_for_activity = (int)($kiosk['company_id'] ?? 0);
     $has_recent_activity = v1_has_recent_control_panel_activity($conn, $company_id_for_activity, $activity_window_seconds);
     $effective_interval = $has_recent_activity ? $fast_interval_seconds : $default_interval_seconds;
-    $screenshot_interval_seconds = (int)($kiosk['screenshot_interval_seconds'] ?? 0);
-    if ($screenshot_interval_seconds <= 0) {
-        $screenshot_interval_seconds = $default_screenshot_interval_seconds;
-    }
+    $screenshot_interval_seconds = ($has_recent_activity || $screenshot_ttl_active)
+        ? $watch_screenshot_interval_seconds
+        : $idle_screenshot_interval_seconds;
+    $screenshot_watch_active = $has_recent_activity || $screenshot_ttl_active;
 
     $response['success']                   = true;
     $response['kiosk_id']                  = $kiosk_id;
     $response['device_id']                 = $kiosk['device_id'];
     $response['sync_interval']             = $effective_interval;
-    $response['screenshot_requested']      = $screenshot_requested;
+    $response['screenshot_requested']      = $screenshot_watch_active;
     $response['screenshot_enabled']        = (bool)$kiosk['screenshot_enabled'];
     $response['debug_mode']                = (bool)$kiosk['debug_mode'];
     $response['screenshot_interval_seconds'] = $screenshot_interval_seconds;
+    $response['screenshot_watch_active']   = $screenshot_watch_active;
+    $response['screenshot_watch_idle_interval_seconds'] = $idle_screenshot_interval_seconds;
     $response['company_id']                = $kiosk['company_id'];
     $response['company_name']              = $kiosk['company_name'] ?? '';
     $response['needs_update']              = $need_update;
 
     $kiosk_version_raw = trim((string)($kiosk['version'] ?? ''));
     $latest_system_version = '1.1.0';
-    $versions_file = dirname(__DIR__, 3) . '/install/init/versions.json';
+    $versions_file = dirname(__DIR__, 4) . '/install/init/versions.json';
     if (is_file($versions_file)) {
         $versions_data = json_decode((string)file_get_contents($versions_file), true);
         if (is_array($versions_data) && !empty($versions_data['system_version'])) {
@@ -532,7 +578,7 @@ try {
             // Unknown kiosk version should receive a core refresh to recover drifted/stale clients.
             $core_update_required = true;
         } else {
-            $core_update_required = version_compare($kiosk_version_raw, $latest_system_version, '<');
+            $core_update_required = v1_is_core_version_older($kiosk_version_raw, $latest_system_version);
         }
     }
 

@@ -207,6 +207,26 @@ execute_command() {
             fi
             ;;
 
+        core_update)
+            log "Starting core-only self-update..."
+            UPDATE_LOG="${LOG_DIR}/core_update.log"
+            UPDATE_SCRIPT="${CONFIG_DIR}/init/update.sh"
+            if [ -x "$UPDATE_SCRIPT" ]; then
+                if sudo bash "$UPDATE_SCRIPT" --core-only --source=admin-dashboard >> "$UPDATE_LOG" 2>&1; then
+                    output="Core update completed successfully"
+                    log_success "$output"
+                else
+                    error="Core update script failed (see $UPDATE_LOG)"
+                    status="failed"
+                    log_error "$error"
+                fi
+            else
+                error="Update script not found or not executable: $UPDATE_SCRIPT"
+                status="failed"
+                log_error "$error"
+            fi
+            ;;
+
         restart_service)
             log "Restarting service: $command"
             if service_action restart "$command"; then
@@ -403,7 +423,8 @@ server_reachable() {
 }
 
 display_force_off() {
-    service_action stop edudisplej-kiosk.service || true
+    pkill -f '^surf( |$)' 2>/dev/null || true
+    pkill -f '/usr/bin/surf' 2>/dev/null || true
     if command -v xset >/dev/null 2>&1; then
         DISPLAY=:0 xset dpms force off >/dev/null 2>&1 || true
     fi
@@ -566,7 +587,6 @@ apply_local_schedule_mode() {
     else
         log "Local schedule mode switch: TURNED_OFF -> ACTIVE"
         display_force_on
-        service_action restart edudisplej-kiosk.service || true
         LAST_DISPLAY_WAKE_EPOCH=0
     fi
 

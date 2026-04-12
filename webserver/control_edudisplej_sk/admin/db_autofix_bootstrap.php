@@ -119,6 +119,21 @@ function edudisplej_db_autofix_run(): void {
             CONSTRAINT service_versions_user_fk FOREIGN KEY (updated_by_user_id) REFERENCES users(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        // Group loop planner table used by scheduled special loop overrides.
+        $conn->query("CREATE TABLE IF NOT EXISTS kiosk_group_loop_plans (
+            group_id INT(11) NOT NULL,
+            plan_json LONGTEXT NOT NULL,
+            plan_version BIGINT(20) NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (group_id),
+            CONSTRAINT kglp_group_fk_bootstrap FOREIGN KEY (group_id) REFERENCES kiosk_groups(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $plan_version_check = $conn->query("SHOW COLUMNS FROM kiosk_group_loop_plans LIKE 'plan_version'");
+        if (!$plan_version_check || $plan_version_check->num_rows === 0) {
+            $conn->query("ALTER TABLE kiosk_group_loop_plans ADD COLUMN plan_version BIGINT(20) NOT NULL DEFAULT 0 AFTER plan_json");
+        }
+
         $kiosk_columns = [
             'last_heartbeat' => "ALTER TABLE kiosks ADD COLUMN last_heartbeat DATETIME DEFAULT NULL",
             'license_active' => "ALTER TABLE kiosks ADD COLUMN license_active TINYINT(1) NOT NULL DEFAULT 1",

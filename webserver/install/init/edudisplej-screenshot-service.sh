@@ -15,7 +15,8 @@ DATA_DIR="${CONFIG_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
 TEMP_DIR="/tmp/edudisplej-screenshots"
 TOKEN_FILE="${CONFIG_DIR}/lic/token"
-SCREENSHOT_INTERVAL="${SCREENSHOT_INTERVAL:-15}"  # Default 15 seconds; overridden by server policy
+SCREENSHOT_INTERVAL="${SCREENSHOT_INTERVAL:-1800}"  # Default 30 minutes; overridden by server policy
+SCREENSHOT_POLL_INTERVAL="${SCREENSHOT_POLL_INTERVAL:-15}"
 API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
 SCREENSHOT_API="${API_BASE_URL}/api/screenshot_sync.php"
 # File written by the sync service with the last sync response (for screenshot policy)
@@ -147,6 +148,46 @@ get_screenshot_interval() {
         fi
     fi
     echo "$interval"
+}
+
+get_last_screenshot_epoch() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo 0
+        return 0
+    fi
+
+    local last_screenshot=""
+    if command -v jq >/dev/null 2>&1; then
+        last_screenshot=$(jq -r '.last_screenshot // empty' "$CONFIG_FILE" 2>/dev/null)
+    else
+        last_screenshot=$(grep -o '"last_screenshot"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" 2>/dev/null | head -1 | cut -d'"' -f4)
+    fi
+
+    if [ -z "$last_screenshot" ]; then
+        echo 0
+        return 0
+    fi
+
+    date -d "$last_screenshot" +%s 2>/dev/null || echo 0
+}
+
+is_capture_due() {
+    local interval_seconds="$1"
+    local last_capture_epoch
+    local now_epoch
+
+    last_capture_epoch=$(get_last_screenshot_epoch)
+    now_epoch=$(date +%s)
+
+    if [ "$last_capture_epoch" -le 0 ]; then
+        return 0
+    fi
+
+    if [ "$interval_seconds" -le 0 ]; then
+        return 0
+    fi
+
+    [ $((now_epoch - last_capture_epoch)) -ge "$interval_seconds" ]
 }
 
 # Read config.json to check if screenshot is enabled (legacy flag)
@@ -324,25 +365,29 @@ main() {
 
         # Check if screenshot is active (server-requested OR locally enabled)
         if is_screenshot_active; then
-            log_debug "Screenshot active - capturing (interval: ${current_interval}s)..."
-            
-            # Capture screenshot
-            if screenshot_file=$(capture_screenshot); then
-                log_debug "Screenshot captured: $screenshot_file"
-                
-                # Upload screenshot
-                if upload_screenshot "$screenshot_file"; then
-                    update_last_screenshot_time
+            if is_capture_due "$current_interval"; then
+                log_debug "Screenshot active - capturing (interval: ${current_interval}s)..."
+
+                # Capture screenshot
+                if screenshot_file=$(capture_screenshot); then
+                    log_debug "Screenshot captured: $screenshot_file"
+
+                    # Upload screenshot
+                    if upload_screenshot "$screenshot_file"; then
+                        update_last_screenshot_time
+                    fi
+                else
+                    log_error "Failed to capture screenshot"
                 fi
             else
-                log_error "Failed to capture screenshot"
+                log_debug "Screenshot active but not due yet (interval: ${current_interval}s)"
             fi
         else
             log_debug "Screenshot not active (not requested, not enabled) - skipping"
         fi
         
-        # Wait for next cycle using server-defined interval
-        sleep "$current_interval"
+        # Poll frequently so watch mode can switch quickly without waiting for the idle interval
+        sleep "$SCREENSHOT_POLL_INTERVAL"
     done
 }
 

@@ -85,12 +85,15 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
 
+        const showVersionParam = (urlParams.get('showVersion') || '').trim().toLowerCase();
+        const versionParam = (urlParams.get('coreVersion') || urlParams.get('version') || '').trim();
+
         const settings = {
-            text: 'EDUdisplej.sk',
+            text: urlParams.get('text') || 'EDUdisplej.sk',
             textColor: urlParams.get('textColor') || '#ffffff',
             bgColor: urlParams.get('bgColor') || '#000000',
-            showVersion: false,
-            version: ''
+            showVersion: showVersionParam === '' ? true : (showVersionParam === '1' || showVersionParam === 'true' || showVersionParam === 'yes' || showVersionParam === 'on'),
+            version: versionParam
         };
 
         document.body.style.backgroundColor = settings.bgColor;
@@ -123,7 +126,7 @@
 
         const version = document.getElementById('version');
         if (settings.showVersion) {
-            version.textContent = settings.version;
+            version.textContent = settings.version || 'n/a';
             version.style.color = settings.textColor;
         } else {
             version.style.display = 'none';

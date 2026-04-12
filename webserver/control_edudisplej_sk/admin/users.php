@@ -26,6 +26,12 @@ function admin_users_verify_csrf_token(): bool {
     return $submitted !== '' && $sessionToken !== '' && hash_equals($sessionToken, $submitted);
 }
 
+function admin_users_normalize_lang($lang): string {
+    $candidate = strtolower(trim((string)$lang));
+    $allowed = ['hu', 'sk', 'en'];
+    return in_array($candidate, $allowed, true) ? $candidate : 'sk';
+}
+
 $error = '';
 $success = '';
 
@@ -66,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     $user_role = edudisplej_normalize_user_role($_POST['user_role'] ?? 'user', (bool)$isadmin);
     $company_id = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
     $require_otp = isset($_POST['require_otp']) && (string)$_POST['require_otp'] === '1' ? 1 : 0;
+    $lang = admin_users_normalize_lang($_POST['lang'] ?? 'sk');
 
     if ($username === '' || $password === '') {
         $error = 'Username and password are required';
@@ -86,11 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
                 if ($company_id) {
-                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, isadmin, user_role, company_id, otp_enabled) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("sssisii", $username, $email, $hashed_password, $isadmin, $user_role, $company_id, $require_otp);
+                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, isadmin, user_role, company_id, otp_enabled, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("sssisiis", $username, $email, $hashed_password, $isadmin, $user_role, $company_id, $require_otp, $lang);
                 } else {
-                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, isadmin, user_role, otp_enabled) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("sssisi", $username, $email, $hashed_password, $isadmin, $user_role, $require_otp);
+                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, isadmin, user_role, otp_enabled, lang) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("sssisis", $username, $email, $hashed_password, $isadmin, $user_role, $require_otp, $lang);
                 }
 
                 if ($stmt->execute()) {
@@ -193,6 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
     $isadmin = isset($_POST['isadmin']) && (string)$_POST['isadmin'] === '1' ? 1 : 0;
     $user_role = edudisplej_normalize_user_role($_POST['user_role'] ?? 'user', (bool)$isadmin);
     $company_id = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
+    $lang = admin_users_normalize_lang($_POST['lang'] ?? ($edit_user['lang'] ?? 'sk'));
 
     if ($username === '') {
         $error = 'Username is required';
@@ -207,20 +215,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
                 } else {
                     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
                     if ($company_id) {
-                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ?, isadmin = ?, user_role = ?, company_id = ? WHERE id = ?");
-                        $stmt->bind_param("sssisii", $username, $email, $hashed_password, $isadmin, $user_role, $company_id, $user_id);
+                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ?, isadmin = ?, user_role = ?, company_id = ?, lang = ? WHERE id = ?");
+                        $stmt->bind_param("sssisisi", $username, $email, $hashed_password, $isadmin, $user_role, $company_id, $lang, $user_id);
                     } else {
-                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ?, isadmin = ?, user_role = ?, company_id = NULL WHERE id = ?");
-                        $stmt->bind_param("sssisi", $username, $email, $hashed_password, $isadmin, $user_role, $user_id);
+                        $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, password = ?, isadmin = ?, user_role = ?, company_id = NULL, lang = ? WHERE id = ?");
+                        $stmt->bind_param("sssissi", $username, $email, $hashed_password, $isadmin, $user_role, $lang, $user_id);
                     }
                 }
             } else {
                 if ($company_id) {
-                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, isadmin = ?, user_role = ?, company_id = ? WHERE id = ?");
-                    $stmt->bind_param("ssisii", $username, $email, $isadmin, $user_role, $company_id, $user_id);
+                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, isadmin = ?, user_role = ?, company_id = ?, lang = ? WHERE id = ?");
+                    $stmt->bind_param("ssisisi", $username, $email, $isadmin, $user_role, $company_id, $lang, $user_id);
                 } else {
-                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, isadmin = ?, user_role = ?, company_id = NULL WHERE id = ?");
-                    $stmt->bind_param("ssisi", $username, $email, $isadmin, $user_role, $user_id);
+                    $stmt = $conn->prepare("UPDATE users SET username = ?, email = ?, isadmin = ?, user_role = ?, company_id = NULL, lang = ? WHERE id = ?");
+                    $stmt->bind_param("ssissi", $username, $email, $isadmin, $user_role, $lang, $user_id);
                 }
             }
 
@@ -312,6 +320,15 @@ include 'header.php';
             </select>
         </div>
         <div class="form-field">
+            <label for="lang">Nyelv</label>
+            <select id="lang" name="lang">
+                <?php $selected_lang = admin_users_normalize_lang($edit_user['lang'] ?? 'sk'); ?>
+                <option value="sk" <?php echo $selected_lang === 'sk' ? 'selected' : ''; ?>>Szlovák</option>
+                <option value="hu" <?php echo $selected_lang === 'hu' ? 'selected' : ''; ?>>Magyar</option>
+                <option value="en" <?php echo $selected_lang === 'en' ? 'selected' : ''; ?>>English</option>
+            </select>
+        </div>
+        <div class="form-field">
             <label for="isadmin">Admin</label>
             <select id="isadmin" name="isadmin">
                 <option value="1" <?php echo $edit_user && (int)$edit_user['isadmin'] === 1 ? 'selected' : ''; ?>>Igen</option>
@@ -355,6 +372,7 @@ include 'header.php';
                     <th>ID</th>
                     <th>Felhasznalo</th>
                     <th>Email</th>
+                    <th>Nyelv</th>
                     <th>Szerepkör</th>
                     <th>Institution</th>
                     <th>2FA</th>
@@ -366,7 +384,7 @@ include 'header.php';
             <tbody>
                 <?php if (empty($users)): ?>
                     <tr>
-                        <td colspan="9" class="muted">Nincs felhasznalo.</td>
+                        <td colspan="10" class="muted">Nincs felhasznalo.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($users as $user): ?>
@@ -374,6 +392,7 @@ include 'header.php';
                             <td><?php echo (int)$user['id']; ?></td>
                             <td><?php echo htmlspecialchars($user['username']); ?></td>
                             <td><?php echo htmlspecialchars($user['email'] ?? '-'); ?></td>
+                            <td><?php echo htmlspecialchars(strtoupper(admin_users_normalize_lang($user['lang'] ?? 'sk'))); ?></td>
                             <td><?php
                                 $role_label = 'Felhasználó';
                                 if ((int)$user['isadmin'] === 1) {

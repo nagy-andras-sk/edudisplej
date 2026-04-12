@@ -193,6 +193,68 @@
             outline: 2px solid #1f3e56;
             outline-offset: -2px;
         }
+
+        .mobile-quick-panel {
+            border: 1px solid #cfd6dd;
+            background: #f8fbff;
+            padding: 10px;
+            margin: 0 0 10px 0;
+        }
+
+        .mobile-quick-panel-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1f2d3d;
+        }
+
+        .mobile-quick-panel-subtitle {
+            font-size: 12px;
+            color: #425466;
+            margin: 4px 0 8px 0;
+        }
+
+        .mobile-quick-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .mobile-quick-grid.single {
+            grid-template-columns: 1fr;
+        }
+
+        .mobile-quick-grid label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #2b3f52;
+            margin-bottom: 4px;
+        }
+
+        .mobile-quick-grid input,
+        .mobile-quick-grid textarea {
+            width: 100%;
+            min-height: 36px;
+            border: 1px solid #c7ced6;
+            background: #fff;
+            padding: 8px;
+            font-size: 14px;
+        }
+
+        .mobile-quick-grid textarea {
+            resize: vertical;
+            min-height: 96px;
+        }
+
+        .mobile-quick-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .mobile-quick-actions .btn {
+            min-height: 38px;
+        }
         
         .content-grid {
             display: grid;
@@ -216,6 +278,43 @@
                 top: auto;
                 max-height: none;
                 overflow: visible;
+            }
+
+            .mobile-quick-actions {
+                justify-content: stretch;
+            }
+
+            .mobile-quick-actions .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 820px) {
+            .loop-workspace-preview {
+                display: none;
+            }
+
+            .mobile-quick-panel {
+                position: sticky;
+                top: 8px;
+                z-index: 5;
+            }
+
+            .mobile-quick-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .time-block-toolbar {
+                padding: 6px;
+                gap: 6px;
+            }
+
+            .time-block-toolbar select,
+            .time-block-toolbar input,
+            .btn {
+                min-height: 38px;
+                font-size: 14px;
             }
         }
 

@@ -92,6 +92,54 @@ function edudisplej_time_ranges_overlap($a_start, $a_end, $b_start, $b_end) {
     return true;
 }
 
+function edudisplej_special_loop_prefix(): string {
+    return 'KALENDAR | ';
+}
+
+function edudisplej_is_special_loop_name(string $name): bool {
+    $trimmed = trim($name);
+    if ($trimmed === '') {
+        return false;
+    }
+
+    $prefix = edudisplej_special_loop_prefix();
+    return strncmp($trimmed, $prefix, strlen($prefix)) === 0;
+}
+
+function edudisplej_apply_special_loop_prefix(string $name): string {
+    $trimmed = trim($name);
+    if ($trimmed === '') {
+        $trimmed = 'Specialna slucka';
+    }
+
+    if (edudisplej_is_special_loop_name($trimmed)) {
+        return $trimmed;
+    }
+
+    return edudisplej_special_loop_prefix() . $trimmed;
+}
+
+function edudisplej_is_turned_off_loop_style(array $style): bool {
+    $name = strtolower(trim((string)($style['name'] ?? '')));
+    if ($name === 'turned off') {
+        return true;
+    }
+
+    $items = is_array($style['items'] ?? null) ? $style['items'] : [];
+    if (count($items) !== 1) {
+        return false;
+    }
+
+    return strtolower(trim((string)($items[0]['module_key'] ?? ''))) === 'turned-off';
+}
+
+function edudisplej_is_special_or_turned_off_loop_style(array $style): bool {
+    $style_name = trim((string)($style['name'] ?? ''));
+    return (int)($style['is_special'] ?? 0) === 1
+        || edudisplej_is_special_loop_name($style_name)
+        || edudisplej_is_turned_off_loop_style($style);
+}
+
 function edudisplej_validate_time_blocks_conflicts(array $time_blocks) {
     $normalized = [];
     foreach ($time_blocks as $index => $block) {
@@ -276,6 +324,7 @@ if (!edudisplej_can_edit_module_content()) {
 }
 
 $group_id = intval($_REQUEST['group_id'] ?? 0);
+$special_only = isset($_REQUEST['special_only']) && (string)$_REQUEST['special_only'] === '1';
 
 try {
     $conn = getDbConnection();
@@ -455,7 +504,45 @@ try {
             $plan_updated_at = $plan_row['updated_at'] ?? null;
         }
 
-        if (empty($loop_styles) && empty($time_blocks)) {
+        if ($special_only) {
+            $special_style_map = [];
+            foreach ($loop_styles as $style) {
+                if (!is_array($style)) {
+                    continue;
+                }
+                $style_id = (int)($style['id'] ?? 0);
+                if ($style_id <= 0) {
+                    continue;
+                }
+                $style_name = trim((string)($style['name'] ?? ('Loop #' . $style_id)));
+                $is_special_style = edudisplej_is_special_or_turned_off_loop_style($style);
+                if (!$is_special_style) {
+                    continue;
+                }
+                if (edudisplej_is_turned_off_loop_style($style)) {
+                    $style['name'] = 'Turned Off';
+                } else {
+                    $style['name'] = edudisplej_apply_special_loop_prefix($style_name);
+                }
+                $style['is_special'] = 1;
+                $special_style_map[$style_id] = $style;
+            }
+            $loop_styles = array_values($special_style_map);
+            $special_style_ids = array_fill_keys(array_map(static fn(array $style): int => (int)($style['id'] ?? 0), $loop_styles), true);
+            $schedule_blocks = array_values(array_filter($schedule_blocks, static function (array $block) use ($special_style_ids): bool {
+                $block_name = trim((string)($block['block_name'] ?? ''));
+                if (edudisplej_is_special_loop_name($block_name) || (int)($block['is_special'] ?? 0) === 1) {
+                    return true;
+                }
+                $style_id = (int)($block['loop_style_id'] ?? 0);
+                return $style_id > 0 && isset($special_style_ids[$style_id]);
+            }));
+            $default_loop_style_id = null;
+            $base_loop = [];
+            $time_blocks = [];
+        }
+
+        if (!$special_only && empty($loop_styles) && empty($time_blocks)) {
             $base_items = $base_loop;
             if (empty($base_items) && $unconfigured_module) {
                 $base_items = [[
@@ -522,6 +609,207 @@ try {
             ? $payload['time_blocks']
             : [];
 
+        if ($special_only && $has_planner_payload) {
+            $current_plan_row = null;
+            $plan_stmt = $conn->prepare("SELECT plan_json, plan_version FROM kiosk_group_loop_plans WHERE group_id = ? LIMIT 1");
+            $plan_stmt->bind_param("i", $group_id);
+            $plan_stmt->execute();
+            $current_plan_row = $plan_stmt->get_result()->fetch_assoc();
+            $plan_stmt->close();
+
+            $existing_plan = [];
+            if ($current_plan_row && !empty($current_plan_row['plan_json'])) {
+                $decoded_plan = json_decode((string)$current_plan_row['plan_json'], true);
+                if (is_array($decoded_plan)) {
+                    $existing_plan = $decoded_plan;
+                }
+            }
+
+            $existing_styles = is_array($existing_plan['loop_styles'] ?? null) ? $existing_plan['loop_styles'] : [];
+            $existing_blocks = is_array($existing_plan['schedule_blocks'] ?? null) ? $existing_plan['schedule_blocks'] : [];
+            $base_styles = [];
+            $special_styles = [];
+            foreach ($existing_styles as $style) {
+                if (!is_array($style)) {
+                    continue;
+                }
+                $style_name = trim((string)($style['name'] ?? ''));
+                $is_special_style = edudisplej_is_special_or_turned_off_loop_style($style);
+                if ($is_special_style) {
+                    continue;
+                }
+                $base_styles[] = $style;
+            }
+            foreach ($loop_styles as $style) {
+                if (!is_array($style)) {
+                    continue;
+                }
+                $style_name = trim((string)($style['name'] ?? ('Loop #' . (int)($style['id'] ?? 0))));
+                $style['is_special'] = 1;
+                if (edudisplej_is_turned_off_loop_style($style)) {
+                    $style['name'] = 'Turned Off';
+                } else {
+                    $style['name'] = edudisplej_apply_special_loop_prefix($style_name);
+                }
+                $special_styles[(int)($style['id'] ?? 0)] = $style;
+            }
+            foreach ($existing_styles as $style) {
+                if (!is_array($style)) {
+                    continue;
+                }
+                $style_name = trim((string)($style['name'] ?? ''));
+                $is_special_style = edudisplej_is_special_or_turned_off_loop_style($style);
+                if (!$is_special_style) {
+                    continue;
+                }
+                $style_id = (int)($style['id'] ?? 0);
+                if ($style_id > 0 && !isset($special_styles[$style_id])) {
+                    $special_styles[$style_id] = $style;
+                }
+            }
+
+            $special_blocks = [];
+            foreach ($existing_blocks as $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+                $block_name = trim((string)($block['block_name'] ?? ''));
+                $style_id = (int)($block['loop_style_id'] ?? 0);
+                $is_special_block = (int)($block['is_special'] ?? 0) === 1 || edudisplej_is_special_loop_name($block_name) || isset($special_styles[$style_id]) || edudisplej_is_turned_off_loop_style($special_styles[$style_id] ?? []);
+                if (!$is_special_block) {
+                    $special_blocks[] = $block;
+                }
+            }
+            foreach ($schedule_blocks as $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+                $block_name = trim((string)($block['block_name'] ?? 'Idoblock'));
+                $friendly_name = trim((string)($block['friendly_name'] ?? $block_name));
+                $event_purpose = trim((string)($block['event_purpose'] ?? ''));
+                $style_id = (int)($block['loop_style_id'] ?? 0);
+                $block['is_special'] = 1;
+                $block['friendly_name'] = $friendly_name;
+                $block['event_purpose'] = $event_purpose;
+                $block['block_name'] = edudisplej_apply_special_loop_prefix($friendly_name !== '' ? $friendly_name : $block_name);
+                $special_blocks[] = $block;
+                if ($style_id > 0 && isset($special_styles[$style_id])) {
+                    $special_styles[$style_id]['is_special'] = 1;
+                }
+            }
+
+            $merged_plan = [
+                'loop_styles' => array_values($base_styles + $special_styles),
+                'default_loop_style_id' => $existing_plan['default_loop_style_id'] ?? null,
+                'schedule_blocks' => array_values($special_blocks),
+            ];
+
+            $conn->begin_transaction();
+            try {
+                $special_ids_stmt = $conn->prepare("SELECT id FROM kiosk_group_time_blocks WHERE group_id = ? AND block_name LIKE 'KALENDAR | %'");
+                $special_ids_stmt->bind_param("i", $group_id);
+                $special_ids_stmt->execute();
+                $special_ids_result = $special_ids_stmt->get_result();
+                $special_block_ids = [];
+                while ($special_row = $special_ids_result->fetch_assoc()) {
+                    $special_block_ids[] = (int)$special_row['id'];
+                }
+                $special_ids_stmt->close();
+
+                if (!empty($special_block_ids)) {
+                    $id_list = implode(',', array_map('intval', $special_block_ids));
+                    $conn->query("DELETE FROM kiosk_group_modules WHERE group_id = {$group_id} AND time_block_id IN ({$id_list})");
+                    $conn->query("DELETE FROM kiosk_group_time_blocks WHERE group_id = {$group_id} AND id IN ({$id_list})");
+                }
+
+                $module_key_cache = [];
+                foreach ($schedule_blocks as $block_index => $block) {
+                    if (!is_array($block)) {
+                        continue;
+                    }
+
+                    $block_name = trim((string)($block['block_name'] ?? 'Speciális'));
+                    $friendly_name = trim((string)($block['friendly_name'] ?? ''));
+                    if ($friendly_name !== '') {
+                        $block_name = $friendly_name;
+                    }
+                    $block_type = strtolower(trim((string)($block['block_type'] ?? 'date')));
+                    if (!in_array($block_type, ['date', 'datetime_range'], true)) {
+                        $block_type = 'date';
+                    }
+                    $specific_date = $block_type === 'date' ? trim((string)($block['specific_date'] ?? '')) : null;
+                    $start_datetime_raw = trim((string)($block['start_datetime'] ?? ''));
+                    $end_datetime_raw = trim((string)($block['end_datetime'] ?? ''));
+                    $start_datetime_ts = $block_type === 'datetime_range' ? strtotime(str_replace('T', ' ', $start_datetime_raw)) : false;
+                    $end_datetime_ts = $block_type === 'datetime_range' ? strtotime(str_replace('T', ' ', $end_datetime_raw)) : false;
+                    if ($block_type === 'datetime_range' && $start_datetime_ts !== false) {
+                        $specific_date = date('Y-m-d', $start_datetime_ts);
+                    }
+                    $start_time = edudisplej_normalize_time_value($block['start_time'] ?? '08:00:00', '08:00:00');
+                    $end_time = edudisplej_normalize_time_value($block['end_time'] ?? '12:00:00', '12:00:00');
+                    if ($block_type === 'datetime_range' && $start_datetime_ts !== false && $end_datetime_ts !== false) {
+                        $start_time = date('H:i:s', $start_datetime_ts);
+                        $end_time = date('H:i:s', $end_datetime_ts);
+                    }
+                    $days_mask = trim((string)($block['days_mask'] ?? ''));
+                    $is_active_block = !isset($block['is_active']) || (int)$block['is_active'] !== 0 ? 1 : 0;
+                    $priority = (int)($block['priority'] ?? ($block_type === 'datetime_range' ? 400 : 300));
+                    $loop_style_id = (int)($block['loop_style_id'] ?? 0);
+
+                    $insert_block = $conn->prepare("INSERT INTO kiosk_group_time_blocks (group_id, block_name, block_type, specific_date, start_time, end_time, days_mask, is_active, priority, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $insert_block->bind_param("issssssiii", $group_id, $block_name, $block_type, $specific_date, $start_time, $end_time, $days_mask, $is_active_block, $priority, $block_index);
+                    $insert_block->execute();
+                    $new_block_id = (int)$insert_block->insert_id;
+                    $insert_block->close();
+
+                    if ($loop_style_id > 0 && isset($special_styles[$loop_style_id])) {
+                        foreach (($special_styles[$loop_style_id]['items'] ?? []) as $index => $loop) {
+                            if (!is_array($loop)) {
+                                continue;
+                            }
+                            $module_id = intval($loop['module_id']);
+                            $module_key = edudisplej_canonical_module_key((string)($loop['module_key'] ?? ''));
+                            if ($module_key === '') {
+                                $module_key = edudisplej_resolve_module_key($conn, $module_id, $module_key_cache);
+                            }
+                            $duration = edudisplej_clamp_module_duration($module_key, $loop['duration_seconds'] ?? null);
+                            $sanitized_settings = edudisplej_sanitize_module_settings($module_key, $loop['settings'] ?? []);
+                            $video_duration = $module_key === 'video' ? edudisplej_video_duration_from_settings($sanitized_settings) : null;
+                            if ($video_duration !== null) {
+                                $duration = $video_duration;
+                            }
+                            $settings = json_encode($sanitized_settings, JSON_UNESCAPED_UNICODE);
+                            $stmt = $conn->prepare("INSERT INTO kiosk_group_modules (group_id, time_block_id, module_id, module_key, display_order, duration_seconds, settings, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+                            $stmt->bind_param("iiisiis", $group_id, $new_block_id, $module_id, $module_key, $index, $duration, $settings);
+                            $stmt->execute();
+                            $stmt->close();
+                        }
+                    }
+                }
+
+                $plan_json = json_encode($merged_plan, JSON_UNESCAPED_UNICODE);
+                if ($plan_json !== false) {
+                    $response_plan_version = (int)round(microtime(true) * 1000);
+                    $response_plan_version_str = (string)$response_plan_version;
+                    $plan_stmt = $conn->prepare("INSERT INTO kiosk_group_loop_plans (group_id, plan_json, plan_version) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE plan_json = VALUES(plan_json), plan_version = VALUES(plan_version), updated_at = CURRENT_TIMESTAMP");
+                    $plan_stmt->bind_param("iss", $group_id, $plan_json, $response_plan_version_str);
+                    $plan_stmt->execute();
+                    $plan_stmt->close();
+                }
+
+                $conn->commit();
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Special loop configuration successfully saved',
+                    'plan_version' => $response_plan_version
+                ]);
+                exit();
+            } catch (Exception $e) {
+                $conn->rollback();
+                throw $e;
+            }
+        }
+
         if ($has_planner_payload) {
             $style_map = [];
             foreach ($loop_styles as $style) {
@@ -532,13 +820,25 @@ try {
                 if ($style_id === 0) {
                     continue;
                 }
+                $style_name = trim((string)($style['name'] ?? ('Loop #' . $style_id)));
+                $is_special_style = edudisplej_is_special_or_turned_off_loop_style($style);
+                if ($is_special_style) {
+                    if (edudisplej_is_turned_off_loop_style($style)) {
+                        $style_name = 'Turned Off';
+                    } else {
+                        $style_name = edudisplej_apply_special_loop_prefix($style_name);
+                    }
+                }
                 $style_items = is_array($style['items'] ?? null) ? $style['items'] : [];
                 $style_map[$style_id] = [
                     'id' => $style_id,
-                    'name' => trim((string)($style['name'] ?? ('Loop #' . $style_id))),
+                    'name' => $style_name,
+                    'is_special' => $is_special_style ? 1 : 0,
                     'items' => $style_items,
                 ];
             }
+
+            $loop_styles = array_values($style_map);
 
             if ($default_loop_style_id === 0 && !empty($style_map)) {
                 $first_keys = array_keys($style_map);
@@ -556,6 +856,14 @@ try {
                     continue;
                 }
                 $expanded_block = $block;
+                $is_special_block = (int)($block['is_special'] ?? 0) === 1
+                    || !empty($style_map[$style_id]['is_special'])
+                    || edudisplej_is_special_loop_name((string)($block['block_name'] ?? ''));
+                if ($is_special_block) {
+                    $expanded_block['is_special'] = 1;
+                    $expanded_block['block_name'] = edudisplej_apply_special_loop_prefix((string)($expanded_block['block_name'] ?? ''));
+                    unset($expanded_block['priority']);
+                }
                 $expanded_block['loops'] = $style_map[$style_id]['items'];
                 $time_blocks[] = $expanded_block;
             }
@@ -620,6 +928,46 @@ try {
 
                 return $style;
             }, $loop_styles));
+
+            $schedule_blocks = array_values(array_map(function ($block) {
+                if (!is_array($block)) {
+                    return $block;
+                }
+
+                $normalized = [
+                    'id' => (int)($block['id'] ?? 0),
+                    'block_name' => trim((string)($block['block_name'] ?? 'Idoblock')),
+                    'friendly_name' => trim((string)($block['friendly_name'] ?? '')),
+                    'event_purpose' => trim((string)($block['event_purpose'] ?? '')),
+                    'block_type' => strtolower(trim((string)($block['block_type'] ?? 'weekly'))),
+                    'specific_date' => trim((string)($block['specific_date'] ?? '')),
+                    'start_datetime' => trim((string)($block['start_datetime'] ?? '')),
+                    'end_datetime' => trim((string)($block['end_datetime'] ?? '')),
+                    'start_time' => edudisplej_normalize_time_value($block['start_time'] ?? '08:00:00', '08:00:00'),
+                    'end_time' => edudisplej_normalize_time_value($block['end_time'] ?? '12:00:00', '12:00:00'),
+                    'days_mask' => trim((string)($block['days_mask'] ?? '1,2,3,4,5,6,7')),
+                    'is_active' => !isset($block['is_active']) || (int)$block['is_active'] !== 0 ? 1 : 0,
+                    'display_order' => (int)($block['display_order'] ?? 0),
+                    'loop_style_id' => (int)($block['loop_style_id'] ?? 0),
+                ];
+
+                if (in_array($normalized['block_type'], ['weekly', 'date', 'datetime_range'], true) === false) {
+                    $normalized['block_type'] = 'weekly';
+                }
+
+                $is_special = (int)($block['is_special'] ?? 0) === 1 || edudisplej_is_special_loop_name($normalized['block_name']);
+                if ($is_special) {
+                    $normalized['is_special'] = 1;
+                    $normalized['block_name'] = edudisplej_apply_special_loop_prefix($normalized['block_name']);
+                    if ($normalized['friendly_name'] === '') {
+                        $normalized['friendly_name'] = preg_replace('/^' . preg_quote(edudisplej_special_loop_prefix(), '/') . '/i', '', $normalized['block_name']);
+                    }
+                } elseif (isset($block['priority'])) {
+                    $normalized['priority'] = (int)$block['priority'];
+                }
+
+                return $normalized;
+            }, $time_blocks));
         }
 
         $validation = edudisplej_validate_time_blocks_conflicts($time_blocks);
@@ -711,14 +1059,22 @@ try {
 
                 $days_mask = trim((string)($block['days_mask'] ?? '1,2,3,4,5,6,7'));
                 $is_active_block = !isset($block['is_active']) || (int)$block['is_active'] !== 0 ? 1 : 0;
+                $is_special_block = (int)($block['is_special'] ?? 0) === 1 || edudisplej_is_special_loop_name($block_name);
                 $priority = (int)($block['priority'] ?? ($block_type === 'date' ? 300 : 100));
                 if ($block_type === 'datetime_range' && !isset($block['priority'])) {
+                    $priority = 400;
+                }
+                if ($is_special_block && $block_type === 'datetime_range') {
                     $priority = 400;
                 }
                 $loop_style_id = (int)($block['loop_style_id'] ?? 0);
 
                 if ($block_name === '') {
                     $block_name = 'Időblokk';
+                }
+
+                if ($is_special_block) {
+                    $block_name = edudisplej_apply_special_loop_prefix($block_name);
                 }
 
                 $insert_block = $conn->prepare("INSERT INTO kiosk_group_time_blocks (group_id, block_name, block_type, specific_date, start_time, end_time, days_mask, is_active, priority, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");

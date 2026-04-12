@@ -22,6 +22,9 @@ Ez a teljes audit a **EduDisplej Control Panel** biztonsági és teljesítmény 
 
 ### 🧭 ÜZEMELTETÉSI / SZINKRON DOKUMENTÁCIÓK
 
+- [INCIDENT_2026-04-12_SYNC_OFFLINE_AFTER_DAILY_UPDATE.md](INCIDENT_2026-04-12_SYNC_OFFLINE_AFTER_DAILY_UPDATE.md)
+  Incidens dokumentacio a kijelzok offline jelolese hibarol: gyokerok, azonnali elharitas, tartos javitas es fleet rollout lepesek.
+
 - [DEBIAN_LIVE_OFFLINE_INSTALLER_WINDOWS_WSL_GUIDE.md](DEBIAN_LIVE_OFFLINE_INSTALLER_WINDOWS_WSL_GUIDE.md)  
   Részletes, végponttól végpontig leírás arról, hogyan épüljön be az EduDisplej offline wizard egy Debian Live ISO-ba, külön Windows + PowerShell + WSL2 workflow-val, build lépésekkel, first-boot működéssel és hibakereséssel.
 

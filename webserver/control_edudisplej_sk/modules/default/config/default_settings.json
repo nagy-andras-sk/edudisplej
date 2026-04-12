@@ -3,6 +3,6 @@
   "fontSize": 120,
   "textColor": "#ffffff",
   "bgColor": "#000000",
-  "showVersion": false,
-  "version": ""
+  "showVersion": true,
+  "version": "v1.0"
 }

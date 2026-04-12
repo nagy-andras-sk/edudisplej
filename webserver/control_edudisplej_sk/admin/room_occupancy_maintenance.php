@@ -107,26 +107,32 @@ include 'header.php';
 </div>
 
 <div class="panel" style="margin-top:12px;">
-    <div class="panel-title"><?php echo htmlspecialchars(t_def('room_occ.admin.sync_example', 'Külső sync példa (admin integráció)')); ?></div>
-    <pre style="white-space:pre-wrap; overflow:auto; max-height:260px; background:#0f172a; color:#e2e8f0; padding:10px; border-radius:8px;">curl -X POST "../api/room_occupancy.php?action=external_upsert" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Token: COMPANY_API_TOKEN" \
-  -d '{
-    "company_id": 123,
-    "server_key": "skolsky-sis",
-    "events": [
-      {
-        "external_ref": "sis-evt-2026-02-22-a101-0800",
-        "room_key": "a101",
-        "room_name": "A101 Informatika",
-        "event_date": "2026-02-22",
-        "start_time": "08:00",
-        "end_time": "09:30",
-        "event_title": "10.A Matematika",
-        "event_note": "Tanár: Kovács"
-      }
-    ]
-  }'</pre>
+        <div class="panel-title"><?php echo htmlspecialchars(t_def('room_occ.admin.sync_example', 'Külső sync példa (termek + foglaltság)')); ?></div>
+        <pre style="white-space:pre-wrap; overflow:auto; max-height:260px; background:#0f172a; color:#e2e8f0; padding:10px; border-radius:8px;">curl -X POST "../api/room_occupancy.php?action=external_sync" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer COMPANY_API_TOKEN" \
+    -d '{
+        "server_key": "skolsky-sis",
+        "rooms": [
+            {
+                "room_key": "a101",
+                "room_name": "A101 Informatika",
+                "capacity": 30,
+                "is_active": true
+            }
+        ],
+        "occupancies": [
+            {
+                "room_key": "a101",
+                "room_name": "A101 Informatika",
+                "event_date": "2026-02-22",
+                "start_time": "08:00",
+                "end_time": "09:30",
+                "title": "10.A Matematika",
+                "comment": "Tanár: Kovács"
+            }
+        ]
+    }'</pre>
 </div>
 
 <div id="room-occ-admin-status" class="muted" style="margin-top:10px;"></div>

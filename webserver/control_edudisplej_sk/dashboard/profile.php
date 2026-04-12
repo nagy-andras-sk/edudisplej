@@ -504,7 +504,11 @@ $logout_url = '../login.php?logout=1';
                                         <td>
                                             <?php if ($u['id'] !== $user_id): ?>
                                                 <button onclick="editUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small"><?php echo htmlspecialchars(t_def('common.edit', '✏️ Szerkesztés')); ?></button>
-                                                <button onclick="deleteUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small" style="color: #d32f2f;"><?php echo htmlspecialchars(t_def('common.delete', '🗑️ Törlés')); ?></button>
+                                                <?php if ($is_admin_user || !$is_admin): ?>
+                                                    <button onclick="deleteUser(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars($u['username']); ?>')" class="action-btn action-btn-small" style="color: #d32f2f;"><?php echo htmlspecialchars(t_def('common.delete', '🗑️ Törlés')); ?></button>
+                                                <?php else: ?>
+                                                    <small style="color: #999;"><?php echo htmlspecialchars(t_def('profile.users.admin_delete_blocked', 'Admin user nem törölhető')); ?></small>
+                                                <?php endif; ?>
                                             <?php else: ?>
                                                 <small style="color: #999;"><?php echo htmlspecialchars(t_def('profile.users.own_account_note', '(Saját fiók: jelszó itt nem szerkeszthető)')); ?></small>
                                             <?php endif; ?>

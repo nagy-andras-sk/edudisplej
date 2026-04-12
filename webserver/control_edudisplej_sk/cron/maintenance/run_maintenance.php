@@ -654,6 +654,14 @@ if ($shouldRunMaintenance) {
 
     @file_put_contents($maintenanceLastRunMarker, (string)time());
 
+    require __DIR__ . '/core_version_refresh.php';
+    $coreVersionResult = edudisplej_refresh_core_version_manifest(dirname($baseDir));
+    if (!empty($coreVersionResult['message'])) {
+        $coreLine = '[' . date('Y-m-d H:i:s') . '] ' . $coreVersionResult['message'] . "\n";
+        appendCronLog($cronLog, $coreLine);
+        emitMaintenanceOutput($coreLine, $isCli, !empty($coreVersionResult['error']));
+    }
+
     ob_start();
 
     define('EDUDISPLEJ_DBJAVITO_NO_HTML', true);
