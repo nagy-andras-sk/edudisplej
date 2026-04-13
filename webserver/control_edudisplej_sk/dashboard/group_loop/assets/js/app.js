@@ -24,6 +24,103 @@
         const specialWorkflowStart = String(groupLoopBootstrap.specialWorkflowStart || '').trim();
         const specialWorkflowEnd = String(groupLoopBootstrap.specialWorkflowEnd || '').trim();
         const forcedSpecialLoopName = String(groupLoopBootstrap.forcedSpecialLoopName || '').trim();
+        const queryParams = new URLSearchParams(window.location.search || '');
+        const forceGroupLoopDebug = String(window.location.pathname || '').toLowerCase().includes('/dashboard/group_loop/index.php');
+        const groupLoopDebugEnabled = forceGroupLoopDebug || queryParams.get('loop_debug') === '1' || localStorage.getItem('group_loop_debug') === '1';
+
+        console.log('[GROUP_LOOP_DEBUG] app.js loaded', {
+            href: window.location.href,
+            path: window.location.pathname,
+            debugEnabled: groupLoopDebugEnabled,
+            forceDebug: forceGroupLoopDebug
+        });
+
+        function summarizeBlockTypes(blocks) {
+            const summary = { weekly: 0, date: 0, datetime_range: 0, other: 0 };
+            (Array.isArray(blocks) ? blocks : []).forEach((block) => {
+                const type = String(block?.block_type || 'weekly').toLowerCase();
+                if (Object.prototype.hasOwnProperty.call(summary, type)) {
+                    summary[type] += 1;
+                } else {
+                    summary.other += 1;
+                }
+            });
+            return summary;
+        }
+
+        function summarizeStyleNames(styles, limit = 8) {
+            return (Array.isArray(styles) ? styles : [])
+                .slice(0, limit)
+                .map((style) => ({
+                    id: parseInt(style?.id || 0, 10),
+                    name: String(style?.name || ''),
+                    items: Array.isArray(style?.items) ? style.items.length : 0
+                }));
+        }
+
+        function summarizeBlockPreview(blocks, limit = 12) {
+            return (Array.isArray(blocks) ? blocks : [])
+                .slice(0, limit)
+                .map((block) => ({
+                    id: parseInt(block?.id || 0, 10),
+                    type: String(block?.block_type || 'weekly'),
+                    days_mask: String(block?.days_mask || ''),
+                    specific_date: String(block?.specific_date || ''),
+                    start: String(block?.start_time || ''),
+                    end: String(block?.end_time || ''),
+                    loop_style_id: parseInt(block?.loop_style_id || 0, 10),
+                    block_name: String(block?.block_name || '')
+                }));
+        }
+
+        function debugGroupLoop(label, details = null) {
+            if (!groupLoopDebugEnabled) {
+                return;
+            }
+
+            const prefix = '[GROUP_LOOP_DEBUG]';
+            if (details === null || typeof details === 'undefined') {
+                console.log(`${prefix} ${label}`);
+                return;
+            }
+
+            console.log(`${prefix} ${label}`, details);
+        }
+
+        window.GroupLoopDebug = {
+            enabled: groupLoopDebugEnabled,
+            enable() {
+                localStorage.setItem('group_loop_debug', '1');
+                console.log('[GROUP_LOOP_DEBUG] enabled, refresh the page');
+            },
+            disable() {
+                localStorage.removeItem('group_loop_debug');
+                console.log('[GROUP_LOOP_DEBUG] disabled, refresh the page');
+            },
+            dump() {
+                debugGroupLoop('runtime-state', {
+                    groupId,
+                    specialOnlyMode,
+                    activeLoopStyleId,
+                    defaultLoopStyleId,
+                    activeScope,
+                    loopStylesCount: Array.isArray(loopStyles) ? loopStyles.length : 0,
+                    timeBlocksCount: Array.isArray(timeBlocks) ? timeBlocks.length : 0,
+                    blockTypeSummary: summarizeBlockTypes(timeBlocks),
+                    stylesPreview: summarizeStyleNames(loopStyles),
+                    blocksPreview: summarizeBlockPreview(timeBlocks)
+                });
+            }
+        };
+
+        debugGroupLoop('bootstrap', {
+            groupId,
+            companyId,
+            specialOnlyMode,
+            autoCreateSpecialLoop,
+            forcedSpecialLoopName,
+            query: window.location.search || ''
+        });
 
         function resolveSpecialWorkflowRange() {
             const pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
@@ -3101,35 +3198,18 @@
             const start = minutesToTimeString(minMinute);
             const endExclusive = Math.min(1440, maxMinute + scheduleGridStepMinutes);
             const end = minutesToTimeString(endExclusive >= 1440 ? 0 : endExclusive);
-            const targetDate = getDateForDayInOffsetWeek(day);
-            const dateKey = toDateKey(targetDate);
-
-            const payload = scheduleWeekOffset === 0
-                ? {
-                    id: nextTempTimeBlockId--,
-                    block_type: 'weekly',
-                    days_mask: String(day),
-                    start_time: start,
-                    end_time: end,
-                    block_name: `${dayName(day)} ${minutesToTimeLabel(minMinute)}-${minutesToTimeLabel(endExclusive >= 1440 ? 0 : endExclusive)}`,
-                    priority: 100,
-                    loop_style_id: selectedStyleId,
-                    is_active: 1,
-                    loops: []
-                }
-                : {
-                    id: nextTempTimeBlockId--,
-                    block_type: 'date',
-                    specific_date: dateKey,
-                    start_time: start,
-                    end_time: end,
-                    days_mask: '',
-                    block_name: `Speciális ${dateKey}`,
-                    priority: 300,
-                    loop_style_id: selectedStyleId,
-                    is_active: 1,
-                    loops: []
-                };
+            const payload = {
+                id: nextTempTimeBlockId--,
+                block_type: 'weekly',
+                days_mask: String(day),
+                start_time: start,
+                end_time: end,
+                block_name: `${dayName(day)} ${minutesToTimeLabel(minMinute)}-${minutesToTimeLabel(endExclusive >= 1440 ? 0 : endExclusive)}`,
+                priority: 100,
+                loop_style_id: selectedStyleId,
+                is_active: 1,
+                loops: []
+            };
 
             if (!resolveScheduleConflicts(payload, null)) {
                 showAutosaveToast('ℹ️ Ütközés miatt megszakítva', true);
@@ -4075,12 +4155,66 @@
         function resolveLoopStylesAndBlocksFromConfig(data) {
             const plannerStyles = Array.isArray(data.loop_styles) ? data.loop_styles : [];
             if (plannerStyles.length > 0) {
+                const styles = normalizeLoopStyles(plannerStyles, [], specialOnlyMode);
+                const styleById = new Map();
+                const styleByItemsSignature = new Map();
+
+                const buildItemsSignature = (items) => {
+                    try {
+                        return JSON.stringify(Array.isArray(items) ? items : []);
+                    } catch (_) {
+                        return '[]';
+                    }
+                };
+
+                const registerStyle = (style) => {
+                    if (!style || typeof style !== 'object') {
+                        return;
+                    }
+                    const styleId = parseInt(style.id || 0, 10);
+                    if (styleId !== 0) {
+                        styleById.set(styleId, style);
+                    }
+                    styleByItemsSignature.set(buildItemsSignature(style.items), style);
+                };
+
+                styles.forEach(registerStyle);
+
+                let blocks = normalizeTimeBlocks(data.schedule_blocks || data.time_blocks || []);
+
+                // Legacy compatibility: older payloads can carry loops in time_blocks but omit loop_style_id.
+                blocks = blocks.map((block, index) => {
+                    const resolvedStyleId = parseInt(block?.loop_style_id || 0, 10);
+                    if (resolvedStyleId > 0 && styleById.has(resolvedStyleId)) {
+                        return block;
+                    }
+
+                    const blockLoops = Array.isArray(block?.loops) ? block.loops : [];
+                    if (blockLoops.length === 0) {
+                        return block;
+                    }
+
+                    const signature = buildItemsSignature(blockLoops);
+                    let matchedStyle = styleByItemsSignature.get(signature) || null;
+
+                    if (!matchedStyle) {
+                        matchedStyle = createFallbackLoopStyle(block.block_name || `Loop ${styles.length + index + 1}`, blockLoops);
+                        styles.push(matchedStyle);
+                        registerStyle(matchedStyle);
+                    }
+
+                    return {
+                        ...block,
+                        loop_style_id: parseInt(matchedStyle.id || 0, 10) || null
+                    };
+                });
+
                 return {
-                    styles: normalizeLoopStyles(plannerStyles, [], specialOnlyMode),
+                    styles,
                     defaultStyleId: specialOnlyMode
                         ? null
                         : (parseInt(data.default_loop_style_id ?? plannerStyles[0]?.id ?? 0, 10) || plannerStyles[0]?.id || null),
-                    blocks: normalizeTimeBlocks(data.schedule_blocks || data.time_blocks || [])
+                    blocks
                 };
             }
 
@@ -4114,6 +4248,24 @@
 
         function applyLoadedLoopConfig(data) {
             const resolved = resolveLoopStylesAndBlocksFromConfig(data);
+            debugGroupLoop('applyLoadedLoopConfig:resolved', {
+                responseKeys: Object.keys(data || {}),
+                raw: {
+                    loop_styles: Array.isArray(data?.loop_styles) ? data.loop_styles.length : 0,
+                    schedule_blocks: Array.isArray(data?.schedule_blocks) ? data.schedule_blocks.length : 0,
+                    time_blocks: Array.isArray(data?.time_blocks) ? data.time_blocks.length : 0,
+                    default_loop_style_id: data?.default_loop_style_id ?? null,
+                    plan_version: data?.plan_version ?? null
+                },
+                resolved: {
+                    styles: Array.isArray(resolved.styles) ? resolved.styles.length : 0,
+                    defaultStyleId: resolved.defaultStyleId,
+                    blocks: Array.isArray(resolved.blocks) ? resolved.blocks.length : 0,
+                    blockTypeSummary: summarizeBlockTypes(resolved.blocks),
+                    stylesPreview: summarizeStyleNames(resolved.styles),
+                    blocksPreview: summarizeBlockPreview(resolved.blocks)
+                }
+            });
             loopStyles = resolved.styles;
             defaultLoopStyleId = resolved.defaultStyleId;
             timeBlocks = resolved.blocks;
@@ -4134,6 +4286,16 @@
             hasLoadedInitialLoop = true;
             tryRestoreDraftFromCache();
             updatePendingSaveBar();
+
+            debugGroupLoop('applyLoadedLoopConfig:applied', {
+                activeLoopStyleId,
+                defaultLoopStyleId,
+                activeScope,
+                loopItemsCount: Array.isArray(loopItems) ? loopItems.length : 0,
+                loopStylesCount: Array.isArray(loopStyles) ? loopStyles.length : 0,
+                timeBlocksCount: Array.isArray(timeBlocks) ? timeBlocks.length : 0,
+                blockTypeSummary: summarizeBlockTypes(timeBlocks)
+            });
 
             if (autoCreateSpecialLoop && specialOnlyMode) {
                 if (forcedSpecialLoopName) {
@@ -4229,9 +4391,22 @@
             hasLoadedInitialLoop = true;
             lastSavedSnapshot = getLoopSnapshot();
 
-            fetch(`../../api/group_loop/config.php?group_id=${groupId}${specialOnlyMode ? '&special_only=1' : ''}`)
+            const loadUrl = `../../api/group_loop/config.php?group_id=${groupId}${specialOnlyMode ? '&special_only=1' : ''}`;
+            debugGroupLoop('loadLoop:request', { url: loadUrl });
+
+            fetch(loadUrl)
                 .then(response => response.json())
                 .then(data => {
+                    debugGroupLoop('loadLoop:response', {
+                        success: !!data?.success,
+                        message: data?.message || '',
+                        loop_styles: Array.isArray(data?.loop_styles) ? data.loop_styles.length : 0,
+                        schedule_blocks: Array.isArray(data?.schedule_blocks) ? data.schedule_blocks.length : 0,
+                        time_blocks: Array.isArray(data?.time_blocks) ? data.time_blocks.length : 0,
+                        default_loop_style_id: data?.default_loop_style_id ?? null,
+                        plan_version: data?.plan_version ?? null,
+                        scheduleBlockTypes: summarizeBlockTypes(data?.schedule_blocks || [])
+                    });
                     if (!data || !data.success) {
                         showAutosaveToast('⚠️ A loop lista betöltése sikertelen, DEFAULT loop használatban', true);
                         if (specialOnlyMode && autoCreateSpecialLoop) {
@@ -4253,6 +4428,9 @@
                     applyLoadedLoopConfig(data);
                 })
                 .catch(error => {
+                    debugGroupLoop('loadLoop:error', {
+                        message: String(error?.message || error || 'unknown error')
+                    });
                     console.error('Error loading loop:', error);
                     showAutosaveToast('⚠️ Hálózati hiba, DEFAULT loop használatban', true);
                     if (specialOnlyMode && autoCreateSpecialLoop) {
@@ -4927,14 +5105,37 @@
 
             const payload = buildLoopPayload();
             const currentSnapshot = getLoopSnapshot();
+            const saveUrl = `../../api/group_loop/config.php?group_id=${groupId}${specialOnlyMode ? '&special_only=1' : ''}`;
+
+            debugGroupLoop('saveLoop:request', {
+                url: saveUrl,
+                source: opts.source,
+                silent: !!opts.silent,
+                payload: {
+                    loop_styles: Array.isArray(payload?.loop_styles) ? payload.loop_styles.length : 0,
+                    schedule_blocks: Array.isArray(payload?.schedule_blocks) ? payload.schedule_blocks.length : 0,
+                    time_blocks: Array.isArray(payload?.time_blocks) ? payload.time_blocks.length : 0,
+                    default_loop_style_id: payload?.default_loop_style_id ?? null,
+                    scheduleBlockTypes: summarizeBlockTypes(payload?.schedule_blocks || []),
+                    stylesPreview: summarizeStyleNames(payload?.loop_styles || []),
+                    blocksPreview: summarizeBlockPreview(payload?.schedule_blocks || [])
+                }
+            });
 
             if (shouldAbortSaveLoop(opts, payload, currentSnapshot)) {
+                debugGroupLoop('saveLoop:aborted', {
+                    reason: 'shouldAbortSaveLoop returned true',
+                    snapshotEqualsLastSaved: currentSnapshot === lastSavedSnapshot,
+                    autoSaveInFlight,
+                    isDefaultGroup,
+                    itemCount: getLoopPayloadItemCount(payload)
+                });
                 return;
             }
 
             autoSaveInFlight = true;
             
-            fetch(`../../api/group_loop/config.php?group_id=${groupId}${specialOnlyMode ? '&special_only=1' : ''}`, {
+            fetch(saveUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -4943,6 +5144,11 @@
             })
             .then(response => response.json())
             .then(data => {
+                debugGroupLoop('saveLoop:response', {
+                    success: !!data?.success,
+                    message: data?.message || '',
+                    plan_version: data?.plan_version ?? null
+                });
                 if (data.success) {
                     handleSaveLoopSuccess(data, currentSnapshot, opts);
                 } else {
@@ -4950,6 +5156,9 @@
                 }
             })
             .catch(error => {
+                debugGroupLoop('saveLoop:error', {
+                    message: String(error?.message || error || 'unknown error')
+                });
                 showAutosaveToast('⚠️ Hiba történt: ' + error, true);
             })
             .finally(() => {

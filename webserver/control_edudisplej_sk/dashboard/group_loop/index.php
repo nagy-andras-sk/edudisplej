@@ -1459,10 +1459,34 @@ $group_loop_localized_module_names['turned-off'] = t_def('group_loop.turned_off.
             ],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
     </script>
+    <script>
+        (function () {
+            var version = <?php echo json_encode($group_loop_js_version_app, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+            var debugInfo = {
+                ts: new Date().toISOString(),
+                href: window.location.href,
+                path: window.location.pathname,
+                appVersion: version
+            };
+
+            window.__GROUP_LOOP_PAGE_PROBE__ = debugInfo;
+            console.log('[GROUP_LOOP_PAGE] inline probe', debugInfo);
+
+            var badge = document.createElement('div');
+            badge.id = 'group-loop-debug-badge';
+            badge.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:99999;padding:4px 8px;background:#0f172a;color:#fff;font:11px/1.3 monospace;border-radius:6px;opacity:0.9;';
+            badge.textContent = 'GL page probe v=' + version;
+            document.body.appendChild(badge);
+        })();
+    </script>
     <script src="assets/js/modules/pdf.js?v=<?php echo rawurlencode($group_loop_js_version_pdf); ?>"></script>
     <script src="assets/js/modules/gallery.js?v=<?php echo rawurlencode($group_loop_js_version_gallery); ?>"></script>
     <script src="assets/js/modules/video.js?v=<?php echo rawurlencode($group_loop_js_version_video); ?>"></script>
-    <script src="assets/js/app.js?v=<?php echo rawurlencode($group_loop_js_version_app); ?>"></script>
+    <script
+        src="assets/js/app.js?v=<?php echo rawurlencode($group_loop_js_version_app); ?>"
+        onload="console.log('[GROUP_LOOP_PAGE] app.js loaded from script tag', this.src)"
+        onerror="console.error('[GROUP_LOOP_PAGE] app.js failed to load', this.src)">
+    </script>
     <?php if (false): ?>
     
     <script>

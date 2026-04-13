@@ -140,6 +140,34 @@ function edudisplej_is_special_or_turned_off_loop_style(array $style): bool {
         || edudisplej_is_turned_off_loop_style($style);
 }
 
+function edudisplej_is_pure_special_loop_style(array $style): bool {
+    if (edudisplej_is_turned_off_loop_style($style)) {
+        return false;
+    }
+
+    $style_name = trim((string)($style['name'] ?? ''));
+    return edudisplej_is_special_loop_name($style_name);
+}
+
+function edudisplej_is_special_schedule_block(array $block, array $special_style_ids = []): bool {
+    $type = strtolower(trim((string)($block['block_type'] ?? 'weekly')));
+    if ($type === 'date' || $type === 'datetime_range') {
+        return true;
+    }
+
+    if ((int)($block['is_special'] ?? 0) === 1) {
+        return true;
+    }
+
+    $block_name = trim((string)($block['block_name'] ?? ''));
+    if (edudisplej_is_special_loop_name($block_name)) {
+        return true;
+    }
+
+    $style_id = (int)($block['loop_style_id'] ?? 0);
+    return $style_id > 0 && isset($special_style_ids[$style_id]);
+}
+
 function edudisplej_validate_time_blocks_conflicts(array $time_blocks) {
     $normalized = [];
     foreach ($time_blocks as $index => $block) {
@@ -540,6 +568,96 @@ try {
             $default_loop_style_id = null;
             $base_loop = [];
             $time_blocks = [];
+        } else {
+            $special_style_ids = [];
+            foreach ($loop_styles as $style) {
+                if (!is_array($style)) {
+                    continue;
+                }
+                if (!edudisplej_is_pure_special_loop_style($style)) {
+                    continue;
+                }
+                $style_id = (int)($style['id'] ?? 0);
+                if ($style_id > 0) {
+                    $special_style_ids[$style_id] = true;
+                }
+            }
+
+            foreach ($schedule_blocks as &$block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+
+                $type = strtolower(trim((string)($block['block_type'] ?? 'weekly')));
+                if ($type !== 'date') {
+                    continue;
+                }
+
+                $style_id = (int)($block['loop_style_id'] ?? 0);
+                $block_name = trim((string)($block['block_name'] ?? ''));
+                $is_explicit_special = (int)($block['is_special'] ?? 0) === 1
+                    || edudisplej_is_special_loop_name($block_name)
+                    || ($style_id > 0 && isset($special_style_ids[$style_id]));
+
+                if ($is_explicit_special) {
+                    continue;
+                }
+
+                $specific_date = trim((string)($block['specific_date'] ?? ''));
+                $ts = $specific_date !== '' ? strtotime($specific_date) : false;
+                if ($ts === false) {
+                    continue;
+                }
+
+                $block['block_type'] = 'weekly';
+                $block['days_mask'] = (string)date('N', $ts);
+                $block['specific_date'] = null;
+                unset($block['is_special']);
+            }
+            unset($block);
+
+            foreach ($schedule_blocks as $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+
+                if (!edudisplej_is_special_schedule_block($block)) {
+                    continue;
+                }
+
+                $style_id = (int)($block['loop_style_id'] ?? 0);
+                if ($style_id > 0) {
+                    $special_style_ids[$style_id] = true;
+                }
+            }
+
+            $loop_styles = array_values(array_filter($loop_styles, static function ($style) use (&$special_style_ids): bool {
+                if (!is_array($style)) {
+                    return false;
+                }
+                if (edudisplej_is_pure_special_loop_style($style)) {
+                    $style_id = (int)($style['id'] ?? 0);
+                    if ($style_id > 0) {
+                        $special_style_ids[$style_id] = true;
+                    }
+                    return false;
+                }
+                return true;
+            }));
+
+            $schedule_blocks = array_values(array_filter($schedule_blocks, static function ($block) use ($special_style_ids): bool {
+                if (!is_array($block)) {
+                    return false;
+                }
+                return !edudisplej_is_special_schedule_block($block, $special_style_ids);
+            }));
+
+            $time_blocks = array_values(array_filter($time_blocks, static function ($block): bool {
+                if (!is_array($block)) {
+                    return false;
+                }
+                return !edudisplej_is_special_schedule_block($block);
+            }));
         }
 
         if (!$special_only && empty($loop_styles) && empty($time_blocks)) {
@@ -608,6 +726,62 @@ try {
         $time_blocks = $is_structured_payload && is_array($payload['time_blocks'] ?? null)
             ? $payload['time_blocks']
             : [];
+
+        $preserved_special_styles = [];
+        $preserved_special_style_ids = [];
+        $preserved_special_blocks = [];
+
+        if (!$special_only && $has_planner_payload) {
+            $current_plan_row = null;
+            $plan_stmt = $conn->prepare("SELECT plan_json FROM kiosk_group_loop_plans WHERE group_id = ? LIMIT 1");
+            $plan_stmt->bind_param("i", $group_id);
+            $plan_stmt->execute();
+            $current_plan_row = $plan_stmt->get_result()->fetch_assoc();
+            $plan_stmt->close();
+
+            $existing_plan = [];
+            if ($current_plan_row && !empty($current_plan_row['plan_json'])) {
+                $decoded_plan = json_decode((string)$current_plan_row['plan_json'], true);
+                if (is_array($decoded_plan)) {
+                    $existing_plan = $decoded_plan;
+                }
+            }
+
+            $existing_styles = is_array($existing_plan['loop_styles'] ?? null) ? $existing_plan['loop_styles'] : [];
+            foreach ($existing_styles as $style) {
+                if (!is_array($style)) {
+                    continue;
+                }
+
+                if (!edudisplej_is_pure_special_loop_style($style)) {
+                    continue;
+                }
+
+                $style_id = (int)($style['id'] ?? 0);
+                if ($style_id <= 0) {
+                    continue;
+                }
+
+                $style['is_special'] = 1;
+                $style['name'] = edudisplej_apply_special_loop_prefix((string)($style['name'] ?? ('Loop #' . $style_id)));
+                $preserved_special_styles[$style_id] = $style;
+                $preserved_special_style_ids[$style_id] = true;
+            }
+
+            $existing_blocks = is_array($existing_plan['schedule_blocks'] ?? null) ? $existing_plan['schedule_blocks'] : [];
+            foreach ($existing_blocks as $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+                if (!edudisplej_is_special_schedule_block($block, $preserved_special_style_ids)) {
+                    continue;
+                }
+
+                $block['is_special'] = 1;
+                $block['block_name'] = edudisplej_apply_special_loop_prefix((string)($block['block_name'] ?? 'Speciális'));
+                $preserved_special_blocks[] = $block;
+            }
+        }
 
         if ($special_only && $has_planner_payload) {
             $current_plan_row = null;
@@ -821,7 +995,13 @@ try {
                     continue;
                 }
                 $style_name = trim((string)($style['name'] ?? ('Loop #' . $style_id)));
-                $is_special_style = edudisplej_is_special_or_turned_off_loop_style($style);
+                $is_pure_special_style = edudisplej_is_pure_special_loop_style($style);
+                if (!$special_only && $is_pure_special_style) {
+                    continue;
+                }
+                $is_special_style = $special_only
+                    ? edudisplej_is_special_or_turned_off_loop_style($style)
+                    : $is_pure_special_style;
                 if ($is_special_style) {
                     if (edudisplej_is_turned_off_loop_style($style)) {
                         $style_name = 'Turned Off';
@@ -845,6 +1025,20 @@ try {
                 $default_loop_style_id = (int)$first_keys[0];
             }
 
+            if (!$special_only && !empty($preserved_special_styles)) {
+                foreach ($preserved_special_styles as $style_id => $style) {
+                    if (!isset($style_map[$style_id])) {
+                        $style_map[$style_id] = [
+                            'id' => $style_id,
+                            'name' => (string)($style['name'] ?? ('Loop #' . $style_id)),
+                            'is_special' => 1,
+                            'items' => is_array($style['items'] ?? null) ? $style['items'] : [],
+                        ];
+                    }
+                }
+                $loop_styles = array_values($style_map);
+            }
+
             $base_loop = $style_map[$default_loop_style_id]['items'] ?? [];
             $time_blocks = [];
             foreach ($schedule_blocks as $block) {
@@ -853,8 +1047,18 @@ try {
                 }
                 $style_id = (int)($block['loop_style_id'] ?? 0);
                 if ($style_id <= 0 || !isset($style_map[$style_id])) {
+                    if ($default_loop_style_id > 0 && isset($style_map[$default_loop_style_id])) {
+                        $style_id = $default_loop_style_id;
+                        $block['loop_style_id'] = $style_id;
+                    } else {
+                        continue;
+                    }
+                }
+
+                 if (!$special_only && edudisplej_is_special_schedule_block($block, $preserved_special_style_ids)) {
                     continue;
                 }
+
                 $expanded_block = $block;
                 $is_special_block = (int)($block['is_special'] ?? 0) === 1
                     || !empty($style_map[$style_id]['is_special'])
@@ -866,6 +1070,22 @@ try {
                 }
                 $expanded_block['loops'] = $style_map[$style_id]['items'];
                 $time_blocks[] = $expanded_block;
+            }
+
+            if (!$special_only && !empty($preserved_special_blocks)) {
+                foreach ($preserved_special_blocks as $block) {
+                    $style_id = (int)($block['loop_style_id'] ?? 0);
+                    if ($style_id <= 0 || !isset($style_map[$style_id])) {
+                        continue;
+                    }
+
+                    $expanded_block = $block;
+                    $expanded_block['is_special'] = 1;
+                    $expanded_block['block_name'] = edudisplej_apply_special_loop_prefix((string)($expanded_block['block_name'] ?? 'Speciális'));
+                    unset($expanded_block['priority']);
+                    $expanded_block['loops'] = $style_map[$style_id]['items'];
+                    $time_blocks[] = $expanded_block;
+                }
             }
         }
 
@@ -967,7 +1187,7 @@ try {
                 }
 
                 return $normalized;
-            }, $time_blocks));
+            }, $schedule_blocks));
         }
 
         $validation = edudisplej_validate_time_blocks_conflicts($time_blocks);
