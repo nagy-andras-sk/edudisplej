@@ -99,6 +99,7 @@
             language: (params.get('language') || 'sk').toLowerCase(),
             timeFontSize: parseInt(params.get('timeFontSize'), 10) || parseInt(params.get('fontSize'), 10) || 150,
             dateFontSize: parseInt(params.get('dateFontSize'), 10) || 48,
+            clockSize: parseInt(params.get('clockSize'), 10) || 300,
             digitalOverlayEnabled: params.get('digitalOverlayEnabled') === 'true',
             digitalOverlayPosition: (() => {
                 const value = String(params.get('digitalOverlayPosition') || 'auto').toLowerCase();
@@ -176,7 +177,7 @@
 
             const el = document.createElement('div');
             el.id = 'digital-full';
-            el.style.fontSize = `clamp(56px, ${Math.max(6, Math.min(14, settings.timeFontSize / 16))}vw, 220px)`;
+            el.style.fontSize = `${Math.max(20, settings.timeFontSize)}px`;
             el.style.color = settings.timeColor;
             stack.appendChild(el);
 
@@ -186,7 +187,7 @@
                 dateEl.id = 'digital-date';
                 dateEl.className = 'clock-date-row';
                 dateEl.style.color = settings.dateColor;
-                dateEl.style.fontSize = `clamp(20px, ${Math.max(2, Math.min(5.5, settings.dateFontSize / 16))}vw, 110px)`;
+                dateEl.style.fontSize = `${Math.max(12, settings.dateFontSize)}px`;
                 stack.appendChild(dateEl);
             }
 
@@ -224,6 +225,15 @@
             const hourHand = document.getElementById('hour-hand');
             const minuteHand = document.getElementById('minute-hand');
             const secondHand = document.getElementById('second-hand');
+            const analogSvg = document.getElementById('analog-svg');
+
+            if (analogSvg) {
+                const sizePx = Math.max(100, settings.clockSize || 300);
+                analogSvg.style.width = `${sizePx}px`;
+                analogSvg.style.height = `${sizePx}px`;
+                analogSvg.style.maxWidth = '100vw';
+                analogSvg.style.maxHeight = '100vh';
+            }
 
             for (let i = 0; i < 12; i += 1) {
                 const mark = document.createElementNS(namespace, 'use');
@@ -241,7 +251,7 @@
                 overlayEl = document.createElement('div');
                 overlayEl.id = 'digital-overlay';
                 overlayEl.style.color = settings.timeColor;
-                overlayEl.style.fontSize = `clamp(28px, ${Math.max(2.8, Math.min(7.5, settings.timeFontSize / 25))}vw, 96px)`;
+                overlayEl.style.fontSize = `${Math.max(16, Math.round(settings.timeFontSize * 0.35))}px`;
                 root.appendChild(overlayEl);
             }
 
@@ -251,7 +261,7 @@
                 analogDateEl.id = 'analog-date';
                 analogDateEl.className = 'clock-date-row';
                 analogDateEl.style.color = settings.dateColor;
-                analogDateEl.style.fontSize = `clamp(18px, ${Math.max(1.8, Math.min(4.8, settings.dateFontSize / 16))}vw, 96px)`;
+                analogDateEl.style.fontSize = `${Math.max(12, settings.dateFontSize)}px`;
                 root.appendChild(analogDateEl);
             }
 

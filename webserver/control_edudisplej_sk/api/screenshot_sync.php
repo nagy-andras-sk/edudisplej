@@ -76,6 +76,37 @@ function enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_per_
     $conn->query("DELETE FROM sync_logs WHERE id IN ($id_list)");
 }
 
+function screenshot_sync_ensure_company_column(mysqli $conn): void {
+    $check = $conn->query("SHOW COLUMNS FROM companies LIKE 'screenshot_enabled'");
+    if ($check && $check->num_rows > 0) {
+        return;
+    }
+
+    $conn->query("ALTER TABLE companies ADD COLUMN screenshot_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER tax_number");
+}
+
+function screenshot_sync_has_recent_company_activity(mysqli $conn, int $company_id, int $window_seconds = 600): bool {
+    if ($company_id <= 0 || $window_seconds <= 0) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("SELECT id
+                            FROM users
+                            WHERE company_id = ?
+                              AND last_activity_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+                            LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("ii", $company_id, $window_seconds);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return !empty($row);
+}
+
 try {
     // Get request data
     $data = json_decode(file_get_contents('php://input'), true);
@@ -91,9 +122,10 @@ try {
     }
     
     $conn = getDbConnection();
+    screenshot_sync_ensure_company_column($conn);
     
     // Verify kiosk and enforce company ownership
-    $kiosk_lookup = $conn->prepare("SELECT id, company_id FROM kiosks WHERE mac = ? LIMIT 1");
+    $kiosk_lookup = $conn->prepare("SELECT k.id, k.company_id, COALESCE(k.screenshot_enabled, 0) AS kiosk_screenshot_enabled, COALESCE(c.screenshot_enabled, 1) AS company_screenshot_enabled FROM kiosks k LEFT JOIN companies c ON c.id = k.company_id WHERE k.mac = ? LIMIT 1");
     $kiosk_lookup->bind_param("s", $mac);
     $kiosk_lookup->execute();
     $kiosk_result = $kiosk_lookup->get_result();
@@ -107,6 +139,20 @@ try {
     }
 
     api_require_company_match($api_company, $kiosk_row['company_id'], 'Unauthorized');
+
+    if (empty($kiosk_row['company_screenshot_enabled']) || empty($kiosk_row['kiosk_screenshot_enabled'])) {
+        $response['message'] = 'Screenshot disabled for this profile';
+        echo json_encode($response);
+        $conn->close();
+        exit;
+    }
+
+    if (!screenshot_sync_has_recent_company_activity($conn, (int)$kiosk_row['company_id'], 10 * 60)) {
+        $response['message'] = 'Screenshot requires active company web login';
+        echo json_encode($response);
+        $conn->close();
+        exit;
+    }
 
     // Use custom filename if provided, otherwise generate default
     if (!empty($custom_filename)) {

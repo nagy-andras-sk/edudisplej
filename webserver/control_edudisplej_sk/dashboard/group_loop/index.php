@@ -3955,7 +3955,7 @@ $group_loop_localized_module_names['turned-off'] = t_def('group_loop.turned_off.
                         
                         <div id="digitalSettings" style="${settings.type === 'analog' ? 'display: none;' : ''}">
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">Betűméret (px):</label>
-                            <input type="number" id="setting-fontSize" value="${settings.fontSize || 120}" min="50" max="300" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                            <input type="number" id="setting-fontSize" value="${settings.fontSize || 120}" min="50" max="1600" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                         </div>
                         
                         <div id="analogSettings" style="${settings.type === 'digital' ? 'display: none;' : ''}">

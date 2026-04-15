@@ -175,6 +175,9 @@ try {
     if (!isset($existing_company_columns['tax_number'])) {
         $conn->query("ALTER TABLE companies ADD COLUMN tax_number VARCHAR(64) DEFAULT NULL AFTER address");
     }
+    if (!isset($existing_company_columns['screenshot_enabled'])) {
+        $conn->query("ALTER TABLE companies ADD COLUMN screenshot_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER tax_number");
+    }
     
     // Get current user info
     $stmt = $conn->prepare("SELECT id, company_id FROM users WHERE id = ? LIMIT 1");
@@ -316,12 +319,13 @@ try {
         $institution_name = trim((string)($_POST['institution_name'] ?? ''));
         $institution_address = trim((string)($_POST['institution_address'] ?? ''));
         $tax_number = trim((string)($_POST['tax_number'] ?? ''));
+        $screenshot_enabled = isset($_POST['screenshot_enabled']) ? 1 : 0;
 
         if ($institution_name === '') {
             $error = t_def('profile.institution.name_required', 'Az intézmény neve kötelező.');
         } else {
-            $update_stmt = $conn->prepare("UPDATE companies SET name = ?, address = ?, tax_number = ? WHERE id = ?");
-            $update_stmt->bind_param("sssi", $institution_name, $institution_address, $tax_number, $company_id);
+            $update_stmt = $conn->prepare("UPDATE companies SET name = ?, address = ?, tax_number = ?, screenshot_enabled = ? WHERE id = ?");
+            $update_stmt->bind_param("sssii", $institution_name, $institution_address, $tax_number, $screenshot_enabled, $company_id);
             if ($update_stmt->execute()) {
                 $success = t_def('profile.institution.update_success', 'Intézmény adatai sikeresen frissítve.');
             } else {
@@ -332,7 +336,7 @@ try {
     }
 
     if ($company_id > 0) {
-        $stmt = $conn->prepare("SELECT id, name, address, tax_number, created_at, api_token FROM companies WHERE id = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, name, address, tax_number, screenshot_enabled, created_at, api_token FROM companies WHERE id = ? LIMIT 1");
         $stmt->bind_param("i", $company_id);
         $stmt->execute();
         $company_data = $stmt->get_result()->fetch_assoc() ?: [];
@@ -576,6 +580,15 @@ $logout_url = '../login.php?logout=1';
                             <div style="margin-top: 12px; max-width: 420px;">
                                 <label for="tax_number" style="display:block; font-weight:600; margin-bottom:6px;"><?php echo htmlspecialchars(t_def('profile.institution.tax_number', 'Adószám')); ?></label>
                                 <input id="tax_number" name="tax_number" type="text" value="<?php echo htmlspecialchars($company_data['tax_number'] ?? ''); ?>" style="width:100%;">
+                            </div>
+                            <div style="margin-top: 12px;">
+                                <label style="display:flex; gap:8px; align-items:center; font-weight:600;">
+                                    <input type="checkbox" name="screenshot_enabled" value="1" <?php echo !empty($company_data['screenshot_enabled']) ? 'checked' : ''; ?>>
+                                    <?php echo htmlspecialchars(t_def('profile.institution.screenshot_enabled', 'Screenshot készítés engedélyezése')); ?>
+                                </label>
+                                <div style="margin-top:6px; color:#666; font-size:13px;">
+                                    <?php echo htmlspecialchars(t_def('profile.institution.screenshot_hint', 'Csak akkor készülnek képernyőképek, ha a profil be van kapcsolva és valaki aktívan használja a webes felületet.')); ?>
+                                </div>
                             </div>
                             <div style="margin-top: 12px;">
                                 <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(t_def('profile.institution.save', 'Intézmény adatok mentése')); ?></button>

@@ -23,6 +23,37 @@ require_once '../dbkonfiguracia.php';
 require_once '../i18n.php';
 require_once 'auth.php';
 
+function screenshot_request_ensure_company_column(mysqli $conn): void {
+    $check = $conn->query("SHOW COLUMNS FROM companies LIKE 'screenshot_enabled'");
+    if ($check && $check->num_rows > 0) {
+        return;
+    }
+
+    $conn->query("ALTER TABLE companies ADD COLUMN screenshot_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER tax_number");
+}
+
+function screenshot_request_has_recent_company_activity(mysqli $conn, int $company_id, int $window_seconds = 600): bool {
+    if ($company_id <= 0 || $window_seconds <= 0) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("SELECT id
+                            FROM users
+                            WHERE company_id = ?
+                              AND last_activity_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+                            LIMIT 1");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("ii", $company_id, $window_seconds);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return !empty($row);
+}
+
 $response = ['success' => false, 'message' => ''];
 
 // Accept either session or token auth
@@ -50,9 +81,13 @@ try {
     }
 
     $conn = getDbConnection();
+    screenshot_request_ensure_company_column($conn);
 
     // Verify ownership
-    $stmt = $conn->prepare("SELECT id, company_id FROM kiosks WHERE id = ?");
+    $stmt = $conn->prepare("SELECT k.id, k.company_id, COALESCE(k.screenshot_enabled, 0) AS kiosk_screenshot_enabled, COALESCE(c.screenshot_enabled, 1) AS company_screenshot_enabled
+                            FROM kiosks k
+                            LEFT JOIN companies c ON c.id = k.company_id
+                            WHERE k.id = ?");
     $stmt->bind_param("i", $kiosk_id);
     $stmt->execute();
     $kiosk = $stmt->get_result()->fetch_assoc();
@@ -76,6 +111,27 @@ try {
             $conn->close();
             exit;
         }
+    }
+
+    $company_screenshot_enabled = !empty($kiosk['company_screenshot_enabled']);
+    $kiosk_screenshot_enabled = !empty($kiosk['kiosk_screenshot_enabled']);
+    $has_recent_activity = screenshot_request_has_recent_company_activity($conn, (int)$kiosk['company_id'], 10 * 60);
+    if (!$company_screenshot_enabled || !$kiosk_screenshot_enabled) {
+        if ($action !== 'stop') {
+            $response['message'] = t_def('api.screenshot_request.disabled', 'Screenshot készítés ki van kapcsolva ennél a profilnál.');
+            $response['screenshot_requested_until'] = null;
+            echo json_encode($response);
+            $conn->close();
+            exit;
+        }
+    }
+
+    if ($action !== 'stop' && !$has_recent_activity) {
+        $response['message'] = t_def('api.screenshot_request.activity_required', 'Screenshot csak aktív céges bejelentkezés mellett engedélyezett.');
+        $response['screenshot_requested_until'] = null;
+        echo json_encode($response);
+        $conn->close();
+        exit;
     }
 
     if ($action === 'stop') {

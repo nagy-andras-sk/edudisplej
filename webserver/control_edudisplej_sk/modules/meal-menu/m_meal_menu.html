@@ -91,8 +91,8 @@
         .root.small-mode .small-page-row.no-icon .small-page-row-icon { display:none; }
         .root.small-mode .small-page-row-icon { width: clamp(34px, 3vw, 68px); height: clamp(34px, 3vw, 68px); color:#bfdbfe; display:inline-flex; align-items:center; justify-content:center; }
         .root.small-mode .small-page-row-icon svg { width: 100%; height: 100%; display:block; }
-        .root.small-mode .small-page-row-text { width:100%; line-height: 1; font-size: clamp(16px, 3.2vw, 68px); font-weight: 800; color:#f8fafc; white-space: nowrap; overflow: hidden; display:block; word-break: normal; text-overflow: clip; }
-        .root.small-mode .small-page-row-text .meal-row-line { white-space: nowrap; }
+        .root.small-mode .small-page-row-text { width:100%; line-height: 1.04; font-size: clamp(16px, 3.2vw, 68px); font-weight: 800; color:#f8fafc; white-space: normal; overflow: hidden; display:block; word-break: break-word; text-overflow: clip; }
+        .root.small-mode .small-page-row-text .meal-row-line { white-space: normal; display: block; }
         .root.small-mode .foot { min-height: 0; text-align: left; font-size: clamp(15px, 1.12vw, 24px); color: #cbd5e1; border: 1px solid rgba(148,163,184,.24); border-radius: 12px; background: rgba(15, 23, 42, 0.72); padding: 0 .9vw; display:flex; align-items:center; }
         .root.small-mode .foot .foot-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
 
@@ -775,6 +775,30 @@
         });
 
         const useTomorrowAfterPassed = settings.showTomorrowAfterMealPassed !== false;
+        const allTodayMealsPassed = settings.mealScheduleEnabled !== false
+            && currentMinutes > (scheduleLimits.dinner ?? (23 * 60 + 59));
+
+        if (allTodayMealsPassed && useTomorrowAfterPassed) {
+            const eveningFallbackKeys = ['breakfast', 'snack_am'];
+            const eveningFallbackMeals = [];
+            eveningFallbackKeys.forEach((key) => {
+                const tomorrowMeal = tomorrowMap.get(key) || null;
+                if (tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
+                    const titlePrefix = String(t.tomorrowMealLabels?.[key] || t.mealLabels?.[key] || tomorrowMeal.label || key).trim();
+                    eveningFallbackMeals.push({
+                        ...tomorrowMeal,
+                        key,
+                        label: titlePrefix,
+                        __displayLabel: titlePrefix,
+                        __tomorrowPreview: true
+                    });
+                }
+            });
+            if (eveningFallbackMeals.length > 0) {
+                return eveningFallbackMeals;
+            }
+        }
+
         const result = [];
 
         displayKeys.forEach((key) => {
@@ -1187,19 +1211,28 @@
 
         if (isSmall) {
             const smallRows = Array.from(document.querySelectorAll('#cards .small-page-row-text'));
-            const responsiveMax = Math.max(28, Math.min(84, Math.round(window.innerHeight * 0.085)));
-            const fittedSmallPx = fitSharedTextSize(smallRows, 10, responsiveMax);
+            const preferredMax = Math.max(60, Math.min(260, Number(settings?.smallRowFontPx || 150)));
+            const fittedSmallPx = fitSharedTextSize(smallRows, 16, preferredMax);
             smallRows.forEach((row) => {
                 row.style.fontSize = `${fittedSmallPx}px`;
             });
         }
     }
 
-    function toDisplaySingleLine(text, language) {
-        const raw = String(text || '').replace(/\s+/g, ' ').trim();
+    function toDisplayMultiline(text) {
+        let raw = String(text || '').trim();
         if (raw === '') {
             return '—';
         }
+
+        raw = raw
+            .replace(/\s*\|\s*/g, '\n')
+            .replace(/\s*\/\s*/g, '\n')
+            .replace(/\s*[;]\s*/g, '\n')
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+
         return raw;
     }
 
@@ -1306,7 +1339,11 @@
 
         const renderRow = (row) => {
             const rawText = String(row?.text || '—');
-            const text = escapeHtml(toDisplaySingleLine(rawText, settings.language));
+            const text = toDisplayMultiline(rawText)
+                .split('\n')
+                .map((line) => escapeHtml(line.trim()))
+                .filter((line) => line !== '')
+                .join('<br>') || '—';
             const iconKey = String(row?.icon || '').trim();
             const iconHtml = iconKey !== ''
                 ? `<span class="small-page-row-icon" aria-hidden="true">${iconSvg(iconKey)}</span>`

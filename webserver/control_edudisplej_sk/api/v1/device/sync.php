@@ -38,6 +38,15 @@ function v1_ensure_debug_mode_column(mysqli $conn): void {
     $conn->query("ALTER TABLE kiosks ADD COLUMN debug_mode TINYINT(1) NOT NULL DEFAULT 0");
 }
 
+function v1_ensure_company_screenshot_column(mysqli $conn): void {
+    $check = $conn->query("SHOW COLUMNS FROM companies LIKE 'screenshot_enabled'");
+    if ($check && $check->num_rows > 0) {
+        return;
+    }
+
+    $conn->query("ALTER TABLE companies ADD COLUMN screenshot_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER tax_number");
+}
+
 function v1_normalize_core_version_text(string $value): string {
     $text = trim($value);
     if ($text === '') {
@@ -182,6 +191,9 @@ function v1_has_recent_control_panel_activity(mysqli $conn, int $company_id, int
 }
 
 $api_company = validate_api_token();
+$conn = getDbConnection();
+
+v1_ensure_company_screenshot_column($conn);
 
 // Read raw body once
 $raw_body = file_get_contents('php://input');
@@ -278,7 +290,8 @@ try {
     $stmt = $conn->prepare(
         "SELECT k.id, k.device_id, k.sync_interval, k.screenshot_requested,
                 COALESCE(k.screenshot_enabled, 0) as screenshot_enabled,
-            COALESCE(k.debug_mode, 0) as debug_mode,
+                COALESCE(c.screenshot_enabled, 1) as company_screenshot_enabled,
+                COALESCE(k.debug_mode, 0) as debug_mode,
                 COALESCE(k.screenshot_interval_seconds, 3) as screenshot_interval_seconds,
                 k.screenshot_requested_until,
                 k.company_id, c.name as company_name, k.loop_last_update,
@@ -346,12 +359,20 @@ try {
 
     $kiosk_id = $kiosk['id'];
 
+    $activity_window_seconds = 10 * 60;
+    $company_id_for_activity = (int)($kiosk['company_id'] ?? 0);
+    $has_recent_activity = v1_has_recent_control_panel_activity($conn, $company_id_for_activity, $activity_window_seconds);
+    $company_screenshot_enabled = !empty($kiosk['company_screenshot_enabled']);
+    $kiosk_screenshot_enabled = !empty($kiosk['screenshot_enabled']);
+    $screenshot_policy_enabled = $company_screenshot_enabled && $kiosk_screenshot_enabled;
+    $screenshot_upload_allowed = $screenshot_policy_enabled && $has_recent_activity;
+
     // -----------------------------------------------------------------------
     // 3. Screenshot upload (optional, included in same request)
     // -----------------------------------------------------------------------
     $screenshot_uploaded = false;
     $screenshot_data = $data['screenshot'] ?? '';
-    if (!empty($screenshot_data)) {
+    if (!empty($screenshot_data) && $screenshot_upload_allowed) {
         $custom_filename = $data['screenshot_filename'] ?? '';
         $custom_filename = v1_sanitize_screenshot_filename($custom_filename);
         $filename = !empty($custom_filename)
@@ -535,25 +556,23 @@ try {
     // Fallback: honour legacy boolean flag if TTL not set
     $screenshot_requested = $screenshot_ttl_active || (bool)$kiosk['screenshot_requested'];
 
-    $activity_window_seconds = 10 * 60;
     $fast_interval_seconds = 30;
     $default_interval_seconds = 5 * 60;
     $watch_screenshot_interval_seconds = 15;
-    $idle_screenshot_interval_seconds = 30 * 60;
-    $company_id_for_activity = (int)($kiosk['company_id'] ?? 0);
-    $has_recent_activity = v1_has_recent_control_panel_activity($conn, $company_id_for_activity, $activity_window_seconds);
+    $idle_screenshot_interval_seconds = 0;
     $effective_interval = $has_recent_activity ? $fast_interval_seconds : $default_interval_seconds;
-    $screenshot_interval_seconds = ($has_recent_activity || $screenshot_ttl_active)
+    $screenshot_watch_active = $screenshot_policy_enabled && $has_recent_activity;
+    $screenshot_interval_seconds = $screenshot_watch_active
         ? $watch_screenshot_interval_seconds
         : $idle_screenshot_interval_seconds;
-    $screenshot_watch_active = $has_recent_activity || $screenshot_ttl_active;
 
     $response['success']                   = true;
     $response['kiosk_id']                  = $kiosk_id;
     $response['device_id']                 = $kiosk['device_id'];
     $response['sync_interval']             = $effective_interval;
     $response['screenshot_requested']      = $screenshot_watch_active;
-    $response['screenshot_enabled']        = (bool)$kiosk['screenshot_enabled'];
+    $response['screenshot_enabled']        = $screenshot_policy_enabled;
+    $response['company_screenshot_enabled'] = $company_screenshot_enabled;
     $response['debug_mode']                = (bool)$kiosk['debug_mode'];
     $response['screenshot_interval_seconds'] = $screenshot_interval_seconds;
     $response['screenshot_watch_active']   = $screenshot_watch_active;

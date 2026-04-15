@@ -519,6 +519,7 @@
                     schedule_snack_pm_until: 'Olovrant do času',
                     schedule_dinner_until: 'Večera do času',
                     show_tomorrow_after_passed: 'Po prekročení dnešného času zobraz zajtrajšie zodpovedajúce jedlo',
+                    small_row_font_size: 'Veľkosť písma riadkov na malom displeji (px)',
                     page_switch: 'Prepínanie strán na malom displeji (sekundy)',
                     page_switch_hint: 'Platí len pre režim A) MALÝ DISPLEJ.',
                     join_breakfast_snack: 'Spojiť Raňajky + Desiata (na malom displeji)',
@@ -5743,6 +5744,7 @@
                     sourceType: 'server',
                     mealDisplayMode: 'small_screen',
                     smallScreenPageSwitchSec: 12,
+                    smallRowFontPx: 150,
                     mealScheduleEnabled: true,
                     scheduleBreakfastUntil: '10:00',
                     scheduleSnackAmUntil: '11:00',
@@ -7279,18 +7281,18 @@
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                             <div>
                                 <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('time_font_size')}</label>
-                                <input type="number" id="setting-timeFontSize" value="${settings.timeFontSize || settings.fontSize || 120}" min="40" max="320" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                                <input type="number" id="setting-timeFontSize" value="${settings.timeFontSize || settings.fontSize || 120}" min="40" max="1600" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                             </div>
                             <div>
                                 <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('date_font_size')}</label>
-                                <input type="number" id="setting-dateFontSize" value="${settings.dateFontSize || Math.max(16, Math.round((settings.timeFontSize || settings.fontSize || 120) * 0.3))}" min="14" max="180" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                                <input type="number" id="setting-dateFontSize" value="${settings.dateFontSize || Math.max(16, Math.round((settings.timeFontSize || settings.fontSize || 120) * 0.3))}" min="14" max="900" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                             </div>
                         </div>
                     </div>
                     
                     <div id="analogSettings" style="${settings.type === 'digital' ? 'display: none;' : ''}">
                         <label style="display: block; margin-bottom: 5px; font-weight: bold;">${clockUiText('clock_size')}</label>
-                        <input type="number" id="setting-clockSize" value="${settings.clockSize || 300}" min="200" max="600" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                        <input type="number" id="setting-clockSize" value="${settings.clockSize || 300}" min="200" max="2000" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                     </div>
                     
                     <div>
@@ -7542,6 +7544,7 @@
             const mealDisplayMode = normalizeMealDisplayMode(settings.mealDisplayMode);
             const isSmallMode = mealDisplayMode === 'small_screen';
             const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const smallRowFontPx = Math.max(60, Math.min(260, parseInt(settings.smallRowFontPx || 150, 10) || 150));
             const mergeBreakfastSnack = settings.mergeBreakfastSnack !== false;
             const mergeLunchSnack = settings.mergeLunchSnack !== false;
             const mealScheduleEnabled = settings.mealScheduleEnabled !== false;
@@ -7589,6 +7592,11 @@
                                 <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('page_switch')}</label>
                                 <input type="number" id="setting-smallScreenPageSwitchSec" min="1" max="120" step="1" value="${smallScreenPageSwitchSec}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                                 <div style="font-size:12px; color:#64748b; margin-top:4px;">${mt('page_switch_hint')}</div>
+                            </div>
+
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_row_font_size')}</label>
+                                <input type="number" id="setting-smallRowFontPx" min="60" max="260" step="2" value="${smallRowFontPx}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                             </div>
 
                             <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mergeBreakfastSnack" ${mergeBreakfastSnack ? 'checked' : ''}> ${mt('join_breakfast_snack')}</label>
@@ -8413,6 +8421,7 @@
         function collectMealMenuSettingsFromForm() {
             const mealDisplayMode = normalizeMealDisplayMode(document.getElementById('setting-mealDisplayMode')?.value || 'small_screen');
             const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(document.getElementById('setting-smallScreenPageSwitchSec')?.value || '12', 10) || 12));
+            const smallRowFontPx = Math.max(60, Math.min(260, parseInt(document.getElementById('setting-smallRowFontPx')?.value || '150', 10) || 150));
             const mealTextFontSize = mealDisplayMode === 'large_screen' ? 1.9 : 3.0;
             const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
             return {
@@ -8424,6 +8433,7 @@
                 runtimeRefreshIntervalSec: 300,
                 mealDisplayMode,
                 smallScreenPageSwitchSec,
+                smallRowFontPx,
                 mealScheduleEnabled: document.getElementById('setting-mealScheduleEnabled')?.checked !== false,
                 scheduleBreakfastUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleBreakfastUntil')?.value, '10:00'),
                 scheduleSnackAmUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleSnackAmUntil')?.value, '11:00'),
@@ -8848,12 +8858,14 @@
             const mealTextFontSize = Math.max(0.8, Math.min(4, parseFloat(settings.mealTextFontSize || 1.85) || 1.85));
             const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
             const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const smallRowFontPx = Math.max(60, Math.min(260, parseInt(settings.smallRowFontPx || 150, 10) || 150));
             const mealDisplayMode = normalizeMealDisplayMode(settings.mealDisplayMode);
             const language = normalizeMealLanguage(settings.language);
             params.append('siteKey', String(settings.siteKey || 'jedalen.sk'));
             params.append('institutionId', String(parseInt(settings.institutionId || 0, 10) || 0));
             params.append('mealDisplayMode', mealDisplayMode);
             params.append('smallScreenPageSwitchSec', String(smallScreenPageSwitchSec));
+            params.append('smallRowFontPx', String(smallRowFontPx));
             params.append('mergeBreakfastSnack', settings.mergeBreakfastSnack === false ? 'false' : 'true');
             params.append('mergeLunchSnack', settings.mergeLunchSnack === false ? 'false' : 'true');
             params.append('language', language);

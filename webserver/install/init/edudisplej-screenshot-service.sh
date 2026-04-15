@@ -103,47 +103,58 @@ get_mac_address() {
     echo "$mac"
 }
 
-# Read config.json to check if screenshot is enabled OR server requested one
+# Read last sync response to check if screenshot is enabled and active
 is_screenshot_active() {
-    # 1. Check server-side screenshot flags from last sync response
-    if [ -f "$LAST_SYNC_RESPONSE" ]; then
-        local enabled=""
-        local requested=""
-        if command -v jq >/dev/null 2>&1; then
-            enabled=$(jq -r '.screenshot_enabled // false' "$LAST_SYNC_RESPONSE" 2>/dev/null)
-            requested=$(jq -r '.screenshot_requested // false' "$LAST_SYNC_RESPONSE" 2>/dev/null)
-        else
-            enabled=$(grep -o '"screenshot_enabled"[[:space:]]*:[[:space:]]*true' "$LAST_SYNC_RESPONSE" 2>/dev/null | head -1)
-            [ -n "$enabled" ] && enabled="true" || enabled="false"
-            requested=$(grep -o '"screenshot_requested"[[:space:]]*:[[:space:]]*true' "$LAST_SYNC_RESPONSE" 2>/dev/null | head -1)
-            [ -n "$requested" ] && requested="true" || requested="false"
-        fi
-        if [ "$enabled" = "true" ]; then
-            log_debug "screenshot_enabled=true from last sync response"
-            return 0
-        fi
-        if [ "$requested" = "true" ]; then
-            log_debug "screenshot_requested=true from last sync response"
-            return 0
-        fi
+    if [ ! -f "$LAST_SYNC_RESPONSE" ]; then
+        return 1
     fi
 
-    # 2. Fallback: check local config.json screenshot_enabled flag
-    is_screenshot_enabled
+    local enabled="false"
+    local requested="false"
+    local interval="0"
+
+    if command -v jq >/dev/null 2>&1; then
+        enabled=$(jq -r '.screenshot_enabled // false' "$LAST_SYNC_RESPONSE" 2>/dev/null)
+        requested=$(jq -r '.screenshot_requested // false' "$LAST_SYNC_RESPONSE" 2>/dev/null)
+        interval=$(jq -r '.screenshot_interval_seconds // 0' "$LAST_SYNC_RESPONSE" 2>/dev/null)
+    else
+        enabled=$(grep -o '"screenshot_enabled"[[:space:]]*:[[:space:]]*true' "$LAST_SYNC_RESPONSE" 2>/dev/null | head -1)
+        [ -n "$enabled" ] && enabled="true" || enabled="false"
+        requested=$(grep -o '"screenshot_requested"[[:space:]]*:[[:space:]]*true' "$LAST_SYNC_RESPONSE" 2>/dev/null | head -1)
+        [ -n "$requested" ] && requested="true" || requested="false"
+        interval=$(grep -o '"screenshot_interval_seconds"[[:space:]]*:[[:space:]]*[0-9]*' "$LAST_SYNC_RESPONSE" 2>/dev/null | grep -o '[0-9]*$' | head -1)
+        [ -n "$interval" ] || interval="0"
+    fi
+
+    if [ "$enabled" != "true" ]; then
+        log_debug "Screenshot policy disabled in last sync response"
+        return 1
+    fi
+
+    if [ "$requested" = "true" ] || [ "${interval:-0}" -gt 0 ]; then
+        log_debug "Screenshot active from last sync response (interval=${interval:-0})"
+        return 0
+    fi
+
+    return 1
 }
 
 # Read screenshot interval from server policy (last sync response)
 get_screenshot_interval() {
-    local interval="$SCREENSHOT_INTERVAL"
+    local interval="0"
     if [ -f "$LAST_SYNC_RESPONSE" ]; then
-        local server_interval=""
+        local enabled="false"
+        local server_interval="0"
         if command -v jq >/dev/null 2>&1; then
-            server_interval=$(jq -r '.screenshot_interval_seconds // empty' "$LAST_SYNC_RESPONSE" 2>/dev/null)
+            enabled=$(jq -r '.screenshot_enabled // false' "$LAST_SYNC_RESPONSE" 2>/dev/null)
+            server_interval=$(jq -r '.screenshot_interval_seconds // 0' "$LAST_SYNC_RESPONSE" 2>/dev/null)
         else
-            server_interval=$(grep -o '"screenshot_interval_seconds"[[:space:]]*:[[:space:]]*[0-9]*' "$LAST_SYNC_RESPONSE" \
-                | grep -o '[0-9]*$' | head -1)
+            enabled=$(grep -o '"screenshot_enabled"[[:space:]]*:[[:space:]]*true' "$LAST_SYNC_RESPONSE" 2>/dev/null | head -1)
+            [ -n "$enabled" ] && enabled="true" || enabled="false"
+            server_interval=$(grep -o '"screenshot_interval_seconds"[[:space:]]*:[[:space:]]*[0-9]*' "$LAST_SYNC_RESPONSE" 2>/dev/null | grep -o '[0-9]*$' | head -1)
+            [ -n "$server_interval" ] || server_interval="0"
         fi
-        if [[ "$server_interval" =~ ^[0-9]+$ ]] && [ "$server_interval" -ge 1 ]; then
+        if [ "$enabled" = "true" ] && [[ "$server_interval" =~ ^[0-9]+$ ]] && [ "$server_interval" -ge 1 ]; then
             interval="$server_interval"
         fi
     fi
@@ -190,37 +201,8 @@ is_capture_due() {
     [ $((now_epoch - last_capture_epoch)) -ge "$interval_seconds" ]
 }
 
-# Read config.json to check if screenshot is enabled (legacy flag)
+# Legacy local config checks are intentionally not used for activation.
 is_screenshot_enabled() {
-    if [ ! -f "$CONFIG_FILE" ]; then
-        log_debug "Config file not found: $CONFIG_FILE"
-        return 1
-    fi
-
-    local mode=""
-    if command -v jq >/dev/null 2>&1; then
-        mode=$(jq -r '.screenshot_mode // empty' "$CONFIG_FILE" 2>/dev/null)
-    else
-        mode=$(grep -o '"screenshot_mode":"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4 | head -1)
-    fi
-
-    if [ "$mode" = "sync" ]; then
-        log_debug "Screenshot mode is 'sync' - handled by sync service"
-        return 1
-    fi
-    
-    if command -v jq >/dev/null 2>&1; then
-        local enabled=$(jq -r '.screenshot_enabled // false' "$CONFIG_FILE" 2>/dev/null)
-        if [ "$enabled" = "true" ]; then
-            return 0
-        fi
-    else
-        # Fallback without jq
-        if grep -q '"screenshot_enabled"[[:space:]]*:[[:space:]]*true' "$CONFIG_FILE" 2>/dev/null; then
-            return 0
-        fi
-    fi
-    
     return 1
 }
 

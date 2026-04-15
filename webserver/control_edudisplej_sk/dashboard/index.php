@@ -222,6 +222,18 @@ include '../admin/header.php';
         font-weight: 700;
     }
 
+    .dashboard-refresh-indicator {
+        display: none;
+        margin: 8px 0 10px;
+        font-size: 12px;
+        color: #425466;
+        font-weight: 600;
+    }
+
+    .dashboard-refresh-indicator.active {
+        display: block;
+    }
+
 </style>
 
 <?php if ($error): ?>
@@ -256,6 +268,7 @@ include '../admin/header.php';
 </div>
 
 <!-- Kiosk table -->
+<div id="dashboard-refresh-indicator" class="dashboard-refresh-indicator">⏳ <?php echo htmlspecialchars(t_def('dashboard.screenshot.refreshing', 'Screenshot frissítés...')); ?></div>
 <div class="table-wrap">
     <table class="minimal-table" id="kiosk-table">
         <thead>
@@ -366,7 +379,7 @@ include '../admin/header.php';
                         <td class="muted nowrap kiosk-last-seen"><?php echo htmlspecialchars($last_seen_str); ?></td>
                         <td class="kiosk-screenshot-cell">
                             <?php if (in_array($k['status'], ['online', 'online_error', 'online_pending'], true) && $k['screenshot_url']): ?>
-                                  <div class="preview-card" style="cursor:pointer;" onclick="openScreenshotViewer(<?php echo (int)$k['id']; ?>, <?php echo htmlspecialchars($screenshot_url_json, ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars($screenshot_ts_json, ENT_QUOTES, 'UTF-8'); ?>);" title="<?php echo htmlspecialchars(t_def('dashboard.screenshot.zoom_live', 'Nagyítás és élő frissítés')); ?>">
+                                  <div class="preview-card js-open-screenshot-viewer" style="cursor:pointer;" data-screenshot-kiosk-id="<?php echo (int)$k['id']; ?>" data-screenshot-url="<?php echo htmlspecialchars((string)($k['screenshot_url'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" data-screenshot-ts="<?php echo htmlspecialchars((string)($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky')), ENT_QUOTES, 'UTF-8'); ?>" title="<?php echo htmlspecialchars(t_def('dashboard.screenshot.zoom_live', 'Nagyítás és élő frissítés')); ?>">
                                     <img class="screenshot-img"
                                          src="<?php echo htmlspecialchars($k['screenshot_url']); ?>"
                                          alt="Screenshot"
@@ -374,7 +387,7 @@ include '../admin/header.php';
                                     <span class="screenshot-timestamp"><?php echo htmlspecialchars($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky')); ?></span>
                                 </div>
                             <?php elseif ($k['status'] === 'offline'): ?>
-                                <div class="preview-card placeholder" style="cursor:pointer;" onclick="openScreenshotViewer(<?php echo (int)$k['id']; ?>, <?php echo htmlspecialchars($screenshot_url_json, ENT_QUOTES, 'UTF-8'); ?>, 'OFFLINE');" title="<?php echo htmlspecialchars(t_def('dashboard.screenshot.open_history', 'Előzmények megnyitása')); ?>">
+                                <div class="preview-card placeholder js-open-screenshot-viewer" style="cursor:pointer;" data-screenshot-kiosk-id="<?php echo (int)$k['id']; ?>" data-screenshot-url="<?php echo htmlspecialchars((string)($k['screenshot_url'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" data-screenshot-ts="OFFLINE" title="<?php echo htmlspecialchars(t_def('dashboard.screenshot.open_history', 'Előzmények megnyitása')); ?>">
                                     <div class="screenshot-loader">OFFLINE</div>
                                     <span class="screenshot-timestamp">OFFLINE</span>
                                 </div>
@@ -492,6 +505,7 @@ var _historyCurrentIndex = 0;
 var _historyPlayerTimer = null;
 var _historyPlaybackElapsedMs = 0;
 var _dashboardAutoRefreshTimer = null;
+var _dashboardRefreshInFlight = false;
 var _viewerWatchTimer = null;
 var _viewerWatchActive = false;
 var _summaryFilter = 'all';
@@ -672,6 +686,10 @@ var DASHBOARD_KIOSK_PREFIX_TEXT = <?php
 var COMMON_UNKNOWN_ERROR_TEXT = <?php
     $common_unknown_error_text_json = json_encode(t_def('common.unknown_error', 'Ismeretlen hiba'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $common_unknown_error_text_json !== false ? $common_unknown_error_text_json : '"Unknown error"';
+?>;
+var DASHBOARD_SCREENSHOT_REFRESHING_TEXT = <?php
+    $dashboard_screenshot_refreshing_text_json = json_encode(t_def('dashboard.screenshot.refreshing', 'Screenshot frissítés...'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    echo $dashboard_screenshot_refreshing_text_json !== false ? $dashboard_screenshot_refreshing_text_json : '"Screenshot refreshing..."';
 ?>;
 var CAN_EDIT_KIOSK_DETAILS = <?php echo $can_edit_kiosk_details ? 'true' : 'false'; ?>;
 var DASHBOARD_GROUPS = <?php
@@ -977,8 +995,18 @@ function loadScreenshotHistory(page) {
             if (!_viewerWatchActive || !_viewerKioskId) {
                 return;
             }
-            requestScreenshotTTL(_viewerKioskId, 300);
-            refreshScreenshotViewerLiveImage();
+            requestScreenshotTTL(_viewerKioskId, 300).then(function (data) {
+                if (data && data.success === false) {
+                    _viewerWatchActive = false;
+                    updateScreenshotWatchUi(false);
+                    stopScreenshotWatchTimer();
+                    if (data.message) {
+                        alert('⚠️ ' + data.message);
+                    }
+                    return;
+                }
+                refreshScreenshotViewerLiveImage();
+            });
         }, 15000);
     }
 
@@ -988,7 +1016,20 @@ function loadScreenshotHistory(page) {
 
         if (_viewerWatchActive) {
             if (kioskId) {
-                requestScreenshotTTL(kioskId, 300);
+                requestScreenshotTTL(kioskId, 300).then(function (data) {
+                    if (data && data.success === false) {
+                        _viewerWatchActive = false;
+                        updateScreenshotWatchUi(false);
+                        stopScreenshotWatchTimer();
+                        if (data.message) {
+                            alert('⚠️ ' + data.message);
+                        }
+                        return;
+                    }
+                    refreshScreenshotViewerLiveImage();
+                    startScreenshotWatchTimer();
+                });
+                return;
             }
             refreshScreenshotViewerLiveImage();
             startScreenshotWatchTimer();
@@ -1343,12 +1384,30 @@ function handleScreenshotBackdropClick(event) {
     }
 }
 
+function handleScreenshotCardClick(event) {
+    var target = event.target;
+    while (target && target !== document.body) {
+        if (target.classList && target.classList.contains('js-open-screenshot-viewer')) {
+            var kioskId = parseInt(target.getAttribute('data-screenshot-kiosk-id') || '0', 10);
+            var imageSrc = target.getAttribute('data-screenshot-url') || '';
+            var timestamp = target.getAttribute('data-screenshot-ts') || '';
+            if (kioskId > 0) {
+                openScreenshotViewer(kioskId, imageSrc, timestamp);
+            }
+            return;
+        }
+        target = target.parentNode;
+    }
+}
+
 function requestScreenshotTTL(kioskId, ttlSeconds) {
-    fetch('../api/screenshot_request.php', {
+    return fetch('../api/screenshot_request.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kiosk_id: kioskId, ttl_seconds: ttlSeconds || 300 })
-    }).catch(function () {});
+    })
+    .then(function (response) { return response.json(); })
+    .catch(function () {});
 }
 
 function stopScreenshotTTL(kioskId) {
@@ -1512,7 +1571,7 @@ function renderKioskScreenshotCell(kiosk) {
     var kioskId = parseInt(kiosk.id, 10) || 0;
     var screenshotUrl = String(kiosk.screenshot_url || '');
     if (status === 'offline') {
-        return '<div class="preview-card placeholder" style="cursor:pointer;" onclick="openScreenshotViewer(' + kioskId + ', ' + JSON.stringify(screenshotUrl) + ', ' + JSON.stringify(SCREENSHOT_OFFLINE_TEXT) + ');" title="' + escapeHtml(DASHBOARD_OPEN_HISTORY_TITLE_TEXT) + '">'
+        return '<div class="preview-card placeholder js-open-screenshot-viewer" style="cursor:pointer;" data-screenshot-kiosk-id="' + escapeHtml(kioskId) + '" data-screenshot-url="' + escapeHtml(screenshotUrl) + '" data-screenshot-ts="OFFLINE" title="' + escapeHtml(DASHBOARD_OPEN_HISTORY_TITLE_TEXT) + '">'
             + '<div class="screenshot-loader">' + escapeHtml(SCREENSHOT_OFFLINE_TEXT) + '</div>'
             + '<span class="screenshot-timestamp">' + escapeHtml(SCREENSHOT_OFFLINE_TEXT) + '</span>'
             + '</div>';
@@ -1520,7 +1579,7 @@ function renderKioskScreenshotCell(kiosk) {
 
     if (kiosk.screenshot_url) {
         var screenshotTs = String(kiosk.screenshot_timestamp || NO_TIMESTAMP_TEXT);
-        return '<div class="preview-card" style="cursor:pointer;" onclick="openScreenshotViewer(' + kioskId + ', ' + JSON.stringify(screenshotUrl) + ', ' + JSON.stringify(screenshotTs) + ');" title="' + escapeHtml(DASHBOARD_ZOOM_LIVE_TITLE_TEXT) + '">'
+        return '<div class="preview-card js-open-screenshot-viewer" style="cursor:pointer;" data-screenshot-kiosk-id="' + escapeHtml(kioskId) + '" data-screenshot-url="' + escapeHtml(screenshotUrl) + '" data-screenshot-ts="' + escapeHtml(screenshotTs) + '" title="' + escapeHtml(DASHBOARD_ZOOM_LIVE_TITLE_TEXT) + '">'
             + '<img class="screenshot-img" src="' + escapeHtml(screenshotUrl) + '" alt="Screenshot" loading="lazy">'
             + '<span class="screenshot-timestamp">' + escapeHtml(screenshotTs) + '</span>'
             + '</div>';
@@ -1556,6 +1615,10 @@ function refreshSummaryCounters() {
 }
 
 function refreshDashboardData() {
+    if (_dashboardRefreshInFlight) {
+        return;
+    }
+
     var rows = Array.prototype.slice.call(document.querySelectorAll('#kiosk-table .kiosk-row[data-kiosk-id]'));
     if (rows.length === 0) {
         return;
@@ -1568,10 +1631,19 @@ function refreshDashboardData() {
         return;
     }
 
+    _dashboardRefreshInFlight = true;
+    setDashboardRefreshIndicator(true);
+
+    function finalizeDashboardRefresh() {
+        _dashboardRefreshInFlight = false;
+        setDashboardRefreshIndicator(false);
+    }
+
     fetch('../api/kiosk_details.php?refresh_list=' + encodeURIComponent(ids.join(',')))
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (!data || !data.success || !Array.isArray(data.kiosks)) {
+                finalizeDashboardRefresh();
                 return;
             }
 
@@ -1624,15 +1696,33 @@ function refreshDashboardData() {
 
             refreshSummaryCounters();
             applyCombinedFilters();
+            finalizeDashboardRefresh();
         })
-        .catch(function () {});
+        .catch(function () {
+            finalizeDashboardRefresh();
+        });
 }
 
 function startDashboardAutoRefresh() {
     if (_dashboardAutoRefreshTimer) {
         clearInterval(_dashboardAutoRefreshTimer);
     }
-    _dashboardAutoRefreshTimer = setInterval(refreshDashboardData, 30000);
+    refreshDashboardData();
+    _dashboardAutoRefreshTimer = setInterval(refreshDashboardData, 10000);
+}
+
+function setDashboardRefreshIndicator(isRefreshing) {
+    var indicator = document.getElementById('dashboard-refresh-indicator');
+    if (!indicator) {
+        return;
+    }
+
+    if (isRefreshing) {
+        indicator.classList.add('active');
+        indicator.textContent = '⏳ ' + DASHBOARD_SCREENSHOT_REFRESHING_TEXT;
+    } else {
+        indicator.classList.remove('active');
+    }
 }
 
 function openKioskDetail(kioskId, hostname) {
@@ -1671,6 +1761,7 @@ function openKioskDetail(kioskId, hostname) {
 
 filterByGroup('all');
 startDashboardAutoRefresh();
+document.addEventListener('click', handleScreenshotCardClick);
 </script>
 
 <?php include '../admin/footer.php'; ?>
