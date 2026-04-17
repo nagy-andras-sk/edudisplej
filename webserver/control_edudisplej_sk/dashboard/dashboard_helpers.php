@@ -288,3 +288,139 @@ function edudisplej_resolve_group_current_content($plan, $now) {
         'schedule_text' => edudisplej_dashboard_t('dashboard.schedule.no_active', 'No active time block'),
     ];
 }
+
+/**
+ * Resolve next content for a group (after current time)
+ */
+function edudisplej_resolve_group_next_content($plan, $now) {
+    if (!is_array($plan)) {
+        return null;
+    }
+
+    $styles = is_array($plan['loop_styles'] ?? null) ? $plan['loop_styles'] : [];
+    $style_map = edudisplej_build_style_map($styles);
+
+    $default_style_id = (int)($plan['default_loop_style_id'] ?? 0);
+    $schedule_blocks = is_array($plan['schedule_blocks'] ?? null)
+        ? $plan['schedule_blocks']
+        : (is_array($plan['time_blocks'] ?? null) ? $plan['time_blocks'] : []);
+
+    // Find next blocks that start after current time
+    $now_ts = $now->getTimestamp();
+    $now_date = $now->format('Y-m-d');
+    $now_time = $now->format('H:i:s');
+    $weekday = (int)$now->format('N');
+    
+    $next_candidates = [];
+
+    foreach ($schedule_blocks as $block) {
+        if (!is_array($block)) {
+            continue;
+        }
+
+        if ((int)($block['is_active'] ?? 1) === 0) {
+            continue;
+        }
+
+        $type = strtolower(trim((string)($block['block_type'] ?? 'weekly')));
+        $start_ts = null;
+
+        if ($type === 'datetime_range') {
+            $start_dt = strtotime(str_replace('T', ' ', (string)($block['start_datetime'] ?? '')));
+            if ($start_dt === false) {
+                continue;
+            }
+            // Only consider datetime_range blocks that start after now
+            if ($start_dt <= $now_ts) {
+                continue;
+            }
+            $start_ts = $start_dt;
+            $next_candidates[] = ['block' => $block, 'start_ts' => $start_ts, 'type' => $type];
+            continue;
+        }
+
+        $start = (string)($block['start_time'] ?? '00:00:00');
+        $end = (string)($block['end_time'] ?? '00:00:00');
+        
+        // Normalize time format
+        if (strlen($start) === 5) {
+            $start .= ':00';
+        }
+        if (strlen($end) === 5) {
+            $end .= ':00';
+        }
+
+        $check_date = $now_date;
+        $check_weekday = $weekday;
+
+        // Check date/day match
+        if ($type === 'date') {
+            $specific_date = (string)($block['specific_date'] ?? '');
+            // For date blocks, check if block is today and time is after now, or if block is in future
+            if ($specific_date === $now_date) {
+                // Today - check if start time is after now
+                if ($start <= $now_time) {
+                    continue;
+                }
+            } elseif ($specific_date < $now_date) {
+                // Past date
+                continue;
+            }
+            $start_ts = strtotime($specific_date . ' ' . $start);
+        } else {
+            // Weekly blocks - find next occurrence
+            // Check if current weekday matches and time is after now
+            $days = array_filter(array_map('intval', explode(',', (string)($block['days_mask'] ?? ''))));
+            
+            if (in_array($weekday, $days, true) && $start > $now_time) {
+                // Today's block is still in future
+                $start_ts = strtotime('today ' . $start);
+            } else {
+                // Find next matching weekday
+                for ($i = 1; $i <= 7; $i++) {
+                    $future_date = date('Y-m-d', strtotime("+$i days", $now_ts));
+                    $future_weekday = (int)date('N', strtotime($future_date));
+                    
+                    if (in_array($future_weekday, $days, true)) {
+                        $start_ts = strtotime($future_date . ' ' . $start);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($start_ts !== null) {
+            $next_candidates[] = ['block' => $block, 'start_ts' => $start_ts, 'type' => $type];
+        }
+    }
+
+    // Sort candidates by start time (earliest first)
+    if (!empty($next_candidates)) {
+        usort($next_candidates, static function ($a, $b) {
+            if ($a['start_ts'] !== $b['start_ts']) {
+                return $a['start_ts'] <=> $b['start_ts'];
+            }
+            // If same time, prioritize by type and priority
+            $ta = $a['type'] === 'datetime_range' ? 3 : ($a['type'] === 'date' ? 2 : 1);
+            $tb = $b['type'] === 'datetime_range' ? 3 : ($b['type'] === 'date' ? 2 : 1);
+            if ($ta !== $tb) {
+                return $tb <=> $ta;
+            }
+            $pa = (int)($a['block']['priority'] ?? 0);
+            $pb = (int)($b['block']['priority'] ?? 0);
+            if ($pa !== $pb) {
+                return $pb <=> $pa;
+            }
+            return ((int)($a['block']['id'] ?? 0)) <=> ((int)($b['block']['id'] ?? 0));
+        });
+
+        $next_block = $next_candidates[0]['block'];
+        $next_start_ts = $next_candidates[0]['start_ts'];
+        
+        // Create a DateTimeImmutable from the next start timestamp
+        $next_start_dt = (new DateTimeImmutable())->setTimestamp($next_start_ts);
+        return edudisplej_format_schedule_info($next_block, $style_map, $next_start_dt, $default_style_id);
+    }
+
+    return null;
+}

@@ -38,6 +38,7 @@ $kiosks = [];
 $groups = [];
 $error  = '';
 $group_plans_by_id = [];
+$group_calendar_events_by_id = [];
 
 function edudisplej_append_screenshot_cache_buster($url, $timestamp = null) {
     $url = (string)($url ?? '');
@@ -78,6 +79,13 @@ function edudisplej_parse_loop_version_timestamp($value) {
 
 try {
     $conn = getDbConnection();
+
+    $conn->query("CREATE TABLE IF NOT EXISTS kiosk_group_calendar_events (
+        group_id INT PRIMARY KEY,
+        event_json LONGTEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_updated_at (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     // Load groups for this company
     $stmt = $conn->prepare(
@@ -199,6 +207,20 @@ try {
                 }
             }
             $plan_stmt->close();
+        }
+
+        $event_stmt = $conn->prepare("SELECT group_id, event_json FROM kiosk_group_calendar_events WHERE group_id IN ($placeholders)");
+        if ($event_stmt) {
+            $event_stmt->bind_param($types, ...$gid_list);
+            $event_stmt->execute();
+            $event_result = $event_stmt->get_result();
+            while ($event_row = $event_result->fetch_assoc()) {
+                $decoded = json_decode((string)($event_row['event_json'] ?? ''), true);
+                if (is_array($decoded)) {
+                    $group_calendar_events_by_id[(int)$event_row['group_id']] = $decoded;
+                }
+            }
+            $event_stmt->close();
         }
     }
 
@@ -336,8 +358,23 @@ include '../admin/header.php';
                     }
                     $primary_group_id = !empty($gids) ? (int)$gids[0] : 0;
                     $current_content = ['loop_name' => '—', 'schedule_text' => '—'];
+                    $next_content = null;
                     if ($primary_group_id > 0) {
                         $current_content = edudisplej_resolve_group_current_content($group_plans_by_id[$primary_group_id] ?? null, $dashboard_now);
+                        $next_content = edudisplej_resolve_group_next_content($group_plans_by_id[$primary_group_id] ?? null, $dashboard_now);
+
+                        $calendar_plan = $group_calendar_events_by_id[$primary_group_id] ?? null;
+                        if (is_array($calendar_plan)) {
+                            $special_current = edudisplej_resolve_group_current_content([
+                                'loop_styles' => is_array($calendar_plan['specialStyles'] ?? null) ? $calendar_plan['specialStyles'] : [],
+                                'default_loop_style_id' => null,
+                                'schedule_blocks' => is_array($calendar_plan['specialBlocks'] ?? null) ? $calendar_plan['specialBlocks'] : [],
+                            ], $dashboard_now);
+
+                            if (!empty($special_current['schedule_text']) && $special_current['schedule_text'] !== t_def('dashboard.schedule.no_active', 'No active time block')) {
+                                $current_content = $special_current;
+                            }
+                        }
                     }
                 ?>
                     <tr class="kiosk-row"
@@ -389,6 +426,13 @@ include '../admin/header.php';
                                 <a href="group_loop/index.php?id=<?php echo (int)$primary_group_id; ?>" title="<?php echo htmlspecialchars(t_def('dashboard.loop.open_editor', 'Megnyitás a loop szerkesztőben')); ?>">
                                     <strong><?php echo htmlspecialchars((string)$current_content['loop_name']); ?></strong><br>
                                     <span style="font-size:11px;"><?php echo htmlspecialchars((string)$current_content['schedule_text']); ?></span>
+                                    <span class="countdown-timer" style="display:inline-block;margin-left:6px;font-size:11px;color:#666;">⏱ —</span>
+                                    <?php if ($next_content && $next_content['loop_name'] !== $current_content['loop_name']): ?>
+                                        <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,0.1);font-size:10px;color:#666;opacity:0.7;">
+                                            <strong style="color:#555;"><?php echo htmlspecialchars((string)$next_content['loop_name']); ?></strong><br>
+                                            <span><?php echo htmlspecialchars((string)$next_content['schedule_text']); ?></span>
+                                        </div>
+                                    <?php endif; ?>
                                 </a>
                             <?php else: ?>
                                 —
@@ -1899,6 +1943,65 @@ function openKioskDetail(kioskId, hostname) {
             body.innerHTML = '<p class="muted">' + escapeHtml(COMMON_LOAD_ERROR_TEXT) + '</p>';
         });
 }
+
+// Countdown timer for schedule end times
+function updateCountdownTimers() {
+    var timers = document.querySelectorAll('.countdown-timer');
+    var now = new Date();
+    
+    timers.forEach(function(timerEl) {
+        var row = timerEl.closest('tr');
+        if (!row) return;
+        
+        // Find the schedule text (second row in the cell content)
+        var contentCell = row.querySelector('td.muted:nth-child(5)');
+        if (!contentCell) return;
+        
+        var scheduleText = contentCell.textContent || '';
+        
+        // Extract end time from schedule text (format: "... • Do: HH:MM" or "Until: HH:MM")
+        var endTimeMatch = scheduleText.match(/(?:Do:|Until:)\s*(\d{1,2}):(\d{2})/);
+        if (!endTimeMatch) {
+            timerEl.textContent = '⏱ —';
+            return;
+        }
+        
+        var endHour = parseInt(endTimeMatch[1], 10);
+        var endMin = parseInt(endTimeMatch[2], 10);
+        
+        // Create end time for today
+        var endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endHour, endMin, 0);
+        
+        // If end time is in the past, don't show countdown
+        if (endTime <= now) {
+            timerEl.textContent = '⏱ —';
+            return;
+        }
+        
+        // Calculate time difference in seconds
+        var diffMs = endTime.getTime() - now.getTime();
+        var diffSec = Math.floor(diffMs / 1000);
+        
+        var hours = Math.floor(diffSec / 3600);
+        var mins = Math.floor((diffSec % 3600) / 60);
+        var secs = diffSec % 60;
+        
+        var timeStr = '';
+        if (hours > 0) {
+            timeStr = hours + 'h ' + mins + 'm';
+        } else if (mins > 0) {
+            timeStr = mins + 'm ' + secs + 's';
+        } else {
+            timeStr = secs + 's';
+        }
+        
+        timerEl.textContent = '⏱ ' + timeStr;
+    });
+}
+
+// Update countdown timers every second
+setInterval(updateCountdownTimers, 1000);
+updateCountdownTimers();
 
 filterByGroup('all');
 startDashboardAutoRefresh();

@@ -2422,19 +2422,26 @@
 
             host.innerHTML = `
                 <div style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:3200;">
-                    <div style="background:#fff; width:min(500px,92vw); border:1px solid #cfd6dd; padding:16px;">
-                        <h3 style="margin:0 0 10px 0;">${tr('group_loop.quick_schedule_title', 'Weekly schedule')}</h3>
-                        <div style="font-size:12px; color:#425466; margin-bottom:10px;">${tr('group_loop.quick_schedule_loop', 'Loop')}: <strong>${styleName}</strong></div>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-                            ${[1,2,3,4,5,6,7].map((d) => `<label style="display:flex; align-items:center; gap:4px; font-size:12px;"><input type="checkbox" class="quick-weekly-day" value="${d}">${getDayShortLabel(String(d))}</label>`).join('')}
+                    <div style="background:#fff; width:min(550px,92vw); border:1px solid #cfd6dd; border-radius:6px; max-height:90vh; overflow-y:auto;">
+                        <div style="padding:16px; border-bottom:1px solid #e5eaee;">
+                            <h3 style="margin:0 0 8px 0;">${tr('group_loop.quick_schedule_title', 'Schedule block')}</h3>
+                            <div style="font-size:12px; color:#425466;">${tr('group_loop.quick_schedule_loop', 'Loop')}: <strong>${styleName}</strong></div>
                         </div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
-                            <input type="text" id="quick-weekly-start" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="${tr('group_loop.quick_schedule_start_aria', 'Weekly start (hour-minute)')}">
-                            <input type="text" id="quick-weekly-end" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="${tr('group_loop.quick_schedule_end_aria', 'Weekly end (hour-minute)')}">
+                        <div style="padding:16px;">
+                            <div id="schedule-tab-weekly" class="schedule-tab-content">
+                                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+                                    ${[1,2,3,4,5,6,7].map((d) => `<label style="display:flex; align-items:center; gap:4px; font-size:12px;"><input type="checkbox" class="quick-weekly-day" value="${d}">${getDayShortLabel(String(d))}</label>`).join('')}
+                                </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+                                    <input type="text" id="quick-weekly-start" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="${tr('group_loop.quick_schedule_start_aria', 'Weekly start (hour-minute)')}">
+                                    <input type="text" id="quick-weekly-end" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="${tr('group_loop.quick_schedule_end_aria', 'Weekly end (hour-minute)')}">
+                                </div>
+                            </div>
                         </div>
-                        <div style="display:flex; justify-content:flex-end; gap:8px;">
+                        <div style="display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid #e5eaee;">
+                            <button type="button" class="btn" onclick="openSpecialCalendarPage()">📅 ${tr('group_loop.event_calendar_open', 'Open event calendar')}</button>
                             <button type="button" class="btn" onclick="closeTimeBlockModal()">${tr('common.cancel', 'Cancel')}</button>
-                            <button type="button" class="btn" onclick="saveQuickScheduleDialog(${normalizedStyleId})">${tr('group_loop.add', 'Add')}</button>
+                            <button type="button" class="btn btn-primary" onclick="saveQuickScheduleDialog(${normalizedStyleId})">${tr('group_loop.add', 'Add')}</button>
                         </div>
                     </div>
                 </div>
@@ -2444,11 +2451,26 @@
             set24HourTimeSelectValue('quick-weekly-end', '10:00');
         }
 
+        function openSpecialCalendarPage() {
+            if (!groupId) {
+                return;
+            }
+            window.open(`../quick_messages.php?group_id=${encodeURIComponent(String(groupId))}`, '_blank', 'noopener,noreferrer');
+        }
+
         function saveQuickScheduleDialog(loopStyleId) {
+            const styleId = parseInt(loopStyleId || 0, 10);
+            if (!styleId) {
+                return;
+            }
+
+            saveQuickScheduleDialogWeekly(styleId);
+        }
+
+        function saveQuickScheduleDialogWeekly(styleId) {
             const selectedDays = Array.from(document.querySelectorAll('.quick-weekly-day:checked')).map((el) => String(parseInt(el.value, 10))).filter((v) => /^[1-7]$/.test(v));
             const startRaw = String(document.getElementById('quick-weekly-start')?.value || '').trim();
             const endRaw = String(document.getElementById('quick-weekly-end')?.value || '').trim();
-            const styleId = parseInt(loopStyleId || 0, 10);
 
             if (!styleId || selectedDays.length === 0 || !startRaw || !endRaw) {
                 showAutosaveToast(`⚠️ ${tr('group_loop.day_and_time_required', 'Choose at least one day and set both times')}`, true);

@@ -164,7 +164,7 @@ $admin_nav_pages = [
 // Dashboard nav page map
 $dashboard_nav_pages = [
     'index.php' => ['href' => 'index.php', 'label' => t('nav.kiosks'), 'key' => 'kiosks'],
-    'quick_messages.php' => ['href' => 'quick_messages.php', 'label' => '📅 ' . t_def('nav.special_plan', 'Specialis terv'), 'key' => 'special_plan'],
+    'quick_messages.php' => ['href' => 'quick_messages.php', 'label' => '📅 ' . t_def('nav.special_plan', 'Eseménynaptár'), 'key' => 'special_plan'],
     'groups.php' => ['href' => 'groups.php', 'label' => '📁 ' . t('nav.groups'), 'key' => 'groups'],
     'modules.php' => ['href' => 'modules.php', 'label' => '🧩 ' . t('nav.modules'), 'key' => 'modules_page'],
     'profile.php' => ['href' => 'profile.php', 'label' => '🏢 ' . t('nav.profile'), 'key' => 'profile'],
@@ -175,7 +175,7 @@ if (!$is_admin_user) {
     if ($current_user_role === 'easy_user') {
         $dashboard_nav_pages = [
             'index.php' => ['href' => 'easy_user/', 'label' => t_def('nav.easy_user.control', 'Easy Control'), 'key' => 'easy_user'],
-            'quick_messages.php' => ['href' => '../quick_messages.php', 'label' => '📅 ' . t_def('nav.special_plan', 'Specialis terv'), 'key' => 'special_plan'],
+            'quick_messages.php' => ['href' => '../quick_messages.php', 'label' => '📅 ' . t_def('nav.special_plan', 'Eseménynaptár'), 'key' => 'special_plan'],
             'settings.php' => ['href' => 'settings.php', 'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
         ];
     }

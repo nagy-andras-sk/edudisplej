@@ -807,7 +807,6 @@ try {
                 if (!is_array($style)) {
                     continue;
                 }
-                $style_name = trim((string)($style['name'] ?? ''));
                 $is_special_style = edudisplej_is_special_or_turned_off_loop_style($style);
                 if ($is_special_style) {
                     continue;
@@ -827,33 +826,25 @@ try {
                 }
                 $special_styles[(int)($style['id'] ?? 0)] = $style;
             }
-            foreach ($existing_styles as $style) {
-                if (!is_array($style)) {
-                    continue;
-                }
-                $style_name = trim((string)($style['name'] ?? ''));
-                $is_special_style = edudisplej_is_special_or_turned_off_loop_style($style);
-                if (!$is_special_style) {
-                    continue;
-                }
-                $style_id = (int)($style['id'] ?? 0);
-                if ($style_id > 0 && !isset($special_styles[$style_id])) {
-                    $special_styles[$style_id] = $style;
-                }
-            }
 
-            $special_blocks = [];
+            $base_blocks = [];
             foreach ($existing_blocks as $block) {
                 if (!is_array($block)) {
                     continue;
                 }
                 $block_name = trim((string)($block['block_name'] ?? ''));
                 $style_id = (int)($block['loop_style_id'] ?? 0);
-                $is_special_block = (int)($block['is_special'] ?? 0) === 1 || edudisplej_is_special_loop_name($block_name) || isset($special_styles[$style_id]) || edudisplej_is_turned_off_loop_style($special_styles[$style_id] ?? []);
-                if (!$is_special_block) {
-                    $special_blocks[] = $block;
+                $is_special_block = (int)($block['is_special'] ?? 0) === 1
+                    || edudisplej_is_special_loop_name($block_name)
+                    || isset($special_styles[$style_id])
+                    || edudisplej_is_turned_off_loop_style($special_styles[$style_id] ?? []);
+                if ($is_special_block) {
+                    continue;
                 }
+                $base_blocks[] = $block;
             }
+
+            $special_blocks = [];
             foreach ($schedule_blocks as $block) {
                 if (!is_array($block)) {
                     continue;
@@ -872,11 +863,10 @@ try {
                 }
             }
 
-            $merged_plan = [
-                'loop_styles' => array_values($base_styles + $special_styles),
-                'default_loop_style_id' => $existing_plan['default_loop_style_id'] ?? null,
-                'schedule_blocks' => array_values($special_blocks),
-            ];
+            $merged_plan = $existing_plan;
+            $merged_plan['loop_styles'] = array_values(array_merge($base_styles, array_values($special_styles)));
+            $merged_plan['default_loop_style_id'] = $existing_plan['default_loop_style_id'] ?? null;
+            $merged_plan['schedule_blocks'] = array_values(array_merge($base_blocks, $special_blocks));
 
             $conn->begin_transaction();
             try {

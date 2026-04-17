@@ -160,6 +160,13 @@ function edudisplej_group_loop_module_description(array $module): string {
 try {
     $conn = getDbConnection();
 
+    $conn->query("CREATE TABLE IF NOT EXISTS kiosk_group_calendar_events (
+        group_id INT PRIMARY KEY,
+        event_json LONGTEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_updated_at (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
     $module_stmt = $conn->prepare("SELECT m.*, COALESCE(ml.quantity, 0) as license_quantity
                             FROM modules m
                             LEFT JOIN module_licenses ml ON m.id = ml.module_id AND ml.company_id = ?
@@ -230,13 +237,13 @@ try {
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $types = str_repeat('i', count($ids));
 
-        $plan_stmt = $conn->prepare("SELECT group_id, plan_json FROM kiosk_group_loop_plans WHERE group_id IN ($placeholders)");
+        $plan_stmt = $conn->prepare("SELECT group_id, event_json FROM kiosk_group_calendar_events WHERE group_id IN ($placeholders)");
         if ($plan_stmt) {
             $plan_stmt->bind_param($types, ...$ids);
             $plan_stmt->execute();
             $plan_result = $plan_stmt->get_result();
             while ($plan_row = $plan_result->fetch_assoc()) {
-                $decoded = json_decode((string)($plan_row['plan_json'] ?? ''), true);
+                $decoded = json_decode((string)($plan_row['event_json'] ?? ''), true);
                 if (is_array($decoded)) {
                     $group_plans[(int)$plan_row['group_id']] = $decoded;
                 }
@@ -658,10 +665,11 @@ $selected_group_plan = ($active_group && isset($group_plans[(int)$active_group['
     : null;
 $selected_special_styles = [];
 $selected_special_blocks = [];
+$special_events_by_day = [];
 
 if (is_array($selected_group_plan)) {
     $style_names_by_id = [];
-    foreach (($selected_group_plan['loop_styles'] ?? []) as $style) {
+    foreach (($selected_group_plan['specialStyles'] ?? []) as $style) {
         if (!is_array($style)) {
             continue;
         }
@@ -683,7 +691,7 @@ if (is_array($selected_group_plan)) {
         $style_names_by_id[$style_id] = $style_name;
     }
 
-    foreach (($selected_group_plan['schedule_blocks'] ?? []) as $block) {
+    foreach (($selected_group_plan['specialBlocks'] ?? []) as $block) {
         if (!is_array($block)) {
             continue;
         }
@@ -801,11 +809,24 @@ if (is_array($selected_group_plan)) {
     usort($selected_special_blocks, static function (array $a, array $b): int {
         return strcmp((string)($a['start_datetime'] ?: $a['specific_date']), (string)($b['start_datetime'] ?: $b['specific_date']));
     });
+
+    foreach ($selected_special_blocks as $special_block) {
+        $day_key = '';
+        if (($special_block['block_type'] ?? '') === 'datetime_range') {
+            $day_key = substr((string)($special_block['start_datetime'] ?? ''), 0, 10);
+        } else {
+            $day_key = (string)($special_block['specific_date'] ?? '');
+        }
+
+        if ($day_key !== '') {
+            $special_events_by_day[$day_key][] = $special_block;
+        }
+    }
 }
 ?>
 
 <div class="loop-main-header">
-    📅 <?php echo htmlspecialchars(t_def('dashboard.special_loop.page_title', 'Specialis terv')); ?> • <?php echo htmlspecialchars(t_def('dashboard.special_loop.group', 'Csoport')); ?>:
+    📅 <?php echo htmlspecialchars(t_def('dashboard.special_loop.page_title', 'Eseménynaptár')); ?> • <?php echo htmlspecialchars(t_def('dashboard.special_loop.group', 'Csoport')); ?>:
     <strong><?php echo htmlspecialchars($selected_group_name); ?></strong>
 </div>
 
@@ -813,7 +834,7 @@ if (is_array($selected_group_plan)) {
     <div style="margin:10px 0 14px 0; padding:10px 12px; border:1px solid #d8e1ea; background:#f8fafc; border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
         <div style="font-size:12px; color:#425466; line-height:1.4;">
             <strong><?php echo htmlspecialchars(t_def('dashboard.special_loop.save_hint_title', 'Mentés')); ?></strong><br>
-            <?php echo htmlspecialchars(t_def('dashboard.special_loop.save_hint_text', 'A special időszak loopját a szerkesztőben tudod elmenteni.')); ?>
+            <?php echo htmlspecialchars(t_def('dashboard.special_loop.save_hint_text', 'Az eseményt a szerkesztőben tudod elmenteni.')); ?>
         </div>
         <button type="button" class="btn btn-primary" onclick="publishLoopPlan()">💾 <?php echo htmlspecialchars(t_def('common.save', 'Save')); ?></button>
     </div>
@@ -825,15 +846,70 @@ if (is_array($selected_group_plan)) {
 
 <?php if (!$special_workflow_mode): ?>
 <div class="planner-panel" style="margin-bottom:14px;">
-    <div class="planner-title"><?php echo htmlspecialchars(t_def('dashboard.special_loop.workflow_title', 'Speciális ütemezés indítása')); ?></div>
+    <div class="planner-title"><?php echo htmlspecialchars(t_def('dashboard.special_loop.workflow_title', 'Eseménynaptár')); ?></div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; padding:12px; border:1px solid #e7eaf0; background:#f8fafc; border-radius:8px;">
         <div style="font-size:12px; color:#425466; line-height:1.5;">
             <strong><?php echo htmlspecialchars(t_def('dashboard.special_loop.workflow_steps_title', 'Lépések')); ?></strong><br>
-            <?php echo htmlspecialchars(t_def('dashboard.special_loop.workflow_steps_text', '1. Csoport. 2. Időszak (tól-ig). 3. Loop összeállítása. 4. Mentés.')); ?>
+            <?php echo htmlspecialchars(t_def('dashboard.special_loop.workflow_steps_text', 'A heti terv az alap. Az eseménynaptárban ezeket napokra szóló loopokkal írhatod felül.')); ?>
         </div>
         <button type="button" class="btn btn-primary" onclick="openSpecialWorkflowStart()">
-            <?php echo htmlspecialchars(t_def('dashboard.special_loop.start_workflow', 'Ütemezés indítása')); ?>
+            <?php echo htmlspecialchars(t_def('dashboard.special_loop.start_workflow', 'Új esemény')); ?>
         </button>
+    </div>
+</div>
+
+<div class="special-events-panel" style="margin-bottom:14px;">
+    <div class="special-events-header">
+        <div>
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#8a4b00; font-weight:700;"><?php echo htmlspecialchars(t_def('dashboard.special_loop.calendar_title', 'Havi eseménynaptár')); ?></div>
+            <div style="font-size:13px; color:#6a4a1a; margin-top:4px;"><?php echo htmlspecialchars(t_def('dashboard.special_loop.calendar_hint', 'A napokra betervezett események felülírják a heti alaptervet.')); ?></div>
+        </div>
+        <div class="special-calendar-nav">
+            <a class="btn" href="quick_messages.php?group_id=<?php echo (int)$requested_group_id; ?>&ym=<?php echo htmlspecialchars($prev_ym); ?>" title="<?php echo htmlspecialchars(t_def('group_loop.prev_month', 'Previous month')); ?>">◀</a>
+            <strong style="min-width:120px; text-align:center; display:inline-block;"><?php echo htmlspecialchars($month_start->format('Y. m')); ?></strong>
+            <a class="btn" href="quick_messages.php?group_id=<?php echo (int)$requested_group_id; ?>&ym=<?php echo htmlspecialchars($next_ym); ?>" title="<?php echo htmlspecialchars(t_def('group_loop.next_month', 'Next month')); ?>">▶</a>
+        </div>
+    </div>
+    <div style="overflow:auto;">
+        <table class="special-calendar">
+            <thead>
+                <tr>
+                    <th><?php echo htmlspecialchars(t_def('common.mon', 'Mon')); ?></th>
+                    <th><?php echo htmlspecialchars(t_def('common.tue', 'Tue')); ?></th>
+                    <th><?php echo htmlspecialchars(t_def('common.wed', 'Wed')); ?></th>
+                    <th><?php echo htmlspecialchars(t_def('common.thu', 'Thu')); ?></th>
+                    <th><?php echo htmlspecialchars(t_def('common.fri', 'Fri')); ?></th>
+                    <th><?php echo htmlspecialchars(t_def('common.sat', 'Sat')); ?></th>
+                    <th><?php echo htmlspecialchars(t_def('common.sun', 'Sun')); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php for ($week = 0; $week < 6; $week++): ?>
+                    <tr>
+                        <?php for ($day = 0; $day < 7; $day++):
+                            $current_day = $calendar_grid_start->modify('+' . (($week * 7) + $day) . ' days');
+                            $day_key = $current_day->format('Y-m-d');
+                            $is_outside = $current_day < $month_start || $current_day > $month_end;
+                            $day_events = $special_events_by_day[$day_key] ?? [];
+                        ?>
+                            <td class="<?php echo $is_outside ? 'outside' : 'clickable'; ?>">
+                                <div class="day-number"><?php echo htmlspecialchars($current_day->format('j')); ?></div>
+                                <div class="day-events">
+                                    <?php foreach (array_slice($day_events, 0, 3) as $day_event): ?>
+                                        <div class="event-dot" title="<?php echo htmlspecialchars((string)($day_event['friendly_name'] ?? $day_event['block_name'])); ?>">
+                                            <?php echo htmlspecialchars((string)($day_event['friendly_name'] ?? $day_event['block_name'])); ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                    <?php if (count($day_events) > 3): ?>
+                                        <div class="more">+<?php echo (int)(count($day_events) - 3); ?> <?php echo htmlspecialchars(t_def('dashboard.special_loop.more_events', 'more')); ?></div>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        <?php endfor; ?>
+                    </tr>
+                <?php endfor; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -841,8 +917,8 @@ if (is_array($selected_group_plan)) {
     <div class="special-events-panel">
         <div class="special-events-header">
             <div>
-                <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#8a4b00; font-weight:700;"><?php echo htmlspecialchars(t_def('dashboard.special_loop.event_list_title', 'Tervezett speciális események')); ?></div>
-                <div style="font-size:13px; color:#6a4a1a; margin-top:4px;"><?php echo htmlspecialchars(t_def('dashboard.special_loop.event_list_hint', 'Itt látod a közelgő és már betervezett speciális eseményeket.')); ?></div>
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#8a4b00; font-weight:700;"><?php echo htmlspecialchars(t_def('dashboard.special_loop.event_list_title', 'Eseménylista')); ?></div>
+                <div style="font-size:13px; color:#6a4a1a; margin-top:4px;"><?php echo htmlspecialchars(t_def('dashboard.special_loop.event_list_hint', 'Itt látod a közelgő és már betervezett napokra szóló loopokat.')); ?></div>
             </div>
             <div class="special-calendar-nav">
                 <a class="btn" href="quick_messages.php?group_id=<?php echo (int)$requested_group_id; ?>&ym=<?php echo htmlspecialchars($prev_ym); ?>" title="<?php echo htmlspecialchars(t_def('group_loop.prev_month', 'Previous month')); ?>">◀</a>
@@ -1493,14 +1569,11 @@ function buildSpecialPayloadFromEditor(blockId) {
 function saveSpecialPlanPayload(updatedBlocks, updatedStyles) {
     var bootstrap = getSpecialPlannerBootstrap();
     var payload = {
-        loop_styles: updatedStyles,
-        default_loop_style_id: null,
-        schedule_blocks: updatedBlocks,
-        base_loop: [],
-        time_blocks: []
+        specialStyles: updatedStyles,
+        specialBlocks: updatedBlocks
     };
 
-    return fetch(`../api/group_loop/config.php?group_id=${encodeURIComponent(String(bootstrap.groupId || 0))}&special_only=1`, {
+    return fetch(`../api/group_calendar/events.php?group_id=${encodeURIComponent(String(bootstrap.groupId || 0))}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

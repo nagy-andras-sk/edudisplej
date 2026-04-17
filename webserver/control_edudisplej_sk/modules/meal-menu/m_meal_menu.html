@@ -105,8 +105,9 @@
         }
         .root.small-mode .small-page-header-row {
             min-height: 0;
+            max-height: 120px;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-columns: 1fr 1fr;
             align-items: center;
             border: 1px solid rgba(59, 130, 246, 0.34);
             border-radius: 10px;
@@ -131,7 +132,7 @@
             justify-content: flex-end;
             color: var(--small-header-clock-color, #facc15);
             background: rgba(15, 23, 42, 0.92);
-            flex-shrink: 0;
+            flex: 1;
         }
         .root.small-mode .small-page-header-title,
         .root.small-mode .small-page-header-clock {
@@ -1488,8 +1489,8 @@
         if (!cardEl) return;
 
         const preferredRowMax = Math.max(60, Math.min(260, Number(settings?.smallRowFontPx || 150)));
-        const titleMax = Math.max(28, Math.min(640, Number(settings?.smallHeaderRowTitleFontPx || settings?.smallScreenHeaderFontPx || 58) * 5));
-        const clockMax = Math.max(28, Math.min(520, Number(settings?.smallHeaderRowClockFontPx || settings?.smallScreenHeaderFontPx || 62) * 4));
+        const titleMax = Math.max(28, Math.min(120, Number(settings?.smallHeaderRowTitleFontPx || settings?.smallScreenHeaderFontPx || 58) * 2));
+        const clockMax = Math.max(24, Math.min(100, Number(settings?.smallHeaderRowClockFontPx || settings?.smallScreenHeaderFontPx || 62) * 1.5));
 
         const headerRow = cardEl.querySelector('.small-page-header-row');
         const headerTitleEl = cardEl.querySelector('.small-page-header-title');
