@@ -403,17 +403,22 @@ write_offline_status() {
         fi
     fi
 
-    cat > "$OFFLINE_STATUS_FILE" <<EOF
+        {
+                cat > "$OFFLINE_STATUS_FILE" <<EOF
 {
-  "active": ${active},
-  "message": "Server je momentalne nedostupny",
-  "failed_checks": ${fail_count},
-  "threshold": ${OFFLINE_FAIL_THRESHOLD},
-  "updated_at_epoch": ${now_epoch},
-  "last_ok_epoch": ${last_ok_epoch},
-  "last_ok_at": "${last_ok_iso}"
+    "active": ${active},
+    "message": "Server je momentalne nedostupny",
+    "failed_checks": ${fail_count},
+    "threshold": ${OFFLINE_FAIL_THRESHOLD},
+    "updated_at_epoch": ${now_epoch},
+    "last_ok_epoch": ${last_ok_epoch},
+    "last_ok_at": "${last_ok_iso}"
 }
 EOF
+        } || {
+                # Do not crash the whole service when a root-written file temporarily blocks writes.
+                log_error "Failed to update offline status file: ${OFFLINE_STATUS_FILE}"
+        }
 }
 
 server_reachable() {

@@ -364,6 +364,16 @@ fi
 print_info "Letrehozas -- Vytvorenie: .xinitrc"
 cat > "$USER_HOME/.xinitrc" <<'XINITRC_EOF'
 #!/bin/bash
+# Prefer stable 60Hz modes for physical HDMI compatibility.
+xrandr --output HDMI-1 --mode 1920x1080 --rate 60 --primary 2>/dev/null || \
+    xrandr --output HDMI-1 --mode 1024x768 --rate 60 --primary 2>/dev/null || \
+    xrandr --output HDMI-1 --auto --primary 2>/dev/null || true
+
+# Avoid DPMS/screensaver blanking in kiosk mode.
+xset -dpms 2>/dev/null || true
+xset s off 2>/dev/null || true
+xset s noblank 2>/dev/null || true
+
 # Start Openbox window manager
 exec openbox-session
 XINITRC_EOF

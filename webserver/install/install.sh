@@ -814,6 +814,8 @@ CORE_SERVICES=(
     "edudisplej-screenshot-service.service"
     "edudisplej-command-executor.service"
     "edudisplej-health.service"
+    "edudisplej-self-heat.service"
+    "edudisplej-self-heat.timer"
 )
 
 # Copy/render service files first
@@ -916,6 +918,11 @@ else
     echo "[!] VAROVANIE: Config manager nenajdeny - Config manager not found"
     echo "[!] Config.json bude vytvoreny pri prvom sync - Config.json will be created on first sync"
 fi
+
+# health service runs as CONSOLE_USER, keep health status file writable by this user
+touch "${TARGET_DIR}/health_status.json" 2>/dev/null || true
+chown "${CONSOLE_USER}:${CONSOLE_USER}" "${TARGET_DIR}/health_status.json" 2>/dev/null || true
+chmod 664 "${TARGET_DIR}/health_status.json" 2>/dev/null || true
 
 echo ""
 

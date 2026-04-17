@@ -39,6 +39,22 @@ $groups = [];
 $error  = '';
 $group_plans_by_id = [];
 
+function edudisplej_append_screenshot_cache_buster($url, $timestamp = null) {
+    $url = (string)($url ?? '');
+    if ($url === '') {
+        return '';
+    }
+    
+    // Use timestamp if provided, otherwise use current time
+    $buster = $timestamp ? strtotime($timestamp) : time();
+    if ($buster === false) {
+        $buster = time();
+    }
+    
+    $separator = strpos($url, '?') === false ? '?' : '&';
+    return $url . $separator . 't=' . $buster;
+}
+
 function edudisplej_parse_loop_version_timestamp($value) {
     if ($value === null || $value === '') {
         return null;
@@ -196,6 +212,7 @@ try {
 $total   = count($kiosks);
 $online  = count(array_filter($kiosks, fn($k) => in_array($k['status'], ['online', 'online_error', 'online_pending'], true)));
 $offline = $total - $online;
+$dashboard_screenshot_session_start_epoch = time();
 
 include '../admin/header.php';
 ?>
@@ -268,7 +285,6 @@ include '../admin/header.php';
 </div>
 
 <!-- Kiosk table -->
-<div id="dashboard-refresh-indicator" class="dashboard-refresh-indicator">⏳ <?php echo htmlspecialchars(t_def('dashboard.screenshot.refreshing', 'Screenshot frissítés...')); ?></div>
 <div class="table-wrap">
     <table class="minimal-table" id="kiosk-table">
         <thead>
@@ -312,6 +328,8 @@ include '../admin/header.php';
                         $group_names_arr = array_map('trim', explode(',', (string)$k['group_names']));
                     }
                     $screenshot_ts = $k['screenshot_timestamp'] ? date('Y-m-d H:i:s', strtotime($k['screenshot_timestamp'])) : null;
+                    $screenshot_ts_epoch = $screenshot_ts ? strtotime($screenshot_ts) : false;
+                    $has_fresh_screenshot = ($screenshot_ts_epoch !== false) && ((time() - $screenshot_ts_epoch) <= 300);
                     $screenshot_ts_json = json_encode($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
                     if ($screenshot_ts_json === false) {
                         $screenshot_ts_json = json_encode(t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky'));
@@ -378,10 +396,10 @@ include '../admin/header.php';
                         </td>
                         <td class="muted nowrap kiosk-last-seen"><?php echo htmlspecialchars($last_seen_str); ?></td>
                         <td class="kiosk-screenshot-cell">
-                            <?php if (in_array($k['status'], ['online', 'online_error', 'online_pending'], true) && $k['screenshot_url']): ?>
+                                                        <?php if (in_array($k['status'], ['online', 'online_error', 'online_pending'], true) && $k['screenshot_url'] && $has_fresh_screenshot): ?>
                                   <div class="preview-card js-open-screenshot-viewer" style="cursor:pointer;" data-screenshot-kiosk-id="<?php echo (int)$k['id']; ?>" data-screenshot-url="<?php echo htmlspecialchars((string)($k['screenshot_url'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" data-screenshot-ts="<?php echo htmlspecialchars((string)($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky')), ENT_QUOTES, 'UTF-8'); ?>" title="<?php echo htmlspecialchars(t_def('dashboard.screenshot.zoom_live', 'Nagyítás és élő frissítés')); ?>">
                                     <img class="screenshot-img"
-                                         src="<?php echo htmlspecialchars($k['screenshot_url']); ?>"
+                                         src="<?php echo htmlspecialchars(edudisplej_append_screenshot_cache_buster($k['screenshot_url'], $k['screenshot_timestamp'])); ?>"
                                          alt="Screenshot"
                                          loading="lazy">
                                     <span class="screenshot-timestamp"><?php echo htmlspecialchars($screenshot_ts ?? t_def('dashboard.screenshot.no_timestamp', 'Bez časovej pečiatky')); ?></span>
@@ -404,6 +422,7 @@ include '../admin/header.php';
         </tbody>
     </table>
 </div>
+<div id="dashboard-refresh-indicator" class="dashboard-refresh-indicator">⏳ <?php echo htmlspecialchars(t_def('dashboard.screenshot.refreshing', 'Screenshot frissítés...')); ?></div>
 
 <!-- Kiosk detail modal -->
 <div id="kiosk-modal" class="kiosk-modal" onclick="handleModalBackdropClick(event)">
@@ -501,6 +520,7 @@ var _viewerImageBase = '';
 var _historyPage = 1;
 var _historyTotalPages = 1;
 var _historyItems = [];
+var _historyTableItems = [];
 var _historyCurrentIndex = 0;
 var _historyPlayerTimer = null;
 var _historyPlaybackElapsedMs = 0;
@@ -508,8 +528,11 @@ var _dashboardAutoRefreshTimer = null;
 var _dashboardRefreshInFlight = false;
 var _viewerWatchTimer = null;
 var _viewerWatchActive = false;
+var _autoOpenedRecentScreenshot = false;
 var _summaryFilter = 'all';
 var _quickFilter = { type: null, value: null, label: null };
+var HISTORY_VIEWER_LIMIT = 10;
+var SCREENSHOT_SESSION_START_EPOCH = <?php echo (int)$dashboard_screenshot_session_start_epoch; ?>;
 var SCREENSHOT_LOADING_TEXT = <?php
     $screenshot_loading_text_json = json_encode(t('dashboard.screenshot.loading'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $screenshot_loading_text_json !== false ? $screenshot_loading_text_json : '"Loading"';
@@ -847,6 +870,7 @@ function openScreenshotViewer(kioskId, imageSrc, initialTimestamp) {
     _viewerImageBase = String(imageSrc || '');
     _historyPage = 1;
     _historyItems = [];
+    _historyTableItems = [];
     _historyCurrentIndex = 0;
     stopHistoryPlayer();
 
@@ -923,11 +947,12 @@ function loadScreenshotHistory(page) {
             _historyTotalPages = Math.max(1, parseInt(pagination.total_pages, 10) || 1);
             _historyPage = Math.max(1, parseInt(pagination.page, 10) || 1);
 
-            _historyItems = items;
+            _historyTableItems = items;
+            _historyItems = items.slice(0, HISTORY_VIEWER_LIMIT);
             _historyCurrentIndex = 0;
 
-            renderScreenshotHistoryRows(items);
-            renderScreenshotGallery(items);
+            renderScreenshotHistoryRows(_historyTableItems);
+            renderScreenshotGallery(_historyItems);
             updateHistoryPager();
 
             if (_historyItems.length > 0) {
@@ -1061,18 +1086,18 @@ function renderScreenshotHistoryRows(items) {
     }
 
     var html = '';
-    items.forEach(function (item, index) {
+    items.forEach(function (item, tableIndex) {
         var timestamp = item.timestamp || '—';
         var screenshotUrl = item.screenshot_url || '';
         var isOfflineMarker = !!item.is_offline_marker;
         var thumbHtml = '';
         if (isOfflineMarker) {
-            thumbHtml = '<div class="history-offline-marker" data-index="' + index + '" style="display:inline-block;padding:10px 12px;border:1px solid #e5b4b4;border-radius:4px;background:#fdecec;color:#9f1d1d;font-weight:700;cursor:pointer;">'
+            thumbHtml = '<div class="history-offline-marker" data-table-index="' + tableIndex + '" style="display:inline-block;padding:10px 12px;border:1px solid #e5b4b4;border-radius:4px;background:#fdecec;color:#9f1d1d;font-weight:700;cursor:pointer;">'
                 + escapeHtml(item.label || (HISTORY_OFFLINE_SINCE_TEXT + ' ' + (item.offline_since || COMMON_UNKNOWN_TEXT)))
                 + '</div>';
         } else {
             thumbHtml = screenshotUrl
-                ? '<img src="' + escapeHtml(appendCacheBuster(screenshotUrl)) + '" data-index="' + index + '" class="history-thumb-img" alt="Screenshot" style="width:120px;height:68px;object-fit:cover;border:1px solid #d0d6dc;border-radius:4px;cursor:pointer;">'
+                ? '<img src="' + escapeHtml(appendCacheBuster(screenshotUrl)) + '" data-table-index="' + tableIndex + '" class="history-thumb-img" alt="Screenshot" style="width:120px;height:68px;object-fit:cover;border:1px solid #d0d6dc;border-radius:4px;cursor:pointer;">'
                 : '<span class="muted">' + escapeHtml(SCREENSHOT_NONE_TEXT) + '</span>';
         }
 
@@ -1086,25 +1111,57 @@ function renderScreenshotHistoryRows(items) {
 
     tbody.querySelectorAll('.history-thumb-img').forEach(function (imgEl) {
         imgEl.addEventListener('click', function () {
-            var idx = parseInt(imgEl.getAttribute('data-index'), 10);
+            var idx = parseInt(imgEl.getAttribute('data-table-index'), 10);
             if (isNaN(idx)) {
                 return;
             }
             stopHistoryPlayer();
-            showHistoryItemByIndex(idx);
+            showHistoryTableItemByIndex(idx);
         });
     });
 
     tbody.querySelectorAll('.history-offline-marker').forEach(function (markerEl) {
         markerEl.addEventListener('click', function () {
-            var idx = parseInt(markerEl.getAttribute('data-index'), 10);
+            var idx = parseInt(markerEl.getAttribute('data-table-index'), 10);
             if (isNaN(idx)) {
                 return;
             }
             stopHistoryPlayer();
-            showHistoryItemByIndex(idx);
+            showHistoryTableItemByIndex(idx);
         });
     });
+}
+
+function showHistoryTableItemByIndex(index) {
+    if (index < 0 || index >= _historyTableItems.length) {
+        return;
+    }
+
+    var selected = _historyTableItems[index] || null;
+    if (!selected) {
+        return;
+    }
+
+    var focusIndex = _historyItems.indexOf(selected);
+    if (focusIndex >= 0) {
+        showHistoryItemByIndex(focusIndex);
+        return;
+    }
+
+    var url = String(selected.screenshot_url || '');
+    _viewerImageBase = url;
+    setScreenshotViewerMedia(_viewerImageBase, !!selected.is_offline_marker);
+
+    var currentTs = selected.timestamp ? String(selected.timestamp) : NO_TIMESTAMP_TEXT;
+    if (selected.is_offline_marker) {
+        currentTs = selected.label || (HISTORY_OFFLINE_SINCE_TEXT + ' ' + (selected.offline_since || COMMON_UNKNOWN_TEXT));
+    }
+    setScreenshotViewerTimestamp(currentTs);
+
+    var status = document.getElementById('history-player-status');
+    if (status) {
+        status.textContent = (index + 1) + ' / ' + _historyTableItems.length + ' • ' + currentTs;
+    }
 }
 
 function renderScreenshotGallery(items) {
@@ -1371,6 +1428,7 @@ function closeScreenshotViewer() {
     _historyPage = 1;
     _historyTotalPages = 1;
     _historyItems = [];
+    _historyTableItems = [];
     _historyCurrentIndex = 0;
     updateScreenshotWatchUi(false);
     setScreenshotViewerMedia('', false);
@@ -1577,10 +1635,10 @@ function renderKioskScreenshotCell(kiosk) {
             + '</div>';
     }
 
-    if (kiosk.screenshot_url) {
+    if (kiosk.screenshot_url && hasFreshScreenshotSinceSessionStart(kiosk.screenshot_timestamp)) {
         var screenshotTs = String(kiosk.screenshot_timestamp || NO_TIMESTAMP_TEXT);
         return '<div class="preview-card js-open-screenshot-viewer" style="cursor:pointer;" data-screenshot-kiosk-id="' + escapeHtml(kioskId) + '" data-screenshot-url="' + escapeHtml(screenshotUrl) + '" data-screenshot-ts="' + escapeHtml(screenshotTs) + '" title="' + escapeHtml(DASHBOARD_ZOOM_LIVE_TITLE_TEXT) + '">'
-            + '<img class="screenshot-img" src="' + escapeHtml(screenshotUrl) + '" alt="Screenshot" loading="lazy">'
+            + '<img class="screenshot-img" src="' + escapeHtml(appendCacheBuster(screenshotUrl)) + '" alt="Screenshot" loading="lazy">'
             + '<span class="screenshot-timestamp">' + escapeHtml(screenshotTs) + '</span>'
             + '</div>';
     }
@@ -1589,6 +1647,89 @@ function renderKioskScreenshotCell(kiosk) {
         + '<div class="screenshot-loader">⏳ ' + escapeHtml(SCREENSHOT_LOADING_TEXT) + '</div>'
         + '<span class="screenshot-timestamp">' + escapeHtml(SCREENSHOT_NONE_TEXT) + '</span>'
         + '</div>';
+}
+
+function parseDashboardTimestampToEpoch(value) {
+    if (!value) {
+        return null;
+    }
+
+    var text = String(value).trim();
+    if (!text) {
+        return null;
+    }
+
+    var normalized = text.replace('T', ' ');
+    var match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) {
+        return null;
+    }
+
+    var year = parseInt(match[1], 10);
+    var month = parseInt(match[2], 10) - 1;
+    var day = parseInt(match[3], 10);
+    var hour = parseInt(match[4], 10);
+    var minute = parseInt(match[5], 10);
+    var second = parseInt(match[6] || '0', 10);
+    return Math.floor(new Date(year, month, day, hour, minute, second).getTime() / 1000);
+}
+
+function hasFreshScreenshotSinceSessionStart(screenshotTimestamp) {
+    var screenshotEpoch = parseDashboardTimestampToEpoch(screenshotTimestamp);
+    if (screenshotEpoch === null) {
+        return false;
+    }
+
+    var nowEpoch = Math.floor(Date.now() / 1000);
+    return (nowEpoch - screenshotEpoch) <= 300;
+}
+
+function openLatestRecentScreenshotOnLoad() {
+    if (_autoOpenedRecentScreenshot) {
+        return;
+    }
+
+    var candidates = Array.prototype.slice.call(document.querySelectorAll('.js-open-screenshot-viewer:not(.placeholder)'));
+    if (!candidates.length) {
+        return;
+    }
+
+    var best = null;
+    candidates.forEach(function (card) {
+        var tsText = card.getAttribute('data-screenshot-ts') || '';
+        var tsEpoch = parseDashboardTimestampToEpoch(tsText);
+        if (tsEpoch === null) {
+            return;
+        }
+
+        var ageSec = Math.floor(Date.now() / 1000) - tsEpoch;
+        if (ageSec < 0 || ageSec > 300) {
+            return;
+        }
+
+        if (!best || tsEpoch > best.tsEpoch) {
+            best = {
+                card: card,
+                tsEpoch: tsEpoch
+            };
+        }
+    });
+
+    if (!best || !best.card) {
+        return;
+    }
+
+    var kioskId = parseInt(best.card.getAttribute('data-screenshot-kiosk-id') || '0', 10);
+    if (!(kioskId > 0)) {
+        return;
+    }
+
+    _autoOpenedRecentScreenshot = true;
+    openScreenshotViewer(
+        kioskId,
+        best.card.getAttribute('data-screenshot-url') || '',
+        best.card.getAttribute('data-screenshot-ts') || ''
+    );
 }
 
 function refreshSummaryCounters() {
@@ -1685,7 +1826,7 @@ function refreshDashboardData() {
 
                 var lastSeenEl = row.querySelector('.kiosk-last-seen');
                 if (lastSeenEl) {
-                    lastSeenEl.textContent = kiosk.last_seen || 'Nikdy';
+                    lastSeenEl.textContent = kiosk.activity_reference || kiosk.last_seen || 'Nikdy';
                 }
 
                 var screenshotCell = row.querySelector('.kiosk-screenshot-cell');

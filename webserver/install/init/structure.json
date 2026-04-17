@@ -16,7 +16,10 @@
     "edudisplej-command-executor.sh": "2026-02-22T00:00:00Z",
     "edudisplej-command-executor.service": "2026-02-22T00:00:00Z",
     "edudisplej-health.sh": "2026-02-22T00:00:00Z",
-    "edudisplej-health.service": "2026-02-22T00:00:00Z"
+    "edudisplej-health.service": "2026-02-22T00:00:00Z",
+    "edudisplej-self-heat.sh": "2026-04-17T00:00:00Z",
+    "edudisplej-self-heat.service": "2026-04-17T00:00:00Z",
+    "edudisplej-self-heat.timer": "2026-04-17T00:00:00Z"
   },
   "files": [
     {
@@ -153,6 +156,22 @@
       "permissions": "644"
     },
     {
+      "source": "edudisplej-self-heat.sh",
+      "destination": "/opt/edudisplej/init/edudisplej-self-heat.sh",
+      "permissions": "755",
+      "description": "Self-heal watchdog script for critical services"
+    },
+    {
+      "source": "edudisplej-self-heat.service",
+      "destination": "/opt/edudisplej/init/edudisplej-self-heat.service",
+      "permissions": "644"
+    },
+    {
+      "source": "edudisplej-self-heat.timer",
+      "destination": "/opt/edudisplej/init/edudisplej-self-heat.timer",
+      "permissions": "644"
+    },
+    {
       "source": "edudisplej-config-manager.sh",
       "destination": "/opt/edudisplej/init/edudisplej-config-manager.sh",
       "permissions": "755",
@@ -208,6 +227,20 @@
       "enabled": true,
       "autostart": true,
       "description": "Kiosk health reporting service"
+    },
+    {
+      "source": "edudisplej-self-heat.service",
+      "name": "edudisplej-self-heat.service",
+      "enabled": true,
+      "autostart": true,
+      "description": "Global self-heal monitor service"
+    },
+    {
+      "source": "edudisplej-self-heat.timer",
+      "name": "edudisplej-self-heat.timer",
+      "enabled": true,
+      "autostart": true,
+      "description": "Runs self-heal checks every minute"
     }
   ]
 }

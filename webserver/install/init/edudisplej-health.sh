@@ -359,8 +359,8 @@ compile_health_status() {
         overall_status="critical"
     fi
     
-    # Create health status JSON
-    cat > "$HEALTH_STATUS_FILE" << EOF
+    # Create health status JSON (fail-safe write: don't crash service if file ownership is temporarily wrong)
+    if ! cat > "$HEALTH_STATUS_FILE" << EOF
 {
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
     "status": "$overall_status",
@@ -373,6 +373,23 @@ compile_health_status() {
     "version": "$SERVICE_VERSION"
 }
 EOF
+    then
+        local fallback_file="${LOG_DIR}/health_status_fallback.json"
+        log_error "Unable to write ${HEALTH_STATUS_FILE}, using fallback: ${fallback_file}"
+        cat > "$fallback_file" << EOF
+{
+    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+    "status": "$overall_status",
+    "system": $system_health,
+    "services": $service_health,
+    "network": $network_health,
+    "kiosk": $kiosk_config,
+    "sync": $sync_health,
+    "fast_loop": $fast_loop,
+    "version": "$SERVICE_VERSION"
+}
+EOF
+    fi
     
     log_success "Health status compiled: $overall_status"
 }
@@ -415,7 +432,7 @@ main() {
     
     # Initial compile of health status
     compile_health_status
-    send_health_report
+    send_health_report || true
     
     # Main loop
     while true; do
@@ -430,7 +447,7 @@ main() {
         
         # Compile and send health status
         compile_health_status
-        send_health_report
+        send_health_report || true
     done
 }
 

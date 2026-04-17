@@ -31,6 +31,7 @@ FAST_LOOP_INTERVAL=30  # 30 seconds in fast loop mode
 CONFIG_DIR="/opt/edudisplej"
 DATA_DIR="${CONFIG_DIR}/data"
 CONFIG_FILE="${DATA_DIR}/config.json"
+CONFIG_FILE_OWNER="${EDUDISPLEJ_CONFIG_FILE_OWNER:-edudisplej:edudisplej}"
 TOKEN_FILE="${CONFIG_DIR}/lic/token"
 LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
 LOOP_FILE="${LOCAL_WEB_DIR}/modules/loop.json"
@@ -477,6 +478,13 @@ force_full_loop_refresh() {
 }
 
 # Config.json management functions
+ensure_config_file_permissions() {
+    if [ -f "$CONFIG_FILE" ]; then
+        chmod 644 "$CONFIG_FILE" 2>/dev/null || true
+        chown "$CONFIG_FILE_OWNER" "$CONFIG_FILE" 2>/dev/null || true
+    fi
+}
+
 init_config_file() {
     if [ ! -f "$CONFIG_FILE" ]; then
         log "Initializing centralized config file: $CONFIG_FILE"
@@ -497,8 +505,11 @@ init_config_file() {
     "service_versions": {}
 }
 CONFIGEOF
-        chmod 644 "$CONFIG_FILE"
+        ensure_config_file_permissions
         log_success "Config file created"
+    else
+        # Heal ownership/permissions if a previous root write broke access for service user.
+        ensure_config_file_permissions
     fi
 }
 
@@ -526,6 +537,8 @@ update_config_field() {
             # String value
             jq --arg k "$key" --arg v "$value" '.[$k] = $v' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
         fi
+
+        ensure_config_file_permissions
         
         log_debug "Updated config: $key = $value"
     fi

@@ -7,6 +7,7 @@
   "text": "Sem vložte text...",
   "fontFamily": "Arial, sans-serif",
   "fontSize": 72,
+  "textSizingMode": "manual",
   "fontWeight": "700",
   "fontStyle": "normal",
   "lineHeight": 1.2,
@@ -19,8 +20,16 @@
   "scrollEndPauseMs": 3000,
   "scrollSpeedPxPerSec": 35,
   "clockOverlayEnabled": false,
-  "clockOverlayPosition": "top",
+  "clockOverlayPosition": "bottom",
   "clockOverlayHeightPercent": 30,
   "clockOverlayTimeColor": "#ffffff",
-  "clockOverlayDateColor": "#ffffff"
+  "clockOverlayDateColor": "#ffffff",
+  "clockOverlayClockSize": 300,
+  "clockOverlayDateFormat": "dmy",
+  "clockOverlayShowYear": true,
+  "clockOverlayLanguage": "sk",
+  "clockOverlayDatePosition": "below",
+  "clockOverlayFontFamily": "Arial, sans-serif",
+  "clockOverlaySeparatorColor": "#22d3ee",
+  "clockOverlaySeparatorThickness": 2
 }

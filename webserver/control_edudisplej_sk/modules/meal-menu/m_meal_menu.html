@@ -31,8 +31,8 @@
         .cards-wrap { width: 100%; height: 100%; overflow: hidden; position: relative; }
         .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         .small-header-right { display: none; align-items: baseline; justify-content: flex-end; min-width: 0; gap: .45vw; }
-        .small-header-date { font-size: clamp(18px, 2.1vw, 44px); font-weight: 800; line-height: 1; color: #facc15; letter-spacing: .01em; white-space: nowrap; }
-        .small-header-clock { font-size: clamp(18px, 2.1vw, 44px); font-weight: 800; line-height: 1; color: #f8fafc; letter-spacing: .02em; white-space: nowrap; }
+        .small-header-date { font-size: var(--small-header-font-px, 40px); font-weight: 800; line-height: 1; color: #facc15; letter-spacing: .01em; white-space: nowrap; }
+        .small-header-clock { font-size: var(--small-header-font-px, 40px); font-weight: 800; line-height: 1; color: #f8fafc; letter-spacing: .02em; white-space: nowrap; }
         .title { font-size: clamp(38px, 4.8vw, 88px); font-weight: 700; }
         .subtitle { font-size: clamp(22px, 2.2vw, 38px); color: #cbd5e1; margin-top: 6px; }
         .status { display: none; }
@@ -50,8 +50,8 @@
         .meal-table { display:grid; gap:8px; }
         .meal-row { display:grid; grid-template-columns: clamp(30px, 1.9vw, 42px) 1fr; align-items:flex-start; gap:12px; border:1px solid rgba(148,163,184,.24); border-radius:13px; background: rgba(30, 41, 59, 0.66); padding:10px 12px; }
         .meal-row-icon { width: clamp(24px, 1.5vw, 34px); height: clamp(24px, 1.5vw, 34px); display:inline-flex; color:#bfdbfe; margin-top: 4px; flex: 0 0 auto; }
-        .meal-row-text { font-size: clamp(28px, var(--meal-text-font-size, 2.3vw), 54px); line-height: var(--meal-line-height, 1.38); font-weight: var(--meal-text-weight, 650); color: #f8fafc; display:flex; align-items:center; gap: 8px; flex-wrap: nowrap; min-width: 0; white-space: nowrap; }
-        .meal-row-line { display: block; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+        .meal-row-text { font-size: clamp(28px, var(--meal-text-font-size, 2.3vw), 54px); line-height: var(--meal-line-height, 1.38); font-weight: var(--meal-text-weight, 650); color: #f8fafc; display:flex; align-items:center; gap: 8px; flex-wrap: nowrap; min-width: 0; white-space: var(--meal-white-space, nowrap); word-break: var(--meal-word-break, normal); overflow-wrap: var(--meal-overflow-wrap, normal); }
+        .meal-row-line { display: block; white-space: var(--meal-white-space, nowrap); min-width: 0; flex: 1 1 auto; word-break: var(--meal-word-break, normal); overflow-wrap: var(--meal-overflow-wrap, normal); }
         @media (max-width: 1366px) {
             .content-layer { padding: 2.2vh 2vw; gap: 1.3vh; }
             .title { font-size: clamp(42px, 6vw, 90px); }
@@ -67,8 +67,8 @@
         .root.scroll-mode .head { width: 100%; justify-content: center; }
         .root.scroll-mode .title-wrap { display:flex; flex-direction:column; align-items:center; }
         .root.scroll-mode .cards { grid-template-columns: 1fr; width: min(96vw, 1500px); margin: 0 auto; }
-        .root.small-mode .content-layer { padding: .55vh .65vw; gap: .55vh; grid-template-rows: 20% 70% 10%; }
-        .root.small-mode .head { width: 100%; min-height: 0; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 14px; background: rgba(15, 23, 42, 0.66); padding: 0 .9vw; display:flex; align-items:center; }
+        .root.small-mode .content-layer { padding: .45vh .55vw; gap: .35vh; grid-template-rows: minmax(0, 1fr); }
+        .root.small-mode .head { display: none !important; }
         .root.small-mode .title-wrap { flex: 1 1 auto; width: auto; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; min-width: 0; }
         .root.small-mode .title { font-size: clamp(24px, 3.3vw, 64px); line-height: 1; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .root.small-mode .subtitle { display: none !important; }
@@ -93,8 +93,145 @@
         .root.small-mode .small-page-row-icon svg { width: 100%; height: 100%; display:block; }
         .root.small-mode .small-page-row-text { width:100%; line-height: 1.04; font-size: clamp(16px, 3.2vw, 68px); font-weight: 800; color:#f8fafc; white-space: normal; overflow: hidden; display:block; word-break: break-word; text-overflow: clip; }
         .root.small-mode .small-page-row-text .meal-row-line { white-space: normal; display: block; }
-        .root.small-mode .foot { min-height: 0; text-align: left; font-size: clamp(15px, 1.12vw, 24px); color: #cbd5e1; border: 1px solid rgba(148,163,184,.24); border-radius: 12px; background: rgba(15, 23, 42, 0.72); padding: 0 .9vw; display:flex; align-items:center; }
-        .root.small-mode .foot .foot-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        .root.small-mode .foot { display: none !important; }
+
+        .root.small-mode .small-page-card { padding: .25vh .25vw; }
+        .root.small-mode .small-page-table.small-dynamic {
+            height: 100%;
+            min-height: 0;
+            display: grid;
+            grid-template-rows: repeat(var(--small-page-rows, 3), minmax(0, 1fr));
+            gap: .28vh;
+        }
+        .root.small-mode .small-page-header-row {
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            border: 1px solid rgba(59, 130, 246, 0.34);
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.92);
+            overflow: hidden;
+        }
+        .root.small-mode .small-page-header-left,
+        .root.small-mode .small-page-header-right {
+            min-width: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 .7vw;
+        }
+        .root.small-mode .small-page-header-left {
+            justify-content: center;
+            color: var(--small-header-title-color, #000000);
+            background: var(--small-header-row-bg, #bae6fd);
+            border-right: 1px solid rgba(15, 23, 42, 0.18);
+        }
+        .root.small-mode .small-page-header-right {
+            justify-content: flex-end;
+            color: var(--small-header-clock-color, #facc15);
+            background: rgba(15, 23, 42, 0.92);
+            flex-shrink: 0;
+        }
+        .root.small-mode .small-page-header-title,
+        .root.small-mode .small-page-header-clock {
+            width: auto;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+            font-weight: 900;
+        }
+        .root.small-mode .small-page-header-title {
+            width: 100%;
+            text-transform: uppercase;
+            text-align: center;
+        }
+        .root.small-mode .small-page-header-clock {
+            text-align: right;
+            letter-spacing: .02em;
+        }
+        .root.small-mode .small-page-meal-type {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.6em;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .02em;
+            background: rgba(255, 255, 255, 0.12);
+            color: #f1f5f9;
+            margin-right: 6px;
+            flex-shrink: 0;
+        }
+        .root.small-mode .small-page-header-title-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+        .root.small-mode .small-page-header-title-track {
+            display: inline-block;
+            white-space: nowrap;
+            will-change: transform;
+            transform: translate3d(0, 0, 0);
+        }
+        .root.small-mode .small-page-table.clock-at-bottom .small-page-header-row {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .root.small-mode .small-page-table.clock-at-bottom .small-page-header-right {
+            display: none;
+        }
+        .root.small-mode .small-page-meal-row.clock-row {
+            border: 1px solid rgba(250, 204, 21, 0.3);
+            background: rgba(15, 23, 42, 0.95);
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 .62vw;
+        }
+        .root.small-mode .small-page-meal-text.clock-text {
+            color: #facc15;
+            font-weight: 900;
+            text-align: right;
+            letter-spacing: .02em;
+        }
+        .root.small-mode .small-page-meal-row {
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            align-items: center;
+            border: 1px solid rgba(148,163,184,.26);
+            border-radius: 10px;
+            background: rgba(30, 41, 59, 0.72);
+            padding: 0 .62vw;
+            column-gap: .55vw;
+        }
+        .root.small-mode .small-page-meal-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            font-size: clamp(26px, 2.5vw, 58px);
+            line-height: 1;
+        }
+        .root.small-mode .small-page-meal-icon.soup {
+            font-size: clamp(34px, 3.3vw, 80px);
+        }
+        .root.small-mode .small-page-meal-text {
+            min-width: 0;
+            width: 100%;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #f8fafc;
+            font-weight: 850;
+            text-align: center;
+        }
 
         .root.large-mode .cards {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -106,7 +243,7 @@
         .root.large-mode .cards-wrap { overflow: hidden; }
         .root.large-mode .card { min-height: 0; height: 100%; }
         .root.large-mode .meal { font-size: clamp(26px, 2.25vw, 42px); }
-        .root.large-mode .meal-row-text { font-size: clamp(18px, 1.45vw, 30px); line-height: 1.22; }
+        .root.large-mode .meal-row-text { font-size: clamp(18px, 1.45vw, 30px); line-height: 1.22; align-items: flex-start; }
 
         .card.band-breakfast {
             background: linear-gradient(160deg, rgba(30, 64, 175, 0.85) 0%, rgba(30, 58, 138, 0.78) 100%);
@@ -144,6 +281,17 @@
         .foot-line { display:block; }
         .foot-source { display:block; margin-top:4px; font-size: clamp(12px, .95vw, 16px); opacity:.9; }
 
+        /* Preview mode: override clamp() limits for better visibility in small iframe previews */
+        html.preview-mode .meal {
+            font-size: max(34px, var(--meal-title-font-size, 3.2vw));
+        }
+        html.preview-mode .meal-row-text {
+            font-size: max(28px, var(--meal-text-font-size, 2.3vw));
+        }
+        html.preview-mode .day-meal-text {
+            font-size: max(19px, var(--day-meal-text-font-size, 1.3vw));
+        }
+
         .overlay-band {
             position: absolute;
             left: 0;
@@ -173,14 +321,14 @@
     <div class="content-layer">
         <div class="head">
             <div class="title-wrap">
-                <div class="title" id="title">Étrend</div>
-                <div class="subtitle" id="subtitle">Betöltés...</div>
+                <div class="title" id="title">Loading...</div>
+                <div class="subtitle" id="subtitle"></div>
             </div>
             <div class="small-header-right" id="small-header-right">
                 <div class="small-header-date" id="small-header-date">--.--.----</div>
                 <div class="small-header-clock" id="small-header-clock">--:--</div>
             </div>
-            <div class="status" id="status">🔄 Szerver lekérés</div>
+            <div class="status" id="status">Loading...</div>
         </div>
         <div class="cards-wrap" id="cards-wrap"><div class="cards" id="cards"></div></div>
         <div class="foot" id="foot"></div>
@@ -199,6 +347,84 @@
         top: { raf: null },
         bottom: { raf: null }
     };
+    const headerTitleMarqueeState = new WeakMap();
+
+    function stopHeaderTitleMarquee(titleEl) {
+        if (!titleEl) {
+            return;
+        }
+        const state = headerTitleMarqueeState.get(titleEl);
+        if (state && state.raf !== null) {
+            cancelAnimationFrame(state.raf);
+        }
+        headerTitleMarqueeState.delete(titleEl);
+        const track = titleEl.querySelector('.small-page-header-title-track');
+        if (track) {
+            track.style.transform = 'translate3d(0, 0, 0)';
+        }
+    }
+
+    function startHeaderTitleMarquee(titleEl, settings = null) {
+        if (!titleEl) {
+            return;
+        }
+
+        stopHeaderTitleMarquee(titleEl);
+
+        const track = titleEl.querySelector('.small-page-header-title-track');
+        if (!track) {
+            return;
+        }
+
+        const overflow = Math.ceil(track.scrollWidth - titleEl.clientWidth);
+        if (overflow <= 8) {
+            track.style.transform = 'translate3d(0, 0, 0)';
+            return;
+        }
+
+        const speedPxPerSec = Math.max(8, Math.min(60, Number(settings?.smallHeaderMarqueeSpeedPxPerSec || 22)));
+        const edgePauseMs = Math.max(200, Math.min(5000, Number(settings?.smallHeaderMarqueeEdgePauseMs || 1200)));
+        let x = 0;
+        let direction = -1;
+        let lastTs = 0;
+        let pauseUntil = performance.now() + edgePauseMs;
+
+        const step = (ts) => {
+            if (!titleEl.isConnected || !track.isConnected) {
+                stopHeaderTitleMarquee(titleEl);
+                return;
+            }
+
+            if (lastTs === 0) {
+                lastTs = ts;
+            }
+
+            if (ts >= pauseUntil) {
+                const dt = Math.max(0, (ts - lastTs) / 1000);
+                x += direction * speedPxPerSec * dt;
+
+                if (direction < 0 && x <= -overflow) {
+                    x = -overflow;
+                    direction = 1;
+                    pauseUntil = ts + edgePauseMs;
+                } else if (direction > 0 && x >= 0) {
+                    x = 0;
+                    direction = -1;
+                    pauseUntil = ts + edgePauseMs;
+                }
+            }
+
+            track.style.transform = `translate3d(${Math.round(x)}px, 0, 0)`;
+            lastTs = ts;
+
+            const state = headerTitleMarqueeState.get(titleEl);
+            if (state) {
+                state.raf = requestAnimationFrame(step);
+            }
+        };
+
+        headerTitleMarqueeState.set(titleEl, { raf: requestAnimationFrame(step) });
+    }
 
     function stopSlowScroll() {
         if (scrollRaf !== null) {
@@ -226,12 +452,6 @@
     }
 
     function startSmallHeaderClock() {
-        const clockEl = document.getElementById('small-header-clock');
-        const dateEl = document.getElementById('small-header-date');
-        if (!clockEl || !dateEl) {
-            return;
-        }
-
         const skDayShort = ['Ne', 'Po', 'Ut', 'St', 'Št', 'Pia', 'So'];
 
         const renderClock = () => {
@@ -242,8 +462,20 @@
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const yyyy = String(now.getFullYear());
             const dayShort = skDayShort[now.getDay()] || 'Po';
-            clockEl.textContent = `${hh}:${mm}`;
-            dateEl.textContent = `${dayShort} ${dd}.${month}.${yyyy}`;
+
+            const legacyClockEl = document.getElementById('small-header-clock');
+            const legacyDateEl = document.getElementById('small-header-date');
+            if (legacyClockEl) {
+                legacyClockEl.textContent = `${hh}:${mm}`;
+            }
+            if (legacyDateEl) {
+                legacyDateEl.textContent = `${dayShort} ${dd}.${month}.${yyyy}`;
+            }
+
+            const rowClockEls = Array.from(document.querySelectorAll('[data-small-fixed-clock]'));
+            rowClockEls.forEach((el) => {
+                el.textContent = `${hh}:${mm}`;
+            });
         };
 
         stopSmallHeaderClock();
@@ -273,7 +505,20 @@
             sourceType: 'server',
             mealDisplayMode: 'small_screen',
             smallScreenPageSwitchSec: 12,
+            smallScreenStartMode: 'current_onward',
+            smallScreenMaxMeals: 5,
+            smallHeaderMarqueeSpeedPxPerSec: 22,
+            smallHeaderMarqueeEdgePauseMs: 1200,
             smallRowFontPx: 150,
+            smallScreenHeaderFontPx: 40,
+            smallHeaderRowBgColor: '#bae6fd',
+            smallHeaderRowTextColor: '#000000',
+            smallHeaderRowClockColor: '#facc15',
+            smallHeaderRowTitleFontPx: 58,
+            smallHeaderRowClockFontPx: 62,
+            smallScreenShowOperator: true,
+            smallScreenShowDate: true,
+            smallScreenShowCaptions: true,
             smallScreenUseCustomMealSelection: false,
             smallScreenVisibleMeals: 'breakfast,snack_am,lunch,snack_pm,dinner',
             showBreakfast: true,
@@ -355,7 +600,25 @@
                 return legacyLayout === 'square_dual_day' ? 'large_screen' : 'small_screen';
             })(),
             smallScreenPageSwitchSec: Math.max(1, Math.min(120, parseNum(params.get('smallScreenPageSwitchSec') ?? injected.smallScreenPageSwitchSec, defaults.smallScreenPageSwitchSec))),
+            smallScreenStartMode: (() => {
+                const raw = String(params.get('smallScreenStartMode') ?? injected.smallScreenStartMode ?? defaults.smallScreenStartMode).toLowerCase().trim();
+                return ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(raw)
+                    ? raw
+                    : defaults.smallScreenStartMode;
+            })(),
+            smallScreenMaxMeals: Math.max(1, Math.min(5, parseNum(params.get('smallScreenMaxMeals') ?? injected.smallScreenMaxMeals, defaults.smallScreenMaxMeals))),
+            smallHeaderMarqueeSpeedPxPerSec: Math.max(8, Math.min(60, parseNum(params.get('smallHeaderMarqueeSpeedPxPerSec') ?? injected.smallHeaderMarqueeSpeedPxPerSec, defaults.smallHeaderMarqueeSpeedPxPerSec))),
+            smallHeaderMarqueeEdgePauseMs: Math.max(200, Math.min(5000, parseNum(params.get('smallHeaderMarqueeEdgePauseMs') ?? injected.smallHeaderMarqueeEdgePauseMs, defaults.smallHeaderMarqueeEdgePauseMs))),
             smallRowFontPx: Math.max(60, Math.min(260, parseNum(params.get('smallRowFontPx') ?? injected.smallRowFontPx, defaults.smallRowFontPx))),
+            smallScreenHeaderFontPx: Math.max(20, Math.min(120, parseNum(params.get('smallScreenHeaderFontPx') ?? injected.smallScreenHeaderFontPx, defaults.smallScreenHeaderFontPx))),
+            smallHeaderRowBgColor: String(params.get('smallHeaderRowBgColor') ?? injected.smallHeaderRowBgColor ?? defaults.smallHeaderRowBgColor),
+            smallHeaderRowTextColor: String(params.get('smallHeaderRowTextColor') ?? injected.smallHeaderRowTextColor ?? defaults.smallHeaderRowTextColor),
+            smallHeaderRowClockColor: String(params.get('smallHeaderRowClockColor') ?? injected.smallHeaderRowClockColor ?? defaults.smallHeaderRowClockColor),
+            smallHeaderRowTitleFontPx: Math.max(20, Math.min(140, parseNum(params.get('smallHeaderRowTitleFontPx') ?? injected.smallHeaderRowTitleFontPx ?? injected.smallScreenHeaderFontPx, defaults.smallHeaderRowTitleFontPx))),
+            smallHeaderRowClockFontPx: Math.max(20, Math.min(160, parseNum(params.get('smallHeaderRowClockFontPx') ?? injected.smallHeaderRowClockFontPx ?? injected.smallScreenHeaderFontPx, defaults.smallHeaderRowClockFontPx))),
+            smallScreenShowOperator: parseBool(params.get('smallScreenShowOperator') ?? injected.smallScreenShowOperator, defaults.smallScreenShowOperator),
+            smallScreenShowDate: parseBool(params.get('smallScreenShowDate') ?? injected.smallScreenShowDate, defaults.smallScreenShowDate),
+            smallScreenShowCaptions: parseBool(params.get('smallScreenShowCaptions') ?? injected.smallScreenShowCaptions, defaults.smallScreenShowCaptions),
             smallScreenUseCustomMealSelection: parseBool(params.get('smallScreenUseCustomMealSelection') ?? injected.smallScreenUseCustomMealSelection, defaults.smallScreenUseCustomMealSelection),
             smallScreenVisibleMeals: String(params.get('smallScreenVisibleMeals') ?? injected.smallScreenVisibleMeals ?? defaults.smallScreenVisibleMeals),
             showBreakfast: parseBool(params.get('showBreakfast') ?? injected.showBreakfast, defaults.showBreakfast),
@@ -534,14 +797,30 @@
         const titleSize = Math.max(0.8, Math.min(4, textSize * 1.5));
         const textWeight = Math.max(300, Math.min(800, Number(settings.textFontWeight || 600)));
         const lineHeight = Math.max(1, Math.min(2.2, Number(settings.lineHeight || 1.35)));
+        const smallHeaderFontPx = Math.max(20, Math.min(120, Number(settings.smallScreenHeaderFontPx || 40)));
 
-        root.style.setProperty('--meal-title-font-size', `${titleSize}vw`);
-        root.style.setProperty('--meal-text-font-size', `${textSize}vw`);
+        // Detect preview mode: when iframe viewport is exactly 320px or less and it's in an iframe
+        // This is used to scale up vw values which are relative to the small iframe viewport
+        const isInIframe = window.parent !== window;
+        const smallViewport = document.documentElement.offsetWidth <= 320;
+        const isPreview = isInIframe && smallViewport;
+        
+        // Scale factor: 3.5x compensates for the fact that vw calculations are based on 320px iframe width
+        // but the iframe is then scaled down further with CSS transform scale()
+        const scaleFactor = isPreview ? 3.5 : 1;
+
+        root.style.setProperty('--meal-title-font-size', `${titleSize * scaleFactor}vw`);
+        root.style.setProperty('--meal-text-font-size', `${textSize * scaleFactor}vw`);
+        root.style.setProperty('--small-header-font-px', `${smallHeaderFontPx}px`);
+        
+        // Add preview-mode class to override clamp() limits
+        document.documentElement.classList.toggle('preview-mode', isPreview);
         root.style.setProperty('--meal-text-weight', String(Math.round(textWeight)));
         root.style.setProperty('--meal-line-height', String(lineHeight));
 
         root.style.setProperty('--meal-white-space', 'nowrap');
         root.style.setProperty('--meal-word-break', 'normal');
+        root.style.setProperty('--meal-overflow-wrap', 'normal');
 
         const rootEl = document.querySelector('.root');
         if (rootEl) {
@@ -551,6 +830,12 @@
             rootEl.classList.toggle('small-mode', displayMode === 'small_screen');
             rootEl.classList.toggle('large-mode', displayMode === 'large_screen');
             rootEl.classList.remove('center', 'center-left', 'scroll-mode', 'square-mode');
+
+            const shouldWrapLargeText = displayMode === 'large_screen'
+                && settings.wrapText !== false;
+            root.style.setProperty('--meal-white-space', shouldWrapLargeText ? 'normal' : 'nowrap');
+            root.style.setProperty('--meal-word-break', shouldWrapLargeText ? 'break-word' : 'normal');
+            root.style.setProperty('--meal-overflow-wrap', shouldWrapLargeText ? 'anywhere' : 'normal');
         }
     }
 
@@ -741,22 +1026,6 @@
 
     function buildSmallScreenMeals(todayMealsRaw, tomorrowMealsRaw, settings, currentMinutes, t) {
         const orderedKeys = ['breakfast', 'snack_am', 'lunch', 'snack_pm', 'dinner'];
-        const scheduleLimits = {
-            breakfast: parseHmToMinutes(settings.scheduleBreakfastUntil, 10 * 60),
-            snack_am: parseHmToMinutes(settings.scheduleSnackAmUntil, 11 * 60),
-            lunch: parseHmToMinutes(settings.scheduleLunchUntil, 14 * 60),
-            snack_pm: parseHmToMinutes(settings.scheduleSnackPmUntil, 18 * 60),
-            dinner: parseHmToMinutes(settings.scheduleDinnerUntil, 23 * 60 + 59)
-        };
-
-        let displayKeys = orderedKeys.slice();
-        if (settings.mealScheduleEnabled !== false) {
-            const startIndex = orderedKeys.findIndex((key) => currentMinutes <= (scheduleLimits[key] ?? (23 * 60 + 59)));
-            if (startIndex > 0) {
-                displayKeys = orderedKeys.slice(startIndex).concat(orderedKeys.slice(0, startIndex));
-            }
-        }
-
         const todayMap = new Map();
         const tomorrowMap = new Map();
 
@@ -774,58 +1043,73 @@
             }
         });
 
+        const startModeRaw = String(settings.smallScreenStartMode || 'current_onward').toLowerCase();
+        const startMode = ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(startModeRaw)
+            ? startModeRaw
+            : 'current_onward';
+        const maxMeals = Math.max(1, Math.min(5, parseInt(settings.smallScreenMaxMeals || 5, 10) || 5));
+        const scheduleEnabled = settings.mealScheduleEnabled !== false;
         const useTomorrowAfterPassed = settings.showTomorrowAfterMealPassed !== false;
-        const allTodayMealsPassed = settings.mealScheduleEnabled !== false
-            && currentMinutes > (scheduleLimits.dinner ?? (23 * 60 + 59));
 
-        if (allTodayMealsPassed && useTomorrowAfterPassed) {
-            const eveningFallbackKeys = ['breakfast', 'snack_am'];
-            const eveningFallbackMeals = [];
-            eveningFallbackKeys.forEach((key) => {
-                const tomorrowMeal = tomorrowMap.get(key) || null;
-                if (tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
-                    const titlePrefix = String(t.tomorrowMealLabels?.[key] || t.mealLabels?.[key] || tomorrowMeal.label || key).trim();
-                    eveningFallbackMeals.push({
-                        ...tomorrowMeal,
-                        key,
-                        label: titlePrefix,
-                        __displayLabel: titlePrefix,
-                        __tomorrowPreview: true
-                    });
+        const determineStartIndex = () => {
+            if (startMode === 'breakfast_onward') return 0;
+            if (startMode === 'lunch_onward') return 2;
+            if (startMode === 'dinner_onward') return 4;
+            if (!scheduleEnabled) return 0;
+
+            for (let i = 0; i < orderedKeys.length; i += 1) {
+                const key = orderedKeys[i];
+                if (mealVisibleBySchedule(key, settings, currentMinutes)) {
+                    return i;
                 }
-            });
-            if (eveningFallbackMeals.length > 0) {
-                return eveningFallbackMeals;
             }
-        }
+            return orderedKeys.length;
+        };
 
+        const startIndex = determineStartIndex();
         const result = [];
 
-        displayKeys.forEach((key) => {
+        for (let i = startIndex; i < orderedKeys.length; i += 1) {
+            const key = orderedKeys[i];
             const todayMeal = todayMap.get(key) || null;
             const tomorrowMeal = tomorrowMap.get(key) || null;
-            const todayVisible = mealVisibleBySchedule(key, settings, currentMinutes);
 
-            if (todayMeal && todayVisible) {
+            if (todayMeal && mealHasRenderableRows(todayMeal)) {
                 result.push(todayMeal);
-                return;
-            }
-
-            if (useTomorrowAfterPassed && !todayVisible && tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
+            } else if (useTomorrowAfterPassed && tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
                 const titlePrefix = String(t.tomorrowMealLabels?.[key] || t.mealLabels?.[key] || tomorrowMeal.label || key).trim();
                 result.push({
                     ...tomorrowMeal,
+                    key,
                     label: titlePrefix,
                     __displayLabel: titlePrefix,
                     __tomorrowPreview: true
                 });
-                return;
             }
 
-            if (todayMeal && todayVisible) {
-                result.push(todayMeal);
+            if (result.length >= maxMeals) {
+                break;
             }
-        });
+        }
+
+        if (result.length === 0) {
+            orderedKeys.forEach((key) => {
+                if (result.length >= maxMeals) return;
+                const meal = todayMap.get(key) || null;
+                if (meal && mealHasRenderableRows(meal)) {
+                    result.push(meal);
+                }
+            });
+        }
+
+        if (result.length === 0) {
+            (Array.isArray(tomorrowMealsRaw) ? tomorrowMealsRaw : []).forEach((meal) => {
+                if (result.length >= maxMeals) return;
+                if (mealHasRenderableRows(meal)) {
+                    result.push(meal);
+                }
+            });
+        }
 
         return result;
     }
@@ -1176,6 +1460,69 @@
         });
     }
 
+    function fitSingleTextNode(node, minPx, maxPx) {
+        if (!node) {
+            return Math.max(1, Math.round(minPx));
+        }
+        let low = Math.max(1, Math.round(minPx));
+        let high = Math.max(low, Math.round(maxPx));
+        let best = low;
+
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            node.style.fontSize = `${mid}px`;
+            const fits = node.scrollWidth <= node.clientWidth + 2 && node.scrollHeight <= node.clientHeight + 2;
+            if (fits) {
+                best = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+
+        node.style.fontSize = `${best}px`;
+        return best;
+    }
+
+    function fitSmallFixedRows(cardEl, settings = null) {
+        if (!cardEl) return;
+
+        const preferredRowMax = Math.max(60, Math.min(260, Number(settings?.smallRowFontPx || 150)));
+        const titleMax = Math.max(28, Math.min(640, Number(settings?.smallHeaderRowTitleFontPx || settings?.smallScreenHeaderFontPx || 58) * 5));
+        const clockMax = Math.max(28, Math.min(520, Number(settings?.smallHeaderRowClockFontPx || settings?.smallScreenHeaderFontPx || 62) * 4));
+
+        const headerRow = cardEl.querySelector('.small-page-header-row');
+        const headerTitleEl = cardEl.querySelector('.small-page-header-title');
+        const headerClockEl = cardEl.querySelector('.small-page-header-clock');
+        const smallTable = cardEl.querySelector('.small-page-table');
+        
+        if (headerTitleEl && headerClockEl) {
+            const fittedTitle = fitSingleTextNode(headerTitleEl, 18, titleMax);
+            const fittedClock = fitSingleTextNode(headerClockEl, 24, clockMax);
+            headerTitleEl.style.fontSize = `${fittedTitle}px`;
+            headerClockEl.style.fontSize = `${fittedClock}px`;
+            if (headerClockEl) {
+                headerClockEl.style.display = '';
+            }
+            if (smallTable) {
+                smallTable.classList.remove('clock-at-bottom');
+            }
+
+            startHeaderTitleMarquee(headerTitleEl, settings);
+        } else {
+            fitSingleTextNode(headerTitleEl, 14, titleMax);
+            fitSingleTextNode(headerClockEl, 14, clockMax);
+            if (headerTitleEl) {
+                startHeaderTitleMarquee(headerTitleEl, settings);
+            }
+        }
+
+        const rowTextEls = Array.from(cardEl.querySelectorAll('.small-page-meal-text:not(.clock-text)'));
+        rowTextEls.forEach((rowEl) => {
+            fitSingleTextNode(rowEl, 14, preferredRowMax);
+        });
+    }
+
     function fitSharedTextSize(rows, minPx, maxPx) {
         const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
         if (!list.length) {
@@ -1207,6 +1554,14 @@
     function fitVisibleMealCards(displayMode, settings = null) {
         const cards = Array.from(document.querySelectorAll('#cards .card'));
         const isSmall = displayMode === 'small_screen';
+
+        if (isSmall && cards.some((card) => card.querySelector('.small-page-table'))) {
+            cards.forEach((card) => {
+                fitSmallFixedRows(card, settings);
+            });
+            return;
+        }
+
         cards.forEach((card) => fitCardText(card, isSmall ? 10 : 12, isSmall ? 160 : 34));
 
         if (isSmall) {
@@ -1267,7 +1622,8 @@
 
         const raw = String(settings.smallScreenVisibleMeals || '').trim();
         if (raw === '') {
-            return new Set();
+            // If custom selection is enabled but no meals specified, show all meals
+            return null;
         }
 
         const tokens = raw.split(/[\n,;|]+/).map((part) => part.trim()).filter(Boolean);
@@ -1282,12 +1638,45 @@
         return keys;
     }
 
+    function filterSmallScreenMealsWithSafeFallback(meals, settings) {
+        const list = Array.isArray(meals) ? meals : [];
+        if (!list.length) {
+            return [];
+        }
+
+        const allowedKeys = resolveSmallScreenAllowedMealKeys(settings);
+        if (allowedKeys === null) {
+            return list;
+        }
+
+        const filtered = list.filter((meal) => {
+            const key = String(meal?.key || '').trim();
+            if (key === '') {
+                // Do not drop keyless meals in small mode.
+                return true;
+            }
+            return allowedKeys.has(key);
+        });
+
+        // If selection rules filter everything out, keep original list to avoid false empty state.
+        return filtered.length > 0 ? filtered : list;
+    }
+
     function renderSmallScreenPagedMeals(meals, settings, t) {
         const cards = document.getElementById('cards');
         if (!cards) return;
         stopMealPageSwitch();
 
+        const rowTheme = {
+            headerBg: String(settings.smallHeaderRowBgColor || '#bae6fd'),
+            titleColor: String(settings.smallHeaderRowTextColor || '#000000'),
+            clockColor: String(settings.smallHeaderRowClockColor || '#facc15')
+        };
+
         const list = Array.isArray(meals) ? meals : [];
+        
+        // For small screen: always show all meals, even if empty
+        // Never filter meals here
         if (!list.length) {
             cards.innerHTML = `<div class="empty">${escapeHtml(t.emptyMeals || 'No meals available')}</div>`;
             return;
@@ -1333,30 +1722,83 @@
             pages.push({
                 label: mealName,
                 rows: pageRows,
+                key,
                 tomorrowPreview: meal?.__tomorrowPreview === true
             });
         });
 
-        const renderRow = (row) => {
-            const rawText = String(row?.text || '—');
-            const text = toDisplayMultiline(rawText)
-                .split('\n')
-                .map((line) => escapeHtml(line.trim()))
-                .filter((line) => line !== '')
-                .join('<br>') || '—';
-            const iconKey = String(row?.icon || '').trim();
-            const iconHtml = iconKey !== ''
-                ? `<span class="small-page-row-icon" aria-hidden="true">${iconSvg(iconKey)}</span>`
-                : '<span class="small-page-row-icon" aria-hidden="true"></span>';
-            const rowClass = iconKey !== '' ? 'small-page-row' : 'small-page-row no-icon';
-            return `<div class="${rowClass}">${iconHtml}<div class="small-page-row-text"><span class="meal-row-line">${text}</span></div></div>`;
+        const normalizeRowsForFixedSlots = (rawRows) => {
+            const lines = Array.isArray(rawRows) ? rawRows : [];
+            const cleaned = lines
+                .map((row) => ({
+                    text: String(row?.text || '').trim(),
+                    icon: String(row?.icon || '').trim().toLowerCase()
+                }))
+                .filter((row) => row.text !== '');
+
+            if (!cleaned.length) {
+                return [{ text: '—', icon: 'food', soup: false }];
+            }
+
+            const isSingleWord = (text) => {
+                const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+                return words.length === 1;
+            };
+
+            // Merge single-word lines with previous/next line to avoid tiny isolated rows.
+            const merged = [];
+            for (let i = 0; i < cleaned.length; i += 1) {
+                const current = { ...cleaned[i] };
+                if (!isSingleWord(current.text)) {
+                    merged.push({ ...current, soup: false });
+                    continue;
+                }
+
+                const next = cleaned[i + 1] ? { ...cleaned[i + 1] } : null;
+                if (next) {
+                    merged.push({
+                        text: `${current.text} ${next.text}`.trim(),
+                        icon: next.icon || current.icon || 'food',
+                        soup: false
+                    });
+                    i += 1;
+                    continue;
+                }
+
+                if (merged.length > 0) {
+                    const prev = merged[merged.length - 1];
+                    prev.text = `${prev.text} ${current.text}`.trim();
+                } else {
+                    merged.push({ ...current, icon: current.icon || 'food', soup: false });
+                }
+            }
+
+            return merged.map((row) => ({
+                text: String(row.text || '').trim() || '—',
+                icon: String(row.icon || 'food').trim().toLowerCase() || 'food',
+                soup: false
+            }));
+        };
+
+        const renderMealRow = (row) => {
+            const text = escapeHtml(String(row?.text || '—'));
+            return `<div class="small-page-meal-row no-icon"><span class="small-page-meal-text">${text}</span></div>`;
         };
 
         let pageIndex = 0;
         const renderPageHtml = (page) => {
-            const pageRows = Array.isArray(page.rows) ? page.rows : [];
-            const renderedRows = pageRows.map(renderRow).join('');
-            return `<div class="card band-other small-page-card"><div class="small-page-table" style="--small-page-rows:${Math.max(1, pageRows.length)};">${renderedRows}</div></div>`;
+            const pageRows = normalizeRowsForFixedSlots(Array.isArray(page.rows) ? page.rows : []);
+            const pageKey = String(page.key || '').trim();
+            const mealTypeLabel = String(t.mealLabels?.[pageKey] || pageKey || '').trim().toUpperCase();
+            const renderedRows = pageRows.map(renderMealRow).join('');
+            const label = escapeHtml(String(page.label || '').trim() || String(t.title || '').trim() || 'Menu');
+            const titleFontPx = Math.max(20, Math.min(140, Number(settings.smallHeaderRowTitleFontPx || settings.smallScreenHeaderFontPx || 58)));
+            const clockFontPx = Math.max(24, Math.min(480, Number(settings.smallHeaderRowClockFontPx || settings.smallScreenHeaderFontPx || 62)));
+
+            const headerLeft = escapeHtml(mealTypeLabel || String(page.label || '').trim() || label);
+            const gridRows = 1 + Math.max(1, pageRows.length);
+
+            return `<div class="card band-other small-page-card"><div class="small-page-table small-dynamic" style="--small-page-rows:${gridRows}; --small-header-row-bg:${escapeHtml(rowTheme.headerBg)}; --small-header-title-color:${escapeHtml(rowTheme.titleColor)}; --small-header-clock-color:${escapeHtml(rowTheme.clockColor)};"><div class="small-page-header-row"><div class="small-page-header-left"><div class="small-page-header-title-wrapper"><span class="small-page-header-title" style="font-size:${titleFontPx}px;"><span class="small-page-header-title-track">${headerLeft}</span></span></div></div><div class="small-page-header-right"><span class="small-page-header-clock" data-small-fixed-clock style="font-size:${clockFontPx}px;">--:--</span></div></div>${renderedRows}</div></div>`;
         };
 
         const renderPage = () => {
@@ -1444,10 +1886,7 @@
         const mealsUnmergedSmall = buildSmallScreenMeals(mealsRaw, tomorrowMealsRaw, settings, nowMinutesLocal(), t);
         const mealsForSmall = mergeStandardMealBands(mealsUnmergedSmall, t, settings);
         const mealsForLarge = mergeStandardMealBands(mealsUnmergedLarge, t, settings);
-        const smallAllowedKeys = resolveSmallScreenAllowedMealKeys(settings);
-        const mealsForSmallSelected = smallAllowedKeys === null
-            ? mealsForSmall
-            : mealsForSmall.filter((meal) => smallAllowedKeys.has(String(meal?.key || '').trim()));
+        const mealsForSmallSelected = filterSmallScreenMealsWithSafeFallback(mealsForSmall, settings);
 
         if (displayMode === 'small_screen') {
             if (title) {
@@ -1464,6 +1903,7 @@
                 title.textContent = customTitle !== '' ? customTitle : t.title;
                 title.style.display = settings.showHeaderTitle === false ? 'none' : '';
             }
+
             const subtitleParts = [];
             if (settings.showInstitutionName !== false && institutionName) {
                 subtitleParts.push(institutionName);
@@ -1478,21 +1918,32 @@
         cards.classList.toggle('single-card', displayMode === 'small_screen');
         stopSlowScroll();
         stopMealPageSwitch();
-        const displayMealsRaw = displayMode === 'large_screen' ? mealsForLarge : mealsForSmallSelected;
-        const displayMeals = displayMode === 'small_screen'
-            ? displayMealsRaw
-            : displayMealsRaw.filter((meal) => mealHasRenderableRows(meal));
-        if (!displayMeals.length) {
+        const largeRenderableMeals = mealsForLarge.filter((meal) => mealHasRenderableRows(meal));
+
+        if (displayMode === 'small_screen') {
+            const smallCandidates = [
+                mealsForSmallSelected,
+                mealsForSmall,
+                mealsRaw,
+                tomorrowMealsRaw,
+                largeRenderableMeals
+            ];
+            const smallDisplayMeals = smallCandidates.find((list) => Array.isArray(list) && list.length > 0) || [];
+            renderSmallScreenPagedMeals(smallDisplayMeals, settings, t);
+        } else if (!largeRenderableMeals.length) {
             cards.innerHTML = `<div class="empty">${escapeHtml(emptyStateMessage(data, t))}</div>`;
         } else {
-            if (displayMode === 'large_screen') {
-                renderLargeScreenGridMeals(displayMeals, settings, t);
-            } else {
-                renderSmallScreenPagedMeals(displayMeals, settings, t);
-            }
+            renderLargeScreenGridMeals(largeRenderableMeals, settings, t);
+        }
+        if (displayMode === 'large_screen' && settings.slowScrollOnOverflow !== false) {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    startSlowScroll(cards, cardsWrap, settings, true);
+                });
+            });
         }
         if (displayMode === 'small_screen') {
-            const hasTomorrowPreview = displayMeals.some((meal) => meal?.__tomorrowPreview === true);
+            const hasTomorrowPreview = mealsForSmallSelected.some((meal) => meal?.__tomorrowPreview === true);
             const baseDateText = hasTomorrowPreview
                 ? String(t.tomorrowTag || t.tomorrow || 'ZAJTRA').trim()
                 : String(dayText || '').trim();
@@ -2354,3 +2805,5 @@
 </script>
 </body>
 </html>
+
+

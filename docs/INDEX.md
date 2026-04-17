@@ -22,8 +22,14 @@ Ez a teljes audit a **EduDisplej Control Panel** biztonsági és teljesítmény 
 
 ### 🧭 ÜZEMELTETÉSI / SZINKRON DOKUMENTÁCIÓK
 
+- [KOZPONTI_CORE_UPDATER.md](KOZPONTI_CORE_UPDATER.md)
+  Kozponti core updater mukodesi dokumentacio: automatikus es kenyszeritett frissites, trigger folyamat, ellenorzes es rollout gyakorlat.
+
 - [INCIDENT_2026-04-12_SYNC_OFFLINE_AFTER_DAILY_UPDATE.md](INCIDENT_2026-04-12_SYNC_OFFLINE_AFTER_DAILY_UPDATE.md)
   Incidens dokumentacio a kijelzok offline jelolese hibarol: gyokerok, azonnali elharitas, tartos javitas es fleet rollout lepesek.
+
+- [INCIDENT_2026-04-17_OFFLINE_ACTIVE_DISPLAY_SELF_HEAT.md](INCIDENT_2026-04-17_OFFLINE_ACTIVE_DISPLAY_SELF_HEAT.md)
+  Incidens dokumentacio a "kijelzo aktiv, backend szerint offline" hibara: gyokerok, self-heat globalis core javitas es ellenorzesi lista.
 
 - [DEBIAN_LIVE_OFFLINE_INSTALLER_WINDOWS_WSL_GUIDE.md](DEBIAN_LIVE_OFFLINE_INSTALLER_WINDOWS_WSL_GUIDE.md)  
   Részletes, végponttól végpontig leírás arról, hogyan épüljön be az EduDisplej offline wizard egy Debian Live ISO-ba, külön Windows + PowerShell + WSL2 workflow-val, build lépésekkel, first-boot működéssel és hibakereséssel.

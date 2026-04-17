@@ -343,6 +343,9 @@ if (isset($_GET['refresh_list'])) {
         while ($row = $result->fetch_assoc()) {
             kiosk_apply_effective_status($row);
 
+            $activity_reference_raw = kiosk_status_reference_time($row);
+            $row['activity_reference'] = $activity_reference_raw ? date('Y-m-d H:i', strtotime((string)$activity_reference_raw)) : 'Nikdy';
+
             $kiosk_loop_version = normalize_loop_version_value($row['loop_last_update'] ?? null);
             $server_loop_version = normalize_loop_version_value($row['group_server_loop_version'] ?? null)
                 ?? normalize_loop_version_value($row['kiosk_server_loop_version'] ?? null);

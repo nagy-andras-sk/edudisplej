@@ -86,8 +86,15 @@ function kiosk_effective_status(array $kiosk, int $timeoutSeconds = KIOSK_OFFLIN
         return 'error';
     }
 
-    if (kiosk_is_timed_out($kiosk, $timeoutSeconds)) {
+    $isTimedOut = kiosk_is_timed_out($kiosk, $timeoutSeconds);
+    if ($isTimedOut) {
         return 'offline';
+    }
+
+    // If database status is stale offline but we have fresh activity evidence,
+    // prefer reporting online to avoid false offline state in dashboard/UI.
+    if ($status === 'offline' && kiosk_status_reference_time($kiosk) !== null) {
+        return 'online';
     }
 
     return $status;

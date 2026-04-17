@@ -462,8 +462,21 @@
                     schedule_dinner_until: 'Vacsora vége (eddig látszik)',
                     show_tomorrow_after_passed: 'Ha a mai étkezés lejárt, mutassa a holnapi megfelelő étkezést',
                     small_row_font_size: 'Kis kijelző sor betűméret (px)',
+                    small_header_row_bg: '1. sor háttérszín',
+                    small_header_row_text: '1. sor bal szöveg színe',
+                    small_header_row_clock: '1. sor óra színe',
+                    small_header_row_title_font: '1. sor bal betűméret (px)',
+                    small_header_row_clock_font: '1. sor óra betűméret (px)',
                     page_switch: 'Kis kijelző lapozás (másodperc)',
                     page_switch_hint: 'Csak A) KIS KIJELZŐ módban érvényes.',
+                    small_start_mode: 'Kezdő étkezés megjelenítés',
+                    small_start_current: 'Aktuális étkezéstől tovább',
+                    small_start_breakfast: 'Reggelitől tovább',
+                    small_start_lunch: 'Ebédtől tovább',
+                    small_start_dinner: 'Vacsorától tovább',
+                    small_max_meals: 'Max. megjelenített étkezések (1-5)',
+                    small_header_scroll_speed: 'Felső sor vízszintes görgetés sebesség (px/mp)',
+                    small_header_scroll_pause: 'Felső sor szélső megállás (ms)',
                     join_breakfast_snack: 'Raňajky + Desiata összevonás (kis kijelzőn)',
                     join_lunch_snack: 'Obed + Olovrant összevonás (kis kijelzőn)',
                     site: 'Forrás oldal',
@@ -520,8 +533,21 @@
                     schedule_dinner_until: 'Večera do času',
                     show_tomorrow_after_passed: 'Po prekročení dnešného času zobraz zajtrajšie zodpovedajúce jedlo',
                     small_row_font_size: 'Veľkosť písma riadkov na malom displeji (px)',
+                    small_header_row_bg: 'Farba pozadia 1. riadku',
+                    small_header_row_text: 'Farba textu vľavo (1. riadok)',
+                    small_header_row_clock: 'Farba hodín (1. riadok)',
+                    small_header_row_title_font: 'Veľkosť písma vľavo (1. riadok, px)',
+                    small_header_row_clock_font: 'Veľkosť písma hodín (1. riadok, px)',
                     page_switch: 'Prepínanie strán na malom displeji (sekundy)',
                     page_switch_hint: 'Platí len pre režim A) MALÝ DISPLEJ.',
+                    small_start_mode: 'Počiatočné jedlo zobrazenia',
+                    small_start_current: 'Od aktuálneho jedla ďalej',
+                    small_start_breakfast: 'Od raňajok ďalej',
+                    small_start_lunch: 'Od obeda ďalej',
+                    small_start_dinner: 'Od večere ďalej',
+                    small_max_meals: 'Max. zobrazených jedál (1-5)',
+                    small_header_scroll_speed: 'Rýchlosť vodorovného posuvu horného riadku (px/s)',
+                    small_header_scroll_pause: 'Pauza na okrajoch horného riadku (ms)',
                     join_breakfast_snack: 'Spojiť Raňajky + Desiata (na malom displeji)',
                     join_lunch_snack: 'Spojiť Obed + Olovrant (na malom displeji)',
                     site: 'Zdrojová stránka',
@@ -578,8 +604,21 @@
                     schedule_dinner_until: 'Dinner until',
                     show_tomorrow_after_passed: 'After daily cutoff, show tomorrow equivalent meal',
                     small_row_font_size: 'Small-screen row font size (px)',
+                    small_header_row_bg: 'Row 1 background color',
+                    small_header_row_text: 'Row 1 left text color',
+                    small_header_row_clock: 'Row 1 clock color',
+                    small_header_row_title_font: 'Row 1 left font size (px)',
+                    small_header_row_clock_font: 'Row 1 clock font size (px)',
                     page_switch: 'Small-screen page switch (seconds)',
                     page_switch_hint: 'Applies only to A) SMALL SCREEN mode.',
+                    small_start_mode: 'Small-screen start mode',
+                    small_start_current: 'From current meal onward',
+                    small_start_breakfast: 'From breakfast onward',
+                    small_start_lunch: 'From lunch onward',
+                    small_start_dinner: 'From dinner onward',
+                    small_max_meals: 'Max displayed meals (1-5)',
+                    small_header_scroll_speed: 'Top-row horizontal scroll speed (px/s)',
+                    small_header_scroll_pause: 'Top-row edge pause (ms)',
                     join_breakfast_snack: 'Join Breakfast + Morning snack (small screen)',
                     join_lunch_snack: 'Join Lunch + Afternoon snack (small screen)',
                     site: 'Source site',
@@ -981,6 +1020,9 @@
                     color: 'Szín',
                     background: 'Háttér',
                     size: 'Méret',
+                    text_sizing_mode: 'Méretkezelés',
+                    text_sizing_manual: 'Manuális stílus',
+                    text_sizing_fit: 'Fit to screen (pont kiférjen)',
                     line_height: 'Sorköz',
                     play: '▶ Lejátszás',
                     stop: '■ Stop',
@@ -1001,9 +1043,28 @@
                     scroll_end_pause: 'Végi várakozás (s):',
                     scroll_speed: 'Görgetési sebesség (px/s):',
                     clock_split_toggle: 'Split-screen óra + dátum (fix 30%)',
+                    clock_split_unavailable: 'A Split-screen óra opció csak akkor érhető el, ha a Clock modul licencelve/elérhető ebben a cégben.',
                     clock_split_position: 'Óra sáv pozíciója',
                     clock_split_top: 'Fent (30%)',
                     clock_split_bottom: 'Lent (30%)',
+                    clock_split_clock_size: 'Óra mérete (px)',
+                    clock_split_date_position: 'Dátum pozíciója',
+                    clock_split_date_below: 'Dátum alatta',
+                    clock_split_date_right: 'Dátum mellette',
+                    clock_split_date_format: 'Dátum formátuma',
+                    clock_split_show_year: 'Év megjelenítése',
+                    clock_split_date_full: 'Teljes (év, hónap, nap, napnév)',
+                    clock_split_date_short: 'Rövid (év, hónap, nap)',
+                    clock_split_date_dmy: 'Nap.Hónap.Év (NN.HH.ÉÉÉÉ)',
+                    clock_split_date_numeric: 'Numerikus (ÉÉÉÉ.HH.NN)',
+                    clock_split_date_none: 'Nincs dátum',
+                    clock_split_language: 'Nyelv',
+                    clock_split_time_color: 'Óra színe',
+                    clock_split_date_color: 'Dátum színe',
+                    clock_split_font_family: 'Óra betűstílus',
+                    clock_split_separator_color: 'Elválasztó csík színe',
+                    clock_split_separator_thickness: 'Elválasztó csík vastagsága (px)',
+                    clock_split_fixed_bottom_note: 'A split-screen óra fixen az alsó 30%-os sávban jelenik meg.',
                     processing: 'Feldolgozás...',
                     only_images: '⚠️ Csak képfájl tölthető fel',
                     image_process_error: 'Kép feldolgozási hiba',
@@ -1033,6 +1094,9 @@
                     color: 'Farba',
                     background: 'Pozadie',
                     size: 'Veľkosť',
+                    text_sizing_mode: 'Režim veľkosti',
+                    text_sizing_manual: 'Manuálne štýly',
+                    text_sizing_fit: 'Fit to screen (presne sa zmestí)',
                     line_height: 'Riadkovanie',
                     play: '▶ Spustiť',
                     stop: '■ Stop',
@@ -1053,9 +1117,28 @@
                     scroll_end_pause: 'Čakanie na konci (s):',
                     scroll_speed: 'Rýchlosť posúvania (px/s):',
                     clock_split_toggle: 'Split-screen hodiny + dátum (fixne 30%)',
+                    clock_split_unavailable: 'Split-screen hodiny sú dostupné len vtedy, keď je modul Clock licencovaný/dostupný pre firmu.',
                     clock_split_position: 'Pozícia pásu hodín',
                     clock_split_top: 'Hore (30%)',
                     clock_split_bottom: 'Dole (30%)',
+                    clock_split_clock_size: 'Veľkosť hodín (px)',
+                    clock_split_date_position: 'Pozícia dátumu',
+                    clock_split_date_below: 'Dátum pod časom',
+                    clock_split_date_right: 'Dátum vedľa času',
+                    clock_split_date_format: 'Formát dátumu',
+                    clock_split_show_year: 'Zobraziť rok',
+                    clock_split_date_full: 'Plný (rok, mesiac, deň, názov dňa)',
+                    clock_split_date_short: 'Krátky (rok, mesiac, deň)',
+                    clock_split_date_dmy: 'Deň.Mesiac.Rok (DD.MM.RRRR)',
+                    clock_split_date_numeric: 'Numerický (RRRR.MM.DD)',
+                    clock_split_date_none: 'Bez dátumu',
+                    clock_split_language: 'Jazyk',
+                    clock_split_time_color: 'Farba času',
+                    clock_split_date_color: 'Farba dátumu',
+                    clock_split_font_family: 'Štýl písma hodín',
+                    clock_split_separator_color: 'Farba deliaceho pásika',
+                    clock_split_separator_thickness: 'Hrúbka deliaceho pásika (px)',
+                    clock_split_fixed_bottom_note: 'Split-screen hodiny sa zobrazujú fixne v spodnom 30% páse.',
                     processing: 'Spracovanie...',
                     only_images: '⚠️ Je možné nahrať iba obrázok',
                     image_process_error: 'Chyba spracovania obrázka',
@@ -1085,6 +1168,9 @@
                     color: 'Color',
                     background: 'Background',
                     size: 'Size',
+                    text_sizing_mode: 'Sizing mode',
+                    text_sizing_manual: 'Manual style',
+                    text_sizing_fit: 'Fit to screen (exact fit)',
                     line_height: 'Line height',
                     play: '▶ Play',
                     stop: '■ Stop',
@@ -1105,9 +1191,28 @@
                     scroll_end_pause: 'End pause (s):',
                     scroll_speed: 'Scroll speed (px/s):',
                     clock_split_toggle: 'Split-screen clock + date (fixed 30%)',
+                    clock_split_unavailable: 'Split-screen clock is available only when the Clock module is licensed/available for this company.',
                     clock_split_position: 'Clock band position',
                     clock_split_top: 'Top (30%)',
                     clock_split_bottom: 'Bottom (30%)',
+                    clock_split_clock_size: 'Clock size (px)',
+                    clock_split_date_position: 'Date position',
+                    clock_split_date_below: 'Date below time',
+                    clock_split_date_right: 'Date next to time',
+                    clock_split_date_format: 'Date format',
+                    clock_split_show_year: 'Show year',
+                    clock_split_date_full: 'Full (year, month, day, weekday)',
+                    clock_split_date_short: 'Short (year, month, day)',
+                    clock_split_date_dmy: 'Day.Month.Year (DD.MM.YYYY)',
+                    clock_split_date_numeric: 'Numeric (YYYY.MM.DD)',
+                    clock_split_date_none: 'No date',
+                    clock_split_language: 'Language',
+                    clock_split_time_color: 'Clock color',
+                    clock_split_date_color: 'Date color',
+                    clock_split_font_family: 'Clock font style',
+                    clock_split_separator_color: 'Separator stripe color',
+                    clock_split_separator_thickness: 'Separator stripe thickness (px)',
+                    clock_split_fixed_bottom_note: 'Split-screen clock is fixed to the bottom 30% band.',
                     processing: 'Processing...',
                     only_images: '⚠️ Only image files can be uploaded',
                     image_process_error: 'Image processing error',
@@ -5096,6 +5201,82 @@
                 queueDraftPersist(150);
             }
         }
+
+        function ensureManualSaveOverlay() {
+            let styleEl = document.getElementById('group-loop-save-overlay-style');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'group-loop-save-overlay-style';
+                styleEl.textContent = `
+                    #group-loop-save-overlay {
+                        position: fixed;
+                        inset: 0;
+                        display: none;
+                        align-items: center;
+                        justify-content: center;
+                        background: rgba(15, 23, 42, 0.28);
+                        backdrop-filter: blur(1px);
+                        z-index: 20000;
+                    }
+                    #group-loop-save-overlay .group-loop-save-overlay-card {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 10px;
+                        padding: 12px 16px;
+                        border-radius: 10px;
+                        background: rgba(15, 23, 42, 0.92);
+                        color: #f8fafc;
+                        border: 1px solid rgba(148, 163, 184, 0.5);
+                        box-shadow: 0 10px 28px rgba(2, 6, 23, 0.4);
+                        font-weight: 700;
+                    }
+                    #group-loop-save-overlay .group-loop-save-spinner {
+                        width: 16px;
+                        height: 16px;
+                        border-radius: 999px;
+                        border: 2px solid rgba(255, 255, 255, 0.35);
+                        border-top-color: #facc15;
+                        animation: group-loop-save-spin .8s linear infinite;
+                    }
+                    @keyframes group-loop-save-spin {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                    body.group-loop-saving .container {
+                        filter: blur(2px);
+                        pointer-events: none;
+                        user-select: none;
+                    }
+                    body.group-loop-saving #group-loop-save-overlay {
+                        display: flex;
+                    }
+                `;
+                document.head.appendChild(styleEl);
+            }
+
+            let overlay = document.getElementById('group-loop-save-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'group-loop-save-overlay';
+                overlay.setAttribute('aria-live', 'polite');
+                overlay.innerHTML = '<div class="group-loop-save-overlay-card"><span class="group-loop-save-spinner" aria-hidden="true"></span><span>Mentés folyamatban...</span></div>';
+                document.body.appendChild(overlay);
+            }
+            return overlay;
+        }
+
+        function setManualSaveUiState(isSaving) {
+            ensureManualSaveOverlay();
+            document.body.classList.toggle('group-loop-saving', !!isSaving);
+
+            const saveButtons = Array.from(document.querySelectorAll('.pending-save-btn, #pending-bar-confirm'));
+            saveButtons.forEach((btn) => {
+                if (!(btn instanceof HTMLButtonElement)) {
+                    return;
+                }
+                btn.disabled = !!isSaving;
+            });
+        }
         
         function saveLoop(options = {}) {
             const opts = {
@@ -5103,6 +5284,8 @@
                 source: 'publish',
                 ...options
             };
+
+            const showManualSaveOverlay = opts.source === 'publish' && opts.silent !== true;
 
             const payload = buildLoopPayload();
             const currentSnapshot = getLoopSnapshot();
@@ -5135,6 +5318,9 @@
             }
 
             autoSaveInFlight = true;
+            if (showManualSaveOverlay) {
+                setManualSaveUiState(true);
+            }
             
             fetch(saveUrl, {
                 method: 'POST',
@@ -5163,6 +5349,9 @@
                 showAutosaveToast('⚠️ Hiba történt: ' + error, true);
             })
             .finally(() => {
+                if (showManualSaveOverlay) {
+                    setManualSaveUiState(false);
+                }
                 finalizeSaveLoopRequest();
             });
         }
@@ -5561,6 +5750,10 @@
             return modulesCatalog.find((entry) => String(entry?.module_key || '').toLowerCase() === key) || null;
         }
 
+        function hasClockModuleAvailable() {
+            return !!getModuleCatalogEntryByKey('clock');
+        }
+
         function isOverlayCarrierModule(moduleKey) {
             return moduleKey === 'image-gallery' || moduleKey === 'gallery' || moduleKey === 'meal-menu';
         }
@@ -5697,6 +5890,7 @@
                     text: textUiText('insert_text_here'),
                     fontFamily: 'Arial, sans-serif',
                     fontSize: 72,
+                    textSizingMode: 'manual',
                     fontWeight: '700',
                     fontStyle: 'normal',
                     lineHeight: 1.2,
@@ -5709,10 +5903,18 @@
                     scrollEndPauseMs: 3000,
                     scrollSpeedPxPerSec: 35,
                     clockOverlayEnabled: false,
-                    clockOverlayPosition: 'top',
+                    clockOverlayPosition: 'bottom',
                     clockOverlayHeightPercent: 30,
                     clockOverlayTimeColor: '#ffffff',
-                    clockOverlayDateColor: '#ffffff'
+                    clockOverlayDateColor: '#ffffff',
+                    clockOverlayClockSize: 300,
+                    clockOverlayDateFormat: 'dmy',
+                    clockOverlayShowYear: true,
+                    clockOverlayLanguage: 'sk',
+                    clockOverlayDatePosition: 'below',
+                    clockOverlayFontFamily: 'Arial, sans-serif',
+                    clockOverlaySeparatorColor: '#22d3ee',
+                    clockOverlaySeparatorThickness: 2
                 },
                 'video': {
                     videoAssetUrl: '',
@@ -5744,7 +5946,17 @@
                     sourceType: 'server',
                     mealDisplayMode: 'small_screen',
                     smallScreenPageSwitchSec: 12,
+                    smallScreenStartMode: 'current_onward',
+                    smallScreenMaxMeals: 5,
+                    smallHeaderMarqueeSpeedPxPerSec: 22,
+                    smallHeaderMarqueeEdgePauseMs: 1200,
                     smallRowFontPx: 150,
+                    smallScreenHeaderFontPx: 40,
+                    smallHeaderRowBgColor: '#bae6fd',
+                    smallHeaderRowTextColor: '#000000',
+                    smallHeaderRowClockColor: '#facc15',
+                    smallHeaderRowTitleFontPx: 58,
+                    smallHeaderRowClockFontPx: 62,
                     mealScheduleEnabled: true,
                     scheduleBreakfastUntil: '10:00',
                     scheduleSnackAmUntil: '11:00',
@@ -6119,7 +6331,7 @@
             return deduped;
         }
 
-        function bindMealModuleModalEvents(initialSettings) {
+        function bindMealModuleModalEvents(initialSettings, loopItem) {
             const mt = (key, vars = null) => {
                 let text = mealUiText(key);
                 if (vars && typeof vars === 'object') {
@@ -6309,6 +6521,87 @@
                 });
             }
 
+            // Add live preview update listeners for all meal settings
+            const mealSettingInputIds = [
+                'setting-smallScreenPageSwitchSec',
+                'setting-smallScreenStartMode',
+                'setting-smallScreenMaxMeals',
+                'setting-smallHeaderMarqueeSpeedPxPerSec',
+                'setting-smallHeaderMarqueeEdgePauseMs',
+                'setting-smallRowFontPx',
+                'setting-smallScreenHeaderFontPx',
+                'setting-smallHeaderRowBgColor',
+                'setting-smallHeaderRowTextColor',
+                'setting-smallHeaderRowClockColor',
+                'setting-smallHeaderRowTitleFontPx',
+                'setting-smallHeaderRowClockFontPx',
+                'setting-smallScreenShowOperator',
+                'setting-smallScreenShowDate',
+                'setting-smallScreenShowCaptions',
+                'setting-mergeBreakfastSnack',
+                'setting-mergeLunchSnack',
+                'setting-mealScheduleEnabled',
+                'setting-scheduleBreakfastUntil',
+                'setting-scheduleSnackAmUntil',
+                'setting-scheduleLunchUntil',
+                'setting-scheduleSnackPmUntil',
+                'setting-scheduleDinnerUntil',
+                'setting-showTomorrowAfterMealPassed',
+                'setting-mealLanguage',
+                'setting-showHeaderTitle',
+                'setting-customHeaderTitle',
+                'setting-showInstitutionName',
+                'setting-showBreakfast',
+                'setting-showSnackAm',
+                'setting-showLunch',
+                'setting-showSnackPm',
+                'setting-showDinner',
+                'setting-showMealTypeSvgIcons',
+                'setting-showAppetiteMessage',
+                'setting-appetiteMessageText',
+                'setting-showSourceUrl',
+                'setting-sourceUrl',
+                'setting-mealSourceType'
+            ];
+
+            let mealPreviewUpdateTimeout = null;
+            const triggerMealPreviewUpdate = () => {
+                clearTimeout(mealPreviewUpdateTimeout);
+                mealPreviewUpdateTimeout = setTimeout(() => {
+                    // Update loopItem settings with current form values
+                    if (loopItem) {
+                        const mealSettings = collectMealMenuSettingsFromForm();
+                        loopItem.settings = mealSettings;
+                        // Trigger preview update
+                        renderLoop();
+                    }
+                }, 300);
+            };
+
+            mealSettingInputIds.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', triggerMealPreviewUpdate);
+                    el.addEventListener('change', triggerMealPreviewUpdate);
+                }
+            });
+
+            ['setting-smallScreenMaxMeals', 'setting-smallHeaderMarqueeSpeedPxPerSec', 'setting-smallHeaderMarqueeEdgePauseMs'].forEach((id) => {
+                const slider = document.getElementById(id);
+                if (!slider) {
+                    return;
+                }
+                const valueEl = slider.nextElementSibling;
+                const refreshSliderLabel = () => {
+                    if (valueEl) {
+                        valueEl.textContent = String(slider.value || '');
+                    }
+                };
+                refreshSliderLabel();
+                slider.addEventListener('input', refreshSliderLabel);
+                slider.addEventListener('change', refreshSliderLabel);
+            });
+
             refreshSites();
         }
 
@@ -6479,6 +6772,7 @@
                     text: previewTextHtml || 'Sem vložte text...',
                     fontFamily,
                     fontSize,
+                    textSizingMode: (document.getElementById('setting-textSizingMode')?.value || 'manual') === 'fit' ? 'fit' : 'manual',
                     fontWeight: '700',
                     fontStyle: 'normal',
                     lineHeight,
@@ -6491,11 +6785,19 @@
                     scrollStartPauseMs: Math.round((parseFloat(document.getElementById('setting-scrollStartPauseSec')?.value || '3') || 3) * 1000),
                     scrollEndPauseMs: Math.round((parseFloat(document.getElementById('setting-scrollEndPauseSec')?.value || '3') || 3) * 1000),
                     scrollSpeedPxPerSec: parseInt(document.getElementById('setting-scrollSpeedPxPerSec')?.value || '35', 10) || 35,
-                    clockOverlayEnabled: document.getElementById('setting-clockOverlayEnabled')?.checked === true,
-                    clockOverlayPosition: document.getElementById('setting-clockOverlayPosition')?.value === 'bottom' ? 'bottom' : 'top',
+                    clockOverlayEnabled: hasClockModuleAvailable() && document.getElementById('setting-clockOverlayEnabled')?.checked === true,
+                    clockOverlayPosition: 'bottom',
                     clockOverlayHeightPercent: 30,
                     clockOverlayTimeColor: document.getElementById('setting-clockOverlayTimeColor')?.value || '#ffffff',
-                    clockOverlayDateColor: document.getElementById('setting-clockOverlayDateColor')?.value || '#ffffff'
+                    clockOverlayDateColor: document.getElementById('setting-clockOverlayDateColor')?.value || '#ffffff',
+                    clockOverlayClockSize: Math.max(100, Math.min(2000, parseInt(document.getElementById('setting-clockOverlayClockSize')?.value || '300', 10) || 300)),
+                    clockOverlayDateFormat: document.getElementById('setting-clockOverlayDateFormat')?.value || 'dmy',
+                    clockOverlayShowYear: document.getElementById('setting-clockOverlayShowYear')?.checked !== false,
+                    clockOverlayLanguage: document.getElementById('setting-clockOverlayLanguage')?.value || 'sk',
+                    clockOverlayDatePosition: document.getElementById('setting-clockOverlayDatePosition')?.value === 'right' ? 'right' : 'below',
+                    clockOverlayFontFamily: document.getElementById('setting-clockOverlayFontFamily')?.value || 'Arial, sans-serif',
+                    clockOverlaySeparatorColor: document.getElementById('setting-clockOverlaySeparatorColor')?.value || '#22d3ee',
+                    clockOverlaySeparatorThickness: Math.max(1, Math.min(8, parseInt(document.getElementById('setting-clockOverlaySeparatorThickness')?.value || '2', 10) || 2))
                 }
             };
 
@@ -6582,7 +6884,17 @@
                 'setting-bgColor',
                 'setting-previewResolution',
                 'setting-textExternalUrl',
-                'setting-clockOverlayPosition'
+                'setting-textSizingMode',
+                'setting-clockOverlayClockSize',
+                'setting-clockOverlayDatePosition',
+                'setting-clockOverlayDateFormat',
+                'setting-clockOverlayShowYear',
+                'setting-clockOverlayLanguage',
+                'setting-clockOverlayTimeColor',
+                'setting-clockOverlayDateColor',
+                'setting-clockOverlayFontFamily',
+                'setting-clockOverlaySeparatorColor',
+                'setting-clockOverlaySeparatorThickness'
             ];
 
             const textSourceSelect = document.getElementById('setting-textSourceType');
@@ -7351,13 +7663,29 @@
             const textExternalUrl = escapeHtml(String(settings.textExternalUrl || ''));
             const resolvedFontFamily = String(settings.fontFamily || 'Arial, sans-serif');
             const resolvedFontSize = Math.max(8, parseInt(settings.fontSize, 10) || 72);
+            const textSizingMode = String(settings.textSizingMode || 'manual').toLowerCase() === 'fit' ? 'fit' : 'manual';
             const resolvedLineHeight = Math.max(0.8, Math.min(2.5, parseFloat(settings.lineHeight) || 1.2));
             const scrollStartSec = Math.max(0, Math.min(5, (parseInt(settings.scrollStartPauseMs, 10) || 3000) / 1000));
             const scrollEndSec = Math.max(0, Math.min(5, (parseInt(settings.scrollEndPauseMs, 10) || 3000) / 1000));
             const scrollSpeed = Math.max(5, Math.min(200, parseInt(settings.scrollSpeedPxPerSec, 10) || 35));
             const textAnimationEntry = settings.textAnimationEntry || 'none';
-            const clockOverlayEnabled = settings.clockOverlayEnabled === true;
+            const clockModuleAvailable = hasClockModuleAvailable();
+            const clockOverlayEnabled = clockModuleAvailable && settings.clockOverlayEnabled === true;
             const clockOverlayPosition = String(settings.clockOverlayPosition || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
+            const clockOverlayClockSize = Math.max(100, Math.min(2000, parseInt(settings.clockOverlayClockSize, 10) || 300));
+            const clockOverlayDatePosition = String(settings.clockOverlayDatePosition || 'below').toLowerCase() === 'right' ? 'right' : 'below';
+            const clockOverlayFontFamily = String(settings.clockOverlayFontFamily || 'Arial, sans-serif');
+            const clockOverlayDateFormat = (() => {
+                const raw = String(settings.clockOverlayDateFormat || 'dmy').toLowerCase();
+                return ['full', 'short', 'dmy', 'numeric', 'none'].includes(raw) ? raw : 'dmy';
+            })();
+            const clockOverlayShowYear = settings.clockOverlayShowYear !== false;
+            const clockOverlayLanguage = (() => {
+                const raw = String(settings.clockOverlayLanguage || 'sk').toLowerCase();
+                return ['hu', 'sk', 'en'].includes(raw) ? raw : 'sk';
+            })();
+            const clockOverlaySeparatorColor = String(settings.clockOverlaySeparatorColor || '#22d3ee');
+            const clockOverlaySeparatorThickness = Math.max(1, Math.min(8, parseInt(settings.clockOverlaySeparatorThickness, 10) || 2));
 
             return `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
@@ -7473,6 +7801,14 @@
                         </div>
 
                         <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">${textUiText('text_sizing_mode')}</label>
+                            <select id="setting-textSizingMode" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+                                <option value="manual" ${textSizingMode === 'manual' ? 'selected' : ''}>${textUiText('text_sizing_manual')}</option>
+                                <option value="fit" ${textSizingMode === 'fit' ? 'selected' : ''}>${textUiText('text_sizing_fit')}</option>
+                            </select>
+                        </div>
+
+                        <div>
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">${textUiText('text_animation')}</label>
                             <select id="setting-textAnimationEntry" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
                                 <option value="none" ${textAnimationEntry === 'none' ? 'selected' : ''}>${textUiText('anim_none')}</option>
@@ -7504,22 +7840,80 @@
                         </div>
 
                         <div style="padding: 10px; border-radius: 8px; border: 1px solid #e5e5e5;">
+                            ${clockModuleAvailable ? `
                             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 10px;">
                                 <input type="checkbox" id="setting-clockOverlayEnabled" ${clockOverlayEnabled ? 'checked' : ''} style="width: 20px; height: 20px;">
                                 <span style="font-weight: bold;">${textUiText('clock_split_toggle')}</span>
                             </label>
-                            <div id="clockOverlaySettings" style="display:${clockOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr;">
+                            <div id="clockOverlaySettings" style="display:${clockOverlayEnabled ? 'grid' : 'none'}; gap:10px; grid-template-columns:1fr 1fr;">
                                 <div>
-                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_position')}</label>
-                                    <select id="setting-clockOverlayPosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                        <option value="top" ${clockOverlayPosition === 'top' ? 'selected' : ''}>${textUiText('clock_split_top')}</option>
-                                        <option value="bottom" ${clockOverlayPosition === 'bottom' ? 'selected' : ''}>${textUiText('clock_split_bottom')}</option>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_font_family')}</label>
+                                    <select id="setting-clockOverlayFontFamily" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                        <option value="Arial, sans-serif" ${clockOverlayFontFamily === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option>
+                                        <option value="Verdana, sans-serif" ${clockOverlayFontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option>
+                                        <option value="Tahoma, sans-serif" ${clockOverlayFontFamily === 'Tahoma, sans-serif' ? 'selected' : ''}>Tahoma</option>
+                                        <option value="Trebuchet MS, sans-serif" ${clockOverlayFontFamily === 'Trebuchet MS, sans-serif' ? 'selected' : ''}>Trebuchet</option>
+                                        <option value="Impact, Arial Black, sans-serif" ${clockOverlayFontFamily === 'Impact, Arial Black, sans-serif' ? 'selected' : ''}>Impact / Arial Black</option>
+                                        <option value="Georgia, serif" ${clockOverlayFontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option>
+                                        <option value="Times New Roman, serif" ${clockOverlayFontFamily === 'Times New Roman, serif' ? 'selected' : ''}>Times New Roman</option>
+                                        <option value="Courier New, monospace" ${clockOverlayFontFamily === 'Courier New, monospace' ? 'selected' : ''}>Courier New</option>
                                     </select>
                                 </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_clock_size')}</label>
+                                    <input type="number" id="setting-clockOverlayClockSize" value="${clockOverlayClockSize}" min="100" max="2000" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_date_position')}</label>
+                                    <select id="setting-clockOverlayDatePosition" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                        <option value="below" ${clockOverlayDatePosition === 'below' ? 'selected' : ''}>${textUiText('clock_split_date_below')}</option>
+                                        <option value="right" ${clockOverlayDatePosition === 'right' ? 'selected' : ''}>${textUiText('clock_split_date_right')}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_date_format')}</label>
+                                    <select id="setting-clockOverlayDateFormat" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                        <option value="full" ${clockOverlayDateFormat === 'full' ? 'selected' : ''}>${textUiText('clock_split_date_full')}</option>
+                                        <option value="short" ${clockOverlayDateFormat === 'short' ? 'selected' : ''}>${textUiText('clock_split_date_short')}</option>
+                                        <option value="dmy" ${clockOverlayDateFormat === 'dmy' ? 'selected' : ''}>${textUiText('clock_split_date_dmy')}</option>
+                                        <option value="numeric" ${clockOverlayDateFormat === 'numeric' ? 'selected' : ''}>${textUiText('clock_split_date_numeric')}</option>
+                                        <option value="none" ${clockOverlayDateFormat === 'none' ? 'selected' : ''}>${textUiText('clock_split_date_none')}</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px; padding-top:28px;">
+                                    <input type="checkbox" id="setting-clockOverlayShowYear" ${clockOverlayShowYear ? 'checked' : ''} style="width:20px; height:20px;">
+                                    <label for="setting-clockOverlayShowYear" style="font-weight:bold; margin:0;">${textUiText('clock_split_show_year')}</label>
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_language')}</label>
+                                    <select id="setting-clockOverlayLanguage" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                        <option value="hu" ${clockOverlayLanguage === 'hu' ? 'selected' : ''}>${clockUiText('lang_hu')}</option>
+                                        <option value="sk" ${clockOverlayLanguage === 'sk' ? 'selected' : ''}>${clockUiText('lang_sk')}</option>
+                                        <option value="en" ${clockOverlayLanguage === 'en' ? 'selected' : ''}>${clockUiText('lang_en')}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_time_color')}</label>
+                                    <input type="color" id="setting-clockOverlayTimeColor" value="${settings.clockOverlayTimeColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_date_color')}</label>
+                                    <input type="color" id="setting-clockOverlayDateColor" value="${settings.clockOverlayDateColor || '#ffffff'}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_separator_color')}</label>
+                                    <input type="color" id="setting-clockOverlaySeparatorColor" value="${clockOverlaySeparatorColor}" style="width:100%; height:40px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:5px; font-weight:bold;">${textUiText('clock_split_separator_thickness')}</label>
+                                    <input type="number" id="setting-clockOverlaySeparatorThickness" value="${clockOverlaySeparatorThickness}" min="1" max="8" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div style="grid-column:1 / -1; font-size:12px; color:#475569; border:1px dashed #cbd5e1; border-radius:6px; padding:8px 10px; background:#f8fafc;">
+                                    ${textUiText('clock_split_fixed_bottom_note')}
+                                </div>
                             </div>
+                            ` : `<div class="muted" style="font-size:12px;">${textUiText('clock_split_unavailable')}</div>`}
                             <input type="hidden" id="setting-clockOverlayHeightPercent" value="30">
-                            <input type="hidden" id="setting-clockOverlayTimeColor" value="${settings.clockOverlayTimeColor || '#ffffff'}">
-                            <input type="hidden" id="setting-clockOverlayDateColor" value="${settings.clockOverlayDateColor || '#ffffff'}">
                         </div>
                     </div>
 
@@ -7544,7 +7938,19 @@
             const mealDisplayMode = normalizeMealDisplayMode(settings.mealDisplayMode);
             const isSmallMode = mealDisplayMode === 'small_screen';
             const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const smallScreenStartModeRaw = String(settings.smallScreenStartMode || 'current_onward').toLowerCase();
+            const smallScreenStartMode = ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(smallScreenStartModeRaw)
+                ? smallScreenStartModeRaw
+                : 'current_onward';
+            const smallScreenMaxMeals = Math.max(1, Math.min(5, parseInt(settings.smallScreenMaxMeals || 5, 10) || 5));
+            const smallHeaderMarqueeSpeedPxPerSec = Math.max(8, Math.min(60, parseInt(settings.smallHeaderMarqueeSpeedPxPerSec || 22, 10) || 22));
+            const smallHeaderMarqueeEdgePauseMs = Math.max(200, Math.min(5000, parseInt(settings.smallHeaderMarqueeEdgePauseMs || 1200, 10) || 1200));
             const smallRowFontPx = Math.max(60, Math.min(260, parseInt(settings.smallRowFontPx || 150, 10) || 150));
+            const smallHeaderRowTitleFontPx = Math.max(20, Math.min(140, parseInt(settings.smallHeaderRowTitleFontPx || settings.smallScreenHeaderFontPx || 58, 10) || 58));
+            const smallHeaderRowClockFontPx = Math.max(20, Math.min(160, parseInt(settings.smallHeaderRowClockFontPx || settings.smallScreenHeaderFontPx || 62, 10) || 62));
+            const smallHeaderRowBgColor = escapeHtml(String(settings.smallHeaderRowBgColor || '#bae6fd'));
+            const smallHeaderRowTextColor = escapeHtml(String(settings.smallHeaderRowTextColor || '#000000'));
+            const smallHeaderRowClockColor = escapeHtml(String(settings.smallHeaderRowClockColor || '#facc15'));
             const mergeBreakfastSnack = settings.mergeBreakfastSnack !== false;
             const mergeLunchSnack = settings.mergeLunchSnack !== false;
             const mealScheduleEnabled = settings.mealScheduleEnabled !== false;
@@ -7595,8 +8001,51 @@
                             </div>
 
                             <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_start_mode')}</label>
+                                <select id="setting-smallScreenStartMode" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                    <option value="current_onward" ${smallScreenStartMode === 'current_onward' ? 'selected' : ''}>${mt('small_start_current')}</option>
+                                    <option value="breakfast_onward" ${smallScreenStartMode === 'breakfast_onward' ? 'selected' : ''}>${mt('small_start_breakfast')}</option>
+                                    <option value="lunch_onward" ${smallScreenStartMode === 'lunch_onward' ? 'selected' : ''}>${mt('small_start_lunch')}</option>
+                                    <option value="dinner_onward" ${smallScreenStartMode === 'dinner_onward' ? 'selected' : ''}>${mt('small_start_dinner')}</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_max_meals')}</label>
+                                <input type="range" id="setting-smallScreenMaxMeals" min="1" max="5" step="1" value="${smallScreenMaxMeals}" style="width:100%;">
+                                <div style="font-size:12px; color:#334155;">${smallScreenMaxMeals}</div>
+                            </div>
+
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_header_scroll_speed')}</label>
+                                <input type="range" id="setting-smallHeaderMarqueeSpeedPxPerSec" min="8" max="60" step="1" value="${smallHeaderMarqueeSpeedPxPerSec}" style="width:100%;">
+                                <div style="font-size:12px; color:#334155;">${smallHeaderMarqueeSpeedPxPerSec}</div>
+                            </div>
+
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_header_scroll_pause')}</label>
+                                <input type="range" id="setting-smallHeaderMarqueeEdgePauseMs" min="200" max="5000" step="100" value="${smallHeaderMarqueeEdgePauseMs}" style="width:100%;">
+                                <div style="font-size:12px; color:#334155;">${smallHeaderMarqueeEdgePauseMs}</div>
+                            </div>
+
+                            <div>
                                 <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_row_font_size')}</label>
                                 <input type="number" id="setting-smallRowFontPx" min="60" max="260" step="2" value="${smallRowFontPx}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
+
+                            
+
+                            
+
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_header_row_title_font')}</label>
+                                    <input type="number" id="setting-smallHeaderRowTitleFontPx" min="20" max="140" step="2" value="${smallHeaderRowTitleFontPx}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_header_row_clock_font')}</label>
+                                    <input type="number" id="setting-smallHeaderRowClockFontPx" min="20" max="160" step="2" value="${smallHeaderRowClockFontPx}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
                             </div>
 
                             <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mergeBreakfastSnack" ${mergeBreakfastSnack ? 'checked' : ''}> ${mt('join_breakfast_snack')}</label>
@@ -8237,7 +8686,7 @@
             }
 
             if (moduleKey === 'meal-menu') {
-                bindMealModuleModalEvents(settings);
+                bindMealModuleModalEvents(settings, item);
                 return;
             }
 
@@ -8306,6 +8755,7 @@
             }
             settings.fontFamily = document.getElementById('setting-richFontFamily')?.value || 'Arial, sans-serif';
             settings.fontSize = Math.max(8, parseInt(document.getElementById('setting-richFontSize')?.value || '72', 10) || 72);
+            settings.textSizingMode = String(document.getElementById('setting-textSizingMode')?.value || 'manual').toLowerCase() === 'fit' ? 'fit' : 'manual';
             settings.fontWeight = '700';
             settings.fontStyle = 'normal';
             settings.lineHeight = Math.max(0.8, Math.min(2.5, parseFloat(document.getElementById('setting-richLineHeight')?.value || '1.2') || 1.2));
@@ -8322,11 +8772,25 @@
             settings.scrollStartPauseMs = Math.round((parseFloat(document.getElementById('setting-scrollStartPauseSec')?.value || '3') || 3) * 1000);
             settings.scrollEndPauseMs = Math.round((parseFloat(document.getElementById('setting-scrollEndPauseSec')?.value || '3') || 3) * 1000);
             settings.scrollSpeedPxPerSec = parseInt(document.getElementById('setting-scrollSpeedPxPerSec')?.value, 10) || 35;
-            settings.clockOverlayEnabled = document.getElementById('setting-clockOverlayEnabled')?.checked === true;
-            settings.clockOverlayPosition = document.getElementById('setting-clockOverlayPosition')?.value === 'bottom' ? 'bottom' : 'top';
+            settings.clockOverlayEnabled = hasClockModuleAvailable() && document.getElementById('setting-clockOverlayEnabled')?.checked === true;
+            settings.clockOverlayPosition = 'bottom';
             settings.clockOverlayHeightPercent = 30;
             settings.clockOverlayTimeColor = document.getElementById('setting-clockOverlayTimeColor')?.value || '#ffffff';
             settings.clockOverlayDateColor = document.getElementById('setting-clockOverlayDateColor')?.value || '#ffffff';
+            settings.clockOverlayClockSize = Math.max(100, Math.min(2000, parseInt(document.getElementById('setting-clockOverlayClockSize')?.value || '300', 10) || 300));
+            const clockDateFormat = String(document.getElementById('setting-clockOverlayDateFormat')?.value || 'dmy').toLowerCase();
+            settings.clockOverlayDateFormat = ['full', 'short', 'dmy', 'numeric', 'none'].includes(clockDateFormat) ? clockDateFormat : 'dmy';
+            settings.clockOverlayShowYear = document.getElementById('setting-clockOverlayShowYear')?.checked !== false;
+            const clockLanguage = String(document.getElementById('setting-clockOverlayLanguage')?.value || 'sk').toLowerCase();
+            settings.clockOverlayLanguage = ['hu', 'sk', 'en'].includes(clockLanguage) ? clockLanguage : 'sk';
+            settings.clockOverlayDatePosition = document.getElementById('setting-clockOverlayDatePosition')?.value === 'right' ? 'right' : 'below';
+            settings.clockOverlayFontFamily = document.getElementById('setting-clockOverlayFontFamily')?.value || 'Arial, sans-serif';
+            settings.clockOverlaySeparatorColor = document.getElementById('setting-clockOverlaySeparatorColor')?.value || '#22d3ee';
+            settings.clockOverlaySeparatorThickness = Math.max(1, Math.min(8, parseInt(document.getElementById('setting-clockOverlaySeparatorThickness')?.value || '2', 10) || 2));
+
+            if (!hasClockModuleAvailable()) {
+                settings.clockOverlayEnabled = false;
+            }
             return settings;
         }
 
@@ -8421,7 +8885,17 @@
         function collectMealMenuSettingsFromForm() {
             const mealDisplayMode = normalizeMealDisplayMode(document.getElementById('setting-mealDisplayMode')?.value || 'small_screen');
             const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(document.getElementById('setting-smallScreenPageSwitchSec')?.value || '12', 10) || 12));
+            const smallScreenStartModeRaw = String(document.getElementById('setting-smallScreenStartMode')?.value || 'current_onward').toLowerCase();
+            const smallScreenStartMode = ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(smallScreenStartModeRaw)
+                ? smallScreenStartModeRaw
+                : 'current_onward';
+            const smallScreenMaxMeals = Math.max(1, Math.min(5, parseInt(document.getElementById('setting-smallScreenMaxMeals')?.value || '5', 10) || 5));
+            const smallHeaderMarqueeSpeedPxPerSec = Math.max(8, Math.min(60, parseInt(document.getElementById('setting-smallHeaderMarqueeSpeedPxPerSec')?.value || '22', 10) || 22));
+            const smallHeaderMarqueeEdgePauseMs = Math.max(200, Math.min(5000, parseInt(document.getElementById('setting-smallHeaderMarqueeEdgePauseMs')?.value || '1200', 10) || 1200));
             const smallRowFontPx = Math.max(60, Math.min(260, parseInt(document.getElementById('setting-smallRowFontPx')?.value || '150', 10) || 150));
+            const smallScreenHeaderFontPx = Math.max(20, Math.min(120, parseInt(document.getElementById('setting-smallScreenHeaderFontPx')?.value || '40', 10) || 40));
+            const smallHeaderRowTitleFontPx = Math.max(20, Math.min(140, parseInt(document.getElementById('setting-smallHeaderRowTitleFontPx')?.value || String(smallScreenHeaderFontPx), 10) || smallScreenHeaderFontPx));
+            const smallHeaderRowClockFontPx = Math.max(20, Math.min(160, parseInt(document.getElementById('setting-smallHeaderRowClockFontPx')?.value || String(smallScreenHeaderFontPx), 10) || smallScreenHeaderFontPx));
             const mealTextFontSize = mealDisplayMode === 'large_screen' ? 1.9 : 3.0;
             const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
             return {
@@ -8433,7 +8907,17 @@
                 runtimeRefreshIntervalSec: 300,
                 mealDisplayMode,
                 smallScreenPageSwitchSec,
+                smallScreenStartMode,
+                smallScreenMaxMeals,
+                smallHeaderMarqueeSpeedPxPerSec,
+                smallHeaderMarqueeEdgePauseMs,
                 smallRowFontPx,
+                smallScreenHeaderFontPx,
+                smallHeaderRowBgColor: String(document.getElementById('setting-smallHeaderRowBgColor')?.value || '#bae6fd').trim() || '#bae6fd',
+                smallHeaderRowTextColor: String(document.getElementById('setting-smallHeaderRowTextColor')?.value || '#000000').trim() || '#000000',
+                smallHeaderRowClockColor: String(document.getElementById('setting-smallHeaderRowClockColor')?.value || '#facc15').trim() || '#facc15',
+                smallHeaderRowTitleFontPx,
+                smallHeaderRowClockFontPx,
                 mealScheduleEnabled: document.getElementById('setting-mealScheduleEnabled')?.checked !== false,
                 scheduleBreakfastUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleBreakfastUntil')?.value, '10:00'),
                 scheduleSnackAmUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleSnackAmUntil')?.value, '11:00'),
@@ -8779,6 +9263,7 @@
             params.append('durationSeconds', String(parseInt(module.duration_seconds || 10, 10) || 10));
             if (settings.fontFamily) params.append('fontFamily', settings.fontFamily);
             if (settings.fontSize) params.append('fontSize', settings.fontSize);
+            params.append('textSizingMode', String(settings.textSizingMode || '').toLowerCase() === 'fit' ? 'fit' : 'manual');
             if (settings.fontWeight) params.append('fontWeight', settings.fontWeight);
             if (settings.fontStyle) params.append('fontStyle', settings.fontStyle);
             if (settings.lineHeight) params.append('lineHeight', settings.lineHeight);
@@ -8790,12 +9275,20 @@
             if (settings.scrollStartPauseMs !== undefined) params.append('scrollStartPauseMs', settings.scrollStartPauseMs);
             if (settings.scrollEndPauseMs !== undefined) params.append('scrollEndPauseMs', settings.scrollEndPauseMs);
             if (settings.scrollSpeedPxPerSec !== undefined) params.append('scrollSpeedPxPerSec', settings.scrollSpeedPxPerSec);
-            if (settings.clockOverlayEnabled === true) {
+            if (hasClockModuleAvailable() && settings.clockOverlayEnabled === true) {
                 params.append('clockOverlayEnabled', 'true');
-                params.append('clockOverlayPosition', settings.clockOverlayPosition === 'bottom' ? 'bottom' : 'top');
+                params.append('clockOverlayPosition', 'bottom');
                 params.append('clockOverlayHeightPercent', '30');
                 params.append('clockOverlayTimeColor', settings.clockOverlayTimeColor || '#ffffff');
                 params.append('clockOverlayDateColor', settings.clockOverlayDateColor || '#ffffff');
+                params.append('clockOverlayClockSize', String(Math.max(100, Math.min(2000, parseInt(settings.clockOverlayClockSize, 10) || 300))));
+                params.append('clockOverlayDateFormat', ['full', 'short', 'dmy', 'numeric', 'none'].includes(String(settings.clockOverlayDateFormat || '').toLowerCase()) ? String(settings.clockOverlayDateFormat).toLowerCase() : 'dmy');
+                params.append('clockOverlayShowYear', settings.clockOverlayShowYear === false ? 'false' : 'true');
+                params.append('clockOverlayLanguage', ['hu', 'sk', 'en'].includes(String(settings.clockOverlayLanguage || '').toLowerCase()) ? String(settings.clockOverlayLanguage).toLowerCase() : 'sk');
+                params.append('clockOverlayDatePosition', String(settings.clockOverlayDatePosition || '').toLowerCase() === 'right' ? 'right' : 'below');
+                params.append('clockOverlayFontFamily', String(settings.clockOverlayFontFamily || 'Arial, sans-serif'));
+                params.append('clockOverlaySeparatorColor', String(settings.clockOverlaySeparatorColor || '#22d3ee'));
+                params.append('clockOverlaySeparatorThickness', String(Math.max(1, Math.min(8, parseInt(settings.clockOverlaySeparatorThickness, 10) || 2))));
             }
             if (settings.bgImageData) {
                 try {
@@ -8858,14 +9351,37 @@
             const mealTextFontSize = Math.max(0.8, Math.min(4, parseFloat(settings.mealTextFontSize || 1.85) || 1.85));
             const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
             const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const smallScreenStartModeRaw = String(settings.smallScreenStartMode || 'current_onward').toLowerCase();
+            const smallScreenStartMode = ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(smallScreenStartModeRaw)
+                ? smallScreenStartModeRaw
+                : 'current_onward';
+            const smallScreenMaxMeals = Math.max(1, Math.min(5, parseInt(settings.smallScreenMaxMeals || 5, 10) || 5));
+            const smallHeaderMarqueeSpeedPxPerSec = Math.max(8, Math.min(60, parseInt(settings.smallHeaderMarqueeSpeedPxPerSec || 22, 10) || 22));
+            const smallHeaderMarqueeEdgePauseMs = Math.max(200, Math.min(5000, parseInt(settings.smallHeaderMarqueeEdgePauseMs || 1200, 10) || 1200));
             const smallRowFontPx = Math.max(60, Math.min(260, parseInt(settings.smallRowFontPx || 150, 10) || 150));
+            const smallScreenHeaderFontPx = Math.max(20, Math.min(120, parseInt(settings.smallScreenHeaderFontPx || 40, 10) || 40));
+            const smallHeaderRowTitleFontPx = Math.max(20, Math.min(140, parseInt(settings.smallHeaderRowTitleFontPx || smallScreenHeaderFontPx, 10) || smallScreenHeaderFontPx));
+            const smallHeaderRowClockFontPx = Math.max(20, Math.min(160, parseInt(settings.smallHeaderRowClockFontPx || smallScreenHeaderFontPx, 10) || smallScreenHeaderFontPx));
             const mealDisplayMode = normalizeMealDisplayMode(settings.mealDisplayMode);
             const language = normalizeMealLanguage(settings.language);
             params.append('siteKey', String(settings.siteKey || 'jedalen.sk'));
             params.append('institutionId', String(parseInt(settings.institutionId || 0, 10) || 0));
             params.append('mealDisplayMode', mealDisplayMode);
             params.append('smallScreenPageSwitchSec', String(smallScreenPageSwitchSec));
+            params.append('smallScreenStartMode', smallScreenStartMode);
+            params.append('smallScreenMaxMeals', String(smallScreenMaxMeals));
+            params.append('smallHeaderMarqueeSpeedPxPerSec', String(smallHeaderMarqueeSpeedPxPerSec));
+            params.append('smallHeaderMarqueeEdgePauseMs', String(smallHeaderMarqueeEdgePauseMs));
             params.append('smallRowFontPx', String(smallRowFontPx));
+            params.append('smallScreenHeaderFontPx', String(smallScreenHeaderFontPx));
+            params.append('smallHeaderRowBgColor', String(settings.smallHeaderRowBgColor || '#bae6fd'));
+            params.append('smallHeaderRowTextColor', String(settings.smallHeaderRowTextColor || '#000000'));
+            params.append('smallHeaderRowClockColor', String(settings.smallHeaderRowClockColor || '#facc15'));
+            params.append('smallHeaderRowTitleFontPx', String(smallHeaderRowTitleFontPx));
+            params.append('smallHeaderRowClockFontPx', String(smallHeaderRowClockFontPx));
+            params.append('smallScreenShowOperator', settings.smallScreenShowOperator === false ? 'false' : 'true');
+            params.append('smallScreenShowDate', settings.smallScreenShowDate === false ? 'false' : 'true');
+            params.append('smallScreenShowCaptions', settings.smallScreenShowCaptions === false ? 'false' : 'true');
             params.append('mergeBreakfastSnack', settings.mergeBreakfastSnack === false ? 'false' : 'true');
             params.append('mergeLunchSnack', settings.mergeLunchSnack === false ? 'false' : 'true');
             params.append('language', language);
@@ -9742,3 +10258,7 @@
 
         // Load resolutions on page load
         loadGroupResolutions();
+
+
+
+

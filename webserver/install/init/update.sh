@@ -33,6 +33,7 @@ PROGRESS_TOTAL=100
 CURRENT_PHASE="init"
 CURRENT_STATE="running"
 LAST_PROGRESS_MESSAGE="Initialization"
+CORE_VERSION_MARKER_WRITTEN="false"
 
 for arg in "$@"; do
     case "$arg" in
@@ -164,7 +165,24 @@ on_update_error() {
     report_progress "$CURRENT_PHASE" "failed" "Hiba a core update közben (line ${line_no}): ${LAST_PROGRESS_MESSAGE}" "$PROGRESS_STEP" "$PROGRESS_TOTAL" "$PROGRESS_STEP"
 }
 
+write_core_version_marker() {
+    if [ -z "$TARGET_VERSION" ]; then
+        return 0
+    fi
+
+    echo "$TARGET_VERSION" > "${TARGET_DIR}/VERSION" 2>/dev/null || true
+    CORE_VERSION_MARKER_WRITTEN="true"
+}
+
+cleanup_core_update_lock() {
+    if [ -d "/tmp/edudisplej_core_update.lock" ]; then
+        rmdir "/tmp/edudisplej_core_update.lock" 2>/dev/null || true
+    fi
+    rm -f "/tmp/edudisplej_core_update.last_attempt" 2>/dev/null || true
+}
+
 trap 'on_update_error $LINENO' ERR
+trap 'cleanup_core_update_lock' EXIT
 
 # Kontrola root opravneni / Root jogok ellenorzese
 echo "[*] Kontrola opravneni root..."
@@ -643,6 +661,39 @@ except Exception as e:
 # After file installation, install services
 install_services
 
+# Ensure critical core units are installed even when structure.json parsing fails.
+echo "[*] Overujem kriticke unit subory (fallback mode)..."
+FALLBACK_UNITS=(
+    "edudisplej-kiosk.service"
+    "edudisplej-sync.service"
+    "edudisplej-watchdog.service"
+    "edudisplej-screenshot-service.service"
+    "edudisplej-command-executor.service"
+    "edudisplej-health.service"
+    "edudisplej-self-heat.service"
+    "edudisplej-self-heat.timer"
+)
+
+for unit_name in "${FALLBACK_UNITS[@]}"; do
+    src_path="${INIT_DIR}/${unit_name}"
+    dst_path="/etc/systemd/system/${unit_name}"
+    if [ -f "$src_path" ]; then
+        cp "$src_path" "$dst_path" 2>/dev/null || true
+        chmod 644 "$dst_path" 2>/dev/null || true
+    fi
+done
+
+systemctl daemon-reload 2>/dev/null || true
+
+for service_name in "${FALLBACK_UNITS[@]}"; do
+    if systemctl list-unit-files "$service_name" >/dev/null 2>&1 || [ -f "/etc/systemd/system/${service_name}" ]; then
+        systemctl enable "$service_name" 2>/dev/null || true
+        if [ "$service_name" != "edudisplej-kiosk.service" ]; then
+            systemctl start "$service_name" 2>/dev/null || true
+        fi
+    fi
+done
+
 # ============================================================================
 # REFRESH LOOP PLAYER / LOOP LEJATSZO FRISSITESE
 # ============================================================================
@@ -683,6 +734,10 @@ fi
 
 fi
 
+if [ "$CORE_ONLY" = true ] && [ -n "$TARGET_VERSION" ]; then
+    write_core_version_marker
+fi
+
 echo ""
 echo "=========================================="
 echo "[✓] Aktualizacia dokoncena / Frissites kesz!"
@@ -706,21 +761,29 @@ fi
 echo "[*] Restartujem sluzby / Szolgaltatasok ujrainditasa..."
 
 # Najdenie vsetkych sluzieb edudisplej / Osszes edudisplej szolgaltatas megkeresese
-SERVICES=$(systemctl list-units --type=service --all | grep '^[[:space:]]*edudisplej' | awk '{print $1}')
+SERVICES=$(systemctl list-units --type=service --all 2>/dev/null | grep '^[[:space:]]*edudisplej' | awk '{print $1}' || true)
+
+if [ -z "$SERVICES" ]; then
+    SERVICES="edudisplej-kiosk.service edudisplej-sync.service edudisplej-watchdog.service edudisplej-screenshot-service.service edudisplej-command-executor.service edudisplej-health.service edudisplej-self-heat.service"
+fi
 
 if [ -n "$SERVICES" ]; then
     echo "[*] Zastavujem sluzby..."
     for service in $SERVICES; do
-        echo "    - $service"
-        systemctl stop "$service" 2>/dev/null || true
+        if systemctl list-unit-files "$service" >/dev/null 2>&1 || [ -f "/etc/systemd/system/${service}" ]; then
+            echo "    - $service"
+            systemctl stop "$service" 2>/dev/null || true
+        fi
     done
     
     sleep 2
     
     echo "[*] Spustam sluzby..."
     for service in $SERVICES; do
-        echo "    - $service"
-        systemctl start "$service" 2>/dev/null || true
+        if systemctl list-unit-files "$service" >/dev/null 2>&1 || [ -f "/etc/systemd/system/${service}" ]; then
+            echo "    - $service"
+            systemctl start "$service" 2>/dev/null || true
+        fi
     done
     
     echo ""
@@ -728,6 +791,12 @@ if [ -n "$SERVICES" ]; then
 else
     echo "[!] Ziadne sluzby edudisplej nenajdene"
     echo "[!] Mozno je potrebny manualy restart"
+fi
+
+# Keep self-heat timer always active to recover from post-update service drops.
+if systemctl list-unit-files edudisplej-self-heat.timer >/dev/null 2>&1 || [ -f "/etc/systemd/system/edudisplej-self-heat.timer" ]; then
+    systemctl enable edudisplej-self-heat.timer 2>/dev/null || true
+    systemctl start edudisplej-self-heat.timer 2>/dev/null || true
 fi
 
 report_progress "restart" "running" "Core szolgáltatások újraindítva" 96 100 96
@@ -763,6 +832,11 @@ if [ ! -f "$CONFIG_FILE" ]; then
 else
     echo "[✓] Config.json uz existuje - Config.json already exists"
 fi
+
+# Ensure health status file remains writable by edudisplej user (health service runtime user).
+touch "${TARGET_DIR}/health_status.json" 2>/dev/null || true
+chown "${CONSOLE_USER}:${CONSOLE_USER}" "${TARGET_DIR}/health_status.json" 2>/dev/null || true
+chmod 664 "${TARGET_DIR}/health_status.json" 2>/dev/null || true
 
 echo ""
 
@@ -828,7 +902,9 @@ echo "  sudo rm -rf $BACKUP_DIR"
 echo ""
 
 if [ -n "$TARGET_VERSION" ]; then
-    echo "$TARGET_VERSION" > "${TARGET_DIR}/VERSION" 2>/dev/null || true
+    write_core_version_marker
 fi
+
+cleanup_core_update_lock
 
 report_progress "completed" "completed" "Core update sikeresen lefutott" 100 100 100

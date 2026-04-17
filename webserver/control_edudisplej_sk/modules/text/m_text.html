@@ -53,6 +53,19 @@
             z-index: 2;
         }
 
+        .clock-overlay-separator {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-image: repeating-linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0.9) 0 8px,
+                transparent 8px 14px
+            );
+            pointer-events: none;
+        }
+
         .clock-overlay-time,
         .clock-overlay-date {
             width: 100%;
@@ -130,6 +143,7 @@
 <body>
     <div class="module-root" id="moduleRoot">
         <div class="clock-overlay-band" id="clockOverlayBand">
+            <div class="clock-overlay-separator" id="clockOverlaySeparator"></div>
             <div class="clock-overlay-time" id="clockOverlayTime">--:--</div>
             <div class="clock-overlay-date" id="clockOverlayDate">--.--.----</div>
         </div>
@@ -268,6 +282,7 @@
                 text: 'Sem vložte text...',
                 fontFamily: 'Arial, sans-serif',
                 fontSize: 72,
+                textSizingMode: 'manual',
                 fontWeight: '700',
                 fontStyle: 'normal',
                 lineHeight: 1.2,
@@ -283,10 +298,18 @@
                 scrollEndPauseMs: 3000,
                 scrollSpeedPxPerSec: 35,
                 clockOverlayEnabled: false,
-                clockOverlayPosition: 'top',
+                clockOverlayPosition: 'bottom',
                 clockOverlayHeightPercent: 30,
                 clockOverlayTimeColor: '#ffffff',
-                clockOverlayDateColor: '#ffffff'
+                clockOverlayDateColor: '#ffffff',
+                clockOverlayClockSize: 300,
+                clockOverlayDateFormat: 'dmy',
+                clockOverlayShowYear: true,
+                clockOverlayLanguage: 'sk',
+                clockOverlayDatePosition: 'below',
+                clockOverlayFontFamily: 'Arial, sans-serif',
+                clockOverlaySeparatorColor: '#22d3ee',
+                clockOverlaySeparatorThickness: 2
             };
 
             const injected = (typeof window.EDUDISPLEJ_SETTINGS === 'object' && window.EDUDISPLEJ_SETTINGS)
@@ -305,6 +328,7 @@
                 text: params.get('text') ?? injected.text ?? defaults.text,
                 fontFamily: params.get('fontFamily') ?? injected.fontFamily ?? defaults.fontFamily,
                 fontSize: parseNum(params.get('fontSize') ?? injected.fontSize, defaults.fontSize),
+                textSizingMode: String(params.get('textSizingMode') ?? injected.textSizingMode ?? defaults.textSizingMode),
                 fontWeight: String(params.get('fontWeight') ?? injected.fontWeight ?? defaults.fontWeight),
                 fontStyle: String(params.get('fontStyle') ?? injected.fontStyle ?? defaults.fontStyle),
                 lineHeight: parseNum(params.get('lineHeight') ?? injected.lineHeight, defaults.lineHeight),
@@ -323,7 +347,15 @@
                 clockOverlayPosition: String(params.get('clockOverlayPosition') ?? injected.clockOverlayPosition ?? defaults.clockOverlayPosition),
                 clockOverlayHeightPercent: parseNum(params.get('clockOverlayHeightPercent') ?? injected.clockOverlayHeightPercent, defaults.clockOverlayHeightPercent),
                 clockOverlayTimeColor: params.get('clockOverlayTimeColor') ?? injected.clockOverlayTimeColor ?? defaults.clockOverlayTimeColor,
-                clockOverlayDateColor: params.get('clockOverlayDateColor') ?? injected.clockOverlayDateColor ?? defaults.clockOverlayDateColor
+                clockOverlayDateColor: params.get('clockOverlayDateColor') ?? injected.clockOverlayDateColor ?? defaults.clockOverlayDateColor,
+                clockOverlayClockSize: parseNum(params.get('clockOverlayClockSize') ?? injected.clockOverlayClockSize, defaults.clockOverlayClockSize),
+                clockOverlayDateFormat: String(params.get('clockOverlayDateFormat') ?? injected.clockOverlayDateFormat ?? defaults.clockOverlayDateFormat),
+                clockOverlayShowYear: parseBool(params.get('clockOverlayShowYear') ?? injected.clockOverlayShowYear, defaults.clockOverlayShowYear),
+                clockOverlayLanguage: String(params.get('clockOverlayLanguage') ?? injected.clockOverlayLanguage ?? defaults.clockOverlayLanguage),
+                clockOverlayDatePosition: String(params.get('clockOverlayDatePosition') ?? injected.clockOverlayDatePosition ?? defaults.clockOverlayDatePosition),
+                clockOverlayFontFamily: String(params.get('clockOverlayFontFamily') ?? injected.clockOverlayFontFamily ?? defaults.clockOverlayFontFamily),
+                clockOverlaySeparatorColor: String(params.get('clockOverlaySeparatorColor') ?? injected.clockOverlaySeparatorColor ?? defaults.clockOverlaySeparatorColor),
+                clockOverlaySeparatorThickness: parseNum(params.get('clockOverlaySeparatorThickness') ?? injected.clockOverlaySeparatorThickness, defaults.clockOverlaySeparatorThickness)
             };
 
             if (!merged.bgImageData && merged.bgImageStorageKey) {
@@ -369,6 +401,7 @@
         const viewport = document.getElementById('textViewport');
         const content = document.getElementById('textContent');
         const clockOverlayBand = document.getElementById('clockOverlayBand');
+        const clockOverlaySeparator = document.getElementById('clockOverlaySeparator');
         const clockOverlayTime = document.getElementById('clockOverlayTime');
         const clockOverlayDate = document.getElementById('clockOverlayDate');
 
@@ -388,11 +421,65 @@
             return 'sk-SK';
         }
 
+        function getOverlayLocale(language) {
+            const lang = String(language || '').toLowerCase();
+            if (lang === 'hu') return 'hu-HU';
+            if (lang === 'en') return 'en-GB';
+            if (lang === 'sk') return 'sk-SK';
+            return getUiLocale();
+        }
+
+        function normalizeOverlayDateFormat(value) {
+            const raw = String(value || '').toLowerCase();
+            return ['full', 'short', 'dmy', 'numeric', 'none'].includes(raw) ? raw : 'dmy';
+        }
+
+        function normalizeOverlayDatePosition(value) {
+            return String(value || '').toLowerCase() === 'right' ? 'right' : 'below';
+        }
+
         function formatOverlayDate(now) {
-            const locale = getUiLocale();
-            const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(now);
-            const datePart = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now);
-            return `${weekday} ${datePart}`.trim();
+            const locale = getOverlayLocale(settings.clockOverlayLanguage);
+            const format = normalizeOverlayDateFormat(settings.clockOverlayDateFormat);
+            const showYear = settings.clockOverlayShowYear !== false;
+            if (format === 'none') {
+                return '';
+            }
+
+            if (format === 'full') {
+                return new Intl.DateTimeFormat(locale, {
+                    weekday: 'long',
+                    ...(showYear ? { year: 'numeric' } : {}),
+                    month: 'long',
+                    day: 'numeric'
+                }).format(now);
+            }
+
+            if (format === 'short') {
+                return new Intl.DateTimeFormat(locale, {
+                    ...(showYear ? { year: 'numeric' } : {}),
+                    month: 'short',
+                    day: 'numeric'
+                }).format(now);
+            }
+
+            if (format === 'numeric') {
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                if (showYear) {
+                    const y = String(now.getFullYear());
+                    return `${y}.${m}.${d}`;
+                }
+                return `${m}.${d}`;
+            }
+
+            const d = String(now.getDate()).padStart(2, '0');
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            if (showYear) {
+                const y = String(now.getFullYear());
+                return `${d}.${m}.${y}`;
+            }
+            return `${d}.${m}`;
         }
 
         function renderOverlayClockTick() {
@@ -403,7 +490,9 @@
             const hh = String(now.getHours()).padStart(2, '0');
             const mm = String(now.getMinutes()).padStart(2, '0');
             clockOverlayTime.textContent = `${hh}:${mm}`;
-            clockOverlayDate.textContent = formatOverlayDate(now);
+            const dateText = formatOverlayDate(now);
+            clockOverlayDate.textContent = dateText;
+            clockOverlayDate.style.display = dateText ? 'block' : 'none';
         }
 
         function applyClockOverlayLayout() {
@@ -419,18 +508,36 @@
                 clockOverlayBand.style.top = '';
                 clockOverlayBand.style.bottom = '';
                 clockOverlayBand.style.height = '';
+                if (clockOverlaySeparator) {
+                    clockOverlaySeparator.style.display = 'none';
+                }
                 viewport.style.top = '0';
                 viewport.style.bottom = '0';
                 return;
             }
 
-            const position = String(settings.clockOverlayPosition || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
+            const position = 'bottom';
             const bandHeight = Math.max(30, Math.min(30, parseNum(settings.clockOverlayHeightPercent, 30)));
+            const datePosition = normalizeOverlayDatePosition(settings.clockOverlayDatePosition);
+            const clockSize = Math.max(100, Math.min(2000, parseNum(settings.clockOverlayClockSize, 300)));
+            const bandPx = Math.max(120, Math.round((root.clientHeight || window.innerHeight || 1080) * (bandHeight / 100)));
+            const scale = clockSize / 300;
+            const dateHidden = normalizeOverlayDateFormat(settings.clockOverlayDateFormat) === 'none';
+            const baseTimeRatio = dateHidden ? 0.86 : (datePosition === 'right' ? 0.72 : 0.66);
+            const baseDateRatio = datePosition === 'right' ? 0.28 : 0.24;
+            const timePx = Math.max(36, Math.min(900, Math.round(bandPx * baseTimeRatio * scale)));
+            const datePx = Math.max(14, Math.min(260, Math.round(bandPx * baseDateRatio * Math.max(0.7, scale * 0.95))));
+            const overlayFontFamily = String(settings.clockOverlayFontFamily || 'Arial, sans-serif');
+            const separatorColor = String(settings.clockOverlaySeparatorColor || '#22d3ee');
+            const separatorThickness = Math.max(1, Math.min(8, Math.round(parseNum(settings.clockOverlaySeparatorThickness, 2))));
 
             clockOverlayBand.style.display = 'flex';
             clockOverlayBand.style.height = `${bandHeight}%`;
             clockOverlayBand.style.top = position === 'top' ? '0' : '';
             clockOverlayBand.style.bottom = position === 'bottom' ? '0' : '';
+            clockOverlayBand.style.flexDirection = datePosition === 'right' ? 'row' : 'column';
+            clockOverlayBand.style.gap = datePosition === 'right' ? '1.2em' : '0.35em';
+            clockOverlayBand.style.background = 'rgba(0, 0, 0, 0.48)';
 
             if (position === 'top') {
                 viewport.style.top = `${bandHeight}%`;
@@ -440,13 +547,28 @@
                 viewport.style.bottom = `${bandHeight}%`;
             }
 
+            if (clockOverlaySeparator) {
+                clockOverlaySeparator.style.display = 'block';
+                clockOverlaySeparator.style.height = `${separatorThickness}px`;
+                clockOverlaySeparator.style.top = position === 'bottom' ? '0' : 'auto';
+                clockOverlaySeparator.style.bottom = position === 'top' ? '0' : 'auto';
+                clockOverlaySeparator.style.backgroundImage = `repeating-linear-gradient(90deg, ${separatorColor} 0 10px, transparent 10px 17px)`;
+            }
+
             if (clockOverlayTime) {
                 clockOverlayTime.style.color = settings.clockOverlayTimeColor || '#ffffff';
-                clockOverlayTime.style.fontSize = `clamp(36px, ${Math.max(5, bandHeight * 0.32)}vh, 220px)`;
+                clockOverlayTime.style.fontSize = `${timePx}px`;
+                clockOverlayTime.style.width = datePosition === 'right' ? 'auto' : '100%';
+                clockOverlayTime.style.fontFamily = overlayFontFamily;
+                clockOverlayTime.style.fontWeight = '900';
+                clockOverlayTime.style.letterSpacing = '0.02em';
             }
             if (clockOverlayDate) {
                 clockOverlayDate.style.color = settings.clockOverlayDateColor || '#ffffff';
-                clockOverlayDate.style.fontSize = `clamp(20px, ${Math.max(2.6, bandHeight * 0.16)}vh, 120px)`;
+                clockOverlayDate.style.fontSize = `${datePx}px`;
+                clockOverlayDate.style.width = datePosition === 'right' ? 'auto' : '100%';
+                clockOverlayDate.style.marginTop = datePosition === 'right' ? '0' : '6px';
+                clockOverlayDate.style.fontFamily = overlayFontFamily;
             }
 
             renderOverlayClockTick();
@@ -464,12 +586,43 @@
 
             content.innerHTML = resolvedHtml || 'Sem vložte text...';
             content.style.fontFamily = settings.fontFamily || 'Arial, sans-serif';
-            content.style.fontSize = `${Math.max(10, parseNum(settings.fontSize, 72))}px`;
+            const requestedFontSize = Math.max(10, parseNum(settings.fontSize, 72));
+            content.style.fontSize = `${requestedFontSize}px`;
             content.style.fontWeight = settings.fontWeight || '700';
             content.style.fontStyle = settings.fontStyle || 'normal';
             content.style.lineHeight = String(Math.max(0.8, parseNum(settings.lineHeight, 1.2)));
             content.style.textAlign = settings.textAlign || 'left';
             content.style.color = settings.textColor || '#ffffff';
+
+            applyClockOverlayLayout();
+
+            if (String(settings.textSizingMode || 'manual').toLowerCase() === 'fit') {
+                const minFont = 10;
+                const maxFont = 260;
+                let low = minFont;
+                let high = maxFont;
+                let best = minFont;
+
+                const fitsAt = (sizePx) => {
+                    content.style.fontSize = `${sizePx}px`;
+                    return content.scrollHeight <= (viewport.clientHeight + 1)
+                        && content.scrollWidth <= (viewport.clientWidth + 1);
+                };
+
+                while (low <= high) {
+                    const mid = Math.floor((low + high) / 2);
+                    if (fitsAt(mid)) {
+                        best = mid;
+                        low = mid + 1;
+                    } else {
+                        high = mid - 1;
+                    }
+                }
+
+                content.style.fontSize = `${best}px`;
+            } else {
+                content.style.fontSize = `${requestedFontSize}px`;
+            }
 
             const animationEntry = String(settings.textAnimationEntry || 'none').toLowerCase();
             if (animationEntry === 'fadein') {
@@ -479,8 +632,6 @@
             } else if (animationEntry === 'zoomin') {
                 content.classList.add('text-animation-zoomIn');
             }
-
-            applyClockOverlayLayout();
         }
 
         let scrollAnimationFrame = null;
@@ -501,7 +652,8 @@
             clearScrollRuntime();
             content.style.transform = 'translateY(0px)';
 
-            if (!settings.scrollMode) {
+            const scrollRequired = settings.scrollMode || settings.clockOverlayEnabled;
+            if (!scrollRequired) {
                 return;
             }
 

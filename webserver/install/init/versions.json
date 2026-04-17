@@ -1,17 +1,20 @@
 {
-    "system_version": "v20260414203502",
+    "system_version": "v20260417115002",
     "services": {
         "edudisplej_sync_service.sh": "1.1.2",
         "edudisplej_terminal_display.sh": "1.1.2",
         "edudisplej_terminal_script.sh": "1.1.2",
         "edudisplej-download-modules.sh": "1.1.2",
         "edudisplej-watchdog.sh": "1.1.2",
+        "edudisplej-self-heat.sh": "1.0.0",
+        "edudisplej-self-heat.service": "1.0.0",
+        "edudisplej-self-heat.timer": "1.0.0",
         "update.sh": "1.1.2",
         "common.sh": "1.1.2",
         "kiosk.sh": "1.1.2"
     },
-    "last_updated": "2026-04-14T18:35:02Z",
-    "core_checksum": "9c59ee4f0ed8be6246bb481e8e5c74b8e452f6125ecc70d63d0dae37f45870ab",
-    "core_checksum_files": 199,
-    "core_checksum_scanned_at": "2026-04-14T18:35:02Z"
+    "last_updated": "2026-04-17T09:50:02Z",
+    "core_checksum": "7d0fb26e0229869423a5defaa7f7fdf034607db741ef4f72648e99f12f6778a9",
+    "core_checksum_files": 201,
+    "core_checksum_scanned_at": "2026-04-17T09:50:02Z"
 }

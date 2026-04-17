@@ -1,0 +1,12 @@
+[Unit]
+Description=EduDisplej Self-Heat Timer - Run Self-Heal Every Minute
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=10s
+Unit=edudisplej-self-heat.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

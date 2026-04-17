@@ -1,0 +1,11 @@
+[Unit]
+Description=EduDisplej Self-Heat Service - Global Service Self-Heal
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/edudisplej/init/edudisplej-self-heat.sh
+
+[Install]
+WantedBy=multi-user.target
