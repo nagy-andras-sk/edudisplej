@@ -1314,7 +1314,7 @@ $loop_json
                     try {
                         let response = await fetch(new URL('offline_status.json', window.location.href), { cache: 'no-store' });
                         if (!response.ok) {
-                            response = await fetch('file:///opt/edudisplej/localweb/offline_status.json?ts=' + Date.now(), { cache: 'no-store' });
+                            response = await fetch(new URL('offline_status.json', window.location.href), { cache: 'no-store' });
                         }
 
                         if (!response.ok) {
@@ -1359,7 +1359,7 @@ $loop_json
                 try {
                     let response = await fetch(new URL('last_sync_response.json', window.location.href), { cache: 'no-store' });
                     if (!response.ok) {
-                        response = await fetch('file:///opt/edudisplej/last_sync_response.json', { cache: 'no-store' });
+                        response = await fetch(new URL('last_sync_response.json', window.location.href), { cache: 'no-store' });
                     }
 
                     if (response.ok) {
@@ -1388,7 +1388,7 @@ $loop_json
             async updateDebugLogTail() {
                 let response = await fetch(new URL('logs/sync.log', window.location.href), { cache: 'no-store' });
                 if (!response.ok) {
-                    response = await fetch('file:///opt/edudisplej/logs/sync.log?ts=' + Date.now(), { cache: 'no-store' });
+                    response = await fetch(new URL('logs/sync.log', window.location.href), { cache: 'no-store' });
                 }
 
                 if (!response.ok) {
@@ -1434,8 +1434,8 @@ $loop_json
                     let response = await fetch(new URL('modules/loop.json', window.location.href), { cache: 'no-store' });
                     
                     if (!response.ok) {
-                        // Fallback for file:// restrictions or unexpected base paths
-                        response = await fetch('file:///opt/edudisplej/localweb/modules/loop.json', { cache: 'no-store' });
+                        // Retry the same relative path; keep the browser off hardcoded /opt fallbacks.
+                        response = await fetch(new URL('modules/loop.json', window.location.href), { cache: 'no-store' });
                     }
                     
                     if (!response.ok) {

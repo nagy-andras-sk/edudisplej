@@ -38,6 +38,22 @@ if ($company_id <= 0) {
     exit();
 }
 
+$special_calendar_enabled = false;
+if (!$special_calendar_enabled) {
+    $title = t_def('dashboard.special_loop.page_title', 'Event Calendar');
+    require_once 'header.php';
+    ?>
+    <div class="panel" style="margin-top:14px;">
+        <div class="panel-title">📅 <?php echo htmlspecialchars(t_def('dashboard.special_loop.unavailable.title', 'Event Calendar is coming soon')); ?></div>
+        <p class="muted" style="margin-top:8px;">
+            <?php echo htmlspecialchars(t_def('dashboard.special_loop.unavailable.body', 'This feature is temporarily unavailable. We will enable it soon.')); ?>
+        </p>
+    </div>
+    <?php
+    require_once 'footer.php';
+    exit();
+}
+
 $requested_group_id = intval($_GET['group_id'] ?? 0);
 
 $groups = [];
@@ -754,32 +770,32 @@ if (is_array($selected_group_plan)) {
         $format_interval = static function (DateInterval $interval): string {
             $parts = [];
             if ($interval->d > 0) {
-                $parts[] = $interval->d . ' nap';
+                $parts[] = t_def('dashboard.special_loop.time.day', '{count} day', ['count' => $interval->d]);
             }
             if ($interval->h > 0) {
-                $parts[] = $interval->h . ' óra';
+                $parts[] = t_def('dashboard.special_loop.time.hour', '{count} hour', ['count' => $interval->h]);
             }
             if ($interval->i > 0 && count($parts) < 2) {
-                $parts[] = $interval->i . ' perc';
+                $parts[] = t_def('dashboard.special_loop.time.minute', '{count} min', ['count' => $interval->i]);
             }
             if (empty($parts)) {
-                $parts[] = 'kevesebb mint 1 perc';
+                $parts[] = t_def('dashboard.special_loop.time.less_than_minute', 'less than 1 min');
             }
             return implode(' ', $parts);
         };
 
         $status_key = 'scheduled';
-        $status_label = 'Ütemezve';
+        $status_label = t_def('dashboard.special_loop.status.scheduled', 'Scheduled');
         if ($now < $start_dt) {
-            $relative_label = 'Még ' . $format_interval($now->diff($start_dt)) . ' múlva';
+            $relative_label = t_def('dashboard.special_loop.relative.starts_in', 'Starts in {interval}', ['interval' => $format_interval($now->diff($start_dt))]);
         } elseif ($now > $end_dt) {
             $status_key = 'inactive';
-            $status_label = 'Inaktív (lejárt)';
-            $relative_label = 'Már ' . $format_interval($end_dt->diff($now)) . ' telt el';
+            $status_label = t_def('dashboard.special_loop.status.inactive_expired', 'Inactive (expired)');
+            $relative_label = t_def('dashboard.special_loop.relative.elapsed', '{interval} elapsed', ['interval' => $format_interval($end_dt->diff($now))]);
         } else {
             $status_key = 'active';
-            $status_label = 'Aktív';
-            $relative_label = 'Most fut, még ' . $format_interval($now->diff($end_dt)) . ' van hátra';
+            $status_label = t_def('dashboard.special_loop.status.active', 'Active');
+            $relative_label = t_def('dashboard.special_loop.relative.running_remaining', 'Running now, {interval} remaining', ['interval' => $format_interval($now->diff($end_dt))]);
         }
 
         $selected_special_blocks[] = [

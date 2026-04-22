@@ -538,8 +538,8 @@
                     small_header_row_clock: 'Farba hodín (1. riadok)',
                     small_header_row_title_font: 'Veľkosť písma vľavo (1. riadok, px)',
                     small_header_row_clock_font: 'Veľkosť písma hodín (1. riadok, px)',
-                    page_switch: 'Prepínanie strán na malom displeji (sekundy)',
-                    page_switch_hint: 'Platí len pre režim A) MALÝ DISPLEJ.',
+                    small_cycle_total: 'Celkový čas cyklu malého displeja (sekundy)',
+                    small_cycle_hint: 'Celý cyklus sa automaticky rozdelí medzi zobrazené jedlá.',
                     small_start_mode: 'Počiatočné jedlo zobrazenia',
                     small_start_current: 'Od aktuálneho jedla ďalej',
                     small_start_breakfast: 'Od raňajok ďalej',
@@ -609,8 +609,8 @@
                     small_header_row_clock: 'Row 1 clock color',
                     small_header_row_title_font: 'Row 1 left font size (px)',
                     small_header_row_clock_font: 'Row 1 clock font size (px)',
-                    page_switch: 'Small-screen page switch (seconds)',
-                    page_switch_hint: 'Applies only to A) SMALL SCREEN mode.',
+                    small_cycle_total: 'Small-screen total cycle time (seconds)',
+                    small_cycle_hint: 'The total cycle is automatically split across the displayed meals.',
                     small_start_mode: 'Small-screen start mode',
                     small_start_current: 'From current meal onward',
                     small_start_breakfast: 'From breakfast onward',
@@ -5968,6 +5968,7 @@
                     sourceType: 'server',
                     mealDisplayMode: 'small_screen',
                     smallScreenPageSwitchSec: 12,
+                    smallScreenCycleSec: 12,
                     smallScreenStartMode: 'current_onward',
                     smallScreenMaxMeals: 5,
                     smallHeaderMarqueeSpeedPxPerSec: 22,
@@ -6545,7 +6546,7 @@
 
             // Add live preview update listeners for all meal settings
             const mealSettingInputIds = [
-                'setting-smallScreenPageSwitchSec',
+                'setting-smallScreenCycleSec',
                 'setting-smallScreenStartMode',
                 'setting-smallScreenMaxMeals',
                 'setting-smallHeaderMarqueeSpeedPxPerSec',
@@ -7959,12 +7960,13 @@
             const sourceType = String(settings.sourceType || 'manual').toLowerCase() === 'server' ? 'server' : 'manual';
             const mealDisplayMode = normalizeMealDisplayMode(settings.mealDisplayMode);
             const isSmallMode = mealDisplayMode === 'small_screen';
-            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const smallScreenCycleSec = Math.max(3, Math.min(300, parseInt(settings.smallScreenCycleSec || settings.smallScreenPageSwitchSec || 12, 10) || 12));
             const smallScreenStartModeRaw = String(settings.smallScreenStartMode || 'current_onward').toLowerCase();
             const smallScreenStartMode = ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(smallScreenStartModeRaw)
                 ? smallScreenStartModeRaw
                 : 'current_onward';
             const smallScreenMaxMeals = Math.max(1, Math.min(5, parseInt(settings.smallScreenMaxMeals || 5, 10) || 5));
+            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, Math.round(smallScreenCycleSec / smallScreenMaxMeals)));
             const smallHeaderMarqueeSpeedPxPerSec = Math.max(8, Math.min(60, parseInt(settings.smallHeaderMarqueeSpeedPxPerSec || 22, 10) || 22));
             const smallHeaderMarqueeEdgePauseMs = Math.max(200, Math.min(5000, parseInt(settings.smallHeaderMarqueeEdgePauseMs || 1200, 10) || 1200));
             const smallRowFontPx = Math.max(60, Math.min(260, parseInt(settings.smallRowFontPx || 150, 10) || 150));
@@ -8017,9 +8019,10 @@
 
                         <div id="meal-small-settings" style="display:${isSmallMode ? 'grid' : 'none'}; gap:10px;">
                             <div>
-                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('page_switch')}</label>
-                                <input type="number" id="setting-smallScreenPageSwitchSec" min="1" max="120" step="1" value="${smallScreenPageSwitchSec}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
-                                <div style="font-size:12px; color:#64748b; margin-top:4px;">${mt('page_switch_hint')}</div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('small_cycle_total')}</label>
+                                <input type="number" id="setting-smallScreenCycleSec" min="3" max="300" step="1" value="${smallScreenCycleSec}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                <div style="font-size:12px; color:#64748b; margin-top:4px;">${mt('small_cycle_hint')}</div>
+                                <div style="font-size:12px; color:#334155; margin-top:4px;">${smallScreenMaxMeals} x ~${(smallScreenCycleSec / smallScreenMaxMeals).toFixed(1)} s</div>
                             </div>
 
                             <div>
@@ -8906,12 +8909,13 @@
 
         function collectMealMenuSettingsFromForm() {
             const mealDisplayMode = normalizeMealDisplayMode(document.getElementById('setting-mealDisplayMode')?.value || 'small_screen');
-            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(document.getElementById('setting-smallScreenPageSwitchSec')?.value || '12', 10) || 12));
+            const smallScreenCycleSec = Math.max(3, Math.min(300, parseInt(document.getElementById('setting-smallScreenCycleSec')?.value || '12', 10) || 12));
             const smallScreenStartModeRaw = String(document.getElementById('setting-smallScreenStartMode')?.value || 'current_onward').toLowerCase();
             const smallScreenStartMode = ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(smallScreenStartModeRaw)
                 ? smallScreenStartModeRaw
                 : 'current_onward';
             const smallScreenMaxMeals = Math.max(1, Math.min(5, parseInt(document.getElementById('setting-smallScreenMaxMeals')?.value || '5', 10) || 5));
+            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, Math.round(smallScreenCycleSec / smallScreenMaxMeals)));
             const smallHeaderMarqueeSpeedPxPerSec = Math.max(8, Math.min(60, parseInt(document.getElementById('setting-smallHeaderMarqueeSpeedPxPerSec')?.value || '22', 10) || 22));
             const smallHeaderMarqueeEdgePauseMs = Math.max(200, Math.min(5000, parseInt(document.getElementById('setting-smallHeaderMarqueeEdgePauseMs')?.value || '1200', 10) || 1200));
             const smallRowFontPx = Math.max(60, Math.min(260, parseInt(document.getElementById('setting-smallRowFontPx')?.value || '150', 10) || 150));
@@ -8928,6 +8932,7 @@
                 runtimeApiFetchEnabled: true,
                 runtimeRefreshIntervalSec: 300,
                 mealDisplayMode,
+                smallScreenCycleSec,
                 smallScreenPageSwitchSec,
                 smallScreenStartMode,
                 smallScreenMaxMeals,
@@ -9372,12 +9377,13 @@
         function appendMealMenuPreviewParams(params, settings) {
             const mealTextFontSize = Math.max(0.8, Math.min(4, parseFloat(settings.mealTextFontSize || 1.85) || 1.85));
             const mealTitleFontSize = Math.max(0.8, Math.min(4, mealTextFontSize * 1.5));
-            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, parseInt(settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const smallScreenCycleSec = Math.max(3, Math.min(300, parseInt(settings.smallScreenCycleSec || settings.smallScreenPageSwitchSec || 12, 10) || 12));
             const smallScreenStartModeRaw = String(settings.smallScreenStartMode || 'current_onward').toLowerCase();
             const smallScreenStartMode = ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(smallScreenStartModeRaw)
                 ? smallScreenStartModeRaw
                 : 'current_onward';
             const smallScreenMaxMeals = Math.max(1, Math.min(5, parseInt(settings.smallScreenMaxMeals || 5, 10) || 5));
+            const smallScreenPageSwitchSec = Math.max(1, Math.min(120, Math.round(smallScreenCycleSec / smallScreenMaxMeals)));
             const smallHeaderMarqueeSpeedPxPerSec = Math.max(8, Math.min(60, parseInt(settings.smallHeaderMarqueeSpeedPxPerSec || 22, 10) || 22));
             const smallHeaderMarqueeEdgePauseMs = Math.max(200, Math.min(5000, parseInt(settings.smallHeaderMarqueeEdgePauseMs || 1200, 10) || 1200));
             const smallRowFontPx = Math.max(60, Math.min(260, parseInt(settings.smallRowFontPx || 150, 10) || 150));
@@ -9389,6 +9395,7 @@
             params.append('siteKey', String(settings.siteKey || 'jedalen.sk'));
             params.append('institutionId', String(parseInt(settings.institutionId || 0, 10) || 0));
             params.append('mealDisplayMode', mealDisplayMode);
+            params.append('smallScreenCycleSec', String(smallScreenCycleSec));
             params.append('smallScreenPageSwitchSec', String(smallScreenPageSwitchSec));
             params.append('smallScreenStartMode', smallScreenStartMode);
             params.append('smallScreenMaxMeals', String(smallScreenMaxMeals));

@@ -164,7 +164,7 @@ $admin_nav_pages = [
 // Dashboard nav page map
 $dashboard_nav_pages = [
     'index.php' => ['href' => 'index.php', 'label' => t('nav.kiosks'), 'key' => 'kiosks'],
-    'quick_messages.php' => ['href' => 'quick_messages.php', 'label' => '📅 ' . t_def('nav.special_plan', 'Eseménynaptár'), 'key' => 'special_plan'],
+    'quick_messages.php' => ['href' => 'quick_messages.php', 'label' => '📅 ' . t('nav.special_plan') . ' (' . t_def('common.coming_soon', 'Soon') . ')', 'key' => 'special_plan', 'disabled' => true],
     'groups.php' => ['href' => 'groups.php', 'label' => '📁 ' . t('nav.groups'), 'key' => 'groups'],
     'modules.php' => ['href' => 'modules.php', 'label' => '🧩 ' . t('nav.modules'), 'key' => 'modules_page'],
     'profile.php' => ['href' => 'profile.php', 'label' => '🏢 ' . t('nav.profile'), 'key' => 'profile'],
@@ -175,7 +175,7 @@ if (!$is_admin_user) {
     if ($current_user_role === 'easy_user') {
         $dashboard_nav_pages = [
             'index.php' => ['href' => 'easy_user/', 'label' => t_def('nav.easy_user.control', 'Easy Control'), 'key' => 'easy_user'],
-            'quick_messages.php' => ['href' => '../quick_messages.php', 'label' => '📅 ' . t_def('nav.special_plan', 'Eseménynaptár'), 'key' => 'special_plan'],
+            'quick_messages.php' => ['href' => '../quick_messages.php', 'label' => '📅 ' . t('nav.special_plan') . ' (' . t_def('common.coming_soon', 'Soon') . ')', 'key' => 'special_plan', 'disabled' => true],
             'settings.php' => ['href' => 'settings.php', 'label' => '⚙️ ' . t('nav.settings'), 'key' => 'settings'],
         ];
     }
@@ -236,7 +236,7 @@ if (!isset($breadcrumb_items) || !is_array($breadcrumb_items)) {
         <h1>EDUDISPLEJ</h1>
         <div class="header-nav">
             <?php
-                $current_user = $_SESSION['username'] ?? 'Felhasználó';
+                $current_user = $_SESSION['username'] ?? t_def('common.user', 'User');
                 $company_display = $company_name ?? '';
                 $header_user_href = $is_admin_user
                     ? ($app_root_prefix . 'admin/companies.php')
@@ -268,9 +268,15 @@ if (!isset($breadcrumb_items) || !is_array($breadcrumb_items)) {
                                 </div>
                             </div>
                         <?php else: ?>
-                            <a href="<?php echo htmlspecialchars($dashboard_prefix . $page['href']); ?>" class="header-link<?php echo $current_file === $page_file ? ' active' : ''; ?>">
-                                <?php echo htmlspecialchars($page['label']); ?>
-                            </a>
+                            <?php if (!empty($page['disabled'])): ?>
+                                <span class="header-link" style="opacity:0.6; cursor:not-allowed;" title="<?php echo htmlspecialchars(t_def('common.coming_soon', 'Soon')); ?>">
+                                    <?php echo htmlspecialchars($page['label']); ?>
+                                </span>
+                            <?php else: ?>
+                                <a href="<?php echo htmlspecialchars($dashboard_prefix . $page['href']); ?>" class="header-link<?php echo $current_file === $page_file ? ' active' : ''; ?>">
+                                    <?php echo htmlspecialchars($page['label']); ?>
+                                </a>
+                            <?php endif; ?>
                         <?php endif; ?>
                     <?php endforeach; ?>
                 <?php endif; ?>

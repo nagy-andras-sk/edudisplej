@@ -343,6 +343,7 @@
     let mealPageSwitchTimer = null;
     let overlayClockInterval = null;
     let smallHeaderClockInterval = null;
+    let smallHeaderClockBlinkState = false;
     let backgroundRefreshTimer = null;
     const overlayTextState = {
         top: { raf: null },
@@ -450,10 +451,12 @@
             clearInterval(smallHeaderClockInterval);
             smallHeaderClockInterval = null;
         }
+        smallHeaderClockBlinkState = false;
     }
 
     function startSmallHeaderClock() {
         const skDayShort = ['Ne', 'Po', 'Ut', 'St', 'Št', 'Pia', 'So'];
+        const tomorrowTag = 'ZAJTRA';
 
         const renderClock = () => {
             const now = new Date();
@@ -475,13 +478,18 @@
 
             const rowClockEls = Array.from(document.querySelectorAll('[data-small-fixed-clock]'));
             rowClockEls.forEach((el) => {
-                el.textContent = `${hh}:${mm}`;
+                const flashTomorrow = el.dataset.smallTomorrowFlash === '1';
+                const tomorrowText = String(el.dataset.smallTomorrowText || tomorrowTag).trim() || tomorrowTag;
+                el.textContent = flashTomorrow && smallHeaderClockBlinkState ? tomorrowText : `${hh}:${mm}`;
             });
         };
 
         stopSmallHeaderClock();
         renderClock();
-        smallHeaderClockInterval = setInterval(renderClock, 1000);
+        smallHeaderClockInterval = setInterval(() => {
+            smallHeaderClockBlinkState = !smallHeaderClockBlinkState;
+            renderClock();
+        }, 2000);
     }
 
     function parseBool(value, fallback) {
@@ -506,6 +514,7 @@
             sourceType: 'server',
             mealDisplayMode: 'small_screen',
             smallScreenPageSwitchSec: 12,
+            smallScreenCycleSec: 12,
             smallScreenStartMode: 'current_onward',
             smallScreenMaxMeals: 5,
             smallHeaderMarqueeSpeedPxPerSec: 22,
@@ -601,6 +610,7 @@
                 return legacyLayout === 'square_dual_day' ? 'large_screen' : 'small_screen';
             })(),
             smallScreenPageSwitchSec: Math.max(1, Math.min(120, parseNum(params.get('smallScreenPageSwitchSec') ?? injected.smallScreenPageSwitchSec, defaults.smallScreenPageSwitchSec))),
+            smallScreenCycleSec: Math.max(3, Math.min(300, parseNum(params.get('smallScreenCycleSec') ?? injected.smallScreenCycleSec ?? injected.smallScreenPageSwitchSec, defaults.smallScreenCycleSec))),
             smallScreenStartMode: (() => {
                 const raw = String(params.get('smallScreenStartMode') ?? injected.smallScreenStartMode ?? defaults.smallScreenStartMode).toLowerCase().trim();
                 return ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(raw)
@@ -1094,13 +1104,35 @@
         }
 
         if (result.length === 0) {
-            orderedKeys.forEach((key) => {
-                if (result.length >= maxMeals) return;
-                const meal = todayMap.get(key) || null;
-                if (meal && mealHasRenderableRows(meal)) {
-                    result.push(meal);
+            if (shouldShowTomorrowAfterEvening(settings, currentMinutes)) {
+                const dinnerMeal = todayMap.get('dinner') || null;
+                const tomorrowBreakfast = tomorrowMap.get('breakfast') || null;
+
+                if (dinnerMeal && mealHasRenderableRows(dinnerMeal)) {
+                    result.push(dinnerMeal);
                 }
-            });
+
+                if (result.length < maxMeals && tomorrowBreakfast && mealHasRenderableRows(tomorrowBreakfast)) {
+                    const titlePrefix = String(t.tomorrowMealLabels?.breakfast || t.mealLabels?.breakfast || tomorrowBreakfast.label || 'breakfast').trim();
+                    result.push({
+                        ...tomorrowBreakfast,
+                        key: 'breakfast',
+                        label: titlePrefix,
+                        __displayLabel: titlePrefix,
+                        __tomorrowPreview: true
+                    });
+                }
+            }
+
+            if (result.length === 0) {
+                orderedKeys.forEach((key) => {
+                    if (result.length >= maxMeals) return;
+                    const meal = todayMap.get(key) || null;
+                    if (meal && mealHasRenderableRows(meal)) {
+                        result.push(meal);
+                    }
+                });
+            }
         }
 
         if (result.length === 0) {
@@ -1799,7 +1831,10 @@
             const headerLeft = escapeHtml(mealTypeLabel || String(page.label || '').trim() || label);
             const gridRows = 1 + Math.max(1, pageRows.length);
 
-            return `<div class="card band-other small-page-card"><div class="small-page-table small-dynamic" style="--small-page-rows:${gridRows}; --small-header-row-bg:${escapeHtml(rowTheme.headerBg)}; --small-header-title-color:${escapeHtml(rowTheme.titleColor)}; --small-header-clock-color:${escapeHtml(rowTheme.clockColor)};"><div class="small-page-header-row"><div class="small-page-header-left"><div class="small-page-header-title-wrapper"><span class="small-page-header-title" style="font-size:${titleFontPx}px;"><span class="small-page-header-title-track">${headerLeft}</span></span></div></div><div class="small-page-header-right"><span class="small-page-header-clock" data-small-fixed-clock style="font-size:${clockFontPx}px;">--:--</span></div></div>${renderedRows}</div></div>`;
+            const tomorrowFlashAttr = page.tomorrowPreview === true ? '1' : '0';
+            const tomorrowTextAttr = escapeHtml(String(t.tomorrowTag || t.tomorrow || 'ZAJTRA').trim() || 'ZAJTRA');
+
+            return `<div class="card band-other small-page-card"><div class="small-page-table small-dynamic" style="--small-page-rows:${gridRows}; --small-header-row-bg:${escapeHtml(rowTheme.headerBg)}; --small-header-title-color:${escapeHtml(rowTheme.titleColor)}; --small-header-clock-color:${escapeHtml(rowTheme.clockColor)};"><div class="small-page-header-row"><div class="small-page-header-left"><div class="small-page-header-title-wrapper"><span class="small-page-header-title" style="font-size:${titleFontPx}px;"><span class="small-page-header-title-track">${headerLeft}</span></span></div></div><div class="small-page-header-right"><span class="small-page-header-clock" data-small-fixed-clock data-small-tomorrow-flash="${tomorrowFlashAttr}" data-small-tomorrow-text="${tomorrowTextAttr}" style="font-size:${clockFontPx}px;">--:--</span></div></div>${renderedRows}</div></div>`;
         };
 
         const renderPage = () => {
@@ -1820,7 +1855,9 @@
 
         renderPage();
         if (pages.length > 1) {
-            const switchMs = Math.max(1000, Math.min(120000, Number(settings.smallScreenPageSwitchSec || 12) * 1000));
+            const cycleSeconds = Math.max(3, Math.min(300, Number(settings.smallScreenCycleSec || settings.smallScreenPageSwitchSec || 12)));
+            const pageCount = Math.max(1, pages.length);
+            const switchMs = Math.max(1000, Math.min(120000, Math.round((cycleSeconds / pageCount) * 1000)));
             let switchInProgress = false;
             mealPageSwitchTimer = setInterval(() => {
                 if (switchInProgress) {

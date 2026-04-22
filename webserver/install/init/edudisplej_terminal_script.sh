@@ -8,19 +8,126 @@ SERVICE_VERSION="1.1.1"
 CONFIG_DIR="/opt/edudisplej"
 INIT_DIR="${CONFIG_DIR}/init"
 LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
+RUNTIME_WEB_DIR="${HOME}/localweb"
 KIOSK_CONF="${CONFIG_DIR}/kiosk.conf"
 WAITING_PAGE="${INIT_DIR}/waiting_registration.html"
 LOOP_PLAYER="${LOCAL_WEB_DIR}/loop_player.html"
+RUNTIME_LOOP_PLAYER="${RUNTIME_WEB_DIR}/loop_player.html"
+UNCONFIGURED_PAGE="${LOCAL_WEB_DIR}/unconfigured.html"
+RUNTIME_UNCONFIGURED_PAGE="${RUNTIME_WEB_DIR}/unconfigured.html"
+RUNTIME_HTTP_PORT="8765"
+RUNTIME_HTTP_PID_FILE="/tmp/edudisplej_runtime_http.pid"
 TERMINAL_LOG="/opt/edudisplej/logs/terminal_script.log"
 MONITOR_INTERVAL=10
 SURF_RESTART_DELAY=5
 LOOP_FILE="${LOCAL_WEB_DIR}/modules/loop.json"
 OFF_MODE_POLL_INTERVAL=5
 
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-${HOME}/.Xauthority}"
+
 mkdir -p "$(dirname "$TERMINAL_LOG")" 2>/dev/null || true
 
 log_terminal() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$TERMINAL_LOG"
+}
+
+gui_session_ready() {
+    if [ -z "${DISPLAY:-}" ]; then
+        return 1
+    fi
+
+    if [ ! -S "/tmp/.X11-unix/X${DISPLAY#:}" ] && [ ! -e "/tmp/.X11-unix/X${DISPLAY#:}" ]; then
+        return 1
+    fi
+
+    if command -v xset >/dev/null 2>&1; then
+        xset q >/dev/null 2>&1 || return 1
+    fi
+
+    return 0
+}
+
+launch_surf() {
+    local target="$1"
+
+    if ! gui_session_ready; then
+        log_terminal "GUI session not ready - skipping surf launch for ${target}"
+        return 1
+    fi
+
+    surf -F "$target"
+}
+
+prepare_runtime_web_mirror() {
+    mkdir -p "$RUNTIME_WEB_DIR" "$RUNTIME_WEB_DIR/modules" "$RUNTIME_WEB_DIR/logs" 2>/dev/null || return 1
+
+    cp -f "$LOOP_PLAYER" "$RUNTIME_LOOP_PLAYER" 2>/dev/null || return 1
+    chmod 644 "$RUNTIME_LOOP_PLAYER" 2>/dev/null || true
+
+    if [ -f "$UNCONFIGURED_PAGE" ]; then
+        cp -f "$UNCONFIGURED_PAGE" "$RUNTIME_UNCONFIGURED_PAGE" 2>/dev/null || true
+        chmod 644 "$RUNTIME_UNCONFIGURED_PAGE" 2>/dev/null || true
+    fi
+
+    if [ -f "$LOOP_FILE" ]; then
+        cp -f "$LOOP_FILE" "$RUNTIME_WEB_DIR/modules/loop.json" 2>/dev/null || true
+        chmod 644 "$RUNTIME_WEB_DIR/modules/loop.json" 2>/dev/null || true
+    fi
+
+    if [ -d "$LOCAL_WEB_DIR/modules" ]; then
+        cp -a "$LOCAL_WEB_DIR/modules/." "$RUNTIME_WEB_DIR/modules/" 2>/dev/null || return 1
+        find "$RUNTIME_WEB_DIR/modules" -type f \( -name '*.html' -o -name '*.htm' -o -name '*.json' -o -name '*.css' -o -name '*.js' \) -exec chmod 644 {} + 2>/dev/null || true
+    fi
+
+    if [ -f "${CONFIG_DIR}/last_sync_response.json" ]; then
+        cp -f "${CONFIG_DIR}/last_sync_response.json" "$RUNTIME_WEB_DIR/last_sync_response.json" 2>/dev/null || true
+        chmod 644 "$RUNTIME_WEB_DIR/last_sync_response.json" 2>/dev/null || true
+    fi
+
+    if [ -f "${CONFIG_DIR}/localweb/offline_status.json" ]; then
+        cp -f "${CONFIG_DIR}/localweb/offline_status.json" "$RUNTIME_WEB_DIR/offline_status.json" 2>/dev/null || true
+        chmod 644 "$RUNTIME_WEB_DIR/offline_status.json" 2>/dev/null || true
+    else
+        printf '%s\n' '{"active":false,"message":""}' > "$RUNTIME_WEB_DIR/offline_status.json" 2>/dev/null || true
+        chmod 644 "$RUNTIME_WEB_DIR/offline_status.json" 2>/dev/null || true
+    fi
+
+    if [ -f "${CONFIG_DIR}/logs/sync.log" ]; then
+        cp -f "${CONFIG_DIR}/logs/sync.log" "$RUNTIME_WEB_DIR/logs/sync.log" 2>/dev/null || true
+        chmod 644 "$RUNTIME_WEB_DIR/logs/sync.log" 2>/dev/null || true
+    fi
+}
+
+ensure_runtime_http_server() {
+    local existing_pid=""
+
+    if [ -f "$RUNTIME_HTTP_PID_FILE" ]; then
+        existing_pid="$(cat "$RUNTIME_HTTP_PID_FILE" 2>/dev/null || true)"
+        if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        log_terminal "WARNING: python3 not found, cannot start runtime HTTP server"
+        return 1
+    fi
+
+    nohup python3 -m http.server "$RUNTIME_HTTP_PORT" \
+        --bind 127.0.0.1 \
+        --directory "$RUNTIME_WEB_DIR" \
+        >/tmp/edudisplej-runtime-http.log 2>&1 &
+
+    echo "$!" > "$RUNTIME_HTTP_PID_FILE"
+    sleep 1
+
+    if kill -0 "$!" 2>/dev/null; then
+        return 0
+    fi
+
+    log_terminal "WARNING: runtime HTTP server failed to start"
+    return 1
 }
 
 resolve_local_schedule_mode() {
@@ -239,17 +346,19 @@ main() {
     while true; do
         if [ ! -f "$KIOSK_CONF" ]; then
             log_terminal "Device not registered - showing waiting page"
-            surf -F "file://$(render_waiting_page)" || true
+            launch_surf "file://$(render_waiting_page)" || true
             sleep "$MONITOR_INTERVAL"
             continue
         fi
 
         if [ ! -f "$LOOP_PLAYER" ]; then
             log_terminal "Loop player missing - showing recovery page"
-            surf -F "file://$(render_recovery_page 'A kijelzo tartalom ideiglenesen nem elerheto. A rendszer automatikusan probal helyreallni.')" || true
+            launch_surf "file://$(render_recovery_page 'A kijelzo tartalom ideiglenesen nem elerheto. A rendszer automatikusan probal helyreallni.')" || true
             sleep "$MONITOR_INTERVAL"
             continue
         fi
+
+        prepare_runtime_web_mirror || log_terminal "WARNING: Failed to prepare runtime web mirror"
 
         if [[ "$LOOP_PLAYER" == *.json ]]; then
             log_terminal "ERROR: LOOP_PLAYER points to JSON, forcing HTML fallback"
@@ -274,8 +383,10 @@ main() {
             off_state_logged=false
         fi
 
-        log_terminal "Launching surf fullscreen: file://${LOOP_PLAYER}"
-        surf -F "file://${LOOP_PLAYER}" || true
+        ensure_runtime_http_server || true
+
+        log_terminal "Launching surf fullscreen: http://127.0.0.1:${RUNTIME_HTTP_PORT}/loop_player.html"
+        launch_surf "http://127.0.0.1:${RUNTIME_HTTP_PORT}/loop_player.html" || true
         log_terminal "Surf browser exited"
         sleep "$SURF_RESTART_DELAY"
     done

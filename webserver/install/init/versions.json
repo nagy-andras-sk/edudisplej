@@ -1,5 +1,5 @@
 {
-    "system_version": "v20260417132003",
+    "system_version": "v20260422220001",
     "services": {
         "edudisplej_sync_service.sh": "1.1.2",
         "edudisplej_terminal_display.sh": "1.1.2",
@@ -13,8 +13,8 @@
         "common.sh": "1.1.2",
         "kiosk.sh": "1.1.2"
     },
-    "last_updated": "2026-04-17T11:20:03Z",
-    "core_checksum": "20cbceadcaddc74ba4027c3cded03552b0aeccfe45d9186fe87d98730e2584db",
+    "last_updated": "2026-04-22T20:00:01Z",
+    "core_checksum": "6b340ebd7ff687bf74378d9ac5c6738a2db0d66e1913210ad88c1c354a2de30c",
     "core_checksum_files": 202,
-    "core_checksum_scanned_at": "2026-04-17T11:20:03Z"
+    "core_checksum_scanned_at": "2026-04-22T20:00:01Z"
 }

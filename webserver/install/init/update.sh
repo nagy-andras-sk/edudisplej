@@ -512,6 +512,7 @@ else
     
     # Nastavenie opravneni / Jogok beallitasa
     chmod -R 755 "$TARGET_DIR"
+    find "${TARGET_DIR}" -type f \( -name '*.html' -o -name '*.htm' \) -exec chmod 644 {} + 2>/dev/null || true
     
     # Setup screenshot service directories and permissions
     mkdir -p "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic" "${TARGET_DIR}/logs"
