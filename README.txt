@@ -71,20 +71,21 @@ Modulok / Moduly
 
 Fájlstruktúra / Štruktúra súborov
 -----------------------------------
+kiosk/                           - Kiosk eszköz szkriptjei / Skripty kiosk zariadenia
+  common.sh                      - Közös funkciók / spoločné funkcie
+  edudisplej-init.sh             - Első indítás inicializálás
+  edudisplej-kiosk.service       - Kiosk systemd szolgáltatás
+  edudisplej-sync.service        - Szinkronizációs szolgáltatás
+  edudisplej-watchdog.service    - Watchdog szolgáltatás
+  edudisplej-watchdog.sh         - Watchdog script
+  kiosk-start.sh                 - X szerver indítás
+  kiosk.sh                       - Böngésző kiosk mód
+  clock.html                     - Offline óra fallback oldal
+  waiting_registration.html      - Regisztrációra várakozó oldal
+
 webserver/
   install/
     install.sh                   - Telepítő script
-    init/
-      common.sh                  - Közös funkciók / spoločné funkcie
-      edudisplej-init.sh         - Első indítás inicializálás
-      edudisplej-kiosk.service   - Kiosk systemd szolgáltatás
-      edudisplej-sync.service    - Szinkronizációs szolgáltatás
-      edudisplej-watchdog.service - Watchdog szolgáltatás
-      edudisplej-watchdog.sh     - Watchdog script
-      kiosk-start.sh             - X szerver indítás
-      kiosk.sh                   - Böngésző kiosk mód
-      clock.html                 - Offline óra fallback oldal
-      waiting_registration.html  - Regisztrációra várakozó oldal
 
   control_edudisplej_sk/         - Vezérlőpanel PHP webalkalmazás
     modules/
