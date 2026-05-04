@@ -272,11 +272,7 @@ cleanup_existing_installation() {
         find /etc/systemd/system -maxdepth 4 -type l -name 'edudisplej*.service' -delete 2>/dev/null || true
     fi
 
-    # Kill any remaining runtime processes tied to old installation path
-    pkill -f '/opt/edudisplej/' 2>/dev/null || true
-
     systemctl daemon-reload 2>/dev/null || true
-    systemctl daemon-reexec 2>/dev/null || true
 
     # Always remove target directory for clean reinstall
     if [ -d "$TARGET_DIR" ]; then
@@ -285,62 +281,6 @@ cleanup_existing_installation() {
     fi
 
     echo "[✓] Cleanup dokonceny - Cleanup completed"
-}
-
-# Oprava boot konfiguracie pre ARMv6 - Fix boot config for ARMv6
-# Reference: Issue #47 - Pi Zero/Pi1 black screen fix
-fix_armv6_boot_config() {
-    echo "[*] Detekcia ARMv6: Oprava boot konfiguracie - ARMv6 detected: Fixing boot config..."
-    
-    # Find config file location
-    CONFIG_FILE=""
-    if [ -f "/boot/firmware/config.txt" ]; then
-        CONFIG_FILE="/boot/firmware/config.txt"
-    elif [ -f "/boot/config.txt" ]; then
-        CONFIG_FILE="/boot/config.txt"
-    else
-        echo "[!] VAROVANIE - WARNING: Boot config file not found, skipping fix"
-        return 0
-    fi
-    
-    echo "[*] Pouzivam - Using: $CONFIG_FILE"
-    
-    # Create backup
-    BACKUP_FILE="${CONFIG_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
-    if ! cp "$CONFIG_FILE" "$BACKUP_FILE"; then
-        echo "[!] CHYBA - ERROR: Failed to create backup - Nepodarilo sa vytvorit zalohu"
-        return 1
-    fi
-    echo "[*] Zaloha vytvorena - Backup created: $BACKUP_FILE"
-    
-    # Check if fix is already applied (idempotent)
-    if grep -q "# ARMv6 fix - Issue #47" "$CONFIG_FILE"; then
-        echo "[*] Oprava uz aplikovana - Fix already applied, skipping"
-        return 0
-    fi
-    
-    # Disable full KMS if present
-    if grep -q "^dtoverlay=vc4-kms-v3d" "$CONFIG_FILE"; then
-        sed -i 's/^dtoverlay=vc4-kms-v3d/#dtoverlay=vc4-kms-v3d # Disabled for ARMv6 - Issue #47/' "$CONFIG_FILE"
-        echo "[*] Deaktivovany full KMS - Disabled full KMS (vc4-kms-v3d)"
-    fi
-    
-    # Add fake KMS if not present
-    if ! grep -q "^dtoverlay=vc4-fkms-v3d" "$CONFIG_FILE"; then
-        cat >> "$CONFIG_FILE" <<'EOF'
-
-# ARMv6 fix - Issue #47
-# Pi Zero/Pi 1 models don't work well with full KMS driver (vc4-kms-v3d)
-# This causes black screen even though Xorg is running
-# Solution: Use fake KMS (vc4-fkms-v3d) instead
-dtoverlay=vc4-fkms-v3d
-EOF
-        echo "[*] Pridany fake KMS - Added fake KMS (vc4-fkms-v3d)"
-    else
-        echo "[*] Fake KMS uz pritomny - Fake KMS already present"
-    fi
-    
-    echo "[✓] Boot config opraveny - Boot config fixed for ARMv6"
 }
 
 # Kontrola root opravneni - Check root permissions
@@ -360,15 +300,6 @@ echo "[*] Architektura - Architecture: $ARCH"
 
 HARDWARE_PROFILE="$(detect_hardware_profile)"
 echo "[*] Hardver profil - Hardware profile: $HARDWARE_PROFILE"
-# Always use surf browser
-KIOSK_MODE="surf"
-
-# Apply ARMv6 boot config fix if needed
-if [ "$HARDWARE_PROFILE" = "raspberry" ] && [ "$ARCH" = "armv6l" ]; then
-  fix_armv6_boot_config
-elif [ "$HARDWARE_PROFILE" != "raspberry" ]; then
-    echo "[*] Neraspberry system detected - skipping Raspberry-specific boot config"
-fi
 
 # Always perform cleanup of previous installation before fresh install
 cleanup_existing_installation
@@ -380,15 +311,6 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 if ! command -v surf >/dev/null 2>&1; then
   MISSING_TOOLS+=("surf")
-fi
-if ! command -v jq >/dev/null 2>&1; then
-  MISSING_TOOLS+=("jq")
-fi
-if ! command -v scrot >/dev/null 2>&1; then
-  MISSING_TOOLS+=("scrot")
-fi
-if ! command -v python3 >/dev/null 2>&1; then
-    MISSING_TOOLS+=("python3")
 fi
 if ! dpkg -s ca-certificates >/dev/null 2>&1; then
     MISSING_TOOLS+=("ca-certificates")
@@ -408,7 +330,7 @@ fi
 
 # Vytvorenie priecinkov - Create directories
 echo "[*] Vytvaranie adresarov - Creating directories..."
-mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR" "${TARGET_DIR}/data" "${TARGET_DIR}/data/screenshots" "${TARGET_DIR}/logs"
+mkdir -p "$INIT_DIR" "$LOCAL_WEB_DIR" "$LIC_DIR" "${TARGET_DIR}/data" "${TARGET_DIR}/logs"
 echo "[✓] Adresare vytvorene - Directories created"
 
 # Save API token if provided
@@ -544,40 +466,27 @@ if [ -z "$USER_HOME" ]; then
 fi
 echo "[*] Pouzivatel - User: $CONSOLE_USER, Domov - Home: $USER_HOME"
 
-    # Validate required runtime files
-    REQUIRED_FILES=(
-        "edudisplej-init.sh"
-        "edudisplej_sync_service.sh"
-        "edudisplej-download-modules.sh"
-        "edudisplej-config-manager.sh"
-        "kiosk-start.sh"
-    )
-    for required in "${REQUIRED_FILES[@]}"; do
-        if [ ! -s "${INIT_DIR}/${required}" ]; then
-            echo "[!] CHYBA - ERROR: Required file missing or empty: ${INIT_DIR}/${required}"
-            exit 1
-        fi
-    done
+# Validate required runtime files
+REQUIRED_FILES=(
+    "edudisplej-init.sh"
+    "edudisplej_sync_service.sh"
+    "kiosk-start.sh"
+)
+for required in "${REQUIRED_FILES[@]}"; do
+    if [ ! -s "${INIT_DIR}/${required}" ]; then
+        echo "[!] CHYBA - ERROR: Required file missing or empty: ${INIT_DIR}/${required}"
+        exit 1
+    fi
+done
 
 # Nastavenie opravneni - Set permissions
 chmod -R 755 "$TARGET_DIR"
-
-# Setup screenshot service directories and permissions
 echo "[*] Konfiguracia oprávnení - Configuring permissions..."
-chmod 755 "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic" "${TARGET_DIR}/data/screenshots"
-
-# Set proper ownership for data directory and config (CONSOLE_USER owns all)
+chmod 755 "${TARGET_DIR}/data" "${TARGET_DIR}/localweb" "${TARGET_DIR}/lic"
 chown -R "$CONSOLE_USER:$CONSOLE_USER" "${TARGET_DIR}/data"
-chmod 755 "${TARGET_DIR}/data"
-chmod 755 "${TARGET_DIR}/data/screenshots"
-
-# Ensure logs directory is writable for user-space services (health/command executor)
 mkdir -p "${TARGET_DIR}/logs"
 chown -R "$CONSOLE_USER:$CONSOLE_USER" "${TARGET_DIR}/logs"
 chmod 755 "${TARGET_DIR}/logs"
-
-# config.json should be readable/writable by CONSOLE_USER
-[ -f "${TARGET_DIR}/data/config.json" ] && chmod 664 "${TARGET_DIR}/data/config.json"
 
 echo "[✓] Oprávnenia nastavené - Permissions configured"
 
@@ -587,238 +496,22 @@ echo "$CONSOLE_USER" > "${TARGET_DIR}/.console_user"
 echo "$USER_HOME" > "${TARGET_DIR}/.user_home"
 echo "$HARDWARE_PROFILE" > "${TARGET_DIR}/.hardware_profile"
 
-# Configure hostname immediately during install (running as root)
-if [ -x "${INIT_DIR}/edudisplej-hostname.sh" ]; then
-    echo "[*] Konfiguracia hostname - Configuring hostname..."
-    if bash "${INIT_DIR}/edudisplej-hostname.sh"; then
-        echo "[✓] Hostname nakonfigurovany - Hostname configured"
-    else
-        echo "[!] VAROVANIE: Hostname konfiguracia zlyhala - Hostname configuration failed"
-    fi
-fi
-
 # ============================================================================
-# SERVICE INSTALLATION / SZOLGALTATASOK TELEPITESE
+# SERVICE INSTALLATION / SLUZBY
 # ============================================================================
 
-install_services_from_structure() {
-    echo ""
-    echo "=========================================="
-    echo "Service fajlok telepitese / Installing services"
-    echo "=========================================="
-    echo ""
-    
-    # Try to download structure.json
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "[!] VAROVANIE: python3 nie je dostupny, pouzivam staru metodu"
-        return 1
-    fi
-    
-    echo "[*] Sťahujem structure.json / Downloading structure.json..."
-    STRUCTURE_JSON=""
-    structure_tmp="$(mktemp)"
-    if fetch_with_retry "${INIT_BASE}/download.php?getstructure&token=${API_TOKEN}" "$structure_tmp" 4; then
-        STRUCTURE_JSON="$(tr -d '\r' < "$structure_tmp")"
-    fi
-    
-    if [ -z "$STRUCTURE_JSON" ]; then
-        echo "[!] Nemozem stiahnut structure.json, pouzivam staru metodu"
-        return 1
-    fi
-
-    # Cache structure.json locally for runtime version comparisons
-    echo "$STRUCTURE_JSON" > "${TARGET_DIR}/structure.json"
-    chmod 644 "${TARGET_DIR}/structure.json"
-
-    # Extract services using Python with robust error handling
-    # Parse from downloaded file directly to avoid shell stdin/heredoc collisions.
-    if ! SERVICES_JSON="$(python3 - "$structure_tmp" << 'PYTHON_EOF'
-import json
-import sys
-
-if len(sys.argv) < 2:
-    sys.stderr.write("ERROR: Missing structure file path\n")
-    sys.exit(1)
-
-path = sys.argv[1]
-try:
-    with open(path, "rb") as f:
-        raw = f.read()
-
-    if not raw:
-        sys.stderr.write("ERROR: Empty structure.json\n")
-        sys.exit(1)
-
-    # Remove UTF-8 BOM if present
-    text = raw.decode("utf-8-sig", errors="replace").strip()
-
-    # If backend accidentally prepends non-JSON text, salvage JSON envelope.
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        sys.stderr.write("ERROR: structure.json does not contain valid JSON object\n")
-        sys.exit(1)
-
-    payload = text[start:end + 1]
-    data = json.loads(payload)
-
-    services = data.get("services", [])
-    if not isinstance(services, list):
-        sys.stderr.write("ERROR: services is not a list\n")
-        sys.exit(1)
-
-    for svc in services:
-        if not isinstance(svc, dict):
-            continue
-        source = str(svc.get("source", "")).strip()
-        name = str(svc.get("name", "")).strip()
-        enabled = str(bool(svc.get("enabled", False))).lower()
-        autostart = str(bool(svc.get("autostart", False))).lower()
-        description = str(svc.get("description", "")).replace("|", ";").strip()
-
-        if source and name:
-            print(f"{source}|{name}|{enabled}|{autostart}|{description}")
-except json.JSONDecodeError as e:
-    sys.stderr.write(f"ERROR: Invalid JSON in structure.json: {e}\n")
-    sys.exit(1)
-except Exception as e:
-    sys.stderr.write(f"ERROR: Failed to parse structure.json: {e}\n")
-    sys.exit(1)
-PYTHON_EOF
-)"; then
-        rm -f "$structure_tmp"
-        echo "[!] Chyba pri parsovani services z structure.json"
-        return 1
-    fi
-
-    rm -f "$structure_tmp"
-    
-    if [ -z "$SERVICES_JSON" ]; then
-        echo "[*] Ziadne services na instalaciu"
-        return 0
-    fi
-    
-    # Render and copy each service file
-    SERVICE_COUNT=0
-    SERVICE_TOTAL=$(echo "$SERVICES_JSON" | wc -l)
-    
-    while IFS='|' read -r source name enabled autostart description; do
-        SERVICE_COUNT=$((SERVICE_COUNT + 1))
-        
-        echo "[$SERVICE_COUNT/$SERVICE_TOTAL] $name"
-        echo "  Popis / Description: $description"
-        
-        # Copy service file from init/ to systemd directory
-        SOURCE_PATH="/opt/edudisplej/init/$source"
-        DEST_PATH="/etc/systemd/system/$name"
-        
-        if [ ! -f "$SOURCE_PATH" ]; then
-            echo "  [!] CHYBA: Service subor nenajdeny: $SOURCE_PATH"
-            continue
-        fi
-        
-        if render_service_for_console_user "$SOURCE_PATH" "$DEST_PATH"; then
-            chmod 644 "$DEST_PATH"
-            echo "  [✓] Service rendered for user: $CONSOLE_USER"
-        else
-            echo "  [!] CHYBA: Nepodarilo sa pripravit service file"
-            continue
-        fi
-        
-        # Verify service exists (check if file exists first, systemctl may be slow)
-        if [ -f "$DEST_PATH" ]; then
-            echo "  [✓] Service file existuje: $DEST_PATH"
-            
-            # Double-check with systemctl (optional, may fail on some systems)
-            if systemctl list-unit-files "$name" >/dev/null 2>&1; then
-                echo "  [✓] Service rozpoznany v systemd"
-            else
-                # Not critical - systemd sometimes needs time to recognize new units
-                echo "  [*] Service subor nainstalovany (systemd ho rozpozna po reloade)"
-            fi
-        else
-            echo "  [!] CHYBA: Service file neexistuje: $DEST_PATH"
-            continue
-        fi
-        
-        echo ""
-        
-    done <<< "$SERVICES_JSON"
-
-    if systemctl daemon-reload 2>/dev/null; then
-        echo "[✓] systemd daemon-reload"
-    else
-        echo "[!] VAROVANIE: daemon-reload zlyhal"
-    fi
-
-    # Enable/start services in a separate pass after single daemon-reload
-    while IFS='|' read -r source name enabled autostart description; do
-        [ -z "${name:-}" ] && continue
-
-        if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
-            if systemctl enable "$name" 2>/dev/null; then
-                echo "  [✓] Service enabled: $name"
-            else
-                echo "  [!] VAROVANIE: enable zlyhal pre $name"
-            fi
-        fi
-
-        if [ "$autostart" = "True" ] || [ "$autostart" = "true" ]; then
-            if [ "$name" != "edudisplej-kiosk.service" ]; then
-                systemctl stop "$name" 2>/dev/null || true
-                sleep 1
-                if systemctl start "$name" 2>/dev/null; then
-                    echo "  [✓] Service spusteny: $name"
-                else
-                    echo "  [!] CHYBA: Nepodarilo sa spustit service: $name"
-                fi
-            else
-                echo "  [*] Service sa spusti po restarte / Will start after reboot"
-            fi
-        fi
-    done <<< "$SERVICES_JSON"
-    
-    echo "[✓] Service instalacia dokoncena"
-    echo ""
-    return 0
-}
-
-# Try to install services from structure.json
-if ! install_services_from_structure; then
-    # Fallback to old method if structure.json is not available
-    echo "[*] Pouzivam staru metodu instalacie services / Using old method..."
-    
-    # Instalacia systemd sluzby - Install systemd service
-    echo "[*] Instalacia systemd sluzby - Installing systemd service..."
-    
-    if [ -f "${INIT_DIR}/edudisplej-kiosk.service" ]; then
-        render_service_for_console_user "${INIT_DIR}/edudisplej-kiosk.service" "$SERVICE_FILE"
-        chmod 644 "$SERVICE_FILE"
-        
-        if [ -f "${INIT_DIR}/kiosk-start.sh" ]; then
-            chmod +x "${INIT_DIR}/kiosk-start.sh"
-        fi
-    else
-        echo "[!] CHYBA - ERROR: Service subor nenajdeny - Service file not found"
-    fi
-fi
-
-# Ensure core services are always present and active even when structure download fails
 echo ""
-echo "[*] Overujem klucove sluzby - Ensuring core services..."
+echo "=========================================="
+echo "Instalacia systemd sluzieb - Installing systemd services"
+echo "=========================================="
+echo ""
 
 CORE_SERVICES=(
     "edudisplej-kiosk.service"
     "edudisplej-sync.service"
     "edudisplej-watchdog.service"
-    "edudisplej-screenshot-service.service"
-    "edudisplej-command-executor.service"
-    "edudisplej-health.service"
-    "edudisplej-self-heat.service"
-    "edudisplej-self-heat.timer"
 )
 
-# Copy/render service files first
 for service in "${CORE_SERVICES[@]}"; do
     source_file="${INIT_DIR}/${service}"
     target_file="/etc/systemd/system/${service}"
@@ -829,43 +522,21 @@ for service in "${CORE_SERVICES[@]}"; do
             echo "  [✓] Service file copied: $service"
         fi
     fi
-
 done
 
 systemctl daemon-reload 2>/dev/null || true
 
-# Enable/start services after daemon-reload
 for service in "${CORE_SERVICES[@]}"; do
-    if [ -f "/etc/systemd/system/${service}" ] || systemctl list-unit-files "$service" >/dev/null 2>&1; then
-        if systemctl enable "$service" 2>/dev/null; then
-            echo "  [✓] Enabled: $service"
-        else
-            echo "  [!] VAROVANIE: enable zlyhal pre $service"
-        fi
+    if [ -f "/etc/systemd/system/${service}" ]; then
+        systemctl enable "$service" 2>/dev/null && echo "  [✓] Enabled: $service" || true
 
-        if [ "$service" = "edudisplej-kiosk.service" ]; then
-            echo "  [*] Kiosk service enabled (will run after reboot)"
+        if [ "$service" != "edudisplej-kiosk.service" ]; then
+            systemctl start "$service" 2>/dev/null && echo "  [✓] Started: $service" || true
         else
-            if systemctl start "$service" 2>/dev/null; then
-                echo "  [✓] Started: $service"
-            else
-                echo "  [!] VAROVANIE: start zlyhal pre $service"
-            fi
+            echo "  [*] Kiosk service sa spusti po restarte - will start after reboot"
         fi
     fi
 done
-
-# Hard safety check for fleet installs: kiosk service must be enabled
-if systemctl is-enabled edudisplej-kiosk.service >/dev/null 2>&1; then
-    echo "[✓] Kiosk service is enabled for next boot"
-else
-    echo "[!] VAROVANIE: kiosk service was not enabled, forcing enable..."
-    if systemctl enable edudisplej-kiosk.service 2>/dev/null; then
-        echo "[✓] Kiosk service force-enabled"
-    else
-        echo "[!] CHYBA: failed to enable kiosk service"
-    fi
-fi
 
 # Sudo konfiguracia - Sudo configuration
 echo "[*] Konfiguracia sudo - Configuring sudo..."
@@ -873,14 +544,9 @@ mkdir -p /etc/sudoers.d
 cat > /etc/sudoers.d/edudisplej <<EOF
 # EduDisplej - Passwordless sudo for system scripts
 $CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-init.sh
-$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-hostname.sh
-$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/update.sh
-$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej_terminal_script.sh
-$CONSOLE_USER ALL=(ALL) NOPASSWD: /opt/edudisplej/init/edudisplej-download-modules.sh
 EOF
 chmod 0440 /etc/sudoers.d/edudisplej
 
-# Verify sudoers syntax
 if visudo -c -f /etc/sudoers.d/edudisplej >/dev/null 2>&1; then
     echo "[✓] Sudoers konfiguracia overena - Sudoers configuration verified"
 else
@@ -888,48 +554,7 @@ else
     rm -f /etc/sudoers.d/edudisplej
 fi
 
-# Keep getty@tty1 enabled as a safety fallback.
-# If kiosk startup fails, tty1 login remains recoverable instead of black screen lockout.
 systemctl enable getty@tty1.service 2>/dev/null || true
-echo "[*] Safety mode: keeping getty@tty1 enabled for local recovery"
-
-# ============================================================================
-# INITIALIZE CENTRALIZED DATA DIRECTORY / CENTRALIZOVANY DATOVY ADRESAR
-# ============================================================================
-
-echo ""
-echo "[*] Inicializujem centralizovany data adresar - Initializing centralized data directory..."
-
-DATA_DIR="${TARGET_DIR}/data"
-CONFIG_FILE="${DATA_DIR}/config.json"
-
-# Data directory was already created at line 166, just verify
-if [ ! -d "$DATA_DIR" ]; then
-    mkdir -p "$DATA_DIR"
-fi
-echo "[✓] Data adresar pripraveny - Data directory ready: $DATA_DIR"
-
-# Initialize config.json using config manager
-if [ -x "${INIT_DIR}/edudisplej-config-manager.sh" ]; then
-    echo "[*] Inicializujem config.json - Initializing config.json..."
-    bash "${INIT_DIR}/edudisplej-config-manager.sh" init
-    echo "[✓] Config.json inicializovany - config.json initialized"
-else
-    echo "[!] VAROVANIE: Config manager nenajdeny - Config manager not found"
-    echo "[!] Config.json bude vytvoreny pri prvom sync - Config.json will be created on first sync"
-fi
-
-# health service runs as CONSOLE_USER, keep health status file writable by this user
-touch "${TARGET_DIR}/health_status.json" 2>/dev/null || true
-chown "${CONSOLE_USER}:${CONSOLE_USER}" "${TARGET_DIR}/health_status.json" 2>/dev/null || true
-chmod 664 "${TARGET_DIR}/health_status.json" 2>/dev/null || true
-
-echo ""
-
-# NOTE:
-# Do NOT create .kiosk_system_configured during install.
-# First boot must run edudisplej-init.sh once to complete system setup
-# (install packages, create .xinitrc and Openbox autostart, finalize kiosk runtime config).
 
 echo ""
 echo "=========================================="
