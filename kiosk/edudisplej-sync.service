@@ -1,13 +1,11 @@
 [Unit]
-Description=EduDisplej Sync Service - Registration and Module Synchronization
-Documentation=https://github.com/nagy-andras-sk/edudisplej
+Description=EduDisplej Sync
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStartPre=/opt/edudisplej/init/edudisplej-hostname.sh
-ExecStart=/opt/edudisplej/init/edudisplej_sync_service.sh start
+ExecStart=/opt/edudisplej/init/edudisplej_sync_service.sh
 Restart=always
 RestartSec=5
 User=root

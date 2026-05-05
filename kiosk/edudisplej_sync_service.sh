@@ -1,1541 +1,179 @@
 #!/bin/bash
-# EduDisplej Sync Service - Registration and Module Synchronization
-# Enhanced with detailed logging and error reporting
-# =============================================================================
-
-# Service version
-SERVICE_VERSION="1.0.0"
 
 set -euo pipefail
 
-# Source common functions if available
 INIT_DIR="/opt/edudisplej/init"
-if [[ -f "${INIT_DIR}/common.sh" ]]; then
-    source "${INIT_DIR}/common.sh"
-fi
+[ -f "${INIT_DIR}/common.sh" ] && source "${INIT_DIR}/common.sh" || true
 
-# Configuration
-API_BASE_URL="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
-REGISTRATION_API="${API_BASE_URL}/api/registration.php"
-MODULES_API="${API_BASE_URL}/api/modules_sync.php"
-# Unified v1 sync endpoint (replaces hw_data_sync, screenshot_sync, log_sync)
-DEVICE_SYNC_API="${API_BASE_URL}/api/v1/device/sync.php"
-# Legacy endpoints kept for reference (deprecated)
-HW_SYNC_API="${API_BASE_URL}/api/hw_data_sync.php"
-KIOSK_LOOP_API="${API_BASE_URL}/api/kiosk_loop.php"
-CHECK_GROUP_LOOP_UPDATE_API="${API_BASE_URL}/api/check_group_loop_update.php"
-STRUCTURE_API="https://install.edudisplej.sk/init/download.php?getstructure"
-INSTALL_SCRIPT_URL="https://install.edudisplej.sk/install.sh"
-SYNC_INTERVAL=300  # 5 minutes
-FAST_LOOP_INTERVAL=30  # 30 seconds in fast loop mode
+API_BASE="${EDUDISPLEJ_API_URL:-https://control.edudisplej.sk}"
+REGISTRATION_API="${API_BASE}/api/registration.php"
+DEVICE_SYNC_API="${API_BASE}/api/v1/device/sync.php"
+LOOP_CHECK_API="${API_BASE}/api/check_group_loop_update.php"
+TIMESTAMP_API="${API_BASE}/api/update_sync_timestamp.php"
+DOWNLOAD_SCRIPT="${INIT_DIR}/edudisplej-download-modules.sh"
+
 CONFIG_DIR="/opt/edudisplej"
-DATA_DIR="${CONFIG_DIR}/data"
-CONFIG_FILE="${DATA_DIR}/config.json"
-CONFIG_FILE_OWNER="${EDUDISPLEJ_CONFIG_FILE_OWNER:-edudisplej:edudisplej}"
 TOKEN_FILE="${CONFIG_DIR}/lic/token"
-LOCAL_WEB_DIR="${CONFIG_DIR}/localweb"
-LOOP_FILE="${LOCAL_WEB_DIR}/modules/loop.json"
-DOWNLOAD_INFO="${LOCAL_WEB_DIR}/modules/.download_info.json"
-DOWNLOAD_SCRIPT="${CONFIG_DIR}/init/edudisplej-download-modules.sh"
-CONFIG_MANAGER="${CONFIG_DIR}/init/edudisplej-config-manager.sh"
+LOOP_FILE="${CONFIG_DIR}/localweb/modules/loop.json"
+LOG_FILE="${CONFIG_DIR}/logs/sync.log"
 STATUS_FILE="${CONFIG_DIR}/sync_status.json"
-SYNC_STATE_FILE="${CONFIG_DIR}/sync_state.json"
-# Latest sync response cached here; read by screenshot service for policy
-LAST_SYNC_RESPONSE="${CONFIG_DIR}/last_sync_response.json"
-LOG_DIR="${CONFIG_DIR}/logs"
-LOG_FILE="${LOG_DIR}/sync.log"
-VERSION_FILE="${CONFIG_DIR}/local_versions.json"
-LOCAL_STRUCTURE_FILE="${CONFIG_DIR}/structure.json"
-REINSTALL_LOG_FILE="${LOG_DIR}/reinstall.log"
-DEBUG="${EDUDISPLEJ_DEBUG:-false}"  # Enable detailed debug logs via environment variable
-ENABLE_SYNC_SCREENSHOT_CAPTURE="${EDUDISPLEJ_SYNC_CAPTURE_SCREENSHOT:-false}"
-ENABLE_LEGACY_LOG_UPLOAD="${EDUDISPLEJ_LEGACY_LOG_UPLOAD:-false}"
-SERVICE_UPDATE_CHECK_INTERVAL="${EDUDISPLEJ_SERVICE_UPDATE_CHECK_INTERVAL:-900}"
+SYNC_INTERVAL=300
+DEVICE_ID=""
 
-# Sync state tracking
-LOOP_CHECK_SERVER_UPDATED_AT=""
-LOOP_CHECK_LOCAL_UPDATED_AT=""
-LOOP_CHECK_NEEDS_UPDATE="false"
-LAST_SCREENSHOT_STATUS="not_run"
-CYCLE_REFRESH_DONE="false"
-LAST_SERVICE_UPDATE_CHECK_EPOCH=0
-CORE_UPDATE_REQUIRED="false"
-CORE_UPDATE_TARGET_VERSION=""
-CORE_UPDATE_CURRENT_VERSION=""
-CORE_UPDATE_LOCK_DIR="/tmp/edudisplej_core_update.lock"
-CORE_UPDATE_LAST_ATTEMPT_FILE="/tmp/edudisplej_core_update.last_attempt"
-CORE_UPDATE_RETRY_COOLDOWN="${EDUDISPLEJ_CORE_UPDATE_RETRY_COOLDOWN:-1800}"
+mkdir -p "${CONFIG_DIR}/logs"
 
-# Create directories
-mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
-# Read API token from license file
-get_api_token() {
-    if [ -f "$TOKEN_FILE" ]; then
-        tr -d '\n\r' < "$TOKEN_FILE"
-        return 0
-    fi
-    return 1
+get_token() {
+    [ -f "$TOKEN_FILE" ] || return 1
+    tr -d '\n\r' < "$TOKEN_FILE"
 }
 
-# Reset kiosk to unconfigured mode on auth failure
-reset_to_unconfigured() {
-    log_error "🔒 Authorization failed. Resetting to unconfigured mode..."
-
-    # Remove modules and loop configuration
-    rm -rf "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
-    mkdir -p "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
-    rm -f "${LOOP_FILE}" 2>/dev/null || true
-
-    # Create unconfigured page if missing
-    local unconfigured_page="${LOCAL_WEB_DIR}/unconfigured.html"
-    if [ ! -f "$unconfigured_page" ]; then
-        cat > "$unconfigured_page" <<'EOF'
-<!DOCTYPE html>
-<html lang="hu">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EduDisplej - Unconfigured</title>
-    <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #0f172a; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .card { text-align: center; max-width: 720px; padding: 40px; background: rgba(255,255,255,0.06); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        h1 { margin-bottom: 12px; font-size: 28px; }
-        p { opacity: 0.9; line-height: 1.5; }
-        .small { margin-top: 16px; font-size: 13px; opacity: 0.7; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>Ez a kijelző még nincs konfigurálva</h1>
-        <p>Kérjük, rendeld hozzá a kijelzőt a vezérlőpultban.</p>
-        <p class="small">EduDisplej • control.edudisplej.sk</p>
-    </div>
-</body>
-</html>
+get_hw_info() {
+    local uptime cpu mem disk
+    uptime=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo 0)
+    cpu=$(awk '/^cpu /{u=($2+$4)*100/($2+$4+$5); printf "%.1f", u}' /proc/stat 2>/dev/null || echo 0)
+    mem=$(free 2>/dev/null | awk '/^Mem:/ {printf "%.1f", ($3/$2)*100}' || echo 0)
+    disk=$(df -h / 2>/dev/null | tail -1 | awk '{print $(NF-1)}' | tr -d '%' || echo 0)
+    cat << EOF
+{"hostname":"$(hostname)","kernel":"$(uname -r)","architecture":"$(uname -m)","uptime_seconds":${uptime},"cpu_usage":${cpu},"memory_usage":${mem},"disk_usage":${disk}}
 EOF
-    fi
-
-    # Reset config fields
-    update_config_field "company_id" "null" || true
-    update_config_field "company_name" "" || true
-    update_config_field "token" "" || true
-
-    # Restart kiosk display
-    if systemctl is-active --quiet edudisplej-kiosk.service 2>/dev/null; then
-        systemctl restart edudisplej-kiosk.service 2>/dev/null || true
-    fi
 }
 
-# Check for authorization failure in API response
 is_auth_error() {
-    local response="$1"
-    echo "$response" | grep -qi '"message"[[:space:]]*:[[:space:]]*"Invalid API token"\|"Authentication required"\|"Unauthorized"\|"Company license is inactive"\|"No valid license key"'
+    echo "$1" | grep -qi '"Invalid API token"\|"Authentication required"\|"Unauthorized"\|"inactive"'
 }
 
-# Logging functions (fallback if common.sh not available)
-if ! command -v print_info &> /dev/null; then
-    log() {
-        local level="INFO"
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
-    }
-    
-    log_debug() {
-        if [ "$DEBUG" = true ]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] $*" | tee -a "$LOG_FILE"
-        fi
-    }
-    
-    log_error() {
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" | tee -a "$LOG_FILE" >&2
-    }
-    
-    log_success() {
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $*" | tee -a "$LOG_FILE"
-    }
-else
-    # Use print_* functions from common.sh
-    log() { print_info "$*" >> "$LOG_FILE"; }
-    log_debug() { [ "$DEBUG" = true ] && print_info "[DEBUG] $*" >> "$LOG_FILE" || true; }
-    log_error() { print_error "$*" >> "$LOG_FILE"; }
-    log_success() { print_success "$*" >> "$LOG_FILE"; }
-fi
-
-# Use shared functions from common.sh if available, otherwise define fallbacks
-if ! command -v get_mac_address &> /dev/null; then
-    get_mac_address() {
-        local mac=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':')
-        log_debug "Detected MAC address: $mac"
-        echo "$mac"
-    }
-fi
-
-if ! command -v get_hostname &> /dev/null; then
-    get_hostname() {
-        local host=$(hostname)
-        log_debug "Detected hostname: $host"
-        echo "$host"
-    }
-fi
-
-if ! command -v get_hw_info &> /dev/null; then
-    get_hw_info() {
-        log_debug "Collecting hardware information..."
-
-        local cpu_model="Unknown"
-        local cpu_temp="N/A"
-        local cpu_usage="0"
-        local memory_usage="0"
-        local disk_usage="0"
-        local uptime_seconds="0"
-        local rpi_model="Unknown"
-        local os_version="Unknown"
-        local wifi_name=""
-        local wifi_signal=""
-        local local_ip=""
-
-        cpu_model=$(grep -m1 -E 'model name|Hardware|Processor|Model' /proc/cpuinfo 2>/dev/null | cut -d: -f2- | xargs || echo "Unknown")
-
-        if [ -f "/sys/class/thermal/thermal_zone0/temp" ]; then
-            cpu_temp=$(awk '{printf "%.1f", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "N/A")
-        fi
-
-        cpu_usage=$(awk '/^cpu /{u=($2+$4)*100/($2+$4+$5); printf "%.1f", u}' /proc/stat 2>/dev/null || echo "0")
-        memory_usage=$(free 2>/dev/null | awk '/^Mem:/ {printf "%.1f", ($3/$2)*100}' || echo "0")
-        disk_usage=$(df -h / 2>/dev/null | tail -1 | awk '{print $(NF-1)}' | tr -d '%' || echo "0")
-        uptime_seconds=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo "0")
-
-        if [ -f "/proc/device-tree/model" ]; then
-            rpi_model=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "Unknown")
-        fi
-
-        if command -v lsb_release >/dev/null 2>&1; then
-            os_version=$(lsb_release -ds 2>/dev/null || echo "Unknown")
-        elif [ -f /etc/os-release ]; then
-            os_version=$(grep '^PRETTY_NAME=' /etc/os-release | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//' || echo "Unknown")
-        fi
-
-        if command -v iwgetid >/dev/null 2>&1; then
-            wifi_name=$(iwgetid -r 2>/dev/null || echo "")
-        fi
-
-        if command -v iwconfig >/dev/null 2>&1; then
-            wifi_signal=$(iwconfig 2>/dev/null | grep -Eo 'Signal level=[^ ]+' | head -1 | cut -d= -f2 || echo "")
-        fi
-
-        local_ip=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
-
-        cat << EOF
-{
-    "hostname": "$(hostname)",
-    "os": "$(lsb_release -ds 2>/dev/null || echo 'Unknown')",
-    "kernel": "$(uname -r)",
-    "architecture": "$(uname -m)",
-    "cpu": "${cpu_model}",
-    "memory": "$(free -h | awk '/^Mem:/ {print $2}')",
-    "uptime": "$(uptime -p)",
-    "uptime_seconds": ${uptime_seconds},
-    "cpu_temp": "${cpu_temp}",
-    "cpu_usage": ${cpu_usage},
-    "memory_usage": ${memory_usage},
-    "disk_usage": ${disk_usage},
-    "rpi_model": "${rpi_model}",
-    "os_version": "${os_version}",
-    "wifi_name": "${wifi_name}",
-    "wifi_signal": "${wifi_signal}",
-    "local_ip": "${local_ip}"
-}
-EOF
-    }
-fi
-
-if ! command -v get_hw_info_quick &> /dev/null; then
-    get_hw_info_quick() {
-        local host kernel arch uptime_seconds
-        host=$(hostname 2>/dev/null || echo "unknown")
-        kernel=$(uname -r 2>/dev/null || echo "unknown")
-        arch=$(uname -m 2>/dev/null || echo "unknown")
-        uptime_seconds=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || echo "0")
-
-        cat << EOF
-{
-    "hostname": "${host}",
-    "kernel": "${kernel}",
-    "architecture": "${arch}",
-    "uptime_seconds": ${uptime_seconds},
-    "boot_phase": "registration"
-}
-EOF
-    }
-fi
-
-if ! command -v get_tech_info &> /dev/null; then
-    get_tech_info() {
-        local version="$SERVICE_VERSION"
-        local screen_resolution="unknown"
-        local screen_status="unknown"
-        
-        if [ -f "/opt/edudisplej/VERSION" ] && [ -s "/opt/edudisplej/VERSION" ]; then
-            version=$(cat /opt/edudisplej/VERSION 2>/dev/null || echo "$SERVICE_VERSION")
-        elif [ -f "$VERSION_FILE" ]; then
-            if command -v jq >/dev/null 2>&1; then
-                local vf_version
-                vf_version=$(jq -r '."edudisplej_sync_service.sh" // empty' "$VERSION_FILE" 2>/dev/null || true)
-                [ -n "$vf_version" ] && version="$vf_version"
-            else
-                local vf_version
-                vf_version=$(sed -n 's/.*"edudisplej_sync_service\.sh"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$VERSION_FILE" | head -1)
-                [ -n "$vf_version" ] && version="$vf_version"
-            fi
-        fi
-        
-        if command -v xrandr &>/dev/null; then
-            screen_resolution=$(DISPLAY=:0 xrandr 2>/dev/null | grep '\*' | awk '{print $1}' | head -1)
-            [ -z "$screen_resolution" ] && screen_resolution="unknown"
-        elif command -v xdpyinfo &>/dev/null; then
-            screen_resolution=$(DISPLAY=:0 xdpyinfo 2>/dev/null | grep dimensions | awk '{print $2}')
-            [ -z "$screen_resolution" ] && screen_resolution="unknown"
-        fi
-
-        if [ "$screen_resolution" = "unknown" ] && [ -f /sys/class/graphics/fb0/virtual_size ]; then
-            local fb_res
-            fb_res=$(tr ',' 'x' < /sys/class/graphics/fb0/virtual_size 2>/dev/null || true)
-            [ -n "$fb_res" ] && screen_resolution="$fb_res"
-        fi
-        
-        if command -v xset &>/dev/null; then
-            local dpms_status=$(DISPLAY=:0 xset q 2>/dev/null | grep "Monitor is" | awk '{print $3}')
-            if [ "$dpms_status" = "On" ]; then
-                screen_status="on"
-            elif [ "$dpms_status" = "Off" ]; then
-                screen_status="off"
-            else
-                if DISPLAY=:0 xset q &>/dev/null; then
-                    screen_status="on"
-                else
-                    screen_status="unknown"
-                fi
-            fi
-        fi
-        
-        echo "{\"version\":\"$version\",\"screen_resolution\":\"$screen_resolution\",\"screen_status\":\"$screen_status\"}"
-    }
-fi
-
-# Parse JSON value (use shared function or fallback)
-if ! command -v json_get &> /dev/null; then
-    json_get() {
-        local json="$1"
-        local key="$2"
-        if command -v jq >/dev/null 2>&1; then
-            echo "$json" | jq -r ".$key // empty" 2>/dev/null
-        else
-            echo "$json" | tr -d '\n\r' | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
-        fi
-    }
-fi
-
-json_escape() {
-    echo "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g; s/\r/\\r/g; s/\n/\\n/g'
+reset_to_unconfigured() {
+    log "Auth error - resetting to unconfigured"
+    rm -rf "${CONFIG_DIR}/localweb/modules" 2>/dev/null || true
+    mkdir -p "${CONFIG_DIR}/localweb/modules" 2>/dev/null || true
+    systemctl restart edudisplej-kiosk.service 2>/dev/null || true
 }
 
-timestamp_to_epoch() {
-    local ts="$1"
-    if [ -z "$ts" ]; then
-        echo "0"
-        return
-    fi
-
-    if date -d "$ts" +%s >/dev/null 2>&1; then
-        date -d "$ts" +%s
-    else
-        echo "0"
-    fi
-}
-
-is_server_newer() {
-    local server_ts="$1"
-    local local_ts="$2"
-    local server_epoch
-    local local_epoch
-    server_epoch=$(timestamp_to_epoch "$server_ts")
-    local_epoch=$(timestamp_to_epoch "$local_ts")
-
-    if [ "$server_epoch" -gt 0 ] && [ "$local_epoch" -gt 0 ]; then
-        [ "$server_epoch" -gt "$local_epoch" ]
-    else
-        [[ "$server_ts" > "$local_ts" ]]
-    fi
-}
-
-json_get_string_from_content() {
-    local json_content="$1"
-    local query="$2"
-
-    if command -v jq >/dev/null 2>&1; then
-        printf '%s' "$json_content" | jq -r "$query // empty" 2>/dev/null || true
-        return
-    fi
-
-    if command -v python3 >/dev/null 2>&1; then
-        JSON_CONTENT="$json_content" JSON_QUERY="$query" python3 - <<'PY'
-import json
-import os
-
-content = os.environ.get("JSON_CONTENT", "")
-query = os.environ.get("JSON_QUERY", "")
-
-try:
-    data = json.loads(content)
-except Exception:
-    print("")
-    raise SystemExit(0)
-
-if query == '.service_versions | keys[]':
-    service_versions = data.get('service_versions', {})
-    if isinstance(service_versions, dict):
-        for key in sorted(service_versions.keys()):
-            print(str(key))
-    raise SystemExit(0)
-
-if query.startswith('.service_versions[') and query.endswith(']'):
-    key = query[len('.service_versions['):-1].strip()
-    if key.startswith('"') and key.endswith('"'):
-        key = key[1:-1]
-    value = data.get('service_versions', {}).get(key, '')
-    print(value if isinstance(value, str) else str(value))
-    raise SystemExit(0)
-
-print("")
-PY
-        return
-    fi
-
-    echo ""
-}
-
-get_service_version_from_structure() {
-    local structure_content="$1"
-    local service_name="$2"
-    local escaped
-
-    escaped=$(printf '%s' "$service_name" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    json_get_string_from_content "$structure_content" ".service_versions[\"${escaped}\"]"
-}
-
-list_structure_services() {
-    local structure_content="$1"
-    json_get_string_from_content "$structure_content" '.service_versions | keys[]' || true
-}
-
-run_full_reinstall_with_token() {
-    local token="$1"
-
-    if [ -z "$token" ]; then
-        log_error "❌ Reinstall skipped: missing token"
-        return 1
-    fi
-
-    log "🚀 Starting full reinstall from ${INSTALL_SCRIPT_URL}"
-    if curl -fsSL "$INSTALL_SCRIPT_URL" | bash -s -- --token="$token" >> "$REINSTALL_LOG_FILE" 2>&1; then
-        log_success "✅ Full reinstall completed successfully"
-        return 0
-    fi
-
-    log_error "❌ Full reinstall failed (see $REINSTALL_LOG_FILE)"
-    return 1
-}
-
-force_full_loop_refresh() {
-    local reason="$1"
-
-    log "📥 Forced full refresh started: ${reason}"
-
-    mkdir -p "${LOCAL_WEB_DIR}/modules" 2>/dev/null || true
-
-    if [ ! -x "$DOWNLOAD_SCRIPT" ]; then
-        log_error "❌ Download script not found: $DOWNLOAD_SCRIPT"
-        return 1
-    fi
-
-    if ! bash "$DOWNLOAD_SCRIPT"; then
-        log_error "❌ Forced full refresh failed during download"
-        return 1
-    fi
-
-    log_success "✅ Forced full refresh download completed"
-    update_config_field "last_update" "$(date '+%Y-%m-%d %H:%M:%S')"
-
-    log "🔄 Restarting kiosk display service..."
-    if systemctl restart edudisplej-kiosk.service 2>/dev/null; then
-        log_success "✅ Kiosk display service restarted"
-    else
-        log_error "❌ Failed to restart kiosk display service"
-        return 1
-    fi
-
-    return 0
-}
-
-# Config.json management functions
-ensure_config_file_permissions() {
-    if [ -f "$CONFIG_FILE" ]; then
-        chmod 644 "$CONFIG_FILE" 2>/dev/null || true
-        chown "$CONFIG_FILE_OWNER" "$CONFIG_FILE" 2>/dev/null || true
-    fi
-}
-
-init_config_file() {
-    if [ ! -f "$CONFIG_FILE" ]; then
-        log "Initializing centralized config file: $CONFIG_FILE"
-        cat > "$CONFIG_FILE" <<'CONFIGEOF'
-{
-    "company_name": "",
-    "company_id": null,
-    "kiosk_id": null,
-    "device_id": "",
-    "token": "",
-    "sync_interval": 300,
-    "last_update": "",
-    "last_sync": "",
-    "screenshot_mode": "sync",
-    "screenshot_enabled": false,
-    "last_screenshot": "",
-    "module_versions": {},
-    "service_versions": {}
-}
-CONFIGEOF
-        ensure_config_file_permissions
-        log_success "Config file created"
-    else
-        # Heal ownership/permissions if a previous root write broke access for service user.
-        ensure_config_file_permissions
-    fi
-}
-
-# Update config.json field
-update_config_field() {
-    local key="$1"
-    local value="$2"
-    
-    init_config_file
-    
-    if command -v jq >/dev/null 2>&1; then
-        local temp_file=$(mktemp)
-        
-        # Handle different value types
-        if [[ "$value" =~ ^[0-9]+$ ]] && [ "$key" != "device_id" ] && [ "$key" != "token" ]; then
-            # Numeric value
-            jq --arg k "$key" --argjson v "$value" '.[$k] = $v' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
-        elif [ "$value" = "true" ] || [ "$value" = "false" ]; then
-            # Boolean value
-            jq --arg k "$key" --argjson v "$value" '.[$k] = $v' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
-        elif [ "$value" = "null" ]; then
-            # Null value
-            jq --arg k "$key" '.[$k] = null' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
-        else
-            # String value
-            jq --arg k "$key" --arg v "$value" '.[$k] = $v' "$CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$CONFIG_FILE"
-        fi
-
-        ensure_config_file_permissions
-        
-        log_debug "Updated config: $key = $value"
-    fi
-}
-
-# Get config.json field
-get_config_field() {
-    local key="$1"
-    
-    if [ ! -f "$CONFIG_FILE" ]; then
-        echo ""
-        return 1
-    fi
-    
-    if command -v jq >/dev/null 2>&1; then
-        jq -r ".$key // empty" "$CONFIG_FILE" 2>/dev/null
-    else
-        # Fallback without jq
-        grep "\"$key\"" "$CONFIG_FILE" | sed 's/.*: *"\?\([^",]*\)"\?.*/\1/' | head -1
-    fi
-}
-
-# Sync hardware data (also returns sync interval and update status)
-sync_hw_data() {
-    local mac=$(get_mac_address)
-    local hostname=$(get_hostname)
-    local hw_info=$(get_hw_info)
-    
-    # Get technical info (version, screen resolution, screen status)
-    local tech_info=$(get_tech_info)
-    local version=$(json_get "$tech_info" "version")
-    local screen_resolution=$(json_get "$tech_info" "screen_resolution")
-    local screen_status=$(json_get "$tech_info" "screen_status")
-    
-    # Get last_update from local loop.json if it exists
-    local last_update=""
-    if [ -f "$LOOP_FILE" ]; then
-        if command -v jq >/dev/null 2>&1; then
-            last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
-        fi
-    fi
-    
-    # Build request with last_update and tech info if available
-    local request_data
-    if [ -n "$last_update" ]; then
-        request_data="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info,\"last_update\":\"$last_update\",\"version\":\"$version\",\"screen_resolution\":\"$screen_resolution\",\"screen_status\":\"$screen_status\"}"
-        log_debug "Sending last_update: $last_update with tech info (v:$version, res:$screen_resolution, status:$screen_status)"
-    else
-        request_data="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info,\"version\":\"$version\",\"screen_resolution\":\"$screen_resolution\",\"screen_status\":\"$screen_status\"}"
-        log_debug "No local last_update found, sending tech info (v:$version, res:$screen_resolution, status:$screen_status)"
-    fi
-    
-    local token
-    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
-
-    response=$(curl -s -X POST "$DEVICE_SYNC_API" \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -d "$request_data")
-
-    if is_auth_error "$response"; then
-        reset_to_unconfigured
-        return 1
-    fi
-    
-    if echo "$response" | grep -q '"success":true'; then
-        # Cache the full sync response for other services (e.g. screenshot service)
-        echo "$response" > "$LAST_SYNC_RESPONSE" 2>/dev/null || true
-
-        local new_interval
-        new_interval=$(echo "$response" | grep -o '"sync_interval":[0-9]*' | cut -d: -f2)
-        if [ -n "$new_interval" ]; then
-            SYNC_INTERVAL=$new_interval
-            update_config_field "sync_interval" "$new_interval"
-        fi
-        
-        # Update screenshot_enabled from server response
-        local screenshot_enabled=$(json_get "$response" "screenshot_enabled")
-        if [ -n "$screenshot_enabled" ]; then
-            update_config_field "screenshot_enabled" "$screenshot_enabled"
-        fi
-        
-        # Update company information
-        local company_id=$(json_get "$response" "company_id")
-        local company_name=$(json_get "$response" "company_name")
-        local token=$(json_get "$response" "token")
-        
-        if [ -n "$company_id" ] && [ "$company_id" != "null" ]; then
-            update_config_field "company_id" "$company_id"
-        fi
-        if [ -n "$company_name" ]; then
-            update_config_field "company_name" "$company_name"
-        fi
-        if [ -n "$token" ]; then
-            update_config_field "token" "$token"
-        fi
-        
-        # Check if update is needed
-        local needs_update
-        needs_update=$(json_get "$response" "needs_update")
-        if [ "$needs_update" = "true" ]; then
-            local update_reason=$(json_get "$response" "update_reason")
-            log "⚠ Update needed: $update_reason"
-
-            if force_full_loop_refresh "server reported version change (${update_reason:-unknown reason})"; then
-                CYCLE_REFRESH_DONE="true"
-                LOOP_CHECK_NEEDS_UPDATE="true"
-            fi
-        fi
-
-        CORE_UPDATE_REQUIRED=$(json_get "$response" "core_update_required")
-        CORE_UPDATE_TARGET_VERSION=$(json_get "$response" "latest_system_version")
-        CORE_UPDATE_CURRENT_VERSION=$(json_get "$response" "current_system_version")
-
-        [ -z "$CORE_UPDATE_REQUIRED" ] && CORE_UPDATE_REQUIRED="false"
-        [ "$CORE_UPDATE_TARGET_VERSION" = "null" ] && CORE_UPDATE_TARGET_VERSION=""
-        [ "$CORE_UPDATE_CURRENT_VERSION" = "null" ] && CORE_UPDATE_CURRENT_VERSION=""
-
-        if [ "$CORE_UPDATE_REQUIRED" = "true" ]; then
-            log "⬆️ Core update required: ${CORE_UPDATE_CURRENT_VERSION:-unknown} -> ${CORE_UPDATE_TARGET_VERSION:-unknown}"
-        else
-            log_debug "Core update not required"
-        fi
-        
-        return 0
-    else
-        log_error "HW data sync failed: $response"
-        return 1
-    fi
-}
-
-trigger_core_update_if_needed() {
-    if [ "$CORE_UPDATE_REQUIRED" != "true" ]; then
-        return 0
-    fi
-
-    if [ -z "$CORE_UPDATE_TARGET_VERSION" ]; then
-        log_error "Core update required but target version missing"
-        return 1
-    fi
-
-    if ! mkdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null; then
-        log_debug "Core update lock active, another update run is in progress"
-        return 0
-    fi
-
-    local unlock_needed=1
-    local now_epoch
-    now_epoch=$(date +%s)
-
-    if [ -f "$CORE_UPDATE_LAST_ATTEMPT_FILE" ]; then
-        local last_attempt
-        last_attempt=$(cat "$CORE_UPDATE_LAST_ATTEMPT_FILE" 2>/dev/null || echo 0)
-        if [[ "$last_attempt" =~ ^[0-9]+$ ]]; then
-            local elapsed=$((now_epoch - last_attempt))
-            if [ "$elapsed" -lt "$CORE_UPDATE_RETRY_COOLDOWN" ]; then
-                log "⏳ Core update retry cooldown active (${elapsed}s/${CORE_UPDATE_RETRY_COOLDOWN}s), skipping this cycle"
-                rmdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null || true
-                return 0
-            fi
-        fi
-    fi
-
-    echo "$now_epoch" > "$CORE_UPDATE_LAST_ATTEMPT_FILE" 2>/dev/null || true
-
-    local update_script="${CONFIG_DIR}/init/update.sh"
-    local update_log="${LOG_DIR}/core_update.log"
-
-    if [ ! -x "$update_script" ]; then
-        log_error "Core update script missing or not executable: $update_script"
-        rmdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null || true
-        return 1
-    fi
-
-    log "🚀 Starting core-only self-update (${CORE_UPDATE_CURRENT_VERSION:-unknown} -> ${CORE_UPDATE_TARGET_VERSION})"
-    if bash "$update_script" --core-only --source=auto-sync --target-version="$CORE_UPDATE_TARGET_VERSION" >> "$update_log" 2>&1; then
-        log_success "✅ Core-only self-update finished"
-        rmdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null || true
-        unlock_needed=0
-        return 0
-    fi
-
-    log_error "❌ Core-only self-update failed (see $update_log)"
-
-    if [ "$unlock_needed" -eq 1 ]; then
-        rmdir "$CORE_UPDATE_LOCK_DIR" 2>/dev/null || true
-    fi
-    return 1
-}
-
-# Check loop changes and update modules if needed
-# This checks kiosk_group_modules updated_at in the group and company where device belongs
-# Enhanced with security: API only responds if device truly belongs to company
-check_loop_updates() {
+sync_loop_if_needed() {
     local device_id="$1"
-    [ -z "$device_id" ] && return 0
-    
-    # Get local last_update timestamp from loop.json
-    local local_last_update=""
-    local local_plan_version=""
-    if [ -f "$LOOP_FILE" ]; then
-        if command -v jq >/dev/null 2>&1; then
-            local_last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
-            local_plan_version=$(jq -r '.loop_plan_version // empty' "$LOOP_FILE" 2>/dev/null)
-        fi
-    fi
+    local local_updated=""
+    [ -f "$LOOP_FILE" ] && command -v jq >/dev/null 2>&1 && \
+        local_updated=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
 
-    LOOP_CHECK_LOCAL_UPDATED_AT="$local_last_update"
-    LOOP_CHECK_SERVER_UPDATED_AT=""
-    LOOP_CHECK_NEEDS_UPDATE="false"
-    
-    log_debug "Local loop last_update: ${local_last_update:-none}"
-    
-    # Query server for group loop configuration with security check
-    # API verifies device belongs to company before responding
-    local response
     local token
-    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+    token=$(get_token) || { reset_to_unconfigured; return 1; }
 
-    response=$(curl -s -X POST "$CHECK_GROUP_LOOP_UPDATE_API" \
+    local response
+    response=$(curl -s -X POST "$LOOP_CHECK_API" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
         -d "{\"device_id\":\"${device_id}\"}" \
-        --max-time 30)
+        --max-time 30 2>/dev/null)
 
-    if is_auth_error "$response"; then
-        reset_to_unconfigured
-        return 1
-    fi
-    
-    # Check for authorization errors first
-    if echo "$response" | grep -q '"message":"Unauthorized"'; then
-        log_error "⚠️ Loop check UNAUTHORIZED: Device does not belong to any company or group access denied"
-        return 1
-    fi
-    
-    if ! echo "$response" | grep -q '"success":true'; then
-        log_error "Loop check failed: $response"
-        return 1
-    fi
-    
-    # Extract response data
-    local config_source
-    config_source=$(json_get "$response" "config_source")
-    local server_updated_at
-    server_updated_at=$(json_get "$response" "loop_updated_at")
-    local company_name
-    company_name=$(json_get "$response" "company_name")
-    local group_id
-    group_id=$(json_get "$response" "group_id")
-    local server_plan_version
-    server_plan_version=$(json_get "$response" "loop_plan_version")
+    is_auth_error "$response" && { reset_to_unconfigured; return 1; }
+    echo "$response" | grep -q '"success":true' || { log "Loop check failed"; return 1; }
 
-    LOOP_CHECK_SERVER_UPDATED_AT="$server_updated_at"
-    
-    log "📋 Loop version check: Company='$company_name', Source='$config_source', Group='${group_id:-none}'"
-    log_debug "Server loop updated_at: ${server_updated_at:-none} (from $config_source)"
-    log_debug "Plan version check: server='${server_plan_version:-none}', local='${local_plan_version:-none}'"
-    
-    # Compare timestamps: if no local timestamp, or server is newer, update
+    local server_updated
+    server_updated=$(json_get "$response" "loop_updated_at")
+
     local needs_update=false
-    
-    if [ -z "$local_last_update" ]; then
-        log "🔄 No local loop found - downloading initial configuration from server..."
-        needs_update=true
-    elif [ -z "$server_updated_at" ]; then
-        log_debug "Server has no update timestamp - skipping comparison"
-    else
-        # Compare timestamps (prefers epoch comparison, falls back to string compare)
-        if is_server_newer "$server_updated_at" "$local_last_update"; then
-            log "⬆️ Server loop is newer - update required (server: $server_updated_at, local: $local_last_update)"
-            needs_update=true
-        else
-            log_debug "✓ Loop configuration is up-to-date"
-        fi
-    fi
+    [ -z "$local_updated" ] && needs_update=true
+    [ -n "$server_updated" ] && [ -n "$local_updated" ] && \
+        [ "$server_updated" \> "$local_updated" ] && needs_update=true
 
-    if [ "$needs_update" = "false" ] && [ -n "$server_plan_version" ] && [ "$server_plan_version" != "null" ]; then
-        if [ -z "$local_plan_version" ] || [ "$local_plan_version" = "null" ] || [ "$server_plan_version" != "$local_plan_version" ]; then
-            log "⬆️ Loop plan version changed - update required (server: $server_plan_version, local: ${local_plan_version:-none})"
-            needs_update=true
-        fi
-    fi
-
-    LOOP_CHECK_NEEDS_UPDATE="$needs_update"
-    
-    # Download modules if update is needed
     if [ "$needs_update" = "true" ]; then
-        force_full_loop_refresh "loop version changed (server: ${server_updated_at:-n/a}, local: ${local_last_update:-n/a})" || true
+        log "Loop update needed, downloading..."
+        [ -x "$DOWNLOAD_SCRIPT" ] && bash "$DOWNLOAD_SCRIPT" && \
+            systemctl restart edudisplej-kiosk.service 2>/dev/null || true
     fi
 }
 
-# Screenshot capture and upload function
-capture_and_upload_screenshot() {
-    LAST_SCREENSHOT_STATUS="running"
-    log "📸 Screenshot: Capturing..."
-    
-    if ! command -v scrot >/dev/null 2>&1; then
-        log_error "📸 Screenshot failed: 'scrot' not installed (run: apt-get install scrot)"
-        LAST_SCREENSHOT_STATUS="error"
-        return 0
-    fi
-    
-    # Try to capture screenshot
-    local temp_file="/tmp/edudisplej_screenshot_$$.png"
-    if ! DISPLAY=:0 timeout 5 scrot "$temp_file" 2>/dev/null; then
-        log_error "📸 Screenshot failed: Unable to capture screen (check DISPLAY=:0 and X server)"
-        LAST_SCREENSHOT_STATUS="error"
-        rm -f "$temp_file"
-        return 0
-    fi
-    
-    if [ ! -f "$temp_file" ] || [ ! -s "$temp_file" ]; then
-        log_error "📸 Screenshot failed: File empty or not created"
-        LAST_SCREENSHOT_STATUS="error"
-        rm -f "$temp_file"
-        return 0
-    fi
-    
-    # Get MAC address for filename
-    local mac=$(get_mac_address)
-    local timestamp=$(date '+%Y%m%d%H%M%S')
-    local filename="scrn_edudisplej${mac}_${timestamp}.png"
-    
-    # Encode to base64 and upload
-    local base64_data=$(base64 -w 0 "$temp_file" 2>/dev/null)
-    if [ -z "$base64_data" ]; then
-        log_error "📸 Screenshot failed: Unable to encode to base64"
-        LAST_SCREENSHOT_STATUS="error"
-        rm -f "$temp_file"
-        return 0
-    fi
-    
-    log "📸 Uploading screenshot ($filename)..."
-    
-    # Upload screenshot
-    local screenshot_api="${API_BASE_URL}/api/screenshot_sync.php"
-    local token
-    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+sync_hw() {
+    local token mac hw version last_update
+    token=$(get_token) || return 1
+    mac=$(get_mac_address 2>/dev/null || hostname -I | awk '{print $1}')
+    hw=$(get_hw_info)
+    version=$(cat "${CONFIG_DIR}/VERSION" 2>/dev/null || echo "unknown")
+    last_update=""
+    [ -f "$LOOP_FILE" ] && command -v jq >/dev/null 2>&1 && \
+        last_update=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
 
-    local upload_response=$(curl -s -X POST "$screenshot_api" \
+    local data="{\"mac\":\"$mac\",\"hostname\":\"$(hostname)\",\"hw_info\":${hw},\"version\":\"$version\""
+    [ -n "$last_update" ] && data="${data},\"last_update\":\"$last_update\""
+    data="${data}}"
+
+    local response
+    response=$(curl -s -X POST "$DEVICE_SYNC_API" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
-        -d "{\"mac\":\"$mac\",\"filename\":\"$filename\",\"screenshot\":\"data:image/png;base64,$base64_data\"}" \
-        --max-time 30 --connect-timeout 10 2>&1)
+        -d "$data" --max-time 30 2>/dev/null)
 
-    if is_auth_error "$upload_response"; then
-        reset_to_unconfigured
-        LAST_SCREENSHOT_STATUS="error"
-        return 1
+    is_auth_error "$response" && { reset_to_unconfigured; return 1; }
+
+    if echo "$response" | grep -q '"sync_interval"'; then
+        local new_interval
+        new_interval=$(echo "$response" | grep -o '"sync_interval":[0-9]*' | cut -d: -f2)
+        [ -n "$new_interval" ] && SYNC_INTERVAL=$new_interval
     fi
-    
-    if echo "$upload_response" | grep -q '"success":true'; then
-        log_success "📸 Screenshot uploaded successfully: $filename"
-        # Update last_screenshot time in config
-        local now=$(date '+%Y-%m-%d %H:%M:%S')
-        update_config_field "last_screenshot" "$now"
-        LAST_SCREENSHOT_STATUS="success"
-    else
-        log_error "📸 Screenshot upload failed: $upload_response"
-        LAST_SCREENSHOT_STATUS="error"
-    fi
-    
-    # Cleanup
-    rm -f "$temp_file"
-    return 0
 }
 
-# Register kiosk and sync
-register_and_sync() {
-    local mac=$(get_mac_address)
-    local hostname=$(get_hostname)
-    local hw_info=$(get_hw_info_quick)
-    CYCLE_REFRESH_DONE="false"
-    
-    log "=========================================="
-    log "Starting sync cycle..."
-    log "=========================================="
-    log_debug "MAC: $mac"
-    log_debug "Hostname: $hostname"
-    log_debug "API URL: $REGISTRATION_API"
-    
-    # Prepare request body
-    local request_body="{\"mac\":\"$mac\",\"hostname\":\"$hostname\",\"hw_info\":$hw_info}"
-    log_debug "Request body: $request_body"
-    
-    # Create temp file for response
-    local response_file=$(mktemp)
-    local headers_file=$(mktemp)
-    
-    # Make API call with detailed logging
-    log "Calling registration API..."
-    
-    local token
-    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
+do_sync() {
+    local token mac hw
+    token=$(get_token) || { log "No token found, skipping sync"; return 1; }
+    mac=$(get_mac_address 2>/dev/null || hostname -I | awk '{print $1}')
+    hw=$(get_hw_info)
 
+    local body="{\"mac\":\"$mac\",\"hostname\":\"$(hostname)\",\"hw_info\":${hw}}"
+    local response_file
+    response_file=$(mktemp)
+
+    local http_code
     http_code=$(curl -s -w "%{http_code}" \
         -X POST "$REGISTRATION_API" \
         -H "Authorization: Bearer $token" \
         -H "Content-Type: application/json" \
-        -d "$request_body" \
-        --max-time 30 \
-        --connect-timeout 10 \
-        -o "$response_file" \
-        -D "$headers_file" \
-        2>&1 || echo "000")
-    
-    response=$(cat "$response_file" 2>/dev/null || echo '{"success":false,"message":"Empty response"}')
-    
-    log_debug "HTTP Status Code: $http_code"
-    log_debug "Response Headers:"
-    log_debug "$(cat "$headers_file" 2>/dev/null)"
-    log_debug "Response Body: $response"
-    
-    # Clean up temp files
-    rm -f "$response_file" "$headers_file"
-    
-    # Check HTTP status
+        -d "$body" --max-time 30 --connect-timeout 10 \
+        -o "$response_file" 2>/dev/null || echo "000")
+
+    local response
+    response=$(cat "$response_file" 2>/dev/null || echo '{}')
+    rm -f "$response_file"
+
     if [ "$http_code" != "200" ]; then
-        log_error "HTTP request failed with status code: $http_code"
-        
-        case "$http_code" in
-            000)
-                log_error "Connection failed - no response from server"
-                log_error "Check network connectivity and API URL"
-                ;;
-            404)
-                log_error "API endpoint not found (404)"
-                log_error "Check API URL: $REGISTRATION_API"
-                ;;
-            500)
-                log_error "Server error (500) - API backend issue"
-                log_error "Check server logs at control panel"
-                ;;
-            503)
-                log_error "Service unavailable (503)"
-                ;;
-            *)
-                log_error "Unexpected HTTP status: $http_code"
-                ;;
-        esac
-        
-        write_error_status "HTTP $http_code error" "$response"
+        log "Registration failed HTTP $http_code"
         return 1
     fi
-    
-    # Parse JSON response
-    if is_auth_error "$response"; then
-        reset_to_unconfigured
-        return 1
-    fi
-    log "Parsing API response..."
-    
-    # Check for debug information and display it
-    if echo "$response" | grep -q '"debug"'; then
-        log "=== DEBUG INFORMATION ==="
-        
-        # Extract and display debug keys
-        if command -v jq >/dev/null 2>&1; then
-            # Use jq if available for nice formatting - handles nested structures properly
-            echo "$response" | jq -r '.debug | to_entries[] | "\(.key): \(.value)"' 2>/dev/null | while IFS= read -r line; do
-                log_debug "$line"
-            done
-        else
-            # Fallback: log that debug section exists but needs jq for full parsing
-            log_debug "Debug information available in response (install 'jq' for formatted output)"
-            log_debug "Raw response: $response"
-        fi
-        
-        log "=== END DEBUG ==="
-    fi
-    
-    if command -v jq >/dev/null 2>&1; then
-        success=$(echo "$response" | jq -r '.success // false' 2>/dev/null || echo "false")
-        kiosk_id=$(echo "$response" | jq -r '.kiosk_id // 0' 2>/dev/null || echo "0")
-        device_id=$(echo "$response" | jq -r '.device_id // "unknown"' 2>/dev/null || echo "unknown")
-        is_configured=$(echo "$response" | jq -r '.is_configured // false' 2>/dev/null || echo "false")
-        company_assigned=$(echo "$response" | jq -r '.company_assigned // false' 2>/dev/null || echo "false")
-        company_name=$(echo "$response" | jq -r '.company_name // "Unknown"' 2>/dev/null || echo "Unknown")
-        group_name=$(echo "$response" | jq -r '.group_name // "Unknown"' 2>/dev/null || echo "Unknown")
-        error_msg=$(echo "$response" | jq -r '.message // "Unknown error"' 2>/dev/null || echo "Unknown error")
-    else
-        compact_response=$(echo "$response" | tr -d '\n\r')
-        success=$(echo "$compact_response" | sed -n 's/.*"success"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -1)
-        [ -z "$success" ] && success="false"
-        kiosk_id=$(echo "$compact_response" | sed -n 's/.*"kiosk_id"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -1)
-        [ -z "$kiosk_id" ] && kiosk_id="0"
-        device_id=$(echo "$compact_response" | sed -n 's/.*"device_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-        [ -z "$device_id" ] && device_id="unknown"
-        is_configured=$(echo "$compact_response" | sed -n 's/.*"is_configured"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -1)
-        [ -z "$is_configured" ] && is_configured="false"
-        company_assigned=$(echo "$compact_response" | sed -n 's/.*"company_assigned"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -1)
-        [ -z "$company_assigned" ] && company_assigned="false"
-        company_name=$(echo "$compact_response" | sed -n 's/.*"company_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-        [ -z "$company_name" ] && company_name="Unknown"
-        group_name=$(echo "$compact_response" | sed -n 's/.*"group_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-        [ -z "$group_name" ] && group_name="Unknown"
-        error_msg=$(echo "$compact_response" | sed -n 's/.*"message"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-        [ -z "$error_msg" ] && error_msg="Unknown error"
-    fi
 
-    if [ "$success" = "true" ]; then
-        # Extract fields already parsed above
-        
-        log_success "✓ Sync successful!"
-        log "  Kiosk ID: $kiosk_id"
-        log "  Device ID: $device_id"
-        log "  Company: $company_name"
-        log "  Group: $group_name"
-        log "  Configured: $is_configured"
-        log "  Company assigned: $company_assigned"
-        
-        # Create kiosk.conf with device_id
-        KIOSK_CONF="${CONFIG_DIR}/kiosk.conf"
-        if [ ! -f "$KIOSK_CONF" ] || ! grep -q "DEVICE_ID=" "$KIOSK_CONF" 2>/dev/null; then
-            log "Creating kiosk configuration file..."
-            cat > "$KIOSK_CONF" <<EOF
-# EduDisplej Kiosk Configuration
-# Auto-generated by sync service
-DEVICE_ID=$device_id
-KIOSK_ID=$kiosk_id
+    is_auth_error "$response" && { reset_to_unconfigured; return 1; }
+    echo "$response" | grep -q '"success":true' || { log "Registration failed: $response"; return 1; }
+
+    local device_id kiosk_id is_configured
+    device_id=$(json_get "$response" "device_id")
+    kiosk_id=$(json_get "$response" "kiosk_id")
+    is_configured=$(json_get "$response" "is_configured")
+    DEVICE_ID="$device_id"
+
+    log "Sync OK - device=$device_id kiosk=$kiosk_id configured=$is_configured"
+
+    cat > "$STATUS_FILE" << EOF
+{"last_sync":"$(date '+%Y-%m-%d %H:%M:%S')","device_id":"$device_id","kiosk_id":"$kiosk_id","is_configured":$is_configured}
 EOF
-            chmod 644 "$KIOSK_CONF"
-            log_success "✓ Created kiosk.conf with DEVICE_ID=$device_id"
-        fi
-        
-        # Write status file
-        write_success_status "$kiosk_id" "$device_id" "$is_configured" "$company_name" "$group_name"
-        
-        # Update sync interval from server
-        if sync_hw_data; then
-            log "Sync interval: ${SYNC_INTERVAL}s"
-            if ! trigger_core_update_if_needed; then
-                log_error "Core update attempt failed (non-critical for current sync cycle)"
-            fi
-        fi
-        
-        # Always check for loop updates if we have a device_id
-        if [ -n "$device_id" ] && [ "$device_id" != "unknown" ]; then
-            if [ "$CYCLE_REFRESH_DONE" = "true" ]; then
-                log "Skipping extra loop check in this cycle (refresh already completed)"
-            else
-                log "Checking for loop configuration changes..."
-                if ! check_loop_updates "$device_id"; then
-                    log_error "Loop check failed (non-critical), continuing sync cycle"
-                fi
-            fi
-            
-            # Get loop version for logging and DB update
-            local loop_updated_at=""
-            if [ -f "$LOOP_FILE" ]; then
-                if command -v jq >/dev/null 2>&1; then
-                    loop_updated_at=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
-                fi
-            fi
-            
-            # Update sync timestamps on server
-            local timestamp_update_api="${API_BASE_URL}/api/update_sync_timestamp.php"
-            local sync_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-            
-            local timestamp_data="{\"mac\":\"$mac\",\"last_sync\":\"$sync_timestamp\""
-            if [ -n "$loop_updated_at" ]; then
-                timestamp_data="${timestamp_data},\"loop_last_update\":\"$loop_updated_at\""
-                log "Loop version: $loop_updated_at (local)"
-            fi
-            timestamp_data="${timestamp_data}}"
-            
-            local token
-            token=$(get_api_token) || { reset_to_unconfigured; return 1; }
 
-            curl -s -X POST "$timestamp_update_api" \
-                -H "Authorization: Bearer $token" \
-                -H "Content-Type: application/json" \
-                -d "$timestamp_data" \
-                --max-time 10 >/dev/null 2>&1 || log_debug "Failed to update sync timestamp"
-            
-            log "Last sync: $sync_timestamp"
-            
-            # Collect and upload logs
-            if [ "$ENABLE_LEGACY_LOG_UPLOAD" = "true" ]; then
-                log_debug "Uploading logs to server..."
-                collect_and_upload_logs "$device_id"
-            else
-                log_debug "Legacy log upload disabled (EDUDISPLEJ_LEGACY_LOG_UPLOAD=false)"
-            fi
-        fi
-        
-        # Notify if not fully configured
-        if [ "$is_configured" = "false" ]; then
-            log "Note: Device not fully configured yet"
-            log "Visit: https://control.edudisplej.sk/admin/"
-        fi
-        
-        return 0
-    else
-        log_error "✗ Sync failed: $error_msg"
-        log_error "Full response: $response"
-        
-        write_error_status "$error_msg" "$response"
-        write_sync_state "error" "$error_msg"
-        return 1
+    sync_hw
+
+    if [ -n "$device_id" ] && [ "$device_id" != "unknown" ]; then
+        sync_loop_if_needed "$device_id"
+
+        curl -s -X POST "$TIMESTAMP_API" \
+            -H "Authorization: Bearer $token" \
+            -H "Content-Type: application/json" \
+            -d "{\"mac\":\"$mac\",\"last_sync\":\"$(date '+%Y-%m-%d %H:%M:%S')\"}" \
+            --max-time 10 >/dev/null 2>&1 || true
     fi
 }
 
-# Write success status
-write_success_status() {
-    local kiosk_id=$1
-    local device_id=$2
-    local is_configured=$3
-    local company_name=$4
-    local group_name=$5
-    
-    # Calculate next sync time with proper fallback for BSD date
-    local next_sync
-    if date -d "+${SYNC_INTERVAL} seconds" '+%Y-%m-%d %H:%M:%S' >/dev/null 2>&1; then
-        # GNU date
-        next_sync=$(date -d "+${SYNC_INTERVAL} seconds" '+%Y-%m-%d %H:%M:%S')
-    elif date -v +${SYNC_INTERVAL}S '+%Y-%m-%d %H:%M:%S' >/dev/null 2>&1; then
-        # BSD date
-        next_sync=$(date -v +${SYNC_INTERVAL}S '+%Y-%m-%d %H:%M:%S')
-    else
-        # Fallback: just use current time
-        next_sync=$(date '+%Y-%m-%d %H:%M:%S')
-    fi
-    
-    cat > "$STATUS_FILE" <<EOF
-{
-    "last_sync": "$(date '+%Y-%m-%d %H:%M:%S')",
-    "status": "success",
-    "kiosk_id": $kiosk_id,
-    "device_id": "$device_id",
-    "company_name": "$company_name",
-    "group_name": "$group_name",
-    "is_configured": $is_configured,
-    "next_sync": "$next_sync",
-    "error": null
-}
-EOF
-    log_debug "Status file updated: $STATUS_FILE"
-    
-    # Update centralized config.json
-    update_config_field "device_id" "$device_id"
-    update_config_field "kiosk_id" "$kiosk_id"
-    update_config_field "company_name" "$company_name"
-    update_config_field "last_sync" "$(date '+%Y-%m-%d %H:%M:%S')"
-}
+log "EduDisplej Sync Service started"
 
-# Write error status
-write_error_status() {
-    local error_msg=$1
-    local response=$2
-    
-    # Try to use jq for proper JSON handling if available
-    if command -v jq >/dev/null 2>&1; then
-        jq -n \
-            --arg last_sync "$(date '+%Y-%m-%d %H:%M:%S')" \
-            --arg status "error" \
-            --arg error "$error_msg" \
-            --arg response "$response" \
-            --arg next_retry "$(date -d "+60 seconds" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -v +60S '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')" \
-            '{last_sync: $last_sync, status: $status, error: $error, response: $response, next_retry: $next_retry}' \
-            > "$STATUS_FILE"
-    else
-        # Fallback: escape JSON special characters manually
-        local escaped_response=$(echo "$response" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr -d '\n\r')
-        
-        cat > "$STATUS_FILE" <<EOF
-{
-    "last_sync": "$(date '+%Y-%m-%d %H:%M:%S')",
-    "status": "error",
-    "error": "$error_msg",
-    "response": "$escaped_response",
-    "next_retry": "$(date -d "+60 seconds" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -v +60S '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')"
-}
-EOF
-    fi
-    log_debug "Error status written: $STATUS_FILE"
-}
-
-write_sync_state() {
-    local status="$1"
-    local error_msg="$2"
-
-    local loop_local=""
-    if [ -f "$LOOP_FILE" ] && command -v jq >/dev/null 2>&1; then
-        loop_local=$(jq -r '.last_update // empty' "$LOOP_FILE" 2>/dev/null)
-    fi
-
-    local sync_interval
-    sync_interval=$(get_config_field "sync_interval")
-    local screenshot_mode
-    screenshot_mode=$(get_config_field "screenshot_mode")
-    local screenshot_enabled
-    screenshot_enabled=$(get_config_field "screenshot_enabled")
-
-    local error_escaped
-    error_escaped=$(json_escape "$error_msg")
-
-    cat > "$SYNC_STATE_FILE" <<EOF
-{
-    "timestamp": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
-    "status": "${status}",
-    "error": "${error_escaped}",
-    "device_id": "$(get_config_field "device_id")",
-    "kiosk_id": "$(get_config_field "kiosk_id")",
-    "company_id": "$(get_config_field "company_id")",
-    "sync_interval": ${sync_interval:-0},
-    "loop_last_update_local": "${loop_local}",
-    "loop_last_update_server": "${LOOP_CHECK_SERVER_UPDATED_AT}",
-    "loop_needs_update": ${LOOP_CHECK_NEEDS_UPDATE},
-    "screenshot_mode": "${screenshot_mode}",
-    "screenshot_enabled": ${screenshot_enabled:-false},
-    "screenshot_status": "${LAST_SCREENSHOT_STATUS}"
-}
-EOF
-}
-
-# Sync modules
-sync_modules() {
-    local kiosk_id=$1
-    log "TODO: Implement module sync for kiosk ID: $kiosk_id"
-    # Future implementation: download modules from MODULES_API
-}
-
-# Collect and upload logs to server
-collect_and_upload_logs() {
-    local device_id="$1"
-    [ -z "$device_id" ] && return 0
-    
-    log_debug "Collecting logs for upload..."
-    
-    local logs_json="["
-    local first=true
-    
-    # Collect recent errors and warnings from sync log
-    if [ -f "$LOG_FILE" ]; then
-        while IFS= read -r line; do
-            # Only send ERROR and WARNING logs
-            if echo "$line" | grep -qE "\[ERROR\]|\[WARNING\]"; then
-                # Extract log level and message
-                local timestamp=$(echo "$line" | sed -n 's/^\[\([^]]*\)\].*/\1/p')
-                local level=$(echo "$line" | sed -n 's/.*\[\(ERROR\|WARNING\)\].*/\1/p' | tr '[:upper:]' '[:lower:]')
-                local message=$(echo "$line" | sed 's/^[^]]*\] \[[^]]*\] //')
-                
-                # Build JSON entry
-                if [ "$first" = true ]; then
-                    first=false
-                else
-                    logs_json+=","
-                fi
-                
-                # Escape quotes in message
-                message=$(echo "$message" | sed 's/"/\\"/g' | tr -d '\n\r')
-                
-                logs_json+="{\"type\":\"sync\",\"level\":\"$level\",\"message\":\"$message\",\"timestamp\":\"$timestamp\"}"
-            fi
-        done < <(tail -100 "$LOG_FILE" 2>/dev/null)
-    fi
-    
-    # Collect systemd service errors if available
-    if command -v journalctl >/dev/null 2>&1; then
-        local service_logs=$(journalctl -u edudisplej-kiosk.service -u edudisplej-sync.service --since "5 minutes ago" -p err -n 20 --no-pager 2>/dev/null || true)
-        if [ -n "$service_logs" ]; then
-            while IFS= read -r line; do
-                if [ -n "$line" ]; then
-                    if [ "$first" = false ]; then
-                        logs_json+=","
-                    fi
-                    first=false
-                    
-                    local message=$(echo "$line" | sed 's/"/\\"/g' | tr -d '\n\r')
-                    logs_json+="{\"type\":\"systemd\",\"level\":\"error\",\"message\":\"$message\"}"
-                fi
-            done <<< "$service_logs"
-        fi
-    fi
-    
-    logs_json+="]"
-    
-    # Only send if we have logs
-    if [ "$logs_json" = "[]" ]; then
-        log_debug "No error/warning logs to upload"
-        return 0
-    fi
-    
-    # Send logs to server
-    local mac=$(get_mac_address)
-    local request_body="{\"mac\":\"$mac\",\"device_id\":\"$device_id\",\"logs\":$logs_json}"
-    
-    local token
-    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
-
-    local response=$(curl -s -X POST "${API_BASE_URL}/api/log_sync.php" \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -d "$request_body" \
-        --max-time 30)
-
-    if is_auth_error "$response"; then
-        reset_to_unconfigured
-        return 1
-    fi
-    
-    if echo "$response" | grep -q '"success":true'; then
-        local logs_inserted=$(json_get "$response" "logs_inserted")
-        log_debug "Uploaded $logs_inserted logs to server"
-    else
-        log_debug "Log upload failed (non-critical)"
-    fi
-}
-
-# Check for service updates (version check)
-check_service_updates() {
-    local now_epoch
-    now_epoch=$(date +%s)
-    if [ "$LAST_SERVICE_UPDATE_CHECK_EPOCH" -gt 0 ]; then
-        local elapsed=$((now_epoch - LAST_SERVICE_UPDATE_CHECK_EPOCH))
-        if [ "$elapsed" -lt "$SERVICE_UPDATE_CHECK_INTERVAL" ]; then
-            log_debug "Skipping service update check (next in $((SERVICE_UPDATE_CHECK_INTERVAL - elapsed))s)"
-            return 0
-        fi
-    fi
-    LAST_SERVICE_UPDATE_CHECK_EPOCH=$now_epoch
-
-    log_debug "Checking service timestamps from structure.json..."
-
-    local token
-    token=$(get_api_token) || { reset_to_unconfigured; return 1; }
-
-    local server_structure
-    server_structure=$(curl -s --fail --max-time 20 --connect-timeout 10 \
-        -H "Authorization: Bearer $token" \
-        "${STRUCTURE_API}&token=${token}" 2>/dev/null || true)
-
-    if [ -z "$server_structure" ]; then
-        log_debug "Structure fetch failed or unavailable"
-        return 0
-    fi
-
-    local server_services
-    server_services=$(list_structure_services "$server_structure")
-    if [ -z "$server_services" ]; then
-        log_debug "No service_versions found in server structure"
-        return 0
-    fi
-
-    local local_structure='{}'
-    if [ -f "$LOCAL_STRUCTURE_FILE" ]; then
-        local_structure=$(cat "$LOCAL_STRUCTURE_FILE" 2>/dev/null || echo '{}')
-    fi
-
-    local update_needed=false
-    local update_details=""
-
-    while IFS= read -r service_name; do
-        [ -z "$service_name" ] && continue
-
-        local server_version
-        local local_version
-        server_version=$(get_service_version_from_structure "$server_structure" "$service_name")
-        local_version=$(get_service_version_from_structure "$local_structure" "$service_name")
-
-        [ -z "$server_version" ] && continue
-
-        if [ -z "$local_version" ] || is_server_newer "$server_version" "$local_version"; then
-            update_needed=true
-            update_details+="${service_name}: ${local_version:-none} -> ${server_version}; "
-        fi
-    done <<< "$server_services"
-
-    if [ "$update_needed" != true ]; then
-        log_debug "Service timestamps are up to date"
-        return 0
-    fi
-
-    log "⚠ Service code update detected in structure.json"
-    log "Update details: ${update_details}"
-
-    if run_full_reinstall_with_token "$token"; then
-        echo "$server_structure" > "$LOCAL_STRUCTURE_FILE"
-        chmod 644 "$LOCAL_STRUCTURE_FILE" 2>/dev/null || true
-        log "♻ Reinstall finished, exiting current sync process"
-        exit 0
-    fi
-}
-
-# Check for system updates (runs daily)
-check_and_update() {
-    local update_check_file="/tmp/edudisplej_update_check"
-    local update_interval=$((24 * 3600))  # 24 hours
-    
-    # Create file if it doesn't exist
-    if [ ! -f "$update_check_file" ]; then
-        touch "$update_check_file"
-    fi
-    
-    # Check if update check has been done in the last 24 hours
-    local last_check=$(stat -c %Y "$update_check_file" 2>/dev/null || echo 0)
-    local current_time=$(date +%s)
-    local time_diff=$((current_time - last_check))
-    
-    if [ $time_diff -ge $update_interval ]; then
-        log "Checking for system updates..."
-        
-        # Run update.sh detached so update-triggered service restarts do not terminate this sync loop.
-        if [ -x "/opt/edudisplej/init/update.sh" ]; then
-            log "Running system update in detached mode (non-blocking)..."
-            if pgrep -f '/opt/edudisplej/init/update.sh' >/dev/null 2>&1; then
-                log_debug "Update already running, skipping duplicate launch"
-            else
-                nohup bash "/opt/edudisplej/init/update.sh" >> "$LOG_DIR/update.log" 2>&1 &
-                local update_pid=$!
-                if [ -n "${update_pid:-}" ] && kill -0 "$update_pid" 2>/dev/null; then
-                    log_success "System update started in background (PID: $update_pid)"
-                else
-                    log_error "Failed to start background system update (non-critical)"
-                fi
-            fi
-        fi
-        
-        # Update check timestamp
-        touch "$update_check_file"
-    else
-        # Calculate remaining time until next update check
-        local remaining=$((update_interval - time_diff))
-        log_debug "Next update check in $remaining seconds (~$(($remaining / 3600)) hours)"
-    fi
-}
-
-# Main loop
-main() {
-    log "=========================================="
-    log "EduDisplej Sync Service Started"
-    log "=========================================="
-    log "Version: $SERVICE_VERSION"
-    log "API URL: $REGISTRATION_API"
-    log "Sync interval: ${SYNC_INTERVAL}s"
-    log "Sync screenshot capture: ${ENABLE_SYNC_SCREENSHOT_CAPTURE}"
-    log "Legacy log upload: ${ENABLE_LEGACY_LOG_UPLOAD}"
-    log "Service update check interval: ${SERVICE_UPDATE_CHECK_INTERVAL}s"
-    log "Auto-update: Enabled (daily)"
-    log "Debug mode: $DEBUG"
-    log "=========================================="
-    echo ""
-
-    init_config_file
-    if [ -z "$(get_config_field "screenshot_mode")" ]; then
-        update_config_field "screenshot_mode" "sync"
-    fi
-    
-    # Run update check on service start
-    check_and_update
-    
-    # Check for service updates
-    check_service_updates
-    
-    while true; do
-        # Check for daily updates
-        check_and_update
-        
-        # Check for service updates (every sync cycle)
-        check_service_updates
-        
-        if register_and_sync; then
-            log "Sync completed successfully"
-            if [ "$ENABLE_SYNC_SCREENSHOT_CAPTURE" = "true" ]; then
-                capture_and_upload_screenshot
-            else
-                LAST_SCREENSHOT_STATUS="disabled"
-                log_debug "Sync screenshot capture disabled (screenshot service handles captures)"
-            fi
-            write_sync_state "success" ""
-            local sleep_secs="$SYNC_INTERVAL"
-            if [ -f "${CONFIG_DIR}/.fast_loop_enabled" ]; then
-                sleep_secs="$FAST_LOOP_INTERVAL"
-                log "Fast loop mode active - waiting ${FAST_LOOP_INTERVAL} seconds until next sync..."
-            else
-                log "Waiting ${SYNC_INTERVAL} seconds until next sync..."
-            fi
-        else
-            log_error "Sync failed - retrying in 60 seconds..."
-            sleep 60
-            continue
-        fi
-        
-        echo ""
-        sleep "$sleep_secs"
-    done
-}
-
-# Handle service commands
-case "${1:-start}" in
-    start)
-        main
-        ;;
-    *)
-        echo "Usage: $0 {start}"
-        exit 1
-        ;;
-esac
+while true; do
+    do_sync || log "Sync failed, retrying in 60s"
+    [ $? -ne 0 ] && sleep 60 && continue
+    log "Next sync in ${SYNC_INTERVAL}s"
+    sleep "$SYNC_INTERVAL"
+done
