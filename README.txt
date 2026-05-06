@@ -1,21 +1,14 @@
 EduDisplej
-==========
-
-Egyszerű kiosk megjelenítő rendszer. Egy szerver + egy vagy több kiosk eszköz.
 
 A szerver biztosítja a vezérlőpanelt és az API-t.
-A kiosk egy Debian/Raspberry Pi alapú gép, amely a szerver által küldött tartalmat
-jeleníti meg teljes képernyős módban.
+A kiosk egy Debian/Raspberry Pi alapú gép, amely a szerver által küldött tartalmat jeleníti meg teljes képernyős módban.
 
-
-==============================================================================
 1. SZERVER BEÁLLÍTÁSA
-==============================================================================
 
 Követelmények:
   - Linux szerver (Debian/Ubuntu)
   - Apache2 + PHP 8.x + MySQL/MariaDB
-  - Két domain (pl. control.example.com és install.example.com)
+  - Két domain (pl. control.valamidomain.sk és install.valamidomain.sk)
 
 Lépések:
 
@@ -32,14 +25,13 @@ Lépések:
 
 1.3  Webszerver fájlok másolása:
 
-     sudo cp -r webserver/control_edudisplej_sk/. /var/www/control.example.com/
-     sudo cp -r webserver/install/.              /var/www/install.example.com/
+     sudo cp -r webserver/control_edudisplej_sk/. /var/www/control.valamidomain.sk/
+     sudo cp -r webserver/install/.              /var/www/install.valamidomain.sk/
 
 1.4  Adatbázis konfiguráció szerkesztése:
 
-     sudo nano /var/www/control.example.com/dbkonfiguracia.php
+     sudo nano /var/www/control.valamidomain.sk/dbkonfiguracia.php
 
-     A fájlban állítsd be:
        $db_host = "localhost";
        $db_name = "edudisplej";
        $db_user = "edudisplej";
@@ -47,13 +39,13 @@ Lépések:
 
 1.5  Apache virtual hostok beállítása:
 
-     Hozz létre két virtual host konfiguráció fájlt:
+    Létre kell hozni két virtual host konfiguráció fájlt:
 
      /etc/apache2/sites-available/control.conf:
        <VirtualHost *:80>
-           ServerName control.example.com
-           DocumentRoot /var/www/control.example.com
-           <Directory /var/www/control.example.com>
+           ServerName control.valamidomain.sk
+           DocumentRoot /var/www/control.valamidomain.sk
+           <Directory /var/www/control.valamidomain.sk>
                AllowOverride All
                Require all granted
            </Directory>
@@ -61,9 +53,9 @@ Lépések:
 
      /etc/apache2/sites-available/install.conf:
        <VirtualHost *:80>
-           ServerName install.example.com
-           DocumentRoot /var/www/install.example.com
-           <Directory /var/www/install.example.com>
+           ServerName install.valamidomain.sk
+           DocumentRoot /var/www/install.valamidomain.sk
+           <Directory /var/www/install.valamidomain.sk>
                AllowOverride All
                Require all granted
            </Directory>
@@ -75,44 +67,36 @@ Lépések:
 
 1.6  DNS / domain beállítás:
 
-     Gondoskodj róla, hogy mindkét domain (control.example.com és
-     install.example.com) a szervered IP-jére mutasson.
-
-     Ha Let's Encrypt SSL tanúsítványt szeretnél:
-       sudo apt-get install -y certbot python3-certbot-apache
-       sudo certbot --apache -d control.example.com -d install.example.com
+      mindkét domain (control.valamidomain.sk és
+     install.valamidomain.sk) a szerver IP-jére mutasson.
 
 1.7  API URL beállítása a kiosk install scriptben:
 
-     Ha nem a default control.edudisplej.sk URL-t használod,
-     szerkeszd meg a webserver/install/install.sh fájlt, és cseréld le:
-       INIT_BASE="https://install.example.com/init"
+     Ha nem a default control.edudisplej.sk URL-t lenne használatban ,
+     a webserver/install/install.sh fájlt kell szerkeszeni és lecserélni:
+       INIT_BASE="https://install.vvalamidomain.skk/init"
      és a kiosk/edudisplej-sync.service fájlban:
-       Environment=EDUDISPLEJ_API_URL=https://control.example.com
+       Environment=EDUDISPLEJ_API_URL=https://control.valamidomain.sk
 
 1.8  Belépés a vezérlőpultba:
 
-     Nyisd meg böngészőben: https://control.example.com
-     Hozz létre egy fiókot / céget, majd generálj API tokent a kiosk számára.
+     https://control.valamidomain.sk
+    
 
-
-==============================================================================
+------------------
 2. KIOSK TELEPÍTÉSE
-==============================================================================
 
 Követelmények:
-  - Raspberry Pi 3/4 vagy más Debian alapú gép
-  - Friss Raspberry Pi OS Lite (64-bit) vagy Debian telepítés
-  - Internetkapcsolat
+  - Raspberry Pi 3/4 , Zero WH , vagy más Debian alapú gép (Hálózat elérés,Grafika)
   - Root hozzáférés
 
 Lépések:
 
-2.1  Szerezd meg az API tokent a vezérlőpultból (control.example.com).
+2.1  API tokent a vezérlőpultból (control.valamidomain.sk).
 
-2.2  Futtasd a telepítőt a kiosk gépen:
+2.2  Telepítő futtatása:
 
-     sudo bash -c "$(curl -fsSL https://install.example.com/install.sh)" -- --token=AZ_API_TOKEN
+     sudo bash -c "$(curl -fsSL https://install.valamidomain.sk/install.sh)" -- --token=AZ_API_TOKEN
 
      A telepítő automatikusan:
        - Letölti a szükséges fájlokat
@@ -123,11 +107,10 @@ Lépések:
      a szerveren konfigurált tartalom.
 
 
-==============================================================================
+------------------
 3. HIBAELHÁRÍTÁS
-==============================================================================
-
-Kiosk nem indul el:
+(logok ellenőrzése)
+Kiosk nem indul el: 
   sudo systemctl status edudisplej-kiosk.service
   sudo journalctl -u edudisplej-kiosk.service -n 50
 
@@ -139,9 +122,8 @@ Kézi újraindítás:
   sudo systemctl restart edudisplej-kiosk.service
 
 
-==============================================================================
+------------------
 4. FÁJLSTRUKTÚRA
-==============================================================================
 
 kiosk/
   common.sh                  - Közös segédfüggvények
@@ -160,6 +142,3 @@ webserver/
   install/install.sh         - Kiosk telepítő script
   control_edudisplej_sk/     - Vezérlőpanel (PHP)
   www_edudisplej_sk/         - Publikus weboldal
-
-
-GitHub: https://github.com/nagy-andras-sk/edudisplej
