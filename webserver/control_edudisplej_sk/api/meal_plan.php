@@ -1,8 +1,6 @@
 <?php
-/**
- * API - Meal Plan (Étrend)
- * Public read endpoints + authenticated admin CRUD.
- */
+require_once __DIR__ . '/../error_handler_api.php';
+
 session_start();
 require_once '../dbkonfiguracia.php';
 require_once '../auth_roles.php';

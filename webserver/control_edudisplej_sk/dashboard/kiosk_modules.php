@@ -1,8 +1,5 @@
 <?php
-/**
- * Kiosk Module Configuration
- * EduDisplej Control Panel
- */
+require_once __DIR__ . '/../error_handler.php';
 
 session_start();
 require_once '../dbkonfiguracia.php';

@@ -1,10 +1,6 @@
 <?php
-/**
- * Health Check API
- * EduDisplej Control Panel
- * 
- * Usage: curl https://control.edudisplej.sk/api/health.php
- */
+require_once __DIR__ . '/../error_handler_api.php';
+
 $start_time = microtime(true);
 header('Content-Type: application/json');
 require_once __DIR__ . '/auth.php';

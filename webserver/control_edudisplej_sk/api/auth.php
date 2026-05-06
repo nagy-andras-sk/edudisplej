@@ -1,9 +1,5 @@
 <?php
-/**
- * API Authentication Middleware
- * Validates bearer tokens and license keys for API requests
- */
-
+require_once __DIR__ . '/../error_handler_api.php';
 require_once __DIR__ . '/../security_config.php';
 
 function edudisplej_api_get_headers(): array {

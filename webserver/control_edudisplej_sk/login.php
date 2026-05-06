@@ -1,9 +1,5 @@
 <?php
-/**
- * Centralized Login Portal
- * EduDisplej Control Panel
- * Routes users to admin or dashboard based on role
- */
+require_once __DIR__ . '/error_handler.php';
 
 session_start();
 require_once 'dbkonfiguracia.php';
