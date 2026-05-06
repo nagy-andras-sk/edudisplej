@@ -3,7 +3,6 @@ require_once __DIR__ . '/error_handler.php';
 
 session_start();
 require_once 'dbkonfiguracia.php';
-require_once __DIR__ . '/admin/db_autofix_bootstrap.php';
 require_once 'logging.php';
 require_once 'i18n.php';
 require_once 'auth_roles.php';
