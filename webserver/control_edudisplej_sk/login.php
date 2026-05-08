@@ -75,7 +75,7 @@ if ($base_prefix === '.' || $base_prefix === '/') {
 }
 $base_href = $base_prefix === '' ? '/' : ($base_prefix . '/');
 $login_path = $base_prefix . '/login';
-$admin_dashboard_path = $base_prefix . '/admin/dashboard.php';
+$admin_dashboard_path = $base_prefix . '/dashboard/';
 $easy_user_dashboard_path = $base_prefix . '/dashboard/easy_user/';
 $default_dashboard_path = $base_prefix . '/dashboard/index.php';
 

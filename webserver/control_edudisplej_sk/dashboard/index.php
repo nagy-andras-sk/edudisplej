@@ -15,20 +15,27 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$user_id    = $_SESSION['user_id'];
+$user_id    = (int)($_SESSION['user_id'] ?? 0);
 $company_id = $_SESSION['company_id'] ?? null;
 $company_name = $_SESSION['company_name'] ?? '';
 $session_role = edudisplej_get_session_role();
 $can_edit_kiosk_details = true;
+$db_warning = false;
 
 if ($session_role === 'easy_user') {
     header('Location: easy_user/');
     exit();
 }
 
+$is_static_admin = ($user_id === 0 && !empty($_SESSION['isadmin']));
+
 if (!$company_id) {
-    header('Location: ../login.php');
-    exit();
+    if (!$is_static_admin) {
+        header('Location: ../login.php');
+        exit();
+    }
+    // Static admin without DB: skip DB load, show empty dashboard + warning banner
+    $db_warning = true;
 }
 
 $kiosks = [];
@@ -74,7 +81,7 @@ function edudisplej_parse_loop_version_timestamp($value) {
     return $ts === false ? null : $ts;
 }
 
-try {
+if (!$db_warning) { try {
     $conn = getDbConnection();
 
     $conn->query("CREATE TABLE IF NOT EXISTS kiosk_group_calendar_events (
@@ -226,7 +233,7 @@ try {
 } catch (Exception $e) {
     $error = t_def('dashboard.error.db', 'Adatbázis hiba');
     error_log($e->getMessage());
-}
+} } // end if (!$db_warning)
 
 $total   = count($kiosks);
 $online  = count(array_filter($kiosks, fn($k) => in_array($k['status'], ['online', 'online_error', 'online_pending'], true)));
