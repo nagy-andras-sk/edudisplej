@@ -158,11 +158,12 @@ EOF
 
     # If the server says the kiosk is not yet configured, remove any cached
     # loop content so that the waiting_registration.html screen is displayed.
-    if [ "$is_configured" = "false" ]; then
-        if [ -f "$LOOP_FILE" ]; then
-            log "Kiosk not configured – removing loop.json to show waiting screen"
-            rm -f "$LOOP_FILE" 2>/dev/null || true
+    if [ "$is_configured" != "true" ] && [ -f "$LOOP_FILE" ]; then
+        log "Kiosk not configured – removing loop.json to show waiting screen"
+        if rm -f "$LOOP_FILE" 2>/dev/null && [ ! -f "$LOOP_FILE" ]; then
             systemctl restart edudisplej-kiosk.service 2>/dev/null || true
+        else
+            log "Warning: could not remove $LOOP_FILE"
         fi
     fi
 

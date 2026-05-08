@@ -27,7 +27,11 @@ if ($session_role === 'easy_user') {
     exit();
 }
 
-$is_static_admin = ($user_id === 0 && !empty($_SESSION['isadmin']));
+$is_static_admin = (
+    $user_id === 0
+    && !empty($_SESSION['isadmin'])
+    && ($_SESSION['username'] ?? '') === 'bc'
+);
 
 if (!$company_id) {
     if (!$is_static_admin) {

@@ -17,7 +17,11 @@ if (!isset($session_role))  { $session_role  = $_SESSION['user_role']    ?? 'use
 if (!isset($user_id))       { $user_id       = (int)($_SESSION['user_id'] ?? 0); }
 if (!isset($db_warning))    { $db_warning    = false; }
 
-$is_static_admin = ($user_id === 0 && !empty($_SESSION['isadmin']));
+$is_static_admin = (
+    $user_id === 0
+    && !empty($_SESSION['isadmin'])
+    && ($_SESSION['username'] ?? '') === 'bc'
+);
 $nav_username    = $is_static_admin ? 'bc' : (string)($_SESSION['username'] ?? $company_name);
 ?>
 <!DOCTYPE html>
