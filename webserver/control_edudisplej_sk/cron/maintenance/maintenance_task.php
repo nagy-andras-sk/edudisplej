@@ -760,11 +760,6 @@ function edudisplej_maintenance_should_run_jedalen_by_updated_today(mysqli $conn
     }
 
     foreach ($targets as $target) {
-        $siteKey = strtolower((string)($target['site_key'] ?? ''));
-        if ($siteKey !== 'jedalen.sk') {
-            continue;
-        }
-
         $companyId = (int)($target['company_id'] ?? 0);
         $institutionId = (int)($target['institution_id'] ?? 0);
         if ($companyId <= 0 || $institutionId <= 0) {
@@ -2457,6 +2452,7 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
 
     $everyCycle = !empty($syncConfig['every_cycle']);
     $dailyGate = edudisplej_maintenance_should_run_jedalen_today($conn, $jobKey, $syncConfig);
+    $missingTodayGate = edudisplej_maintenance_should_run_jedalen_by_updated_today($conn, $targets);
     $effectiveJobKey = (string)($dailyGate['slot_job_key'] ?? $jobKey);
 
     $linkedInstitutionIds = [];
@@ -2523,8 +2519,13 @@ function edudisplej_maintenance_run_jedalen_daily_sync(mysqli $conn): void {
     } elseif ($everyCycle) {
         logResult('Jedalen sync: running on every maintenance cycle for loop-linked institutions (every_cycle=1).', 'info');
     } elseif (empty($dailyGate['run'])) {
-        logResult('Jedalen sync skipped: daily gate blocked run (' . (string)($dailyGate['reason'] ?? 'unknown') . '), last daily run: ' . $lastDailyRunAt . '.', 'info');
-        return;
+        if (!empty($missingTodayGate['run'])) {
+            $missingCount = (int)($missingTodayGate['missing_count'] ?? 0);
+            logResult('Jedalen sync: daily gate overridden because no target has menu data updated today (' . $missingCount . ' missing target(s)); forcing run.', 'warning');
+        } else {
+            logResult('Jedalen sync skipped: daily gate blocked run (' . (string)($dailyGate['reason'] ?? 'unknown') . '), last daily run: ' . $lastDailyRunAt . '.', 'info');
+            return;
+        }
     } else {
         $slotLabel = (string)($dailyGate['slot'] ?? 'n/a');
         logResult('Jedalen sync: scheduled run started (' . (string)($dailyGate['reason'] ?? 'scheduled') . ', slot: ' . $slotLabel . ').', 'info');
