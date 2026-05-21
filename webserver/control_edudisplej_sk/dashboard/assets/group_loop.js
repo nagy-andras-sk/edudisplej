@@ -2378,7 +2378,7 @@
 
             if (totalItemCount === 0) {
                 if (!opts.silent) {
-                    alert('⚠️ A loop üres! Adj hozzá legalább egy modult.');
+                    alert('⚠️ Slučka je prázdna. Pridajte aspoň jeden modul.');
                 }
                 return;
             }
@@ -2410,13 +2410,13 @@
                     planVersionToken = String(data.plan_version || data.plan_version_token || data.loop_version || planVersionToken || '');
                     clearDraftCache();
                     setDraftDirty(false);
-                    showAutosaveToast('✓ Mentés sikeres');
+                    showAutosaveToast('✓ Uloženie úspešné');
                 } else {
-                    showAutosaveToast('⚠️ ' + (data.message || 'Mentési hiba'), true);
+                    showAutosaveToast('⚠️ ' + (data.message || 'Chyba ukladania'), true);
                 }
             })
             .catch(error => {
-                showAutosaveToast('⚠️ Hiba történt: ' + error, true);
+                showAutosaveToast('⚠️ Vyskytla sa chyba: ' + error, true);
             })
             .finally(() => {
                 autoSaveInFlight = false;

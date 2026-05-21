@@ -303,9 +303,9 @@ include '../admin/header.php';
 
 <script>
     const i18n = <?php echo json_encode([
-        'noKiosk' => t_def('group_kiosks.no_kiosk', 'Nincs kijelző'),
-        'assignFailed' => t_def('group_kiosks.assign_failed', 'Sikertelen hozzárendelés'),
-        'errorOccurred' => t_def('group_kiosks.error_occurred', 'Hiba történt: {error}'),
+        'noKiosk' => t_def('group_kiosks.no_kiosk', 'Žiadny displej'),
+        'assignFailed' => t_def('group_kiosks.assign_failed', 'Priradenie zlyhalo'),
+        'errorOccurred' => t_def('group_kiosks.error_occurred', 'Vyskytla sa chyba: {error}'),
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 
     var draggedRow = null;

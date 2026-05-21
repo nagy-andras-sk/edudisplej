@@ -236,15 +236,15 @@
 
         .root.large-mode .cards {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            grid-template-rows: repeat(2, minmax(0, 1fr));
+            grid-template-rows: minmax(0, 1fr);
             gap: 1.2vh 1vw;
             width: 100%;
             height: 100%;
         }
         .root.large-mode .cards-wrap { overflow: hidden; }
         .root.large-mode .card { min-height: 0; height: 100%; }
-        .root.large-mode .meal { font-size: clamp(26px, 2.25vw, 42px); }
-        .root.large-mode .meal-row-text { font-size: clamp(18px, 1.45vw, 30px); line-height: 1.22; align-items: flex-start; }
+        .root.large-mode .meal { font-size: clamp(30px, 2.35vw, 48px); }
+        .root.large-mode .meal-row-text { font-size: clamp(22px, 1.65vw, 34px); line-height: 1.22; align-items: flex-start; }
 
         .card.band-breakfast {
             background: linear-gradient(160deg, rgba(30, 64, 175, 0.85) 0%, rgba(30, 58, 138, 0.78) 100%);
@@ -515,6 +515,7 @@
             mealDisplayMode: 'small_screen',
             smallScreenPageSwitchSec: 12,
             smallScreenCycleSec: 12,
+            largeRightPanelSwitchSec: 12,
             smallScreenStartMode: 'current_onward',
             smallScreenMaxMeals: 5,
             smallHeaderMarqueeSpeedPxPerSec: 22,
@@ -539,12 +540,18 @@
             mergeBreakfastSnack: true,
             mergeLunchSnack: true,
             mealScheduleEnabled: true,
+            scheduleBreakfastFrom: '00:00',
             scheduleBreakfastUntil: '10:00',
+            scheduleSnackAmFrom: '10:01',
             scheduleSnackAmUntil: '11:00',
+            scheduleLunchFrom: '11:01',
             scheduleLunchUntil: '14:00',
+            scheduleSnackPmFrom: '14:01',
             scheduleSnackPmUntil: '18:00',
+            scheduleDinnerFrom: '18:01',
             scheduleDinnerUntil: '23:59',
             showTomorrowAfterMealPassed: true,
+            hidePassedTodayMeals: true,
             language: 'sk',
             showHeaderTitle: false,
             customHeaderTitle: '',
@@ -589,7 +596,7 @@
             runtimeApiFetchEnabled: true,
             runtimeRefreshIntervalSec: 300,
             apiTimeoutMs: 3500,
-            maxFallbackDaysAhead: 2,
+            maxFallbackDaysAhead: 5,
             offlinePrefetchedMenuData: null,
             offlinePrefetchedMenuSavedAt: ''
         };
@@ -611,6 +618,7 @@
             })(),
             smallScreenPageSwitchSec: Math.max(1, Math.min(120, parseNum(params.get('smallScreenPageSwitchSec') ?? injected.smallScreenPageSwitchSec, defaults.smallScreenPageSwitchSec))),
             smallScreenCycleSec: Math.max(3, Math.min(300, parseNum(params.get('smallScreenCycleSec') ?? injected.smallScreenCycleSec ?? injected.smallScreenPageSwitchSec, defaults.smallScreenCycleSec))),
+            largeRightPanelSwitchSec: Math.max(3, Math.min(120, parseNum(params.get('largeRightPanelSwitchSec') ?? injected.largeRightPanelSwitchSec, defaults.largeRightPanelSwitchSec))),
             smallScreenStartMode: (() => {
                 const raw = String(params.get('smallScreenStartMode') ?? injected.smallScreenStartMode ?? defaults.smallScreenStartMode).toLowerCase().trim();
                 return ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(raw)
@@ -640,12 +648,18 @@
             mergeBreakfastSnack: parseBool(params.get('mergeBreakfastSnack') ?? injected.mergeBreakfastSnack, defaults.mergeBreakfastSnack),
             mergeLunchSnack: parseBool(params.get('mergeLunchSnack') ?? injected.mergeLunchSnack, defaults.mergeLunchSnack),
             mealScheduleEnabled: parseBool(params.get('mealScheduleEnabled') ?? injected.mealScheduleEnabled, defaults.mealScheduleEnabled),
+            scheduleBreakfastFrom: String(params.get('scheduleBreakfastFrom') ?? injected.scheduleBreakfastFrom ?? defaults.scheduleBreakfastFrom),
             scheduleBreakfastUntil: String(params.get('scheduleBreakfastUntil') ?? injected.scheduleBreakfastUntil ?? defaults.scheduleBreakfastUntil),
+            scheduleSnackAmFrom: String(params.get('scheduleSnackAmFrom') ?? injected.scheduleSnackAmFrom ?? defaults.scheduleSnackAmFrom),
             scheduleSnackAmUntil: String(params.get('scheduleSnackAmUntil') ?? injected.scheduleSnackAmUntil ?? defaults.scheduleSnackAmUntil),
+            scheduleLunchFrom: String(params.get('scheduleLunchFrom') ?? injected.scheduleLunchFrom ?? defaults.scheduleLunchFrom),
             scheduleLunchUntil: String(params.get('scheduleLunchUntil') ?? injected.scheduleLunchUntil ?? defaults.scheduleLunchUntil),
+            scheduleSnackPmFrom: String(params.get('scheduleSnackPmFrom') ?? injected.scheduleSnackPmFrom ?? defaults.scheduleSnackPmFrom),
             scheduleSnackPmUntil: String(params.get('scheduleSnackPmUntil') ?? injected.scheduleSnackPmUntil ?? defaults.scheduleSnackPmUntil),
+            scheduleDinnerFrom: String(params.get('scheduleDinnerFrom') ?? injected.scheduleDinnerFrom ?? defaults.scheduleDinnerFrom),
             scheduleDinnerUntil: String(params.get('scheduleDinnerUntil') ?? injected.scheduleDinnerUntil ?? defaults.scheduleDinnerUntil),
             showTomorrowAfterMealPassed: parseBool(params.get('showTomorrowAfterMealPassed') ?? injected.showTomorrowAfterMealPassed, defaults.showTomorrowAfterMealPassed),
+            hidePassedTodayMeals: parseBool(params.get('hidePassedTodayMeals') ?? injected.hidePassedTodayMeals, defaults.hidePassedTodayMeals),
             showHeaderTitle: parseBool(params.get('showHeaderTitle') ?? injected.showHeaderTitle, defaults.showHeaderTitle),
             customHeaderTitle: String(params.get('customHeaderTitle') ?? injected.customHeaderTitle ?? defaults.customHeaderTitle),
             showInstitutionName: parseBool(params.get('showInstitutionName') ?? injected.showInstitutionName, defaults.showInstitutionName),
@@ -980,25 +994,78 @@
         return now.getHours() * 60 + now.getMinutes();
     }
 
+    function minutesInRange(currentMinutes, startMinutes, endMinutes) {
+        const current = parseInt(currentMinutes, 10);
+        const start = parseInt(startMinutes, 10);
+        const end = parseInt(endMinutes, 10);
+        if (!Number.isFinite(current) || !Number.isFinite(start) || !Number.isFinite(end)) {
+            return false;
+        }
+
+        if (start <= end) {
+            return current >= start && current <= end;
+        }
+
+        // Overnight window support (e.g. 22:00-02:00)
+        return current >= start || current <= end;
+    }
+
+    function mealScheduleRange(mealKey, settings) {
+        const key = String(mealKey || '').trim();
+        const ranges = {
+            breakfast: {
+                from: parseHmToMinutes(settings.scheduleBreakfastFrom, 0),
+                until: parseHmToMinutes(settings.scheduleBreakfastUntil, 10 * 60)
+            },
+            snack_am: {
+                from: parseHmToMinutes(settings.scheduleSnackAmFrom, 10 * 60 + 1),
+                until: parseHmToMinutes(settings.scheduleSnackAmUntil, 11 * 60)
+            },
+            lunch: {
+                from: parseHmToMinutes(settings.scheduleLunchFrom, 11 * 60 + 1),
+                until: parseHmToMinutes(settings.scheduleLunchUntil, 14 * 60)
+            },
+            snack_pm: {
+                from: parseHmToMinutes(settings.scheduleSnackPmFrom, 14 * 60 + 1),
+                until: parseHmToMinutes(settings.scheduleSnackPmUntil, 18 * 60)
+            },
+            dinner: {
+                from: parseHmToMinutes(settings.scheduleDinnerFrom, 18 * 60 + 1),
+                until: parseHmToMinutes(settings.scheduleDinnerUntil, 23 * 60 + 59)
+            }
+        };
+        return ranges[key] || null;
+    }
+
+    function mealUpcomingBySchedule(mealKey, settings, currentMinutes) {
+        if (settings.mealScheduleEnabled === false) {
+            return false;
+        }
+
+        const range = mealScheduleRange(mealKey, settings);
+        if (!range) {
+            return false;
+        }
+
+        if (range.from <= range.until) {
+            return currentMinutes < range.from;
+        }
+
+        // Overnight windows: upcoming means we are in the gap between end and next start.
+        return currentMinutes > range.until && currentMinutes < range.from;
+    }
+
     function mealVisibleBySchedule(mealKey, settings, currentMinutes) {
         if (settings.mealScheduleEnabled === false) {
             return true;
         }
 
-        const limits = {
-            breakfast: parseHmToMinutes(settings.scheduleBreakfastUntil, 10 * 60),
-            snack_am: parseHmToMinutes(settings.scheduleSnackAmUntil, 11 * 60),
-            lunch: parseHmToMinutes(settings.scheduleLunchUntil, 14 * 60),
-            snack_pm: parseHmToMinutes(settings.scheduleSnackPmUntil, 18 * 60),
-            dinner: parseHmToMinutes(settings.scheduleDinnerUntil, 23 * 60 + 59)
-        };
-
-        const key = String(mealKey || '').trim();
-        if (!Object.prototype.hasOwnProperty.call(limits, key)) {
+        const range = mealScheduleRange(mealKey, settings);
+        if (!range) {
             return true;
         }
 
-        return currentMinutes <= limits[key];
+        return minutesInRange(currentMinutes, range.from, range.until);
     }
 
     function filterMealsForCurrentTime(meals, settings, currentMinutes) {
@@ -1021,9 +1088,12 @@
         const triggerKey = String(settings.tomorrowAfterMeal || 'snack_pm').toLowerCase() === 'dinner'
             ? 'dinner'
             : 'snack_pm';
-        const triggerMinutes = triggerKey === 'dinner'
-            ? parseHmToMinutes(settings.scheduleDinnerUntil, 23 * 60 + 59)
-            : parseHmToMinutes(settings.scheduleSnackPmUntil, 18 * 60);
+        const triggerRange = mealScheduleRange(triggerKey, settings);
+        const triggerMinutes = triggerRange
+            ? triggerRange.until
+            : (triggerKey === 'dinner'
+                ? parseHmToMinutes(settings.scheduleDinnerUntil, 23 * 60 + 59)
+                : parseHmToMinutes(settings.scheduleSnackPmUntil, 18 * 60));
         return currentMinutes > triggerMinutes;
     }
 
@@ -1061,6 +1131,7 @@
         const maxMeals = Math.max(1, Math.min(5, parseInt(settings.smallScreenMaxMeals || 5, 10) || 5));
         const scheduleEnabled = settings.mealScheduleEnabled !== false;
         const useTomorrowAfterPassed = settings.showTomorrowAfterMealPassed !== false;
+        const hidePassedTodayMeals = settings.hidePassedTodayMeals !== false;
 
         const determineStartIndex = () => {
             if (startMode === 'breakfast_onward') return 0;
@@ -1168,41 +1239,98 @@
 
         const scheduleEnabled = settings.mealScheduleEnabled !== false;
         const useTomorrowAfterPassed = settings.showTomorrowAfterMealPassed !== false;
-        const result = [];
-        const consumedKeys = new Set();
+        const decorateTomorrowMeal = (meal, key) => {
+            const titlePrefix = String(t.tomorrowMealLabels?.[key] || t.mealLabels?.[key] || meal?.label || key).trim();
+            return {
+                ...meal,
+                key,
+                label: titlePrefix,
+                __displayLabel: titlePrefix,
+                __tomorrowPreview: true
+            };
+        };
 
-        orderedKeys.forEach((key) => {
-            const todayMeal = todayMap.get(key) || null;
-            const tomorrowMeal = tomorrowMap.get(key) || null;
-            const todayVisible = mealVisibleBySchedule(key, settings, currentMinutes);
-
-            if (todayMeal && (!scheduleEnabled || todayVisible)) {
-                result.push(todayMeal);
-                consumedKeys.add(key);
-                return;
+        const timeline = [];
+        const consumedTomorrowKeys = new Set();
+        const startIndex = (() => {
+            if (!scheduleEnabled) {
+                return 0;
             }
+            for (let i = 0; i < orderedKeys.length; i += 1) {
+                const key = orderedKeys[i];
+                if (mealVisibleBySchedule(key, settings, currentMinutes) || mealUpcomingBySchedule(key, settings, currentMinutes)) {
+                    return i;
+                }
+            }
+            return orderedKeys.length;
+        })();
 
-            if (scheduleEnabled && useTomorrowAfterPassed && !todayVisible && tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
-                const titlePrefix = String(t.tomorrowMealLabels?.[key] || t.mealLabels?.[key] || tomorrowMeal.label || key).trim();
-                result.push({
-                    ...tomorrowMeal,
-                    key,
-                    label: titlePrefix,
-                    __displayLabel: titlePrefix,
-                    __tomorrowPreview: true
+        if (startIndex < orderedKeys.length) {
+            for (let i = startIndex; i < orderedKeys.length; i += 1) {
+                const key = orderedKeys[i];
+                const todayMeal = todayMap.get(key) || null;
+                if (todayMeal && mealHasRenderableRows(todayMeal)) {
+                    timeline.push(todayMeal);
+                }
+            }
+        }
+
+        if (useTomorrowAfterPassed) {
+            orderedKeys.forEach((key) => {
+                if (consumedTomorrowKeys.has(key)) {
+                    return;
+                }
+                const tomorrowMeal = tomorrowMap.get(key) || null;
+                if (tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
+                    timeline.push(decorateTomorrowMeal(tomorrowMeal, key));
+                    consumedTomorrowKeys.add(key);
+                }
+            });
+        }
+
+        const allTodayMealsPassed = scheduleEnabled
+            && orderedKeys.every((key) => !mealVisibleBySchedule(key, settings, currentMinutes));
+
+        if (!timeline.length) {
+
+            if (allTodayMealsPassed && useTomorrowAfterPassed) {
+                orderedKeys.forEach((key) => {
+                    const tomorrowMeal = tomorrowMap.get(key) || null;
+                    if (tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
+                        timeline.push(decorateTomorrowMeal(tomorrowMeal, key));
+                    }
                 });
-                consumedKeys.add(key);
             }
-        });
 
-        (Array.isArray(todayMealsRaw) ? todayMealsRaw : []).forEach((meal) => {
-            const key = String(meal?.key || '').trim();
-            if (!consumedKeys.has(key) && mealHasRenderableRows(meal)) {
-                result.push(meal);
+            if (timeline.length > 0) {
+                const mergedTomorrow = mergeStandardMealBands(timeline, t, settings)
+                    .filter((meal) => mealHasRenderableRows(meal));
+                return mergedTomorrow;
             }
-        });
 
-        return result;
+            // If today's schedule is fully over, never fall back to stale today's meals.
+            if (allTodayMealsPassed && hidePassedTodayMeals) {
+                return [];
+            }
+
+            orderedKeys.forEach((key) => {
+                const todayMeal = todayMap.get(key) || null;
+                const tomorrowMeal = tomorrowMap.get(key) || null;
+
+                if (todayMeal && mealHasRenderableRows(todayMeal)) {
+                    timeline.push(todayMeal);
+                    return;
+                }
+
+                if (useTomorrowAfterPassed && tomorrowMeal && mealHasRenderableRows(tomorrowMeal)) {
+                    timeline.push(decorateTomorrowMeal(tomorrowMeal, key));
+                }
+            });
+        }
+
+        const mergedTimeline = mergeStandardMealBands(timeline, t, settings)
+            .filter((meal) => mealHasRenderableRows(meal));
+        return mergedTimeline;
     }
 
     function emptyStateMessage(data, t) {
@@ -1883,13 +2011,30 @@
         if (!cards) return;
         stopMealPageSwitch();
 
-        const list = Array.isArray(meals) ? meals.slice(0, 4) : [];
-        while (list.length < 4) {
-            list.push({ key: 'other', label: '—', text: '—' });
-        }
+        const list = Array.isArray(meals) ? meals.slice() : [];
 
-        cards.innerHTML = list.map((meal) => mealCardHtml(meal, settings, t)).join('');
-        fitVisibleMealCards('large_screen', settings);
+        const primaryMeal = list[0] || { key: 'other', label: '—', text: '—' };
+        const secondaryMeals = list.slice(1);
+
+        const renderPair = (secondaryIndex) => {
+            const rightMeal = secondaryMeals.length > 0
+                ? secondaryMeals[secondaryIndex % secondaryMeals.length]
+                : { key: 'other', label: '—', text: '—' };
+            const visible = [primaryMeal, rightMeal];
+            cards.innerHTML = visible.map((meal) => mealCardHtml(meal, settings, t)).join('');
+            fitVisibleMealCards('large_screen', settings);
+        };
+
+        renderPair(0);
+
+        if (secondaryMeals.length > 1) {
+            let rightIndex = 0;
+            const switchMs = Math.max(3000, Math.min(120000, Math.round(Number(settings.largeRightPanelSwitchSec || 12) * 1000)));
+            mealPageSwitchTimer = setInterval(() => {
+                rightIndex = (rightIndex + 1) % secondaryMeals.length;
+                renderPair(rightIndex);
+            }, switchMs);
+        }
     }
 
     function render(data, settings, context = {}) {
@@ -1910,6 +2055,7 @@
 
         const dayText = String(data?.menu_date || '').trim();
         const institutionName = String(data?.institution_name || '').trim();
+        const contentIsFutureDay = isFutureMenuDate(dayText);
 
         const displayMode = String(settings.mealDisplayMode || 'small_screen').toLowerCase() === 'large_screen'
             ? 'large_screen'
@@ -1918,12 +2064,12 @@
         const tomorrowData = context && typeof context === 'object' ? (context.tomorrowData || null) : null;
         const tomorrowMealsRaw = normalizeMealsForDisplay(Array.isArray(tomorrowData?.meals) ? tomorrowData.meals : []);
         const mealsRaw = normalizeMealsForDisplay(Array.isArray(data?.meals) ? data.meals : []);
-        const mealsUnmergedLarge = isFutureMenuDate(dayText)
-            ? mealsRaw
+        const mealsForLarge = contentIsFutureDay
+            ? mergeStandardMealBands(mealsRaw, t, settings)
+                .filter((meal) => mealHasRenderableRows(meal))
             : buildLargeScreenMeals(mealsRaw, tomorrowMealsRaw, settings, nowMinutesLocal(), t);
         const mealsUnmergedSmall = buildSmallScreenMeals(mealsRaw, tomorrowMealsRaw, settings, nowMinutesLocal(), t);
         const mealsForSmall = mergeStandardMealBands(mealsUnmergedSmall, t, settings);
-        const mealsForLarge = mergeStandardMealBands(mealsUnmergedLarge, t, settings);
         const mealsForSmallSelected = filterSmallScreenMealsWithSafeFallback(mealsForSmall, settings);
 
         if (displayMode === 'small_screen') {
@@ -1956,7 +2102,17 @@
         cards.classList.toggle('single-card', displayMode === 'small_screen');
         stopSlowScroll();
         stopMealPageSwitch();
-        const largeRenderableMeals = mealsForLarge.filter((meal) => mealHasRenderableRows(meal));
+        const largeRenderableMeals = mealsForLarge
+            .filter((meal) => mealHasRenderableRows(meal))
+            .map((meal) => {
+                if (contentIsFutureDay && meal?.__tomorrowPreview !== true) {
+                    return {
+                        ...meal,
+                        __tomorrowPreview: true
+                    };
+                }
+                return meal;
+            });
 
         if (displayMode === 'small_screen') {
             const smallCandidates = [
@@ -1969,7 +2125,15 @@
             const smallDisplayMeals = smallCandidates.find((list) => Array.isArray(list) && list.length > 0) || [];
             renderSmallScreenPagedMeals(smallDisplayMeals, settings, t);
         } else if (!largeRenderableMeals.length) {
-            cards.innerHTML = `<div class="empty">${escapeHtml(emptyStateMessage(data, t))}</div>`;
+            const tomorrowFallbackMeals = mergeStandardMealBands(tomorrowMealsRaw, t, settings)
+                .filter((meal) => mealHasRenderableRows(meal))
+                .map((meal) => ({ ...meal, __tomorrowPreview: true }));
+
+            if (tomorrowFallbackMeals.length > 0) {
+                renderLargeScreenGridMeals(tomorrowFallbackMeals, settings, t);
+            } else {
+                cards.innerHTML = `<div class="empty">${escapeHtml(emptyStateMessage(data, t))}</div>`;
+            }
         } else {
             renderLargeScreenGridMeals(largeRenderableMeals, settings, t);
         }
@@ -2509,7 +2673,17 @@
 
         const effectiveTodayDate = String(data?.menu_date || isoDateOffset(0)).trim() || isoDateOffset(0);
         const effectiveTomorrowDate = isoDateShift(effectiveTodayDate, 1);
-        const tomorrowData = await fetchMenuData(settings, effectiveTomorrowDate, true, debugState);
+        let tomorrowData = await fetchMenuData(settings, effectiveTomorrowDate, true, debugState);
+
+        const shouldSearchUpcoming = settings.showTomorrowAfterMealPassed !== false
+            && (!tomorrowData || !hasAnyMeals(tomorrowData));
+        if (shouldSearchUpcoming) {
+            const maxAhead = Math.max(1, parseInt(settings.maxFallbackDaysAhead || 2, 10) || 2);
+            const upcoming = await findNextMenuWithMeals(settings, 1, maxAhead, debugState);
+            if (upcoming && hasAnyMeals(upcoming)) {
+                tomorrowData = upcoming;
+            }
+        }
 
         render(data, settings, { tomorrowData });
         try {

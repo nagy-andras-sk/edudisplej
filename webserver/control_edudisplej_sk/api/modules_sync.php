@@ -436,13 +436,21 @@ function edudisplej_sync_prefetch_meal_menu_payload(mysqli $conn, int $company_i
     $payload_today = $build_meal_payload($menu_today, $date_value);
 
     $layout_mode = strtolower(trim((string)($settings['layoutMode'] ?? 'classic')));
-    $show_tomorrow = !array_key_exists('showTomorrowInSquare', $settings) || !empty($settings['showTomorrowInSquare']);
+    $display_mode = strtolower(trim((string)($settings['mealDisplayMode'] ?? 'small_screen')));
+    $show_tomorrow_square = !array_key_exists('showTomorrowInSquare', $settings) || !empty($settings['showTomorrowInSquare']);
+    $show_tomorrow_large = !array_key_exists('showTomorrowAfterMealPassed', $settings) || !empty($settings['showTomorrowAfterMealPassed']);
     $is_square_dual = ($layout_mode === 'square_dual_day');
+    $is_large_screen = ($display_mode === 'large_screen');
+    $should_attach_tomorrow = ($is_square_dual && $show_tomorrow_square) || ($is_large_screen && $show_tomorrow_large);
 
-    if ($is_square_dual) {
+    if ($should_attach_tomorrow) {
         $tomorrow_date = date('Y-m-d', strtotime($date_value . ' +1 day'));
-        $menu_tomorrow = $show_tomorrow ? $fetch_menu_for_date($tomorrow_date, true) : null;
-        $payload_tomorrow = $show_tomorrow ? $build_meal_payload($menu_tomorrow, $tomorrow_date) : null;
+        $menu_tomorrow = $fetch_menu_for_date($tomorrow_date, true);
+        if (!$menu_tomorrow) {
+            // If exact tomorrow is missing, use the next available future menu.
+            $menu_tomorrow = $fetch_menu_for_date($tomorrow_date, false);
+        }
+        $payload_tomorrow = $build_meal_payload($menu_tomorrow, $tomorrow_date);
 
         return [
             'today' => $payload_today,

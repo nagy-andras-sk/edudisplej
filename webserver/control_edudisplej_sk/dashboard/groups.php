@@ -670,7 +670,7 @@ closeDbConnection($conn);
     
     <script>
         const groupsI18n = <?php echo json_encode([
-            'errorOccurred' => t_def('groups.error_occurred', 'Hiba történt: {error}'),
+            'errorOccurred' => t_def('groups.error_occurred', 'Vyskytla sa chyba: {error}'),
             'serverError' => (string)$error,
             'serverSuccess' => (string)$success
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;

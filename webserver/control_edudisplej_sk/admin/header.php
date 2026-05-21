@@ -416,11 +416,68 @@ if (!isset($breadcrumb_items) || !is_array($breadcrumb_items)) {
             var inactivityLimitMs = 10 * 60 * 1000;
             var logoutUrl = <?php echo json_encode(isset($logout_url) ? $logout_url : $default_logout_url); ?>;
             var warningMessage = <?php echo json_encode(t('session.timeout.warning')); ?>;
+            var redirectTemplate = <?php echo json_encode(t('session.timeout.redirecting')); ?>;
             var idleTimer = null;
+            var redirectSeconds = 3;
+            var logoutInProgress = false;
+
+            function showTimeoutOverlay(secondsLeft) {
+                var existing = document.getElementById('session-timeout-overlay');
+                if (existing) {
+                    var countdownNode = existing.querySelector('.session-timeout-countdown');
+                    if (countdownNode) {
+                        countdownNode.textContent = String(secondsLeft);
+                    }
+                    existing.style.display = 'flex';
+                    return;
+                }
+
+                var overlay = document.createElement('div');
+                overlay.id = 'session-timeout-overlay';
+                overlay.className = 'session-timeout-overlay';
+                overlay.setAttribute('role', 'alertdialog');
+                overlay.setAttribute('aria-live', 'assertive');
+
+                var box = document.createElement('div');
+                box.className = 'session-timeout-box';
+
+                var message = document.createElement('p');
+                message.className = 'session-timeout-message';
+                message.textContent = warningMessage;
+
+                var redirect = document.createElement('p');
+                redirect.className = 'session-timeout-redirect';
+                redirect.innerHTML = '<span class="session-timeout-redirect-text"></span>';
+
+                box.appendChild(message);
+                box.appendChild(redirect);
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+
+                var redirectText = overlay.querySelector('.session-timeout-redirect-text');
+                var countdown = overlay.querySelector('.session-timeout-countdown');
+                if (redirectText) {
+                    redirectText.innerHTML = redirectTemplate.replace('{seconds}', '<span class="session-timeout-countdown">' + String(secondsLeft) + '</span>');
+                }
+            }
 
             function logoutAfterIdle() {
-                alert(warningMessage);
-                window.location.href = logoutUrl;
+                if (logoutInProgress) {
+                    return;
+                }
+                logoutInProgress = true;
+
+                var secondsLeft = redirectSeconds;
+                showTimeoutOverlay(secondsLeft);
+
+                var redirectTimer = setInterval(function () {
+                    secondsLeft -= 1;
+                    showTimeoutOverlay(Math.max(0, secondsLeft));
+                    if (secondsLeft <= 0) {
+                        clearInterval(redirectTimer);
+                        window.location.href = logoutUrl;
+                    }
+                }, 1000);
             }
 
             function resetIdleTimer() {

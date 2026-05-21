@@ -93,7 +93,7 @@ const GroupLoopPdfModule = (() => {
         if (sections.length === 0) {
             const empty = document.createElement('div');
             empty.style.cssText = 'font-size:12px; color:#8a97a6; padding:8px;';
-            empty.textContent = 'Nincs szakasz megadva. Add hozzá az elsőt.';
+            empty.textContent = 'Nie je definovaný žiadny úsek. Pridajte prvý.';
             list.appendChild(empty);
             return;
         }
@@ -125,8 +125,8 @@ const GroupLoopPdfModule = (() => {
             row.style.cssText = 'display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; border:1px solid #d6dde8; border-radius:6px; padding:6px 8px; background:#f8fafc;';
             row.innerHTML = `
                 <div style="font-size:12px; color:#334155;">#${index + 1}: ${section.startPercent}% → ${section.endPercent}% · ${section.pauseMs} ms · X ${section.horizontalPercent}%</div>
-                <button type="button" data-action="edit" data-index="${index}" style="padding:4px 8px; border:1px solid #2563eb; background:#fff; color:#2563eb; border-radius:4px; cursor:pointer; font-size:12px;">Szerkeszt</button>
-                <button type="button" data-action="remove" data-index="${index}" style="padding:4px 8px; border:1px solid #dc2626; background:#fff; color:#dc2626; border-radius:4px; cursor:pointer; font-size:12px;">Törlés</button>
+                <button type="button" data-action="edit" data-index="${index}" style="padding:4px 8px; border:1px solid #2563eb; background:#fff; color:#2563eb; border-radius:4px; cursor:pointer; font-size:12px;">Upraviť</button>
+                <button type="button" data-action="remove" data-index="${index}" style="padding:4px 8px; border:1px solid #dc2626; background:#fff; color:#dc2626; border-radius:4px; cursor:pointer; font-size:12px;">Vymazať</button>
             `;
             list.appendChild(row);
         });

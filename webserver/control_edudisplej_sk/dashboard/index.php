@@ -735,7 +735,7 @@ var COMMON_HOSTNAME_TEXT = <?php
     echo $common_hostname_text_json !== false ? $common_hostname_text_json : '"Hostname"';
 ?>;
 var DASHBOARD_SAVE_ERROR_TEXT = <?php
-    $dashboard_save_error_text_json = json_encode(t_def('dashboard.error.save', 'Mentési hiba'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    $dashboard_save_error_text_json = json_encode(t_def('dashboard.error.save', 'Chyba ukladania'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
     echo $dashboard_save_error_text_json !== false ? $dashboard_save_error_text_json : '"Save error"';
 ?>;
 var DASHBOARD_OPEN_HISTORY_TITLE_TEXT = <?php

@@ -451,16 +451,23 @@
                     static_language: 'Statikus nyelv',
                     display_profile: 'Kijelző profil',
                     mode_small: 'A) KIS KIJELZŐ — teljes képernyő, nagy sorok, lapozás (nem scroll)',
-                    mode_large: 'B) NAGY KIJELZŐ — 4 egyenlő táblázatos blokk',
+                    mode_large: 'B) NAGY KIJELZŐ — 2 nagy panel (aktuális/következő + utána következő)',
                     mode_hint: 'Kis kijelzőn fix betűméret használatos (2 soros töréssel).',
                     schedule_settings: 'Étkezés időzítés',
                     schedule_enabled: 'Napi étkezések láthatósága idő alapján',
+                    schedule_breakfast_from: 'Reggeli kezdete (ettől látszik)',
                     schedule_breakfast_until: 'Reggeli vége (eddig látszik)',
+                    schedule_snack_am_from: 'Tízórai kezdete (ettől látszik)',
                     schedule_snack_am_until: 'Tízórai vége (eddig látszik)',
+                    schedule_lunch_from: 'Ebéd kezdete (ettől látszik)',
                     schedule_lunch_until: 'Ebéd vége (eddig látszik)',
+                    schedule_snack_pm_from: 'Uzsonna kezdete (ettől látszik)',
                     schedule_snack_pm_until: 'Uzsonna vége (eddig látszik)',
+                    schedule_dinner_from: 'Vacsora kezdete (ettől látszik)',
                     schedule_dinner_until: 'Vacsora vége (eddig látszik)',
                     show_tomorrow_after_passed: 'Ha a mai étkezés lejárt, mutassa a holnapi megfelelő étkezést',
+                    hide_past_after_today: 'Ha ma már nincs étkezés, ne mutassa a mai lejárt tételeket',
+                    large_right_switch_sec: 'Jobb oldali váltás ideje (mp)',
                     small_row_font_size: 'Kis kijelző sor betűméret (px)',
                     small_header_row_bg: '1. sor háttérszín',
                     small_header_row_text: '1. sor bal szöveg színe',
@@ -477,8 +484,8 @@
                     small_max_meals: 'Max. megjelenített étkezések (1-5)',
                     small_header_scroll_speed: 'Felső sor vízszintes görgetés sebesség (px/mp)',
                     small_header_scroll_pause: 'Felső sor szélső megállás (ms)',
-                    join_breakfast_snack: 'Raňajky + Desiata összevonás (kis kijelzőn)',
-                    join_lunch_snack: 'Obed + Olovrant összevonás (kis kijelzőn)',
+                    join_breakfast_snack: 'Raňajky + Desiata összevonás',
+                    join_lunch_snack: 'Obed + Olovrant összevonás',
                     site: 'Forrás oldal',
                     institution: 'Intézmény',
                     refresh: 'Frissít',
@@ -522,16 +529,23 @@
                     static_language: 'Statický jazyk',
                     display_profile: 'Profil displeja',
                     mode_small: 'A) MALÝ DISPLEJ — celá obrazovka, veľké riadky, prepínanie strán (bez scrollu)',
-                    mode_large: 'B) VEĽKÝ DISPLEJ — 4 rovnaké tabuľkové bloky',
+                    mode_large: 'B) VEĽKÝ DISPLEJ — 2 veľké panely (aktuálne/nasledujúce + ďalšie)',
                     mode_hint: 'Na malom displeji sa veľkosť písma nastavuje automaticky podľa dostupného priestoru.',
                     schedule_settings: 'Časovanie jedál',
                     schedule_enabled: 'Viditeľnosť denných jedál podľa času',
+                    schedule_breakfast_from: 'Raňajky od času',
                     schedule_breakfast_until: 'Raňajky do času',
+                    schedule_snack_am_from: 'Desiata od času',
                     schedule_snack_am_until: 'Desiata do času',
+                    schedule_lunch_from: 'Obed od času',
                     schedule_lunch_until: 'Obed do času',
+                    schedule_snack_pm_from: 'Olovrant od času',
                     schedule_snack_pm_until: 'Olovrant do času',
+                    schedule_dinner_from: 'Večera od času',
                     schedule_dinner_until: 'Večera do času',
                     show_tomorrow_after_passed: 'Po prekročení dnešného času zobraz zajtrajšie zodpovedajúce jedlo',
+                    hide_past_after_today: 'Po skončení dnešných časov nezobrazuj dnešné jedlá',
+                    large_right_switch_sec: 'Interval prepínania pravého panela (s)',
                     small_row_font_size: 'Veľkosť písma riadkov na malom displeji (px)',
                     small_header_row_bg: 'Farba pozadia 1. riadku',
                     small_header_row_text: 'Farba textu vľavo (1. riadok)',
@@ -548,8 +562,8 @@
                     small_max_meals: 'Max. zobrazených jedál (1-5)',
                     small_header_scroll_speed: 'Rýchlosť vodorovného posuvu horného riadku (px/s)',
                     small_header_scroll_pause: 'Pauza na okrajoch horného riadku (ms)',
-                    join_breakfast_snack: 'Spojiť Raňajky + Desiata (na malom displeji)',
-                    join_lunch_snack: 'Spojiť Obed + Olovrant (na malom displeji)',
+                    join_breakfast_snack: 'Spojiť Raňajky + Desiata',
+                    join_lunch_snack: 'Spojiť Obed + Olovrant',
                     site: 'Zdrojová stránka',
                     institution: 'Inštitúcia',
                     refresh: 'Obnoviť',
@@ -593,16 +607,23 @@
                     static_language: 'Static language',
                     display_profile: 'Display profile',
                     mode_small: 'A) SMALL SCREEN — fullscreen, large rows, page switching (no scroll)',
-                    mode_large: 'B) LARGE SCREEN — 4 equal table blocks',
+                    mode_large: 'B) LARGE SCREEN — 2 large panels (current/next + following)',
                     mode_hint: 'Small-screen rows use a fixed font size with 2-line wrapping.',
                     schedule_settings: 'Meal timing',
                     schedule_enabled: 'Daily meal visibility by time',
+                    schedule_breakfast_from: 'Breakfast from',
                     schedule_breakfast_until: 'Breakfast until',
+                    schedule_snack_am_from: 'Morning snack from',
                     schedule_snack_am_until: 'Morning snack until',
+                    schedule_lunch_from: 'Lunch from',
                     schedule_lunch_until: 'Lunch until',
+                    schedule_snack_pm_from: 'Afternoon snack from',
                     schedule_snack_pm_until: 'Afternoon snack until',
+                    schedule_dinner_from: 'Dinner from',
                     schedule_dinner_until: 'Dinner until',
                     show_tomorrow_after_passed: 'After daily cutoff, show tomorrow equivalent meal',
+                    hide_past_after_today: 'After today windows end, hide passed today meals',
+                    large_right_switch_sec: 'Right panel switch interval (sec)',
                     small_row_font_size: 'Small-screen row font size (px)',
                     small_header_row_bg: 'Row 1 background color',
                     small_header_row_text: 'Row 1 left text color',
@@ -619,8 +640,8 @@
                     small_max_meals: 'Max displayed meals (1-5)',
                     small_header_scroll_speed: 'Top-row horizontal scroll speed (px/s)',
                     small_header_scroll_pause: 'Top-row edge pause (ms)',
-                    join_breakfast_snack: 'Join Breakfast + Morning snack (small screen)',
-                    join_lunch_snack: 'Join Lunch + Afternoon snack (small screen)',
+                    join_breakfast_snack: 'Join Breakfast + Morning snack',
+                    join_lunch_snack: 'Join Lunch + Afternoon snack',
                     site: 'Source site',
                     institution: 'Institution',
                     refresh: 'Refresh',
@@ -1381,11 +1402,11 @@
             `;
         }
 
-        function showPendingBarPrompt({ message, confirmLabel = 'Igen', cancelLabel = 'Mégse', onConfirm = null, onCancel = null }) {
+        function showPendingBarPrompt({ message, confirmLabel = 'Áno', cancelLabel = 'Zrušiť', onConfirm = null, onCancel = null }) {
             pendingBarPromptState = {
                 message: String(message || ''),
                 confirmLabel: String(confirmLabel || 'Igen'),
-                cancelLabel: String(cancelLabel || 'Mégse'),
+                cancelLabel: String(cancelLabel || 'Zrušiť'),
                 onConfirm,
                 onCancel
             };
@@ -1490,7 +1511,7 @@
             showPendingBarPrompt({
                 message: 'Találtam nem mentett helyi piszkozatot. Betöltsem?',
                 confirmLabel: 'Betöltés',
-                cancelLabel: 'Mégse',
+                cancelLabel: 'Zrušiť',
                 onConfirm: () => {
                     try {
                         const payload = JSON.parse(parsed.snapshot);
@@ -1522,7 +1543,7 @@
             showPendingBarPrompt({
                 message: 'Biztosan elveted a helyi módosításokat?',
                 confirmLabel: 'Elvetés',
-                cancelLabel: 'Mégse',
+                cancelLabel: 'Zrušiť',
                 onConfirm: () => {
                     if (lastPublishedPayload && applyPlanPayload(lastPublishedPayload)) {
                         clearDraftCache();
@@ -1563,7 +1584,7 @@
                     const parsedId = parseInt(block?.id, 10);
                     return Number.isFinite(parsedId) && parsedId !== 0 ? parsedId : nextTempTimeBlockId--;
                 })(),
-                block_name: String(block.block_name || 'Időblokk'),
+                block_name: String(block.block_name || 'Časový blok'),
                 block_type: (() => {
                     const normalizedType = String(block.block_type || 'weekly').toLowerCase();
                     if (normalizedType === 'date' || normalizedType === 'datetime_range') {
@@ -2038,7 +2059,7 @@
             if (!Array.isArray(loopStyles) || loopStyles.length === 0) {
                 const emptyOption = document.createElement('option');
                 emptyOption.value = '';
-                emptyOption.textContent = 'Nincs elérhető loop';
+                emptyOption.textContent = 'Nie je dostupná žiadna slučka';
                 select.appendChild(emptyOption);
                 select.disabled = true;
                 return;
@@ -2277,7 +2298,7 @@
             if (resolvedId !== 0) {
                 const block = getWeeklyBlockById(resolvedId);
                 if (!block) {
-                    showAutosaveToast('⚠️ A kiválasztott heti idősáv nem található', true);
+                    showAutosaveToast('⚠️ Vybraný týždenný časový blok sa nenašiel', true);
                     return;
                 }
                 fillWeeklyPlanFormFromBlock(block);
@@ -2528,19 +2549,19 @@
             const endRaw = String(endInput?.value || '').trim();
 
             if (!loopStyleId || selectedDays.length === 0 || !startRaw || !endRaw) {
-                showAutosaveToast('⚠️ Add meg a napot, időt és loop stílust', true);
+                showAutosaveToast('⚠️ Zadajte deň, čas a štýl slučky', true);
                 return;
             }
 
             if (parseInt(loopStyleId, 10) === parseInt(defaultLoopStyleId || 0, 10)) {
-                showAutosaveToast('⚠️ A DEFAULT loop nem tervezhető, az üres időket automatikusan kitölti', true);
+                showAutosaveToast('⚠️ Predvolenú slučku nemožno plánovať, prázdne časy sa vyplnia automaticky', true);
                 return;
             }
 
             const startMinute = parseMinuteFromTime(`${startRaw}:00`, 0);
             const endMinute = parseMinuteFromTime(`${endRaw}:00`, 0);
             if (startMinute === endMinute) {
-                showAutosaveToast('⚠️ A kezdés és befejezés nem lehet azonos', true);
+                showAutosaveToast('⚠️ Začiatok a koniec nemôžu byť rovnaké', true);
                 return;
             }
 
@@ -2559,7 +2580,7 @@
             };
 
             if (!resolveScheduleConflicts(payload, editBlockId !== 0 ? editBlockId : null)) {
-                showAutosaveToast('ℹ️ Ütközés miatt megszakítva', true);
+                showAutosaveToast('ℹ️ Prerušené kvôli kolízii', true);
                 return;
             }
 
@@ -2572,25 +2593,25 @@
             setActiveScope(activeScope, true);
             openFixedWeeklyPlannerModal(payload.id);
             scheduleAutoSave(250);
-            showAutosaveToast(editBlockId !== 0 ? '✓ Heti idősáv frissítve' : '✓ Heti idősáv létrehozva');
+            showAutosaveToast(editBlockId !== 0 ? '✓ Týždenný časový blok bol aktualizovaný' : '✓ Týždenný časový blok bol vytvorený');
         }
 
         function deleteSelectedWeeklyPlanBlock() {
             const idInput = document.getElementById('fixed-plan-block-id');
             const blockId = parseInt(idInput?.value || '0', 10);
             if (!blockId) {
-                showAutosaveToast('ℹ️ Törléshez válassz ki egy heti idősávot', true);
+                showAutosaveToast('ℹ️ Na odstránenie vyberte týždenný časový blok', true);
                 return;
             }
 
             const block = getWeeklyBlockById(blockId);
             if (!block) {
-                showAutosaveToast('⚠️ A kiválasztott heti idősáv nem található', true);
+                showAutosaveToast('⚠️ Vybraný týždenný časový blok sa nenašiel', true);
                 clearWeeklyPlanSelection(true);
                 return;
             }
 
-            if (!confirm(`Törlöd a heti idősávot?\n${getScopeLabel(block)}`)) {
+            if (!confirm(`Chcete odstrániť týždenný časový blok?\n${getScopeLabel(block)}`)) {
                 return;
             }
 
@@ -2605,11 +2626,11 @@
         function clearEntireSchedulePlan() {
             const weeklyCount = timeBlocks.filter((entry) => String(entry.block_type || 'weekly') === 'weekly').length;
             if (weeklyCount === 0) {
-                showAutosaveToast('ℹ️ Nincs törölhető heti terv', true);
+                showAutosaveToast('ℹ️ Nie je čo odstrániť v týždennom pláne', true);
                 return;
             }
 
-            if (!confirm(`Biztosan törlöd a teljes heti tervet?\n${weeklyCount} heti idősáv lesz törölve.`)) {
+            if (!confirm(`Naozaj chcete odstrániť celý týždenný plán?\nOdstráni sa ${weeklyCount} týždenných časových blokov.`)) {
                 return;
             }
 
@@ -2708,7 +2729,7 @@
 
             const payload = {
                 id: nextTempTimeBlockId--,
-                block_name: `Speciális ${startDate} ${startTime.slice(0, 5)}-${endDate} ${endTime.slice(0, 5)}`,
+                block_name: `Špeciálny ${startDate} ${startTime.slice(0, 5)}-${endDate} ${endTime.slice(0, 5)}`,
                 block_type: 'datetime_range',
                 start_datetime: `${startDate} ${startTime}`,
                 end_datetime: `${endDate} ${endTime}`,
@@ -2831,11 +2852,11 @@
 
             const deletedId = parseInt(style.id, 10);
             if (deletedId === parseInt(defaultLoopStyleId || 0, 10)) {
-                showAutosaveToast('⚠️ A DEFAULT loop nem törölhető', true);
+                showAutosaveToast('⚠️ Predvolenú slučku nemožno odstrániť', true);
                 return;
             }
 
-            if (!confirm(`Törlöd ezt a loopot?\n${style.name}`)) {
+            if (!confirm(`Chcete odstrániť túto slučku?\n${style.name}`)) {
                 return;
             }
 
@@ -2861,7 +2882,7 @@
         }
 
         function setActiveAsDefaultLoopStyle() {
-            showAutosaveToast('ℹ️ A DEFAULT loop fix, másik loop nem állítható alapnak', true);
+            showAutosaveToast('ℹ️ Predvolená slučka je pevná, inú slučku nemožno nastaviť ako predvolenú', true);
         }
 
         function persistCurrentScopeItems() {
@@ -2874,10 +2895,10 @@
             if (block.block_type === 'datetime_range') {
                 const startDt = String(block.start_datetime || '').replace('T', ' ').slice(0, 16);
                 const endDt = String(block.end_datetime || '').replace('T', ' ').slice(0, 16);
-                return `${startDt || '—'} → ${endDt || '—'} • ${block.block_name || 'Speciális intervallum'}`;
+                return `${startDt || '—'} → ${endDt || '—'} • ${block.block_name || 'Špeciálny interval'}`;
             }
             if (block.block_type === 'date') {
-                return `${block.specific_date || '—'} ${start}-${end} • ${block.block_name || 'Speciális'}`;
+                return `${block.specific_date || '—'} ${start}-${end} • ${block.block_name || 'Špeciálny'}`;
             }
             return `${start}-${end} • ${block.block_name || 'Heti blokk'}`;
         }
@@ -2889,7 +2910,7 @@
 
                 const baseOption = document.createElement('option');
                 baseOption.value = 'base';
-                baseOption.textContent = 'DEFAULT loop (időblokkon kívül)';
+                baseOption.textContent = 'Predvolená slučka (mimo časových blokov)';
                 selector.appendChild(baseOption);
 
                 const visibleBlocks = specialOnlyMode
@@ -3221,7 +3242,7 @@
                             const style = getLoopStyleById(styleId);
                             return style ? style.name : '';
                         })()
-                        : 'DEFAULT loop (idősávon kívül)';
+                        : 'Predvolená slučka (mimo časového pásma)';
                     const cellLabel = hasWeekly
                         ? `${styleName}${weeklyBlocks.length > 1 ? ` +${weeklyBlocks.length - 1}` : ''}`
                         : '';
@@ -3301,7 +3322,7 @@
                 ? parseInt(forcedLoopStyleId, 10)
                 : parseInt(activeLoopStyleId || defaultLoopStyleId || 0, 10);
             if (!selectedStyleId) {
-                showAutosaveToast('⚠️ Előbb válassz vagy hozz létre loop stílust', true);
+                showAutosaveToast('⚠️ Najprv vyberte alebo vytvorte štýl slučky', true);
                 return null;
             }
             return selectedStyleId;
@@ -3317,7 +3338,7 @@
                 return;
             }
             if (parseInt(selectedStyleId, 10) === parseInt(defaultLoopStyleId || 0, 10)) {
-                showAutosaveToast('⚠️ A DEFAULT loop nem tervezhető, az üres időket automatikusan kitölti', true);
+                showAutosaveToast('⚠️ Predvolenú slučku nemožno plánovať, prázdne časy sa vyplnia automaticky', true);
                 return;
             }
 
@@ -3340,7 +3361,7 @@
             };
 
             if (!resolveScheduleConflicts(payload, null)) {
-                showAutosaveToast('ℹ️ Ütközés miatt megszakítva', true);
+                showAutosaveToast('ℹ️ Prerušené kvôli kolízii', true);
                 return;
             }
 
@@ -3348,7 +3369,7 @@
             activeScope = `block:${payload.id}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(250);
-            showAutosaveToast('✓ Idősáv létrehozva');
+            showAutosaveToast('✓ Časové pásmo bolo vytvorené');
         }
 
         function startScheduleRangeSelection(event, day, hour) {
@@ -3452,7 +3473,7 @@
 
             if (!resolveScheduleConflicts(candidate, parseInt(block.id, 10))) {
                 renderWeeklyScheduleGrid();
-                showAutosaveToast('ℹ️ Ütközés miatt a nyújtás megszakítva', true);
+                showAutosaveToast('ℹ️ Rozšírenie bolo prerušené kvôli kolízii', true);
                 return;
             }
 
@@ -3471,7 +3492,7 @@
             activeScope = `block:${parseInt(block.id, 10)}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(250);
-            showAutosaveToast('✓ Időblokk frissítve');
+            showAutosaveToast('✓ Časový blok bol aktualizovaný');
         }
 
         function cancelScheduleBlockResize() {
@@ -3578,7 +3599,7 @@
             }
 
             if (!specialOnlyMode) {
-                wrap.innerHTML = '<div class="item"><span class="muted">A speciális események kezelése a Speciális terv oldalon érhető el.</span></div>';
+                wrap.innerHTML = '<div class="item"><span class="muted">Správa špeciálnych udalostí je dostupná na stránke Špeciálny plán.</span></div>';
                 return;
             }
 
@@ -3609,7 +3630,7 @@
                 .sort((a, b) => getScopeLabel(a).localeCompare(getScopeLabel(b)));
 
             if (specialBlocks.length === 0) {
-                wrap.innerHTML = `<div class="item"><span class="muted">${searchTerm ? 'Nincs találat a keresésre.' : 'Nincs speciális dátumos idősáv.'}</span></div>`;
+                wrap.innerHTML = `<div class="item"><span class="muted">${searchTerm ? 'Nenašli sa žiadne výsledky pre vyhľadávanie.' : 'Nie je žiadny špeciálny časový blok s dátumom.'}</span></div>`;
                 return;
             }
 
@@ -3625,13 +3646,13 @@
 
         function openSpecialDayPlanner() {
             if (!specialOnlyMode) {
-                showAutosaveToast('ℹ️ Speciális eseményt csak a Speciális terv oldalon lehet létrehozni', true);
+                showAutosaveToast('ℹ️ Špeciálnu udalosť je možné vytvoriť iba na stránke Špeciálny plán', true);
                 return;
             }
 
             const dateVal = String(document.getElementById('special-day-focus')?.value || '').trim();
             if (!dateVal) {
-                showAutosaveToast('⚠️ Előbb válassz napot', true);
+                showAutosaveToast('⚠️ Najprv vyberte deň', true);
                 return;
             }
 
@@ -3647,23 +3668,23 @@
             host.innerHTML = `
                 <div style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:3200;">
                     <div style="background:#fff; width:min(680px,94vw); border:1px solid #cfd6dd; padding:16px;">
-                        <h3 style="margin:0 0 8px 0;">Speciális napi terv • ${dateVal}</h3>
+                        <h3 style="margin:0 0 8px 0;">Špeciálny denný plán • ${dateVal}</h3>
                         <div style="font-size:12px; color:#425466; margin-bottom:10px;">Ez a napi terv felülírja az aznapi heti tervet az érintett idősávokban.</div>
                         <div style="max-height:220px; overflow:auto; border:1px solid #d9e0e7; margin-bottom:10px;">
                             ${dayBlocks.length === 0
-                                ? '<div style="padding:8px; font-size:12px; color:#607080;">Nincs még speciális idősáv erre a napra.</div>'
+                                ? '<div style="padding:8px; font-size:12px; color:#607080;">Pre tento deň zatiaľ nie je žiadny špeciálny časový blok.</div>'
                                 : dayBlocks.map((block) => {
                                     const styleName = getLoopStyleName(block.loop_style_id || 0);
                                     return `<div style="display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #edf1f4;">
                                         <span style="font-size:12px; color:#2b3f52;">${String(block.start_time).slice(0, 5)}-${String(block.end_time).slice(0, 5)} • ${styleName}</span>
                                         <button type="button" class="btn" onclick="setActiveScope('block:${block.id}', true); closeTimeBlockModal();">Szerkesztés</button>
-                                        <button type="button" class="btn btn-danger" onclick="deleteSpecialDayBlock(${block.id}, '${dateVal}')">Törlés</button>
+                                        <button type="button" class="btn btn-danger" onclick="deleteSpecialDayBlock(${block.id}, '${dateVal}')">Vymazať</button>
                                     </div>`;
                                 }).join('')}
                         </div>
                         <div style="display:grid; grid-template-columns:120px 120px 1fr auto; gap:8px; align-items:center; margin-bottom:12px;">
-                            <input type="text" id="special-day-plan-start" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="Speciális napi kezdés (24 órás)">
-                            <input type="text" id="special-day-plan-end" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="Speciális napi befejezés (24 órás)">
+                            <input type="text" id="special-day-plan-start" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="Začiatok špeciálneho dňa (24-hodinový)">
+                            <input type="text" id="special-day-plan-end" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" aria-label="Koniec špeciálneho dňa (24-hodinový)">
                             <select id="special-day-plan-loop">
                                 ${loopStyles
                                     .filter((style) => parseInt(style.id, 10) !== parseInt(defaultLoopStyleId || 0, 10))
@@ -3672,10 +3693,10 @@
                             </select>
                             <button type="button" class="btn" onclick="addSpecialDayBlockFromPlanner('${dateVal}')">Hozzáadás</button>
                         </div>
-                        <div style="font-size:12px; color:#425466; margin-bottom:6px;">Speciális intervallum (egyszeri, dátum+idő):</div>
+                        <div style="font-size:12px; color:#425466; margin-bottom:6px;">Špeciálny interval (jednorazový, dátum+čas):</div>
                         <div style="display:grid; grid-template-columns:minmax(160px,1fr) minmax(160px,1fr) 1fr auto; gap:8px; align-items:center; margin-bottom:12px;">
                             <input id="special-range-start" type="datetime-local" aria-label="Intervallum kezdete">
-                            <input id="special-range-end" type="datetime-local" aria-label="Intervallum vége">
+                            <input id="special-range-end" type="datetime-local" aria-label="Koniec intervalu">
                             <select id="special-range-loop">
                                 ${loopStyles
                                     .filter((style) => parseInt(style.id, 10) !== parseInt(defaultLoopStyleId || 0, 10))
@@ -3687,7 +3708,7 @@
                         <div style="font-size:12px; color:#425466; margin-bottom:6px;">Ideiglenes kampány (szövegek egymás után, fix intervallumban):</div>
                         <div style="display:grid; grid-template-columns:minmax(160px,1fr) minmax(160px,1fr); gap:8px; align-items:center; margin-bottom:8px;">
                             <input id="special-temp-start" type="datetime-local" aria-label="Kampány kezdete">
-                            <input id="special-temp-end" type="datetime-local" aria-label="Kampány vége">
+                            <input id="special-temp-end" type="datetime-local" aria-label="Koniec kampane">
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 120px auto; gap:8px; align-items:center; margin-bottom:12px;">
                             <textarea id="special-temp-texts" rows="5" placeholder="Minden sor külön szöveg kártya" style="width:100%; resize:vertical;"></textarea>
@@ -3731,7 +3752,7 @@
 
         function createTemporaryRangeCampaignFromPlanner() {
             if (!specialOnlyMode) {
-                showAutosaveToast('ℹ️ Ideiglenes kampányt csak a Speciális terv oldalon lehet létrehozni', true);
+                showAutosaveToast('ℹ️ Dočasnú kampaň je možné vytvoriť iba na stránke Špeciálny plán', true);
                 return;
             }
 
@@ -3753,7 +3774,7 @@
             const normalizedDuration = Math.max(2, Math.min(120, Number.isFinite(parseInt(durationSeconds, 10)) ? parseInt(durationSeconds, 10) : 10));
 
             if (!startVal || !endVal) {
-                showAutosaveToast('⚠️ Add meg a kampány kezdő és záró időpontját', true);
+                showAutosaveToast('⚠️ Zadajte začiatok a koniec kampane', true);
                 return false;
             }
 
@@ -3777,7 +3798,7 @@
             const startTs = Date.parse(startVal);
             const endTs = Date.parse(endVal);
             if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) {
-                showAutosaveToast('⚠️ Az intervallum vége legyen később a kezdésnél', true);
+                showAutosaveToast('⚠️ Koniec intervalu musí byť neskôr než začiatok', true);
                 return false;
             }
 
@@ -3834,7 +3855,7 @@
             activeScope = `block:${payload.id}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(120);
-            showAutosaveToast('✓ Ideiglenes kampány létrehozva és ütemezve');
+            showAutosaveToast('✓ Dočasná kampaň bola vytvorená a naplánovaná');
             if (closeModalAfter) {
                 closeTimeBlockModal();
             }
@@ -3888,7 +3909,7 @@
 
         function addSpecialRangeBlockFromPlanner() {
             if (!specialOnlyMode) {
-                showAutosaveToast('ℹ️ Speciális intervallumot csak a Speciális terv oldalon lehet létrehozni', true);
+                showAutosaveToast('ℹ️ Špeciálny interval je možné vytvoriť iba na stránke Špeciálny plán', true);
                 return;
             }
 
@@ -3917,7 +3938,7 @@
 
             const payload = {
                 id: nextTempTimeBlockId--,
-                block_name: `Speciális intervallum ${startDate} ${startTime.slice(0, 5)}-${endDate} ${endTime.slice(0, 5)}`,
+                block_name: `Špeciálny interval ${startDate} ${startTime.slice(0, 5)}-${endDate} ${endTime.slice(0, 5)}`,
                 block_type: 'datetime_range',
                 start_datetime: `${startDate} ${startTime}`,
                 end_datetime: `${endDate} ${endTime}`,
@@ -3951,13 +3972,13 @@
             activeScope = `block:${payload.id}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(120);
-            showAutosaveToast('✓ Speciális intervallum létrehozva');
+            showAutosaveToast('✓ Špeciálny interval bol vytvorený');
             closeTimeBlockModal();
         }
 
         function addSpecialDayBlockFromPlanner(dateVal) {
             if (!specialOnlyMode) {
-                showAutosaveToast('ℹ️ Speciális napi idősávot csak a Speciális terv oldalon lehet létrehozni', true);
+                showAutosaveToast('ℹ️ Špeciálny denný časový blok je možné vytvoriť iba na stránke Špeciálny plán', true);
                 return;
             }
 
@@ -3966,13 +3987,13 @@
             const styleId = parseInt(document.getElementById('special-day-plan-loop')?.value || 0, 10);
 
             if (!dateVal || !startVal || !endVal || !styleId) {
-                showAutosaveToast('⚠️ Hiányos speciális napi adat', true);
+                showAutosaveToast('⚠️ Neúplné údaje špeciálneho dňa', true);
                 return;
             }
 
             const payload = {
                 id: nextTempTimeBlockId--,
-                block_name: `Speciális ${dateVal}`,
+                block_name: `Špeciálny ${dateVal}`,
                 block_type: 'date',
                 specific_date: dateVal,
                 start_time: `${startVal}:00`,
@@ -4003,7 +4024,7 @@
             activeScope = `block:${payload.id}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(120);
-            showAutosaveToast('✓ Speciális napi idősáv létrehozva');
+            showAutosaveToast('✓ Špeciálny denný časový blok bol vytvorený');
             openSpecialDayPlanner();
         }
 
@@ -4018,7 +4039,7 @@
             }
             setActiveScope(activeScope, true);
             scheduleAutoSave(120);
-            showAutosaveToast('✓ Speciális napi idősáv törölve');
+            showAutosaveToast('✓ Špeciálny denný časový blok bol odstránený');
             if (dateVal) {
                 openSpecialDayPlanner();
             }
@@ -4536,7 +4557,7 @@
                         scheduleBlockTypes: summarizeBlockTypes(data?.schedule_blocks || [])
                     });
                     if (!data || !data.success) {
-                        showAutosaveToast('⚠️ A loop lista betöltése sikertelen, DEFAULT loop használatban', true);
+                        showAutosaveToast('⚠️ Nepodarilo sa načítať zoznam slučiek, používa sa predvolená slučka', true);
                         if (specialOnlyMode && autoCreateSpecialLoop) {
                             const workflowRange = resolveSpecialWorkflowRange();
                             const startDatetime = workflowRange ? workflowRange.start : '';
@@ -4560,7 +4581,7 @@
                         message: String(error?.message || error || 'unknown error')
                     });
                     console.error('Error loading loop:', error);
-                    showAutosaveToast('⚠️ Hálózati hiba, DEFAULT loop használatban', true);
+                    showAutosaveToast('⚠️ Sieťová chyba, používa sa predvolená slučka', true);
                     if (specialOnlyMode && autoCreateSpecialLoop) {
                         const workflowRange = resolveSpecialWorkflowRange();
                         const startDatetime = workflowRange ? workflowRange.start : '';
@@ -4584,7 +4605,7 @@
 
         function ensureActiveLoopStyleSelected() {
             if (!getLoopStyleById(activeLoopStyleId)) {
-                showAutosaveToast('⚠️ Nincs aktív loop kiválasztva', true);
+                showAutosaveToast('⚠️ Nie je vybraná žiadna aktívna slučka', true);
                 return false;
             }
             return true;
@@ -5171,14 +5192,14 @@
         function shouldAbortSaveLoop(opts, payload, currentSnapshot) {
             if (isDefaultGroup) {
                 if (!opts.silent) {
-                    alert('⚠️ A default csoport loopja nem szerkeszthető.');
+                    alert('⚠️ Slučku predvolenej skupiny nie je možné upravovať.');
                 }
                 return true;
             }
 
             if (getLoopPayloadItemCount(payload) === 0) {
                 if (!opts.silent) {
-                    alert('⚠️ A loop üres! Adj hozzá legalább egy modult.');
+                    alert('⚠️ Slučka je prázdna. Pridajte aspoň jeden modul.');
                 }
                 return true;
             }
@@ -5201,7 +5222,7 @@
             planVersionToken = String(data.plan_version || data.plan_version_token || data.loop_version || planVersionToken || '');
             clearDraftCache();
             setDraftDirty(false);
-            showAutosaveToast('✓ Mentés sikeres');
+            showAutosaveToast('✓ Uloženie úspešné');
 
             if (opts.source === 'publish' && specialOnlyMode && autoCreateSpecialLoop) {
                 const target = new URL(window.location.href);
@@ -5213,7 +5234,7 @@
         }
 
         function handleSaveLoopFailure(data) {
-            showAutosaveToast('⚠️ ' + (data.message || 'Mentési hiba'), true);
+            showAutosaveToast('⚠️ ' + (data.message || 'Chyba ukladania'), true);
         }
 
         function finalizeSaveLoopRequest() {
@@ -5281,7 +5302,7 @@
                 overlay = document.createElement('div');
                 overlay.id = 'group-loop-save-overlay';
                 overlay.setAttribute('aria-live', 'polite');
-                overlay.innerHTML = '<div class="group-loop-save-overlay-card"><span class="group-loop-save-spinner" aria-hidden="true"></span><span>Mentés folyamatban...</span></div>';
+                overlay.innerHTML = '<div class="group-loop-save-overlay-card"><span class="group-loop-save-spinner" aria-hidden="true"></span><span>Ukladanie prebieha...</span></div>';
                 document.body.appendChild(overlay);
             }
             return overlay;
@@ -5368,7 +5389,7 @@
                 debugGroupLoop('saveLoop:error', {
                     message: String(error?.message || error || 'unknown error')
                 });
-                showAutosaveToast('⚠️ Hiba történt: ' + error, true);
+                showAutosaveToast('⚠️ Vyskytla sa chyba: ' + error, true);
             })
             .finally(() => {
                 if (showManualSaveOverlay) {
@@ -5467,12 +5488,12 @@
             const styleId = parseInt(activeLoopStyleId || defaultLoopStyleId || 0, 10);
 
             if (!dateVal || !startVal || !endVal || !styleId) {
-                showAutosaveToast('⚠️ Add meg a dátumot és időt', true);
+                showAutosaveToast('⚠️ Zadajte dátum a čas', true);
                 return;
             }
 
             if (parseInt(styleId, 10) === parseInt(defaultLoopStyleId || 0, 10)) {
-                showAutosaveToast('⚠️ A DEFAULT loop nem tervezhető', true);
+                showAutosaveToast('⚠️ Predvolenú slučku nemožno plánovať', true);
                 return;
             }
 
@@ -5497,7 +5518,7 @@
             activeScope = `block:${payload.id}`;
             setActiveScope(activeScope, true);
             scheduleAutoSave(120);
-            showAutosaveToast('✓ Speciális esemény hozzáadva');
+            showAutosaveToast('✓ Špeciálna udalosť bola pridaná');
         }
 
         function openTimeBlockModal(block = null, preset = null) {
@@ -5525,13 +5546,13 @@
             host.innerHTML = `
                 <div style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:3200;">
                     <div style="background:#fff; width:min(560px,92vw); border:1px solid #cfd6dd; padding:16px;">
-                        <h3 style="margin:0 0 12px 0;">${editing ? 'Időblokk szerkesztése' : 'Új időblokk'}</h3>
+                        <h3 style="margin:0 0 12px 0;">${editing ? 'Upraviť časový blok' : 'Nový časový blok'}</h3>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                             <div>
                                 <label style="display:block; font-size:12px; margin-bottom:4px;">Típus</label>
                                 <select id="tb-type" style="width:100%;">
                                     <option value="weekly" ${blockType === 'weekly' ? 'selected' : ''}>Heti</option>
-                                    <option value="date" ${blockType === 'date' ? 'selected' : ''}>Speciális dátum</option>
+                                    <option value="date" ${blockType === 'date' ? 'selected' : ''}>Špeciálny dátum</option>
                                 </select>
                             </div>
                             <div>
@@ -5551,11 +5572,11 @@
                                 <input id="tb-date" type="date" value="${specificDate}" style="width:100%;">
                             </div>
                             <div>
-                                <label style="display:block; font-size:12px; margin-bottom:4px;">Kezdés</label>
+                                <label style="display:block; font-size:12px; margin-bottom:4px;">Začiatok</label>
                                 <input id="tb-start" type="text" style="width:100%;" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$">
                             </div>
                             <div>
-                                <label style="display:block; font-size:12px; margin-bottom:4px;">Vége</label>
+                                <label style="display:block; font-size:12px; margin-bottom:4px;">Koniec</label>
                                 <input id="tb-end" type="text" style="width:100%;" inputmode="numeric" placeholder="HH:MM" maxlength="5" pattern="^([01]\\d|2[0-3]):[0-5]\\d$">
                             </div>
                             <div id="tb-days-wrap" style="grid-column:1 / span 2; ${blockType === 'weekly' ? '' : 'display:none;'}">
@@ -5570,8 +5591,8 @@
                             </div>
                         </div>
                         <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
-                            <button type="button" class="btn" onclick="closeTimeBlockModal()">Mégse</button>
-                            <button type="button" class="btn btn-primary" onclick="saveTimeBlockModal(${editing ? 'true' : 'false'}, ${editing ? parseInt(block.id, 10) : 'null'})">Mentés</button>
+                            <button type="button" class="btn" onclick="closeTimeBlockModal()">Zrušiť</button>
+                            <button type="button" class="btn btn-primary" onclick="saveTimeBlockModal(${editing ? 'true' : 'false'}, ${editing ? parseInt(block.id, 10) : 'null'})">Uložiť</button>
                         </div>
                     </div>
                 </div>
@@ -5623,7 +5644,7 @@
                 return;
             }
             if (!start || !end) {
-                alert('⚠️ Adj meg kezdési és zárási időt.');
+                alert('⚠️ Zadajte čas začiatku a konca.');
                 return;
             }
             if (blockType === 'weekly' && days.length === 0) {
@@ -5631,15 +5652,15 @@
                 return;
             }
             if (blockType === 'date' && !specificDate) {
-                alert('⚠️ Válassz dátumot.');
+                alert('⚠️ Vyberte dátum.');
                 return;
             }
             if (!loopStyleId) {
-                alert('⚠️ Válassz loop stílust az idősávhoz.');
+                alert('⚠️ Vyberte štýl slučky pre časový blok.');
                 return;
             }
             if (parseInt(loopStyleId, 10) === parseInt(defaultLoopStyleId || 0, 10)) {
-                alert('⚠️ A DEFAULT loop nem tervezhető. Az üres sávokat automatikusan kitölti.');
+                alert('⚠️ Predvolenú slučku nemožno plánovať. Prázdne úseky sa vyplnia automaticky.');
                 return;
             }
 
@@ -5661,7 +5682,7 @@
             };
 
             if (!resolveScheduleConflicts(payload, isEdit ? parseInt(editId, 10) : null)) {
-                alert('Ütközés miatt a mentés megszakítva.');
+                alert('Ukladanie bolo zrušené kvôli kolízii.');
                 return;
             }
 
@@ -5678,13 +5699,13 @@
             closeTimeBlockModal();
             setActiveScope(activeScope, true);
             scheduleAutoSave(250);
-            showAutosaveToast('✓ Időblokk mentve');
+            showAutosaveToast('✓ Časový blok bol uložený');
         }
 
         function editCurrentTimeBlock() {
             const block = getActiveTimeBlock();
             if (!block) {
-                showAutosaveToast('ℹ️ Válassz egy időblokkot szerkesztéshez', true);
+                showAutosaveToast('ℹ️ Vyberte časový blok na úpravu', true);
                 return;
             }
             openTimeBlockModal(block);
@@ -5693,16 +5714,16 @@
         function deleteCurrentTimeBlock() {
             const block = getActiveTimeBlock();
             if (!block) {
-                showAutosaveToast('ℹ️ Nincs kiválasztott időblokk', true);
+                showAutosaveToast('ℹ️ Nie je vybratý žiadny časový blok', true);
                 return;
             }
 
             if (String(block.block_type || 'weekly') === 'date') {
-                showAutosaveToast('⚠️ Speciális dátum blokk itt nem törölhető', true);
+                showAutosaveToast('⚠️ Blok so špeciálnym dátumom tu nie je možné odstrániť', true);
                 return;
             }
 
-            if (!confirm(`Biztosan törlöd ezt az időblokkot?\n${getScopeLabel(block)}`)) {
+            if (!confirm(`Naozaj chcete odstrániť tento časový blok?\n${getScopeLabel(block)}`)) {
                 return;
             }
 
@@ -5710,7 +5731,7 @@
             activeScope = 'base';
             setActiveScope('base', true);
             scheduleAutoSave(250);
-            showAutosaveToast('✓ Időblokk törölve');
+            showAutosaveToast('✓ Časový blok bol odstránený');
         }
         
         // Module customization
@@ -5981,16 +6002,22 @@
                     smallHeaderRowTitleFontPx: 58,
                     smallHeaderRowClockFontPx: 62,
                     mealScheduleEnabled: true,
+                    scheduleBreakfastFrom: '00:00',
                     scheduleBreakfastUntil: '10:00',
+                    scheduleSnackAmFrom: '10:01',
                     scheduleSnackAmUntil: '11:00',
+                    scheduleLunchFrom: '11:01',
                     scheduleLunchUntil: '14:00',
+                    scheduleSnackPmFrom: '14:01',
                     scheduleSnackPmUntil: '18:00',
+                    scheduleDinnerFrom: '18:01',
                     scheduleDinnerUntil: '23:59',
                     showTomorrowAfterMealPassed: true,
+                    hidePassedTodayMeals: true,
                     language: 'sk',
                     showHeaderTitle: true,
                     customHeaderTitle: '',
-                    showInstitutionName: true,
+                    showInstitutionName: false,
                     showBreakfast: true,
                     showSnackAm: true,
                     showLunch: true,
@@ -6564,12 +6591,18 @@
                 'setting-mergeBreakfastSnack',
                 'setting-mergeLunchSnack',
                 'setting-mealScheduleEnabled',
+                'setting-scheduleBreakfastFrom',
                 'setting-scheduleBreakfastUntil',
+                'setting-scheduleSnackAmFrom',
                 'setting-scheduleSnackAmUntil',
+                'setting-scheduleLunchFrom',
                 'setting-scheduleLunchUntil',
+                'setting-scheduleSnackPmFrom',
                 'setting-scheduleSnackPmUntil',
+                'setting-scheduleDinnerFrom',
                 'setting-scheduleDinnerUntil',
                 'setting-showTomorrowAfterMealPassed',
+                'setting-hidePassedTodayMeals',
                 'setting-mealLanguage',
                 'setting-showHeaderTitle',
                 'setting-customHeaderTitle',
@@ -6728,7 +6761,7 @@
                 bgImageDataInput.value = String(collection.bg_image_data || '');
             }
             if (bgStatus) {
-                bgStatus.textContent = String(collection.bg_image_data || '').trim() ? 'Háttérkép gyűjteményből' : 'Nincs kiválasztott kép';
+                bgStatus.textContent = String(collection.bg_image_data || '').trim() ? 'Obrázok pozadia z kolekcie' : 'Nie je vybraný obrázok';
             }
         }
 
@@ -7961,6 +7994,7 @@
             const mealDisplayMode = normalizeMealDisplayMode(settings.mealDisplayMode);
             const isSmallMode = mealDisplayMode === 'small_screen';
             const smallScreenCycleSec = Math.max(3, Math.min(300, parseInt(settings.smallScreenCycleSec || settings.smallScreenPageSwitchSec || 12, 10) || 12));
+            const largeRightPanelSwitchSec = Math.max(3, Math.min(120, parseInt(settings.largeRightPanelSwitchSec || 12, 10) || 12));
             const smallScreenStartModeRaw = String(settings.smallScreenStartMode || 'current_onward').toLowerCase();
             const smallScreenStartMode = ['current_onward', 'breakfast_onward', 'lunch_onward', 'dinner_onward'].includes(smallScreenStartModeRaw)
                 ? smallScreenStartModeRaw
@@ -7979,10 +8013,16 @@
             const mergeLunchSnack = settings.mergeLunchSnack !== false;
             const mealScheduleEnabled = settings.mealScheduleEnabled !== false;
             const showTomorrowAfterMealPassed = settings.showTomorrowAfterMealPassed !== false;
+            const hidePassedTodayMeals = settings.hidePassedTodayMeals !== false;
+            const scheduleBreakfastFrom = escapeHtml(normalizeMealScheduleTime(settings.scheduleBreakfastFrom, '00:00'));
             const scheduleBreakfastUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleBreakfastUntil, '10:00'));
+            const scheduleSnackAmFrom = escapeHtml(normalizeMealScheduleTime(settings.scheduleSnackAmFrom, '10:01'));
             const scheduleSnackAmUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleSnackAmUntil, '11:00'));
+            const scheduleLunchFrom = escapeHtml(normalizeMealScheduleTime(settings.scheduleLunchFrom, '11:01'));
             const scheduleLunchUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleLunchUntil, '14:00'));
+            const scheduleSnackPmFrom = escapeHtml(normalizeMealScheduleTime(settings.scheduleSnackPmFrom, '14:01'));
             const scheduleSnackPmUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleSnackPmUntil, '18:00'));
+            const scheduleDinnerFrom = escapeHtml(normalizeMealScheduleTime(settings.scheduleDinnerFrom, '18:01'));
             const scheduleDinnerUntil = escapeHtml(normalizeMealScheduleTime(settings.scheduleDinnerUntil, '23:59'));
             const language = normalizeMealLanguage(settings.language);
             const customHeaderTitle = escapeHtml(String(settings.customHeaderTitle || ''));
@@ -8079,23 +8119,47 @@
 
                         <div style="padding:10px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; display:grid; gap:8px;">
                             <div style="font-weight:700; color:#1f2937;">${mt('schedule_settings')}</div>
+                            <div>
+                                <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('large_right_switch_sec')}</label>
+                                <input type="number" id="setting-largeRightPanelSwitchSec" min="3" max="120" step="1" value="${largeRightPanelSwitchSec}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                            </div>
                             <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-mealScheduleEnabled" ${mealScheduleEnabled ? 'checked' : ''}> ${mt('schedule_enabled')}</label>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                                 <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_breakfast_from')}</label>
+                                    <input type="text" id="setting-scheduleBreakfastFrom" value="${scheduleBreakfastFrom}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
                                     <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_breakfast_until')}</label>
                                     <input type="text" id="setting-scheduleBreakfastUntil" value="${scheduleBreakfastUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_snack_am_from')}</label>
+                                    <input type="text" id="setting-scheduleSnackAmFrom" value="${scheduleSnackAmFrom}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                                 </div>
                                 <div>
                                     <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_snack_am_until')}</label>
                                     <input type="text" id="setting-scheduleSnackAmUntil" value="${scheduleSnackAmUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                                 </div>
                                 <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_lunch_from')}</label>
+                                    <input type="text" id="setting-scheduleLunchFrom" value="${scheduleLunchFrom}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
                                     <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_lunch_until')}</label>
                                     <input type="text" id="setting-scheduleLunchUntil" value="${scheduleLunchUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                                 </div>
                                 <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_snack_pm_from')}</label>
+                                    <input type="text" id="setting-scheduleSnackPmFrom" value="${scheduleSnackPmFrom}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
                                     <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_snack_pm_until')}</label>
                                     <input type="text" id="setting-scheduleSnackPmUntil" value="${scheduleSnackPmUntil}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
+                                </div>
+                                <div>
+                                    <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_dinner_from')}</label>
+                                    <input type="text" id="setting-scheduleDinnerFrom" value="${scheduleDinnerFrom}" placeholder="HH:MM" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:5px;">
                                 </div>
                                 <div>
                                     <label style="display:block; margin-bottom:4px; font-weight:bold;">${mt('schedule_dinner_until')}</label>
@@ -8103,6 +8167,7 @@
                                 </div>
                             </div>
                             <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-showTomorrowAfterMealPassed" ${showTomorrowAfterMealPassed ? 'checked' : ''}> ${mt('show_tomorrow_after_passed')}</label>
+                            <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="setting-hidePassedTodayMeals" ${hidePassedTodayMeals ? 'checked' : ''}> ${mt('hide_past_after_today')}</label>
                         </div>
 
                         <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end;">
@@ -8946,12 +9011,18 @@
                 smallHeaderRowTitleFontPx,
                 smallHeaderRowClockFontPx,
                 mealScheduleEnabled: document.getElementById('setting-mealScheduleEnabled')?.checked !== false,
+                scheduleBreakfastFrom: normalizeMealScheduleTime(document.getElementById('setting-scheduleBreakfastFrom')?.value, '00:00'),
                 scheduleBreakfastUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleBreakfastUntil')?.value, '10:00'),
+                scheduleSnackAmFrom: normalizeMealScheduleTime(document.getElementById('setting-scheduleSnackAmFrom')?.value, '10:01'),
                 scheduleSnackAmUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleSnackAmUntil')?.value, '11:00'),
+                scheduleLunchFrom: normalizeMealScheduleTime(document.getElementById('setting-scheduleLunchFrom')?.value, '11:01'),
                 scheduleLunchUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleLunchUntil')?.value, '14:00'),
+                scheduleSnackPmFrom: normalizeMealScheduleTime(document.getElementById('setting-scheduleSnackPmFrom')?.value, '14:01'),
                 scheduleSnackPmUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleSnackPmUntil')?.value, '18:00'),
+                scheduleDinnerFrom: normalizeMealScheduleTime(document.getElementById('setting-scheduleDinnerFrom')?.value, '18:01'),
                 scheduleDinnerUntil: normalizeMealScheduleTime(document.getElementById('setting-scheduleDinnerUntil')?.value, '23:59'),
                 showTomorrowAfterMealPassed: document.getElementById('setting-showTomorrowAfterMealPassed')?.checked !== false,
+                hidePassedTodayMeals: document.getElementById('setting-hidePassedTodayMeals')?.checked !== false,
                 mergeBreakfastSnack: document.getElementById('setting-mergeBreakfastSnack')?.checked !== false,
                 mergeLunchSnack: document.getElementById('setting-mergeLunchSnack')?.checked !== false,
                 language: normalizeMealLanguage(document.getElementById('setting-mealLanguage')?.value || 'sk'),
@@ -9117,7 +9188,7 @@
         
         function startPreview() {
             if (loopItems.length === 0) {
-                alert('⚠️ Nincs modul a loop-ban!');
+                alert('⚠️ V slučke nie je žiadny modul!');
                 return;
             }
             
@@ -9395,6 +9466,7 @@
             params.append('siteKey', String(settings.siteKey || 'jedalen.sk'));
             params.append('institutionId', String(parseInt(settings.institutionId || 0, 10) || 0));
             params.append('mealDisplayMode', mealDisplayMode);
+            params.append('largeRightPanelSwitchSec', String(Math.max(3, Math.min(120, parseInt(settings.largeRightPanelSwitchSec || 12, 10) || 12))));
             params.append('smallScreenCycleSec', String(smallScreenCycleSec));
             params.append('smallScreenPageSwitchSec', String(smallScreenPageSwitchSec));
             params.append('smallScreenStartMode', smallScreenStartMode);
@@ -9413,6 +9485,19 @@
             params.append('smallScreenShowCaptions', settings.smallScreenShowCaptions === false ? 'false' : 'true');
             params.append('mergeBreakfastSnack', settings.mergeBreakfastSnack === false ? 'false' : 'true');
             params.append('mergeLunchSnack', settings.mergeLunchSnack === false ? 'false' : 'true');
+            params.append('mealScheduleEnabled', settings.mealScheduleEnabled === false ? 'false' : 'true');
+            params.append('scheduleBreakfastFrom', normalizeMealScheduleTime(settings.scheduleBreakfastFrom, '00:00'));
+            params.append('scheduleBreakfastUntil', normalizeMealScheduleTime(settings.scheduleBreakfastUntil, '10:00'));
+            params.append('scheduleSnackAmFrom', normalizeMealScheduleTime(settings.scheduleSnackAmFrom, '10:01'));
+            params.append('scheduleSnackAmUntil', normalizeMealScheduleTime(settings.scheduleSnackAmUntil, '11:00'));
+            params.append('scheduleLunchFrom', normalizeMealScheduleTime(settings.scheduleLunchFrom, '11:01'));
+            params.append('scheduleLunchUntil', normalizeMealScheduleTime(settings.scheduleLunchUntil, '14:00'));
+            params.append('scheduleSnackPmFrom', normalizeMealScheduleTime(settings.scheduleSnackPmFrom, '14:01'));
+            params.append('scheduleSnackPmUntil', normalizeMealScheduleTime(settings.scheduleSnackPmUntil, '18:00'));
+            params.append('scheduleDinnerFrom', normalizeMealScheduleTime(settings.scheduleDinnerFrom, '18:01'));
+            params.append('scheduleDinnerUntil', normalizeMealScheduleTime(settings.scheduleDinnerUntil, '23:59'));
+            params.append('showTomorrowAfterMealPassed', settings.showTomorrowAfterMealPassed === false ? 'false' : 'true');
+            params.append('hidePassedTodayMeals', settings.hidePassedTodayMeals === false ? 'false' : 'true');
             params.append('language', language);
             params.append('showHeaderTitle', settings.showHeaderTitle === false ? 'false' : 'true');
             params.append('customHeaderTitle', String(settings.customHeaderTitle || ''));
@@ -9905,7 +9990,7 @@
             
             if (loopItems.length === 0) {
                 container.className = 'empty';
-                container.innerHTML = '<p>Nincs elem a loop-ban. Húzz ide modult az „Elérhető Modulok” panelről.</p>';
+                container.innerHTML = '<p>V slučke nie je žiadna položka. Presuňte sem modul z panela „Dostupné moduly“.</p>';
                 updateTotalDuration();
                 stopPreview(); // Stop preview if loop is empty
                 return;

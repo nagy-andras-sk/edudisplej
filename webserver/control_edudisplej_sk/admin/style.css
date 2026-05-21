@@ -705,6 +705,51 @@ tbody tr:hover td {
     height: 112px;
 }
 
+.session-timeout-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2500;
+    background: rgba(7, 15, 24, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.session-timeout-box {
+    width: min(480px, 100%);
+    background: #ffffff;
+    border: 1px solid #bfd0df;
+    border-radius: 10px;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28);
+    padding: 18px 18px 16px;
+}
+
+.session-timeout-title {
+    margin: 0 0 8px;
+    font-size: 17px;
+    color: #0b3c5d;
+    font-weight: 700;
+}
+
+.session-timeout-message {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: #1b1b1b;
+    line-height: 1.5;
+}
+
+.session-timeout-redirect {
+    margin: 0;
+    font-size: 13px;
+    color: #4f5f6f;
+}
+
+.session-timeout-countdown {
+    color: #b23b3b;
+    font-weight: 700;
+}
+
 /* =========================================================
    Breadcrumb
    ========================================================= */

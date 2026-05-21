@@ -13,14 +13,14 @@ const GroupLoopDisplayScheduler = (() => {
     'use strict';
 
     // Constants
-    const DAYS_OF_WEEK = ['Vasárnap', 'Hétfő', 'Kedd', 'Szerda', 'Csütörtök', 'Péntek', 'Szombat'];
+    const DAYS_OF_WEEK = ['Nedeľa', 'Pondelok', 'Utorok', 'Streda', 'Štvrtok', 'Piatok', 'Sobota'];
     const HOUR_RANGE = Array.from({ length: 24 }, (_, i) => i);
 
     /**
      * Render weekly schedule grid
      */
     const renderScheduleGrid = (schedule) => {
-        if (!schedule) return '<p>Nincs ütemezés beállítva</p>';
+        if (!schedule) return '<p>Nie je nastavený žiadny harmonogram</p>';
 
         const container = document.createElement('div');
         container.className = 'schedule-grid-container';
@@ -43,7 +43,7 @@ const GroupLoopDisplayScheduler = (() => {
 
         // Header row with day names
         const headerCell = document.createElement('div');
-        headerCell.textContent = 'Óra';
+        headerCell.textContent = 'Hodina';
         headerCell.style.cssText = `
             background: #f0f0f0;
             padding: 8px;
@@ -122,8 +122,8 @@ const GroupLoopDisplayScheduler = (() => {
             color: #555;
         `;
         legend.innerHTML = `
-            <div><span style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 3px;">✓ Aktív</span> - Kijelző bekapcsolt</div>
-            <div style="margin-top: 5px;"><span style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 3px;">✕ Ki</span> - Kijelző kikapcsolt</div>
+            <div><span style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 3px;">✓ Aktívny</span> - Displej zapnutý</div>
+            <div style="margin-top: 5px;"><span style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 3px;">✕ Vypnutý</span> - Displej vypnutý</div>
         `;
         container.appendChild(legend);
 
@@ -165,7 +165,7 @@ const GroupLoopDisplayScheduler = (() => {
      */
     const toggleHourStatus = (schedule, day, hour) => {
         // TODO: Implement time slot update via API
-        alert(`Hétfő ${String(hour).padStart(2, '0')}:00 statuusza módosítva`);
+        alert(`Pondelok ${String(hour).padStart(2, '0')}:00: stav bol zmenený`);
     };
 
     /**
@@ -194,11 +194,11 @@ const GroupLoopDisplayScheduler = (() => {
         if (status === 'ACTIVE') {
             indicator.style.background = '#2ecc71';
             indicator.style.color = 'white';
-            indicator.textContent = '● Aktív';
+            indicator.textContent = '● Aktívny';
         } else if (status === 'TURNED_OFF') {
             indicator.style.background = '#e74c3c';
             indicator.style.color = 'white';
-            indicator.textContent = '● Kikapcsolt';
+            indicator.textContent = '● Vypnutý';
         } else {
             indicator.style.background = '#95a5a6';
             indicator.style.color = 'white';
@@ -237,7 +237,7 @@ const GroupLoopDisplayScheduler = (() => {
 
         // Title
         const title = document.createElement('h3');
-        title.textContent = '📅 Kijelzo Ütemezés';
+        title.textContent = '📅 Harmonogram displeja';
         title.style.cssText = 'margin-top: 0; color: #2c3e50;';
         panel.appendChild(title);
 
@@ -251,7 +251,7 @@ const GroupLoopDisplayScheduler = (() => {
         `;
 
         const statusLabel = document.createElement('p');
-        statusLabel.textContent = 'Aktuális státusz:';
+        statusLabel.textContent = 'Aktuálny stav:';
         statusLabel.style.cssText = 'margin: 0 0 10px 0; font-weight: bold; color: #555;';
         statusSection.appendChild(statusLabel);
 
@@ -267,7 +267,7 @@ const GroupLoopDisplayScheduler = (() => {
             panel.appendChild(renderScheduleGrid(schedule));
         } else {
             const noSchedule = document.createElement('p');
-            noSchedule.textContent = 'Nincs ütemezés beállítva. Az ütemezés az admin felületen állítható be.';
+            noSchedule.textContent = 'Nie je nastavený harmonogram. Harmonogram je možné nastaviť v administrácii.';
             noSchedule.style.cssText = 'color: #777; font-style: italic;';
             panel.appendChild(noSchedule);
         }
@@ -284,11 +284,11 @@ const GroupLoopDisplayScheduler = (() => {
             color: #555;
         `;
         infbox.innerHTML = `
-            <strong>ℹ️ Információ:</strong><br>
+            <strong>ℹ️ Informácie:</strong><br>
             <ul style="margin: 5px 0; padding-left: 20px;">
-                <li><strong>Zöld</strong> (✓): Kijelző bekapcsolt, tartalom megjelenik</li>
-                <li><strong>Piros</strong> (✕): Kijelző kikapcsolt, szolgáltatás szünetel</li>
-                <li>Alapértelmezés: 22:00 - 06:00 között kikapcsolt</li>
+                <li><strong>Zelená</strong> (✓): Displej je zapnutý, obsah sa zobrazuje</li>
+                <li><strong>Červená</strong> (✕): Displej je vypnutý, služba je pozastavená</li>
+                <li>Predvolene: vypnuté medzi 22:00 - 06:00</li>
             </ul>
         `;
         panel.appendChild(infbox);

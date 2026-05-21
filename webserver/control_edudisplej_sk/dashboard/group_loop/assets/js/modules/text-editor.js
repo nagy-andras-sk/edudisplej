@@ -460,7 +460,7 @@ const GroupLoopTextEditor = (() => {
         if (removeBgButton && bgDataInput) {
             removeBgButton.addEventListener('click', () => {
                 bgDataInput.value = '';
-                if (bgStatus) bgStatus.textContent = 'Nincs kiválasztott kép';
+                if (bgStatus) bgStatus.textContent = 'Nie je vybraný obrázok';
                 if (bgFileInput) bgFileInput.value = '';
                 applyTextEditorBackground();
                 updateTextModuleMiniPreview(buildModuleUrl, groupDefaultResolution, groupResolutionChoices);
@@ -472,11 +472,11 @@ const GroupLoopTextEditor = (() => {
                 const file = bgFileInput.files && bgFileInput.files[0];
                 if (!file) return;
                 if (!file.type.startsWith('image/')) {
-                    showAutosaveToast('⚠️ Csak képfájl tölthető fel', true);
+                    showAutosaveToast('⚠️ Nahrať je možné iba obrázkový súbor', true);
                     return;
                 }
 
-                if (bgStatus) bgStatus.textContent = 'Feldolgozás...';
+                if (bgStatus) bgStatus.textContent = 'Spracovanie...';
 
                 try {
                     const dataUrl = await readImageAsCompressedDataUrl(file);
@@ -487,14 +487,14 @@ const GroupLoopTextEditor = (() => {
                     applyTextEditorBackground();
                     updateTextModuleMiniPreview(buildModuleUrl, groupDefaultResolution, groupResolutionChoices);
                 } catch (error) {
-                    if (bgStatus) bgStatus.textContent = 'Kép feldolgozási hiba';
-                    showAutosaveToast('⚠️ Nem sikerült betölteni a képet', true);
+                    if (bgStatus) bgStatus.textContent = 'Chyba spracovania obrázka';
+                    showAutosaveToast('⚠️ Obrázok sa nepodarilo načítať', true);
                 }
             });
         }
 
         if (bgStatus && !String(settings.bgImageData || '').trim()) {
-            bgStatus.textContent = 'Nincs kiválasztott kép';
+            bgStatus.textContent = 'Nie je vybraný obrázok';
         }
 
         applyTextEditorBackground();
