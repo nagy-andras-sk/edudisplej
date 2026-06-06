@@ -194,7 +194,7 @@ include 'header.php';
 <div class="panel">
     <div class="panel-title">Screenshot policy</div>
     <p style="font-size:13px;color:#555;margin-bottom:12px;">
-        A kijelző folyamatos screenshot küldése itt kapcsolható.
+        Bekapcsolva: 06:00-22:00 között 10 percenként, éjjel 30 percenként készül screenshot, screen off állapotban óránként, akkor is ha nincs aktív nézet.
     </p>
     <div>
         <button id="btn-screenshot-on" onclick="setScreenshotEnabled(<?php echo (int)$kiosk['id']; ?>, true)"

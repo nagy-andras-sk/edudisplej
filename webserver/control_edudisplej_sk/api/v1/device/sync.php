@@ -121,8 +121,8 @@ function v1_assign_default_group_for_company(mysqli $conn, int $kiosk_id, int $c
     $assign_stmt->close();
 }
 
-function v1_enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_per_kiosk = 100): void {
-    if ($max_per_kiosk < 1) {
+function v1_enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $min_age_hours = 24, int $max_delete_per_run = 2000): void {
+    if ($min_age_hours < 1 || $max_delete_per_run < 1) {
         return;
     }
 
@@ -132,10 +132,11 @@ function v1_enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_p
         "SELECT id, details
            FROM sync_logs
           WHERE kiosk_id = ? AND action = 'screenshot'
-          ORDER BY timestamp DESC, id DESC
-          LIMIT 100000 OFFSET ?"
+            AND timestamp < DATE_SUB(NOW(), INTERVAL ? HOUR)
+          ORDER BY timestamp ASC, id ASC
+          LIMIT ?"
     );
-    $old_stmt->bind_param("ii", $kiosk_id, $max_per_kiosk);
+    $old_stmt->bind_param("iii", $kiosk_id, $min_age_hours, $max_delete_per_run);
     $old_stmt->execute();
     $old_result = $old_stmt->get_result();
 
@@ -365,7 +366,7 @@ try {
     $company_screenshot_enabled = !empty($kiosk['company_screenshot_enabled']);
     $kiosk_screenshot_enabled = !empty($kiosk['screenshot_enabled']);
     $screenshot_policy_enabled = $company_screenshot_enabled && $kiosk_screenshot_enabled;
-    $screenshot_upload_allowed = $screenshot_policy_enabled && $has_recent_activity;
+    $screenshot_upload_allowed = $screenshot_policy_enabled;
 
     // -----------------------------------------------------------------------
     // 3. Screenshot upload (optional, included in same request)
@@ -413,7 +414,7 @@ try {
             $ls->execute();
             $ls->close();
 
-            v1_enforce_screenshot_retention($conn, (int)$kiosk_id, 100);
+            v1_enforce_screenshot_retention($conn, (int)$kiosk_id, 24, 2000);
         }
     }
 
@@ -559,12 +560,25 @@ try {
     $fast_interval_seconds = 30;
     $default_interval_seconds = 5 * 60;
     $watch_screenshot_interval_seconds = 15;
-    $idle_screenshot_interval_seconds = 0;
+    $screen_off_interval_seconds = 60 * 60;
+    $daytime_idle_screenshot_interval_seconds = 10 * 60;
+    $night_idle_screenshot_interval_seconds = 30 * 60;
+    $screen_status_normalized = strtolower(trim((string)$screen_status));
+    $is_screen_off = $screen_status_normalized === 'off';
+    $current_hour = (int)date('G');
+    $is_daytime_window = $current_hour >= 6 && $current_hour < 22;
+    $idle_screenshot_interval_seconds = $screenshot_policy_enabled
+        ? ($is_screen_off
+            ? $screen_off_interval_seconds
+            : ($is_daytime_window ? $daytime_idle_screenshot_interval_seconds : $night_idle_screenshot_interval_seconds))
+        : 0;
     $effective_interval = $has_recent_activity ? $fast_interval_seconds : $default_interval_seconds;
     $screenshot_watch_active = $screenshot_policy_enabled && $has_recent_activity;
-    $screenshot_interval_seconds = $screenshot_watch_active
-        ? $watch_screenshot_interval_seconds
-        : $idle_screenshot_interval_seconds;
+    $screenshot_interval_seconds = $is_screen_off
+        ? ($screenshot_policy_enabled ? $screen_off_interval_seconds : 0)
+        : ($screenshot_watch_active
+            ? $watch_screenshot_interval_seconds
+            : $idle_screenshot_interval_seconds);
 
     $response['success']                   = true;
     $response['kiosk_id']                  = $kiosk_id;

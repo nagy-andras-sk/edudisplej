@@ -29,8 +29,8 @@ function sanitize_screenshot_filename($filename) {
     return $name;
 }
 
-function enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_per_kiosk = 100): void {
-    if ($max_per_kiosk < 1) {
+function enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $min_age_hours = 24, int $max_delete_per_run = 2000): void {
+    if ($min_age_hours < 1 || $max_delete_per_run < 1) {
         return;
     }
 
@@ -40,10 +40,11 @@ function enforce_screenshot_retention(mysqli $conn, int $kiosk_id, int $max_per_
         "SELECT id, details
            FROM sync_logs
           WHERE kiosk_id = ? AND action = 'screenshot'
-          ORDER BY timestamp DESC, id DESC
-          LIMIT 100000 OFFSET ?"
+            AND timestamp < DATE_SUB(NOW(), INTERVAL ? HOUR)
+            ORDER BY timestamp ASC, id ASC
+            LIMIT ?"
     );
-    $old_stmt->bind_param("ii", $kiosk_id, $max_per_kiosk);
+        $old_stmt->bind_param("iii", $kiosk_id, $min_age_hours, $max_delete_per_run);
     $old_stmt->execute();
     $old_result = $old_stmt->get_result();
 
@@ -147,13 +148,6 @@ try {
         exit;
     }
 
-    if (!screenshot_sync_has_recent_company_activity($conn, (int)$kiosk_row['company_id'], 10 * 60)) {
-        $response['message'] = 'Screenshot requires active company web login';
-        echo json_encode($response);
-        $conn->close();
-        exit;
-    }
-
     // Use custom filename if provided, otherwise generate default
     if (!empty($custom_filename)) {
         $filename = sanitize_screenshot_filename($custom_filename);
@@ -208,7 +202,7 @@ try {
         $log_stmt->execute();
         $log_stmt->close();
 
-        enforce_screenshot_retention($conn, (int)$kiosk_row['id'], 100);
+        enforce_screenshot_retention($conn, (int)$kiosk_row['id'], 24, 2000);
     } else {
         $response['message'] = 'Screenshot upload failed';
     }

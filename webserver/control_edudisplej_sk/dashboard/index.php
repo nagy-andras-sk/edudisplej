@@ -500,7 +500,7 @@ include '../admin/header.php';
                     <span id="history-timeline-oldest"><?php echo htmlspecialchars(t_def('dashboard.history.oldest', 'Legrégebbi')); ?>: —</span>
                     <span id="history-timeline-latest"><?php echo htmlspecialchars(t_def('dashboard.history.latest', 'Legfrissebb')); ?>: —</span>
                 </div>
-                <input type="range" id="history-timeline" min="0" max="0" value="0" step="0.001" oninput="onTimelineInput(this.value)" style="width:100%;direction:rtl;">
+                <input type="range" id="history-timeline" min="0" max="0" value="0" step="1" oninput="onTimelineInput(this.value)" style="width:100%;direction:rtl;">
                 <div id="history-timeline-current" style="margin-top:4px;font-size:12px;color:#444;text-align:right;"><?php echo htmlspecialchars(t_def('dashboard.history.current', 'Aktuálne')); ?>: —</div>
                 <div id="history-timeline-labels" style="margin-top:6px;display:flex;justify-content:space-between;align-items:flex-start;gap:2px;min-height:92px;"></div>
             </div>
@@ -531,6 +531,16 @@ include '../admin/header.php';
                     <button type="button" class="btn btn-primary" onclick="applyHistoryFilter()"><?php echo htmlspecialchars(t_def('dashboard.history.filter', 'Filtrovať')); ?></button>
                     <button type="button" class="btn" onclick="clearHistoryFilter()"><?php echo htmlspecialchars(t_def('dashboard.history.filter_clear', 'Szűrő törlése')); ?></button>
                 </div>
+
+                <div id="history-hour-controls" style="margin-bottom:10px;padding:10px;border:1px solid #d7dee7;border-radius:6px;background:#f7fafc;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+                        <strong><?php echo htmlspecialchars(t_def('dashboard.history.hourly_groups', 'Óránkénti csoportosítás')); ?></strong>
+                        <span id="history-hour-current" class="muted"><?php echo htmlspecialchars(t_def('dashboard.history.no_results', 'Žiadne výsledky.')); ?></span>
+                    </div>
+                    <input type="range" id="history-hour-slider" min="0" max="0" value="0" step="1" oninput="onHistoryHourSliderInput(this.value)" style="width:100%;">
+                </div>
+
+                <div id="history-hour-groups" style="margin-bottom:10px;"></div>
 
                 <table class="minimal-table" id="history-table" style="width:100%;">
                     <thead>
@@ -563,6 +573,9 @@ var _viewerKioskId = null;
 var _viewerImageBase = '';
 var _historyPage = 1;
 var _historyTotalPages = 1;
+var _historyAllItems = [];
+var _historyHourBuckets = [];
+var _historyActiveHourIndex = 0;
 var _historyItems = [];
 var _historyTableItems = [];
 var _historyCurrentIndex = 0;
@@ -991,18 +1004,22 @@ function loadScreenshotHistory(page) {
             _historyTotalPages = Math.max(1, parseInt(pagination.total_pages, 10) || 1);
             _historyPage = Math.max(1, parseInt(pagination.page, 10) || 1);
 
-            _historyTableItems = items;
-            _historyItems = items.slice(0, HISTORY_VIEWER_LIMIT);
-            _historyCurrentIndex = 0;
+            _historyAllItems = items;
+            _historyHourBuckets = buildHistoryHourBuckets(items);
+            _historyActiveHourIndex = 0;
 
-            renderScreenshotHistoryRows(_historyTableItems);
-            renderScreenshotGallery(_historyItems);
+            renderHistoryHourGroups(_historyHourBuckets);
             updateHistoryPager();
 
-            if (_historyItems.length > 0) {
-                showHistoryItemByIndex(0);
-                startHistoryPlayer();
+            if (_historyHourBuckets.length > 0) {
+                selectHistoryHour(0, true);
             } else {
+                _historyTableItems = [];
+                _historyItems = [];
+                _historyCurrentIndex = 0;
+                renderScreenshotHistoryRows([]);
+                renderScreenshotGallery([]);
+                updateHistoryHourSlider();
                 updateHistoryPlayerStatus();
                 updateHistoryTimeline();
                 stopHistoryPlayer();
@@ -1013,6 +1030,198 @@ function loadScreenshotHistory(page) {
                 tbody.innerHTML = '<tr><td colspan="2" class="muted" style="text-align:center;">' + escapeHtml(COMMON_LOAD_ERROR_TEXT) + '</td></tr>';
             }
         });
+}
+
+function buildHistoryHourBuckets(items) {
+    var byKey = {};
+    var ordered = [];
+
+    items.forEach(function (item) {
+        var key = 'unknown';
+        var label = COMMON_UNKNOWN_TEXT;
+
+        if (item && item.is_offline_marker) {
+            key = 'offline';
+            label = HISTORY_OFFLINE_SINCE_TEXT;
+        } else {
+            var ts = String((item && item.timestamp) || '').trim();
+            var m = ts.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}):/);
+            if (m) {
+                key = m[1] + ' ' + m[2] + ':00';
+                label = key;
+            }
+        }
+
+        if (!byKey[key]) {
+            byKey[key] = { key: key, label: label, items: [] };
+            ordered.push(byKey[key]);
+        }
+        byKey[key].items.push(item);
+    });
+
+    return ordered;
+}
+
+function extractTimePart(timestamp) {
+    var ts = String(timestamp || '').trim();
+    var m = ts.match(/^\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2})(?::\d{2})?$/);
+    if (m) {
+        return m[1];
+    }
+    return ts || '—';
+}
+
+function renderHistoryHourGroups(buckets) {
+    var wrap = document.getElementById('history-hour-groups');
+    if (!wrap) {
+        return;
+    }
+
+    if (!buckets.length) {
+        wrap.innerHTML = '<div class="muted" style="padding:8px 0;">' + escapeHtml(HISTORY_NO_RESULTS_TEXT) + '</div>';
+        return;
+    }
+
+    var html = '';
+    buckets.forEach(function (bucket, hourIndex) {
+        var count = Array.isArray(bucket.items) ? bucket.items.length : 0;
+        var previewItems = (bucket.items || []).slice(0, 8);
+        var firstItem = count > 0 ? bucket.items[count - 1] : null;
+        var lastItem = count > 0 ? bucket.items[0] : null;
+        var firstTs = firstItem ? extractTimePart(firstItem.timestamp || '') : '—';
+        var lastTs = lastItem ? extractTimePart(lastItem.timestamp || '') : '—';
+        var rangeText = (firstTs !== '—' && lastTs !== '—') ? (firstTs + ' - ' + lastTs) : '—';
+        var detailsOpen = hourIndex === _historyActiveHourIndex ? ' open' : '';
+        html += '<details class="history-hour-group" data-hour-index="' + hourIndex + '"' + detailsOpen + ' style="margin-bottom:6px;border:1px solid #d7dee7;border-radius:6px;background:#fff;">';
+        html += '<summary style="cursor:pointer;list-style:none;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+        html += '<span><strong>' + escapeHtml(bucket.label) + '</strong> <span class="muted">(' + count + ')</span> <span class="muted">• ' + escapeHtml(rangeText) + '</span></span>';
+        html += '<button type="button" class="btn" data-hour-open="' + hourIndex + '">Megnyitás</button>';
+        html += '</summary>';
+        html += '<div style="padding:8px 10px 10px 10px;border-top:1px solid #edf1f5;display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;">';
+
+        if (!previewItems.length) {
+            html += '<div class="muted">' + escapeHtml(HISTORY_NO_RESULTS_TEXT) + '</div>';
+        } else {
+            previewItems.forEach(function (item, itemIndex) {
+                var ts = String(item.timestamp || '—');
+                var isOffline = !!item.is_offline_marker;
+                if (isOffline) {
+                    html += '<button type="button" class="history-hour-thumb" data-hour-index="' + hourIndex + '" data-item-index="' + itemIndex + '" style="border:1px solid #e5b4b4;border-radius:6px;background:#fdecec;color:#9f1d1d;padding:6px;cursor:pointer;text-align:left;font-size:11px;">'
+                        + escapeHtml(item.label || (HISTORY_OFFLINE_SINCE_TEXT + ' ' + (item.offline_since || COMMON_UNKNOWN_TEXT)))
+                        + '</button>';
+                } else {
+                    var thumbUrl = String(item.screenshot_url || '');
+                    html += '<button type="button" class="history-hour-thumb" data-hour-index="' + hourIndex + '" data-item-index="' + itemIndex + '" style="border:1px solid #d0d6dc;border-radius:6px;background:#fff;padding:4px;cursor:pointer;text-align:left;">'
+                        + '<img src="' + escapeHtml(appendCacheBuster(thumbUrl)) + '" alt="Screenshot" style="display:block;width:100%;height:54px;object-fit:cover;border-radius:4px;">'
+                        + '<div style="margin-top:4px;font-size:10px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(ts) + '</div>'
+                        + '</button>';
+                }
+            });
+        }
+
+        html += '</div>';
+        html += '</details>';
+    });
+
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll('[data-hour-open]').forEach(function (btn) {
+        btn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var hourIndex = parseInt(btn.getAttribute('data-hour-open'), 10);
+            if (isNaN(hourIndex)) {
+                return;
+            }
+            stopHistoryPlayer();
+            selectHistoryHour(hourIndex, false);
+        });
+    });
+
+    wrap.querySelectorAll('.history-hour-thumb').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var hourIndex = parseInt(btn.getAttribute('data-hour-index'), 10);
+            var itemIndex = parseInt(btn.getAttribute('data-item-index'), 10);
+            if (isNaN(hourIndex) || isNaN(itemIndex)) {
+                return;
+            }
+            stopHistoryPlayer();
+            selectHistoryHour(hourIndex, false);
+            showHistoryTableItemByIndex(itemIndex);
+        });
+    });
+}
+
+function updateHistoryHourSlider() {
+    var slider = document.getElementById('history-hour-slider');
+    var current = document.getElementById('history-hour-current');
+
+    if (!slider || !current) {
+        return;
+    }
+
+    if (!_historyHourBuckets.length) {
+        slider.min = '0';
+        slider.max = '0';
+        slider.value = '0';
+        slider.disabled = true;
+        current.textContent = HISTORY_NO_RESULTS_TEXT;
+        return;
+    }
+
+    slider.disabled = false;
+    slider.min = '0';
+    slider.max = String(_historyHourBuckets.length - 1);
+    slider.value = String(_historyActiveHourIndex);
+
+    var active = _historyHourBuckets[_historyActiveHourIndex] || null;
+    var count = active && Array.isArray(active.items) ? active.items.length : 0;
+    current.textContent = (active ? active.label : '—') + ' • ' + count + ' kép • ' + (_historyActiveHourIndex + 1) + '/' + _historyHourBuckets.length;
+}
+
+function selectHistoryHour(index, autoPlay) {
+    if (!_historyHourBuckets.length) {
+        return;
+    }
+
+    var safeIndex = Math.max(0, Math.min(_historyHourBuckets.length - 1, parseInt(index, 10) || 0));
+    _historyActiveHourIndex = safeIndex;
+
+    var selectedBucket = _historyHourBuckets[_historyActiveHourIndex] || { items: [] };
+    _historyTableItems = Array.isArray(selectedBucket.items) ? selectedBucket.items.slice() : [];
+    _historyItems = _historyTableItems.slice();
+    _historyCurrentIndex = 0;
+
+    renderScreenshotHistoryRows(_historyTableItems);
+    renderScreenshotGallery(_historyItems);
+    updateHistoryHourSlider();
+    renderHistoryHourGroups(_historyHourBuckets);
+
+    if (_historyItems.length > 0) {
+        showHistoryItemByIndex(0);
+        if (autoPlay) {
+            startHistoryPlayer();
+        } else {
+            stopHistoryPlayer();
+            updateHistoryPlayerStatus();
+        }
+    } else {
+        stopHistoryPlayer();
+        updateHistoryPlayerStatus();
+        updateHistoryTimeline();
+    }
+}
+
+function onHistoryHourSliderInput(value) {
+    if (!_historyHourBuckets.length) {
+        return;
+    }
+    stopHistoryPlayer();
+    var idx = parseInt(value, 10);
+    if (isNaN(idx)) {
+        return;
+    }
+    selectHistoryHour(idx, false);
 }
 
 
@@ -1471,6 +1680,9 @@ function closeScreenshotViewer() {
     _viewerWatchActive = false;
     _historyPage = 1;
     _historyTotalPages = 1;
+    _historyAllItems = [];
+    _historyHourBuckets = [];
+    _historyActiveHourIndex = 0;
     _historyItems = [];
     _historyTableItems = [];
     _historyCurrentIndex = 0;

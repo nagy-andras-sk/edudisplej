@@ -587,7 +587,7 @@ $logout_url = '../login.php?logout=1';
                                     <?php echo htmlspecialchars(t_def('profile.institution.screenshot_enabled', 'Screenshot készítés engedélyezése')); ?>
                                 </label>
                                 <div style="margin-top:6px; color:#666; font-size:13px;">
-                                    <?php echo htmlspecialchars(t_def('profile.institution.screenshot_hint', 'Csak akkor készülnek képernyőképek, ha a profil be van kapcsolva és valaki aktívan használja a webes felületet.')); ?>
+                                    <?php echo htmlspecialchars(t_def('profile.institution.screenshot_hint', 'Bekapcsolva: 06:00-22:00 között 10 percenként, éjjel 30 percenként, screen off állapotban óránként készülnek képernyőképek, aktív nézet nélkül is.')); ?>
                                 </div>
                             </div>
                             <div style="margin-top: 12px;">
